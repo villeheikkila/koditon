@@ -61,7 +61,7 @@ func run(
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	hintatiedotClient, err := hintatiedot.NewClient(httpClient, cfg.HintatiedotBaseURL)
+	hintatiedotClient, err := hintatiedot.NewClient(httpClient, cfg.HintatiedotBaseURL, logger)
 	if err != nil {
 		return fmt.Errorf("create hintatiedot client: %w", err)
 	}

@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"golang.org/x/text/encoding/charmap"
@@ -17,30 +19,126 @@ import (
 var (
 	ErrUnexpectedStatus = errors.New("unexpected HTTP status")
 	ErrInvalidResponse  = errors.New("invalid response format")
+	ErrParsingError     = errors.New("parsing error")
 )
+
+type BuildingType string
+
+const (
+	BuildingTypeApartment BuildingType = "1"
+	BuildingTypeRowHouse  BuildingType = "2"
+	BuildingTypeHouse     BuildingType = "3"
+)
+
+type RoomCount string
+
+const (
+	RoomCountOne      RoomCount = "1"
+	RoomCountTwo      RoomCount = "2"
+	RoomCountThree    RoomCount = "3"
+	RoomCountFourPlus RoomCount = "4"
+)
+
+type ApartmentSearchParams struct {
+	City          string
+	PostalCodes   []string
+	BuildingTypes []BuildingType
+	RoomCounts    []RoomCount
+	MinArea       *float64
+	MaxArea       *float64
+	RenderType    string
+	Print         bool
+}
+
+func NewApartmentSearchParams(city string) *ApartmentSearchParams {
+	return &ApartmentSearchParams{
+		City:       city,
+		RenderType: "renderTypeTable",
+		Print:      false,
+	}
+}
+
+func (p *ApartmentSearchParams) ToURLValues(page int) url.Values {
+	values := url.Values{}
+	values.Add("c", p.City)
+	values.Add("cr", "1")
+	for _, code := range p.PostalCodes {
+		values.Add("ps", code)
+	}
+	values.Add("nc", "1")
+	for _, buildingType := range p.BuildingTypes {
+		values.Add("h", string(buildingType))
+	}
+	for _, roomCount := range p.RoomCounts {
+		values.Add("r", string(roomCount))
+	}
+	if p.MinArea != nil {
+		values.Add("amin", fmt.Sprintf("%f", *p.MinArea))
+	} else {
+		values.Add("amin", "")
+	}
+	if p.MaxArea != nil {
+		values.Add("amax", fmt.Sprintf("%f", *p.MaxArea))
+	} else {
+		values.Add("amax", "")
+	}
+	values.Add("renderType", "renderTypeTable")
+	if p.Print {
+		values.Add("print", "1")
+	} else {
+		values.Add("print", "0")
+	}
+	if page > 0 {
+		values.Add("z", strconv.Itoa(page))
+	}
+	values.Add("search", "1")
+	if page > 0 {
+		values.Add("submit", "seuraava+sivu+»")
+	}
+	return values
+}
+
+type TransactionEntity struct {
+	City                string
+	Neighborhood        string
+	Description         string
+	Type                string
+	Area                float64
+	Price               int
+	PricePerSquareMeter int
+	BuildYear           int
+	Floor               string
+	Elevator            string
+	Condition           string
+	Plot                string
+	EnergyClass         string
+	Category            string
+}
+
+type TransactionResponse struct {
+	Apartments []*TransactionEntity
+	NextPage   *int
+}
 
 type Client struct {
 	httpClient *http.Client
 	baseURL    *url.URL
+	logger     *slog.Logger
 }
 
-func NewClient(httpClient *http.Client, baseURL string) (*Client, error) {
+func NewClient(httpClient *http.Client, baseURL string, logger *slog.Logger) (*Client, error) {
 	parsedBaseURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse base URL: %w", err)
 	}
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &Client{
 		httpClient: httpClient,
 		baseURL:    parsedBaseURL,
+		logger:     logger,
 	}, nil
-}
-
-type citiesResponse struct {
-	Cities string `json:"cities"`
-}
-
-type postalCodesResponse struct {
-	PostalCodes string `json:"postalCodes"`
 }
 
 func (c *Client) setCommonHeaders(req *http.Request) {
@@ -83,43 +181,6 @@ func (c *Client) getBodyReader(resp *http.Response) io.Reader {
 		return charmap.ISO8859_1.NewDecoder().Reader(resp.Body)
 	}
 	return resp.Body
-}
-
-func (c *Client) FetchCities(ctx context.Context) ([]string, error) {
-	endpoint, err := c.baseURL.Parse("/haku/searchForm/fetchCities")
-	if err != nil {
-		return nil, fmt.Errorf("build fetchCities URL: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader("lang=fi_FI"))
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	var payload citiesResponse
-	if err := c.doRequest(ctx, req, &payload); err != nil {
-		return nil, err
-	}
-	return parseList(payload.Cities), nil
-}
-
-func (c *Client) FetchPostalCodes(ctx context.Context, city string) ([]string, error) {
-	endpoint, err := c.baseURL.Parse("/haku/searchForm/fetchPostalCodes")
-	if err != nil {
-		return nil, fmt.Errorf("build fetchPostalCodes URL: %w", err)
-	}
-	body := strings.NewReader(url.Values{
-		"lang": {"fi_FI"},
-		"city": {city},
-		"type": {""},
-	}.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), body)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	var payload postalCodesResponse
-	if err := c.doRequest(ctx, req, &payload); err != nil {
-		return nil, err
-	}
-	return parseList(payload.PostalCodes), nil
 }
 
 func parseList(raw string) []string {
