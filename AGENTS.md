@@ -4,10 +4,16 @@
 - `cmd/app/`: service entrypoint; keep `main.go` lean by delegating setup to internal packages.
 - `internal/config/`: configuration loading and validation; prefer typed structs over raw maps.
 - `internal/server/`: HTTP handlers, routing, and middleware; group files by feature when it grows.
-- Root files: `go.mod` pins toolchain; `Taskfile.yml` defines common tasks. Add a concise `README` and `.env.example` when configuration options expand.
+- `db/migrations/`: tern migration files; `db/schema/` holds the canonical schema for sqlc inference; `db/queries/` stores SQL for codegen.
+- `internal/db/`: generated sqlc package; treat it as build output and regenerate instead of hand-editing.
+- Root files: `go.mod` pins toolchain; `Taskfile.yml` defines common tasks; `.env.example` documents runtime and DB env vars.
 
 ## Build, Test, and Development Commands
 - `task dev`: run the server with automatic reload on Go source, `go.mod`, or `.env` changes; sets `CGO_ENABLED=0` for reproducible builds.
+- `task tools:db`: install tern + sqlc (requires network and Go toolchain).
+- `task db:new NAME=add_users`: create a timestamped migration in `db/migrations/`.
+- `task db:up`: apply pending migrations using `tern.conf`; `task db:status` shows applied vs pending.
+- `task sqlc`: generate Go code in `internal/db` from `db/queries` using `db/schema` for types.
 - `go run ./cmd/app`: start the application without file watching; useful for quick checks.
 - `go test ./...`: execute unit tests and integration tests; ensure new packages include coverage.
 - `go vet ./...`: static analysis; run before proposing changes to catch common pitfalls.

@@ -1,0 +1,2 @@
+-- Canonical schema used by sqlc for type inference.
+-- Keep this file in sync with migrations (apply migrations then dump schema).

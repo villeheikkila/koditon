@@ -7,3 +7,51 @@ tasks:
       - reflex -r '\.go$' -r 'go\.(mod|sum)$' -r '\.env$' -R vendor -- sh -c 'go run ./cmd/app'
     env:
       CGO_ENABLED: "0"
+
+  tools:tern:
+    desc: Install tern (PostgreSQL migrations)
+    cmds:
+      - command -v tern >/dev/null || go install github.com/jackc/tern/v2@latest
+
+  tools:sqlc:
+    desc: Install sqlc (query-to-Go generator)
+    cmds:
+      - command -v sqlc >/dev/null || go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+  tools:db:
+    desc: Install DB tooling (tern + sqlc)
+    deps:
+      - tools:tern
+      - tools:sqlc
+
+  db:new:
+    desc: Create a new timestamped migration (NAME required)
+    cmds:
+      - test -n "{{.NAME}}" || (echo "NAME is required: task db:new NAME=add_users" && exit 1)
+      - tern --config tern.conf new {{.NAME}}
+
+  db:up:
+    desc: Apply all pending migrations to the latest version
+    cmds:
+      - tern --config tern.conf migrate
+
+  db:status:
+    desc: Show current migration state
+    cmds:
+      - tern --config tern.conf status
+
+  db:force:
+    desc: Force database to a specific migration VERSION (use cautiously)
+    cmds:
+      - test -n "{{.VERSION}}" || (echo "VERSION is required: task db:force VERSION=20250101123045" && exit 1)
+      - tern --config tern.conf migrate --destination {{.VERSION}}
+
+  sqlc:
+    desc: Generate type-safe Go code from SQL queries
+    cmds:
+      - sqlc generate -f sqlc.yaml
+    sources:
+      - db/schema/**/*.sql
+      - db/queries/**/*.sql
+    generates:
+      - internal/db/**/*
