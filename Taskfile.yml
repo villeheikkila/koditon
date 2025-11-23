@@ -10,23 +10,26 @@ tasks:
 
   db:new:
     desc: Create a new timestamped migration (NAME required)
-    dotenv: [".env", ".env.local"]
+    dotenv: ["../../.env"]
+    dir: db/migrations
     cmds:
-      - sh -c 'cd db/migrations && tern new {{.NAME}}'
+      - tern new {{.NAME}}
 
-  db:up:
+  db:migrate:
     desc: Apply all pending migrations to the latest version
-    dotenv: [".env", ".env.local"]
+    dotenv: ["../../.env"]
+    dir: db/migrations
     cmds:
-      - sh -c 'cd db/migrations && tern migrate'
+      - tern migrate
 
   db:status:
     desc: Show current migration state
-    dotenv: [".env", ".env.local"]
+    dotenv: ["../../.env"]
+    dir: db/migrations
     cmds:
-      - sh -c 'cd db/migrations && tern status'
+      - tern status
 
-  sqlc:
+  db:generate:
     desc: Generate type-safe Go code from SQL queries
     dotenv: [".env", ".env.local"]
     cmds:
