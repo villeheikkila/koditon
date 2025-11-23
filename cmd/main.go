@@ -61,7 +61,7 @@ func run(
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	pricesClient, err := prices.NewClient(httpClient, cfg.PricesBaseURL)
+	pricesClient, err := prices.NewClient(httpClient, cfg.PricesBaseURL, logger)
 	if err != nil {
 		return fmt.Errorf("create prices client: %w", err)
 	}
