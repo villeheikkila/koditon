@@ -4,7 +4,7 @@ tasks:
   dev:
     desc: Run the server with automatic reload on source/.env changes
     cmds:
-      - reflex -r '\.go$' -r 'go\.(mod|sum)$' -r '\.env$' -R vendor -- sh -c 'go run ./cmd/app'
+      - reflex --regex='\.go$' --decoration=none --start-service -- sh -c 'go run ./cmd'
     env:
       CGO_ENABLED: "0"
 
