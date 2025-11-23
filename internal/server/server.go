@@ -1,30 +1,54 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"koditon-go/internal/config"
 	"koditon-go/internal/db"
+	"koditon-go/internal/hintatiedot"
 )
 
-func New(logger *log.Logger, cfg config.Config, queries *db.Queries) http.Handler {
+type Server struct {
+	logger         *slog.Logger
+	cfg            config.Config
+	db             *db.Queries
+	hintatiedotAPI *hintatiedot.Client
+}
+
+func New(logger *slog.Logger, cfg config.Config, queries *db.Queries, hintatiedotClient *hintatiedot.Client) *Server {
+	return &Server{
+		logger:         logger.With("component", "server"),
+		cfg:            cfg,
+		db:             queries,
+		hintatiedotAPI: hintatiedotClient,
+	}
+}
+
+func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, logger, cfg, queries)
+	s.addRoutes(mux)
 
 	var handler http.Handler = mux
-	handler = loggingMiddleware(logger, handler)
+	handler = s.loggingMiddleware(handler)
 
 	return handler
 }
 
-func loggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {
+func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
-		logger.Printf("%s %s %d %s", r.Method, r.URL.Path, rw.status, time.Since(start))
+		s.logger.InfoContext(
+			r.Context(),
+			"request completed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration", time.Since(start),
+		)
 	})
 }
 

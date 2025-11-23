@@ -4,119 +4,128 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"koditon-go/internal/config"
-	"koditon-go/internal/db"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func addRoutes(mux *http.ServeMux, logger *log.Logger, cfg config.Config, queries *db.Queries) {
-	mux.Handle("/healthz", handleHealth())
-	mux.Handle("/api/v1/ping", handlePing(logger))
-	mux.Handle("/api/v1/cities", handleListCities(logger, queries))
-	mux.Handle("/api/v1/transactions", handleListTransactions(logger, queries))
+func (s *Server) addRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/api/v1/ping", s.handlePing)
+	mux.HandleFunc("/api/v1/cities", s.handleListCities)
+	mux.HandleFunc("/api/v1/transactions", s.handleListTransactions)
+	mux.HandleFunc("/api/v1/hintatiedot/cities", s.handleFetchHintatiedotCities)
 	mux.Handle("/", http.NotFoundHandler())
 }
 
-func handleHealth() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = encode(w, r, http.StatusOK, map[string]string{
-			"status": "ok",
-		})
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	_ = encode(w, r, http.StatusOK, map[string]string{
+		"status": "ok",
 	})
 }
 
-func handlePing(logger *log.Logger) http.Handler {
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		Message string `json:"message"`
 	}
 	type response struct {
 		Echo string `json:"echo"`
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		payload, err := decode[request](r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 
-		logger.Printf("ping received: %s", payload.Message)
-		if err := encode(w, r, http.StatusOK, response{Echo: payload.Message}); err != nil {
-			logger.Printf("encode response: %v", err)
-		}
-	})
+	payload, err := decode[request](r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	s.logger.InfoContext(r.Context(), "ping received", "message", payload.Message)
+	if err := encode(w, r, http.StatusOK, response{Echo: payload.Message}); err != nil {
+		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
+	}
 }
 
-func handleListCities(logger *log.Logger, queries *db.Queries) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+func (s *Server) handleListCities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-		cities, err := queries.ListCitiesWithNeighborhoods(r.Context())
-		if err != nil {
-			logger.Printf("list cities with neighborhoods: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+	cities, err := s.db.ListCitiesWithNeighborhoods(r.Context())
+	if err != nil {
+		s.logger.ErrorContext(r.Context(), "list cities with neighborhoods", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
-		response := mapCitiesWithNeighborhoods(cities)
-		if err := encode(w, r, http.StatusOK, response); err != nil {
-			logger.Printf("encode response: %v", err)
-		}
-	})
+	response := mapCitiesWithNeighborhoods(cities)
+	if err := encode(w, r, http.StatusOK, response); err != nil {
+		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
+	}
 }
 
-func handleListTransactions(logger *log.Logger, queries *db.Queries) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-		// Parse neighborhood UUIDs from query parameter
-		neighborhoodIDs := []pgtype.UUID{}
-		if v := r.URL.Query().Get("neighborhoods"); v != "" {
-			uuidStrings := strings.Split(v, ",")
-			for _, uuidStr := range uuidStrings {
-				uuidStr = strings.TrimSpace(uuidStr)
-				if uuidStr == "" {
-					continue
-				}
-				parsedUUID, err := parseUUID(uuidStr)
-				if err != nil {
-					logger.Printf("invalid UUID %q: %v", uuidStr, err)
-					http.Error(w, "Invalid neighborhood UUID", http.StatusBadRequest)
-					return
-				}
-				neighborhoodIDs = append(neighborhoodIDs, parsedUUID)
+	// Parse neighborhood UUIDs from query parameter
+	neighborhoodIDs := []pgtype.UUID{}
+	if v := r.URL.Query().Get("neighborhoods"); v != "" {
+		uuidStrings := strings.Split(v, ",")
+		for _, uuidStr := range uuidStrings {
+			uuidStr = strings.TrimSpace(uuidStr)
+			if uuidStr == "" {
+				continue
 			}
+			parsedUUID, err := parseUUID(uuidStr)
+			if err != nil {
+				s.logger.WarnContext(r.Context(), "invalid neighborhood UUID", "uuid", uuidStr, "err", err)
+				http.Error(w, "Invalid neighborhood UUID", http.StatusBadRequest)
+				return
+			}
+			neighborhoodIDs = append(neighborhoodIDs, parsedUUID)
 		}
+	}
 
-		if len(neighborhoodIDs) == 0 {
-			http.Error(w, "At least one neighborhood UUID is required", http.StatusBadRequest)
-			return
-		}
+	if len(neighborhoodIDs) == 0 {
+		http.Error(w, "At least one neighborhood UUID is required", http.StatusBadRequest)
+		return
+	}
 
-		transactions, err := queries.ListTransactionsByNeighborhoods(r.Context(), neighborhoodIDs)
-		if err != nil {
-			logger.Printf("list transactions by neighborhoods: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+	transactions, err := s.db.ListTransactionsByNeighborhoods(r.Context(), neighborhoodIDs)
+	if err != nil {
+		s.logger.ErrorContext(r.Context(), "list transactions by neighborhoods", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
-		response := make([]HintatiedotResponse, len(transactions))
-		for i, row := range transactions {
-			response[i] = mapTransactionResponse(row)
-		}
-		if err := encode(w, r, http.StatusOK, response); err != nil {
-			logger.Printf("encode response: %v", err)
-		}
-	})
+	response := make([]HintatiedotResponse, len(transactions))
+	for i, row := range transactions {
+		response[i] = mapTransactionResponse(row)
+	}
+	if err := encode(w, r, http.StatusOK, response); err != nil {
+		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
+	}
+}
+
+func (s *Server) handleFetchHintatiedotCities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cities, err := s.hintatiedotAPI.FetchCities(r.Context())
+	if err != nil {
+		s.logger.ErrorContext(r.Context(), "fetch cities from hintatiedot", "err", err)
+		http.Error(w, "Failed to fetch cities", http.StatusInternalServerError)
+		return
+	}
+
+	if err := encode(w, r, http.StatusOK, map[string][]string{"cities": cities}); err != nil {
+		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
+	}
 }
 
 func encode[T any](w http.ResponseWriter, _ *http.Request, status int, v T) error {

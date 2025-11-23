@@ -32,3 +32,4 @@ coverage.out
 .idea/
 *.swp
 *.swo
+.gocache

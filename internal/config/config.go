@@ -8,15 +8,16 @@ import (
 )
 
 type Config struct {
-	Host            string
-	Port            string
-	ShutdownTimeout time.Duration
-	DBHost          string
-	DBPort          string
-	DBUser          string
-	DBPassword      string
-	DBName          string
-	DBSSLMode       string
+	Host               string
+	Port               string
+	ShutdownTimeout    time.Duration
+	DBHost             string
+	DBPort             string
+	DBUser             string
+	DBPassword         string
+	DBName             string
+	DBSSLMode          string
+	HintatiedotBaseURL string
 }
 
 func Load(
@@ -40,6 +41,7 @@ func Load(
 	dbPassword := flagSet.String("db-password", fallback(env("DB_PASSWORD"), "postgres"), "Database password")
 	dbName := flagSet.String("db-name", fallback(env("DB_NAME"), "koditon"), "Database name")
 	dbSSLMode := flagSet.String("db-sslmode", fallback(env("DB_SSLMODE"), "disable"), "Database SSL mode")
+	hintatiedotBaseURL := flagSet.String("hintatiedot-base-url", env("HINTATIEDOT_BASE_URL"), "Hintatiedot base API URL")
 	if err := flagSet.Parse(args[1:]); err != nil {
 		return Config{}, fmt.Errorf("parse flags: %w", err)
 	}
@@ -48,15 +50,16 @@ func Load(
 		return Config{}, fmt.Errorf("invalid shutdown timeout %q: %w", *shutdown, err)
 	}
 	return Config{
-		Host:            *host,
-		Port:            *port,
-		ShutdownTimeout: timeout,
-		DBHost:          *dbHost,
-		DBPort:          *dbPort,
-		DBUser:          *dbUser,
-		DBPassword:      *dbPassword,
-		DBName:          *dbName,
-		DBSSLMode:       *dbSSLMode,
+		Host:               *host,
+		Port:               *port,
+		ShutdownTimeout:    timeout,
+		DBHost:             *dbHost,
+		DBPort:             *dbPort,
+		DBUser:             *dbUser,
+		DBPassword:         *dbPassword,
+		DBName:             *dbName,
+		DBSSLMode:          *dbSSLMode,
+		HintatiedotBaseURL: *hintatiedotBaseURL,
 	}, nil
 }
 

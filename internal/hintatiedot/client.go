@@ -10,15 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"golang.org/x/text/encoding/charmap"
-)
-
-const (
-	defaultBaseURL   = "https://asuntojen.hintatiedot.fi"
-	defaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15"
-	defaultTimeout   = 30 * time.Second
 )
 
 var (
@@ -29,15 +22,9 @@ var (
 type Client struct {
 	httpClient *http.Client
 	baseURL    *url.URL
-	userAgent  string
 }
 
-func NewClient(httpClient *http.Client, baseURL, userAgent string) (*Client, error) {
-	if httpClient == nil {
-		httpClient = &http.Client{
-			Timeout: defaultTimeout,
-		}
-	}
+func NewClient(httpClient *http.Client, baseURL string) (*Client, error) {
 	parsedBaseURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse base URL: %w", err)
@@ -45,7 +32,6 @@ func NewClient(httpClient *http.Client, baseURL, userAgent string) (*Client, err
 	return &Client{
 		httpClient: httpClient,
 		baseURL:    parsedBaseURL,
-		userAgent:  userAgent,
 	}, nil
 }
 
@@ -65,7 +51,7 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
 		"Pragma":           "no-cache",
 		"Priority":         "u=5, i",
-		"User-Agent":       c.userAgent,
+		"User-Agent":       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15",
 		"X-Requested-With": "XMLHttpRequest",
 	}
 	for key, value := range headers {
@@ -73,7 +59,7 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 	}
 }
 
-func (c *Client) doRequest(ctx context.Context, req *http.Request, target interface{}) error {
+func (c *Client) doRequest(ctx context.Context, req *http.Request, target any) error {
 	c.setCommonHeaders(req)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

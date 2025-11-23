@@ -6,8 +6,9 @@ import (
 	"io"
 	"koditon-go/internal/config"
 	"koditon-go/internal/db"
+	"koditon-go/internal/hintatiedot"
 	"koditon-go/internal/server"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -16,13 +17,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lmittmann/tint"
 )
-
-type Config struct {
-	Host            string
-	Port            string
-	ShutdownTimeout time.Duration
-}
 
 func main() {
 	ctx := context.Background()
@@ -41,30 +37,38 @@ func run(
 ) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-
 	cfg, err := config.Load(args, getenv, stderr)
 	if err != nil {
 		return err
 	}
-
-	logger := log.New(stdout, "app ", log.LstdFlags|log.LUTC)
-
+	logger := slog.New(tint.NewHandler(stderr, nil))
+	slog.SetDefault(slog.New(
+		tint.NewHandler(stderr, &tint.Options{
+			Level:      slog.LevelDebug,
+			TimeFormat: time.Kitchen,
+		}),
+	))
+	appLogger := logger.With("component", "app")
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL())
 	if err != nil {
 		return fmt.Errorf("create database pool: %w", err)
 	}
 	defer pool.Close()
-
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
-
 	queries := db.New(pool)
-
-	handler := server.New(logger, cfg, queries)
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	hintatiedotClient, err := hintatiedot.NewClient(httpClient, cfg.HintatiedotBaseURL)
+	if err != nil {
+		return fmt.Errorf("create hintatiedot client: %w", err)
+	}
+	srv := server.New(logger, cfg, queries, hintatiedotClient)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
-		Handler: handler,
+		Handler: srv.Handler(),
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
@@ -72,7 +76,7 @@ func run(
 
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Printf("listening on %s", httpServer.Addr)
+		appLogger.InfoContext(ctx, "listening", "addr", httpServer.Addr)
 		if serveErr := httpServer.ListenAndServe(); serveErr != nil && serveErr != http.ErrServerClosed {
 			errCh <- serveErr
 			return
@@ -83,7 +87,7 @@ func run(
 	case <-ctx.Done():
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer shutdownCancel()
-		logger.Printf("shutting down (timeout %s)", cfg.ShutdownTimeout)
+		appLogger.Info("shutting down", "timeout", cfg.ShutdownTimeout)
 		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
 			return fmt.Errorf("server shutdown: %w", shutdownErr)
 		}
