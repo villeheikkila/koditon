@@ -1,0 +1,9 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Run the server with automatic reload on source/.env changes
+    cmds:
+      - reflex -r '\.go$' -r 'go\.(mod|sum)$' -r '\.env$' -R vendor -- sh -c 'go run ./cmd/app'
+    env:
+      CGO_ENABLED: "0"
