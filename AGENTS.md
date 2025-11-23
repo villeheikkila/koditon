@@ -12,7 +12,7 @@
 - `task dev`: run the server with automatic reload on Go source, `go.mod`, or `.env` changes; sets `CGO_ENABLED=0` for reproducible builds.
 - `task tools:db`: install tern + sqlc (requires network and Go toolchain).
 - `task db:new NAME=add_users`: create a timestamped migration in `db/migrations/`.
-- `task db:up`: apply pending migrations using `tern.conf`; `task db:status` shows applied vs pending.
+- `task db:up`: apply pending migrations using `tern.conf` (loads `.env` / `.env.local`); `task db:status` shows applied vs pending; `task db:force VERSION=...` pins state if needed.
 - `task sqlc`: generate Go code in `internal/db` from `db/queries` using `db/schema` for types.
 - `go run ./cmd/app`: start the application without file watching; useful for quick checks.
 - `go test ./...`: execute unit tests and integration tests; ensure new packages include coverage.
