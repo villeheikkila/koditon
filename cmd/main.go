@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"koditon-go/internal/config"
+	"koditon-go/internal/db"
 	"koditon-go/internal/server"
 	"log"
 	"net"
@@ -13,6 +14,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Config struct {
@@ -46,7 +49,19 @@ func run(
 
 	logger := log.New(stdout, "app ", log.LstdFlags|log.LUTC)
 
-	handler := server.New(logger, cfg)
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL())
+	if err != nil {
+		return fmt.Errorf("create database pool: %w", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("ping database: %w", err)
+	}
+
+	queries := db.New(pool)
+
+	handler := server.New(logger, cfg, queries)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
 		Handler: handler,

@@ -11,13 +11,81 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const listHintatiedotTransactions = `-- name: ListHintatiedotTransactions :many
+const listCitiesWithNeighborhoods = `-- name: ListCitiesWithNeighborhoods :many
+SELECT
+    hc.hintatiedot_cities_id,
+    hc.hintatiedot_cities_name,
+    hc.hintatiedot_cities_created_at,
+    hc.hintatiedot_cities_updated_at,
+    hn.hintatiedot_neighborhoods_id,
+    hn.hintatiedot_neighborhoods_name,
+    hn.hintatiedot_neighborhoods_created_at,
+    hn.hintatiedot_neighborhoods_updated_at,
+    hp.hintatiedot_postal_codes_id,
+    hp.hintatiedot_postal_codes_code
+FROM public.hintatiedot_cities AS hc
+LEFT JOIN public.hintatiedot_neighborhoods AS hn
+    ON hn.hintatiedot_neighborhoods_city_id = hc.hintatiedot_cities_id
+LEFT JOIN public.hintatiedot_postal_codes AS hp
+    ON hn.hintatiedot_neighborhoods_postal_code_id = hp.hintatiedot_postal_codes_id
+ORDER BY hc.hintatiedot_cities_name, hn.hintatiedot_neighborhoods_name
+`
+
+type ListCitiesWithNeighborhoodsRow struct {
+	HintatiedotCitiesID               pgtype.UUID        `db:"hintatiedot_cities_id" json:"hintatiedot_cities_id"`
+	HintatiedotCitiesName             string             `db:"hintatiedot_cities_name" json:"hintatiedot_cities_name"`
+	HintatiedotCitiesCreatedAt        pgtype.Timestamptz `db:"hintatiedot_cities_created_at" json:"hintatiedot_cities_created_at"`
+	HintatiedotCitiesUpdatedAt        pgtype.Timestamptz `db:"hintatiedot_cities_updated_at" json:"hintatiedot_cities_updated_at"`
+	HintatiedotNeighborhoodsID        pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
+	HintatiedotNeighborhoodsName      pgtype.Text        `db:"hintatiedot_neighborhoods_name" json:"hintatiedot_neighborhoods_name"`
+	HintatiedotNeighborhoodsCreatedAt pgtype.Timestamptz `db:"hintatiedot_neighborhoods_created_at" json:"hintatiedot_neighborhoods_created_at"`
+	HintatiedotNeighborhoodsUpdatedAt pgtype.Timestamptz `db:"hintatiedot_neighborhoods_updated_at" json:"hintatiedot_neighborhoods_updated_at"`
+	HintatiedotPostalCodesID          pgtype.UUID        `db:"hintatiedot_postal_codes_id" json:"hintatiedot_postal_codes_id"`
+	HintatiedotPostalCodesCode        pgtype.Text        `db:"hintatiedot_postal_codes_code" json:"hintatiedot_postal_codes_code"`
+}
+
+func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCitiesWithNeighborhoodsRow, error) {
+	rows, err := q.db.Query(ctx, listCitiesWithNeighborhoods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCitiesWithNeighborhoodsRow{}
+	for rows.Next() {
+		var i ListCitiesWithNeighborhoodsRow
+		if err := rows.Scan(
+			&i.HintatiedotCitiesID,
+			&i.HintatiedotCitiesName,
+			&i.HintatiedotCitiesCreatedAt,
+			&i.HintatiedotCitiesUpdatedAt,
+			&i.HintatiedotNeighborhoodsID,
+			&i.HintatiedotNeighborhoodsName,
+			&i.HintatiedotNeighborhoodsCreatedAt,
+			&i.HintatiedotNeighborhoodsUpdatedAt,
+			&i.HintatiedotPostalCodesID,
+			&i.HintatiedotPostalCodesCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTransactionsByNeighborhoods = `-- name: ListTransactionsByNeighborhoods :many
+WITH selected_neighborhoods AS (
+    SELECT UNNEST($1::uuid[]) AS neighborhood_id
+)
 SELECT
     ht.hintatiedot_transactions_id,
-    ht.hintatiedot_transactions_neighborhood,
     ht.hintatiedot_transactions_description,
     ht.hintatiedot_transactions_type,
-    ht.hintatiedot_transactions_area,
+    ht.hintatiedot_transactions_area
+
+,
     ht.hintatiedot_transactions_price,
     ht.hintatiedot_transactions_price_per_square_meter,
     ht.hintatiedot_transactions_build_year,
@@ -26,49 +94,58 @@ SELECT
     ht.hintatiedot_transactions_condition,
     ht.hintatiedot_transactions_plot,
     ht.hintatiedot_transactions_energy_class,
-    ht.hintatiedot_transactions_first_seen_at,
-    ht.hintatiedot_transactions_last_seen_at,
+    ht.created_at,
+    ht.updated_at,
     ht.hintatiedot_transactions_category,
-    ht.hintatiedot_neighborhoods_postal_code,
-    hn.hintatiedot_neighborhoods_name
+    hn.hintatiedot_neighborhoods_id,
+    hn.hintatiedot_neighborhoods_name,
+    hp.hintatiedot_postal_codes_code,
+    hc.hintatiedot_cities_name
 FROM public.hintatiedot_transactions AS ht
-NATURAL JOIN public.hintatiedot_neighborhoods AS hn
-ORDER BY ht.hintatiedot_transactions_first_seen_at
+JOIN selected_neighborhoods AS sn
+    ON sn.neighborhood_id = ht.hintatiedot_neighborhoods_id
+LEFT JOIN public.hintatiedot_neighborhoods AS hn
+    ON ht.hintatiedot_neighborhoods_id = hn.hintatiedot_neighborhoods_id
+LEFT JOIN public.hintatiedot_postal_codes AS hp
+    ON hn.hintatiedot_neighborhoods_postal_code_id = hp.hintatiedot_postal_codes_id
+LEFT JOIN public.hintatiedot_cities AS hc
+    ON hn.hintatiedot_neighborhoods_city_id = hc.hintatiedot_cities_id
+ORDER BY ht.created_at DESC
 `
 
-type ListHintatiedotTransactionsRow struct {
+type ListTransactionsByNeighborhoodsRow struct {
 	HintatiedotTransactionsID                  pgtype.UUID        `db:"hintatiedot_transactions_id" json:"hintatiedot_transactions_id"`
-	HintatiedotTransactionsNeighborhood        string             `db:"hintatiedot_transactions_neighborhood" json:"hintatiedot_transactions_neighborhood"`
 	HintatiedotTransactionsDescription         string             `db:"hintatiedot_transactions_description" json:"hintatiedot_transactions_description"`
 	HintatiedotTransactionsType                string             `db:"hintatiedot_transactions_type" json:"hintatiedot_transactions_type"`
 	HintatiedotTransactionsArea                float64            `db:"hintatiedot_transactions_area" json:"hintatiedot_transactions_area"`
 	HintatiedotTransactionsPrice               int32              `db:"hintatiedot_transactions_price" json:"hintatiedot_transactions_price"`
 	HintatiedotTransactionsPricePerSquareMeter int32              `db:"hintatiedot_transactions_price_per_square_meter" json:"hintatiedot_transactions_price_per_square_meter"`
 	HintatiedotTransactionsBuildYear           int32              `db:"hintatiedot_transactions_build_year" json:"hintatiedot_transactions_build_year"`
-	HintatiedotTransactionsFloor               string             `db:"hintatiedot_transactions_floor" json:"hintatiedot_transactions_floor"`
-	HintatiedotTransactionsElevator            string             `db:"hintatiedot_transactions_elevator" json:"hintatiedot_transactions_elevator"`
-	HintatiedotTransactionsCondition           string             `db:"hintatiedot_transactions_condition" json:"hintatiedot_transactions_condition"`
-	HintatiedotTransactionsPlot                string             `db:"hintatiedot_transactions_plot" json:"hintatiedot_transactions_plot"`
+	HintatiedotTransactionsFloor               pgtype.Text        `db:"hintatiedot_transactions_floor" json:"hintatiedot_transactions_floor"`
+	HintatiedotTransactionsElevator            bool               `db:"hintatiedot_transactions_elevator" json:"hintatiedot_transactions_elevator"`
+	HintatiedotTransactionsCondition           pgtype.Text        `db:"hintatiedot_transactions_condition" json:"hintatiedot_transactions_condition"`
+	HintatiedotTransactionsPlot                pgtype.Text        `db:"hintatiedot_transactions_plot" json:"hintatiedot_transactions_plot"`
 	HintatiedotTransactionsEnergyClass         pgtype.Text        `db:"hintatiedot_transactions_energy_class" json:"hintatiedot_transactions_energy_class"`
-	HintatiedotTransactionsFirstSeenAt         pgtype.Timestamptz `db:"hintatiedot_transactions_first_seen_at" json:"hintatiedot_transactions_first_seen_at"`
-	HintatiedotTransactionsLastSeenAt          pgtype.Timestamptz `db:"hintatiedot_transactions_last_seen_at" json:"hintatiedot_transactions_last_seen_at"`
+	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	HintatiedotTransactionsCategory            string             `db:"hintatiedot_transactions_category" json:"hintatiedot_transactions_category"`
-	HintatiedotNeighborhoodsPostalCode         string             `db:"hintatiedot_neighborhoods_postal_code" json:"hintatiedot_neighborhoods_postal_code"`
-	HintatiedotNeighborhoodsName               string             `db:"hintatiedot_neighborhoods_name" json:"hintatiedot_neighborhoods_name"`
+	HintatiedotNeighborhoodsID                 pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
+	HintatiedotNeighborhoodsName               pgtype.Text        `db:"hintatiedot_neighborhoods_name" json:"hintatiedot_neighborhoods_name"`
+	HintatiedotPostalCodesCode                 pgtype.Text        `db:"hintatiedot_postal_codes_code" json:"hintatiedot_postal_codes_code"`
+	HintatiedotCitiesName                      pgtype.Text        `db:"hintatiedot_cities_name" json:"hintatiedot_cities_name"`
 }
 
-func (q *Queries) ListHintatiedotTransactions(ctx context.Context) ([]ListHintatiedotTransactionsRow, error) {
-	rows, err := q.db.Query(ctx, listHintatiedotTransactions)
+func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborhoodIds []pgtype.UUID) ([]ListTransactionsByNeighborhoodsRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByNeighborhoods, neighborhoodIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListHintatiedotTransactionsRow{}
+	items := []ListTransactionsByNeighborhoodsRow{}
 	for rows.Next() {
-		var i ListHintatiedotTransactionsRow
+		var i ListTransactionsByNeighborhoodsRow
 		if err := rows.Scan(
 			&i.HintatiedotTransactionsID,
-			&i.HintatiedotTransactionsNeighborhood,
 			&i.HintatiedotTransactionsDescription,
 			&i.HintatiedotTransactionsType,
 			&i.HintatiedotTransactionsArea,
@@ -80,11 +157,13 @@ func (q *Queries) ListHintatiedotTransactions(ctx context.Context) ([]ListHintat
 			&i.HintatiedotTransactionsCondition,
 			&i.HintatiedotTransactionsPlot,
 			&i.HintatiedotTransactionsEnergyClass,
-			&i.HintatiedotTransactionsFirstSeenAt,
-			&i.HintatiedotTransactionsLastSeenAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.HintatiedotTransactionsCategory,
-			&i.HintatiedotNeighborhoodsPostalCode,
+			&i.HintatiedotNeighborhoodsID,
 			&i.HintatiedotNeighborhoodsName,
+			&i.HintatiedotPostalCodesCode,
+			&i.HintatiedotCitiesName,
 		); err != nil {
 			return nil, err
 		}

@@ -22,5 +22,5 @@ CREATE TABLE public.hintatiedot_transactions (
     hintatiedot_transactions_first_seen_at               timestamptz      NOT NULL,
     hintatiedot_transactions_last_seen_at                timestamptz      NOT NULL,
     hintatiedot_transactions_category                    text             NOT NULL,
-    hintatiedot_neighborhoods_postal_code                text             NOT NULL
+    hintatiedot_neighborhoods_postal_code                text
 );

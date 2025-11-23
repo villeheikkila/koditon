@@ -3,3 +3,50 @@
 //   sqlc v1.30.0
 
 package db
+
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type HintatiedotCity struct {
+	HintatiedotCitiesID        pgtype.UUID        `db:"hintatiedot_cities_id" json:"hintatiedot_cities_id"`
+	HintatiedotCitiesName      string             `db:"hintatiedot_cities_name" json:"hintatiedot_cities_name"`
+	HintatiedotCitiesCreatedAt pgtype.Timestamptz `db:"hintatiedot_cities_created_at" json:"hintatiedot_cities_created_at"`
+	HintatiedotCitiesUpdatedAt pgtype.Timestamptz `db:"hintatiedot_cities_updated_at" json:"hintatiedot_cities_updated_at"`
+}
+
+type HintatiedotNeighborhood struct {
+	HintatiedotNeighborhoodsID           pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
+	HintatiedotNeighborhoodsName         string             `db:"hintatiedot_neighborhoods_name" json:"hintatiedot_neighborhoods_name"`
+	HintatiedotNeighborhoodsCityID       pgtype.UUID        `db:"hintatiedot_neighborhoods_city_id" json:"hintatiedot_neighborhoods_city_id"`
+	HintatiedotNeighborhoodsPostalCodeID pgtype.UUID        `db:"hintatiedot_neighborhoods_postal_code_id" json:"hintatiedot_neighborhoods_postal_code_id"`
+	HintatiedotNeighborhoodsCreatedAt    pgtype.Timestamptz `db:"hintatiedot_neighborhoods_created_at" json:"hintatiedot_neighborhoods_created_at"`
+	HintatiedotNeighborhoodsUpdatedAt    pgtype.Timestamptz `db:"hintatiedot_neighborhoods_updated_at" json:"hintatiedot_neighborhoods_updated_at"`
+}
+
+type HintatiedotPostalCode struct {
+	HintatiedotPostalCodesID        pgtype.UUID        `db:"hintatiedot_postal_codes_id" json:"hintatiedot_postal_codes_id"`
+	HintatiedotPostalCodesCode      string             `db:"hintatiedot_postal_codes_code" json:"hintatiedot_postal_codes_code"`
+	HintatiedotPostalCodesCityID    pgtype.UUID        `db:"hintatiedot_postal_codes_city_id" json:"hintatiedot_postal_codes_city_id"`
+	HintatiedotPostalCodesCreatedAt pgtype.Timestamptz `db:"hintatiedot_postal_codes_created_at" json:"hintatiedot_postal_codes_created_at"`
+	HintatiedotPostalCodesUpdatedAt pgtype.Timestamptz `db:"hintatiedot_postal_codes_updated_at" json:"hintatiedot_postal_codes_updated_at"`
+}
+
+type HintatiedotTransaction struct {
+	HintatiedotTransactionsID                  pgtype.UUID        `db:"hintatiedot_transactions_id" json:"hintatiedot_transactions_id"`
+	HintatiedotTransactionsDescription         string             `db:"hintatiedot_transactions_description" json:"hintatiedot_transactions_description"`
+	HintatiedotTransactionsType                string             `db:"hintatiedot_transactions_type" json:"hintatiedot_transactions_type"`
+	HintatiedotTransactionsArea                float64            `db:"hintatiedot_transactions_area" json:"hintatiedot_transactions_area"`
+	HintatiedotTransactionsPrice               int32              `db:"hintatiedot_transactions_price" json:"hintatiedot_transactions_price"`
+	HintatiedotTransactionsPricePerSquareMeter int32              `db:"hintatiedot_transactions_price_per_square_meter" json:"hintatiedot_transactions_price_per_square_meter"`
+	HintatiedotTransactionsBuildYear           int32              `db:"hintatiedot_transactions_build_year" json:"hintatiedot_transactions_build_year"`
+	HintatiedotTransactionsFloor               pgtype.Text        `db:"hintatiedot_transactions_floor" json:"hintatiedot_transactions_floor"`
+	HintatiedotTransactionsElevator            bool               `db:"hintatiedot_transactions_elevator" json:"hintatiedot_transactions_elevator"`
+	HintatiedotTransactionsCondition           pgtype.Text        `db:"hintatiedot_transactions_condition" json:"hintatiedot_transactions_condition"`
+	HintatiedotTransactionsPlot                pgtype.Text        `db:"hintatiedot_transactions_plot" json:"hintatiedot_transactions_plot"`
+	HintatiedotTransactionsEnergyClass         pgtype.Text        `db:"hintatiedot_transactions_energy_class" json:"hintatiedot_transactions_energy_class"`
+	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HintatiedotTransactionsCategory            string             `db:"hintatiedot_transactions_category" json:"hintatiedot_transactions_category"`
+	HintatiedotNeighborhoodsID                 pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
+}
