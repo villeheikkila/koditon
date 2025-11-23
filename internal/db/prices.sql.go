@@ -11,13 +11,81 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const listPricesTransactions = `-- name: ListPricesTransactions :many
+const listCitiesWithNeighborhoods = `-- name: ListCitiesWithNeighborhoods :many
+SELECT
+    hc.prices_cities_id,
+    hc.prices_cities_name,
+    hc.prices_cities_created_at,
+    hc.prices_cities_updated_at,
+    hn.prices_neighborhoods_id,
+    hn.prices_neighborhoods_name,
+    hn.prices_neighborhoods_created_at,
+    hn.prices_neighborhoods_updated_at,
+    hp.prices_postal_codes_id,
+    hp.prices_postal_codes_code
+FROM public.prices_cities AS hc
+LEFT JOIN public.prices_neighborhoods AS hn
+    ON hn.prices_neighborhoods_city_id = hc.prices_cities_id
+LEFT JOIN public.prices_postal_codes AS hp
+    ON hn.prices_neighborhoods_postal_code_id = hp.prices_postal_codes_id
+ORDER BY hc.prices_cities_name, hn.prices_neighborhoods_name
+`
+
+type ListCitiesWithNeighborhoodsRow struct {
+	PricesCitiesID               pgtype.UUID        `db:"prices_cities_id" json:"prices_cities_id"`
+	PricesCitiesName             string             `db:"prices_cities_name" json:"prices_cities_name"`
+	PricesCitiesCreatedAt        pgtype.Timestamptz `db:"prices_cities_created_at" json:"prices_cities_created_at"`
+	PricesCitiesUpdatedAt        pgtype.Timestamptz `db:"prices_cities_updated_at" json:"prices_cities_updated_at"`
+	PricesNeighborhoodsID        pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
+	PricesNeighborhoodsName      pgtype.Text        `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
+	PricesNeighborhoodsCreatedAt pgtype.Timestamptz `db:"prices_neighborhoods_created_at" json:"prices_neighborhoods_created_at"`
+	PricesNeighborhoodsUpdatedAt pgtype.Timestamptz `db:"prices_neighborhoods_updated_at" json:"prices_neighborhoods_updated_at"`
+	PricesPostalCodesID          pgtype.UUID        `db:"prices_postal_codes_id" json:"prices_postal_codes_id"`
+	PricesPostalCodesCode        pgtype.Text        `db:"prices_postal_codes_code" json:"prices_postal_codes_code"`
+}
+
+func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCitiesWithNeighborhoodsRow, error) {
+	rows, err := q.db.Query(ctx, listCitiesWithNeighborhoods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCitiesWithNeighborhoodsRow{}
+	for rows.Next() {
+		var i ListCitiesWithNeighborhoodsRow
+		if err := rows.Scan(
+			&i.PricesCitiesID,
+			&i.PricesCitiesName,
+			&i.PricesCitiesCreatedAt,
+			&i.PricesCitiesUpdatedAt,
+			&i.PricesNeighborhoodsID,
+			&i.PricesNeighborhoodsName,
+			&i.PricesNeighborhoodsCreatedAt,
+			&i.PricesNeighborhoodsUpdatedAt,
+			&i.PricesPostalCodesID,
+			&i.PricesPostalCodesCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTransactionsByNeighborhoods = `-- name: ListTransactionsByNeighborhoods :many
+WITH selected_neighborhoods AS (
+    SELECT UNNEST($1::uuid[]) AS neighborhood_id
+)
 SELECT
     ht.prices_transactions_id,
-    ht.prices_transactions_neighborhood,
     ht.prices_transactions_description,
     ht.prices_transactions_type,
-    ht.prices_transactions_area,
+    ht.prices_transactions_area
+
+,
     ht.prices_transactions_price,
     ht.prices_transactions_price_per_square_meter,
     ht.prices_transactions_build_year,
@@ -26,49 +94,58 @@ SELECT
     ht.prices_transactions_condition,
     ht.prices_transactions_plot,
     ht.prices_transactions_energy_class,
-    ht.prices_transactions_first_seen_at,
-    ht.prices_transactions_last_seen_at,
+    ht.created_at,
+    ht.updated_at,
     ht.prices_transactions_category,
-    ht.prices_neighborhoods_postal_code,
-    hn.prices_neighborhoods_name
+    hn.prices_neighborhoods_id,
+    hn.prices_neighborhoods_name,
+    hp.prices_postal_codes_code,
+    hc.prices_cities_name
 FROM public.prices_transactions AS ht
-NATURAL JOIN public.prices_neighborhoods AS hn
-ORDER BY ht.prices_transactions_first_seen_at
+JOIN selected_neighborhoods AS sn
+    ON sn.neighborhood_id = ht.prices_neighborhoods_id
+LEFT JOIN public.prices_neighborhoods AS hn
+    ON ht.prices_neighborhoods_id = hn.prices_neighborhoods_id
+LEFT JOIN public.prices_postal_codes AS hp
+    ON hn.prices_neighborhoods_postal_code_id = hp.prices_postal_codes_id
+LEFT JOIN public.prices_cities AS hc
+    ON hn.prices_neighborhoods_city_id = hc.prices_cities_id
+ORDER BY ht.created_at DESC
 `
 
-type ListPricesTransactionsRow struct {
+type ListTransactionsByNeighborhoodsRow struct {
 	PricesTransactionsID                  pgtype.UUID        `db:"prices_transactions_id" json:"prices_transactions_id"`
-	PricesTransactionsNeighborhood        string             `db:"prices_transactions_neighborhood" json:"prices_transactions_neighborhood"`
 	PricesTransactionsDescription         string             `db:"prices_transactions_description" json:"prices_transactions_description"`
 	PricesTransactionsType                string             `db:"prices_transactions_type" json:"prices_transactions_type"`
 	PricesTransactionsArea                float64            `db:"prices_transactions_area" json:"prices_transactions_area"`
 	PricesTransactionsPrice               int32              `db:"prices_transactions_price" json:"prices_transactions_price"`
 	PricesTransactionsPricePerSquareMeter int32              `db:"prices_transactions_price_per_square_meter" json:"prices_transactions_price_per_square_meter"`
 	PricesTransactionsBuildYear           int32              `db:"prices_transactions_build_year" json:"prices_transactions_build_year"`
-	PricesTransactionsFloor               string             `db:"prices_transactions_floor" json:"prices_transactions_floor"`
-	PricesTransactionsElevator            string             `db:"prices_transactions_elevator" json:"prices_transactions_elevator"`
-	PricesTransactionsCondition           string             `db:"prices_transactions_condition" json:"prices_transactions_condition"`
-	PricesTransactionsPlot                string             `db:"prices_transactions_plot" json:"prices_transactions_plot"`
+	PricesTransactionsFloor               pgtype.Text        `db:"prices_transactions_floor" json:"prices_transactions_floor"`
+	PricesTransactionsElevator            bool               `db:"prices_transactions_elevator" json:"prices_transactions_elevator"`
+	PricesTransactionsCondition           pgtype.Text        `db:"prices_transactions_condition" json:"prices_transactions_condition"`
+	PricesTransactionsPlot                pgtype.Text        `db:"prices_transactions_plot" json:"prices_transactions_plot"`
 	PricesTransactionsEnergyClass         pgtype.Text        `db:"prices_transactions_energy_class" json:"prices_transactions_energy_class"`
-	PricesTransactionsFirstSeenAt         pgtype.Timestamptz `db:"prices_transactions_first_seen_at" json:"prices_transactions_first_seen_at"`
-	PricesTransactionsLastSeenAt          pgtype.Timestamptz `db:"prices_transactions_last_seen_at" json:"prices_transactions_last_seen_at"`
+	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	PricesTransactionsCategory            string             `db:"prices_transactions_category" json:"prices_transactions_category"`
-	PricesNeighborhoodsPostalCode         string             `db:"prices_neighborhoods_postal_code" json:"prices_neighborhoods_postal_code"`
-	PricesNeighborhoodsName               string             `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
+	PricesNeighborhoodsID                 pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
+	PricesNeighborhoodsName               pgtype.Text        `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
+	PricesPostalCodesCode                 pgtype.Text        `db:"prices_postal_codes_code" json:"prices_postal_codes_code"`
+	PricesCitiesName                      pgtype.Text        `db:"prices_cities_name" json:"prices_cities_name"`
 }
 
-func (q *Queries) ListPricesTransactions(ctx context.Context) ([]ListPricesTransactionsRow, error) {
-	rows, err := q.db.Query(ctx, listPricesTransactions)
+func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborhoodIds []pgtype.UUID) ([]ListTransactionsByNeighborhoodsRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByNeighborhoods, neighborhoodIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListPricesTransactionsRow{}
+	items := []ListTransactionsByNeighborhoodsRow{}
 	for rows.Next() {
-		var i ListPricesTransactionsRow
+		var i ListTransactionsByNeighborhoodsRow
 		if err := rows.Scan(
 			&i.PricesTransactionsID,
-			&i.PricesTransactionsNeighborhood,
 			&i.PricesTransactionsDescription,
 			&i.PricesTransactionsType,
 			&i.PricesTransactionsArea,
@@ -80,11 +157,13 @@ func (q *Queries) ListPricesTransactions(ctx context.Context) ([]ListPricesTrans
 			&i.PricesTransactionsCondition,
 			&i.PricesTransactionsPlot,
 			&i.PricesTransactionsEnergyClass,
-			&i.PricesTransactionsFirstSeenAt,
-			&i.PricesTransactionsLastSeenAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.PricesTransactionsCategory,
-			&i.PricesNeighborhoodsPostalCode,
+			&i.PricesNeighborhoodsID,
 			&i.PricesNeighborhoodsName,
+			&i.PricesPostalCodesCode,
+			&i.PricesCitiesName,
 		); err != nil {
 			return nil, err
 		}

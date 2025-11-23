@@ -22,5 +22,5 @@ CREATE TABLE public.prices_transactions (
     prices_transactions_first_seen_at               timestamptz      NOT NULL,
     prices_transactions_last_seen_at                timestamptz      NOT NULL,
     prices_transactions_category                    text             NOT NULL,
-    prices_neighborhoods_postal_code                text             NOT NULL
+    prices_neighborhoods_postal_code                text
 );

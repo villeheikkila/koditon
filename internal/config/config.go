@@ -11,6 +11,12 @@ type Config struct {
 	Host            string
 	Port            string
 	ShutdownTimeout time.Duration
+	DBHost          string
+	DBPort          string
+	DBUser          string
+	DBPassword      string
+	DBName          string
+	DBSSLMode       string
 }
 
 func Load(
@@ -28,6 +34,12 @@ func Load(
 	host := flagSet.String("host", fallback(env("APP_HOST"), "0.0.0.0"), "HTTP listen host")
 	port := flagSet.String("port", fallback(env("APP_PORT"), "8080"), "HTTP listen port")
 	shutdown := flagSet.String("shutdown-timeout", fallback(env("APP_SHUTDOWN_TIMEOUT"), "10s"), "graceful shutdown timeout (e.g. 5s)")
+	dbHost := flagSet.String("db-host", fallback(env("DB_HOST"), "localhost"), "Database host")
+	dbPort := flagSet.String("db-port", fallback(env("DB_PORT"), "5432"), "Database port")
+	dbUser := flagSet.String("db-user", fallback(env("DB_USER"), "postgres"), "Database user")
+	dbPassword := flagSet.String("db-password", fallback(env("DB_PASSWORD"), "postgres"), "Database password")
+	dbName := flagSet.String("db-name", fallback(env("DB_NAME"), "koditon"), "Database name")
+	dbSSLMode := flagSet.String("db-sslmode", fallback(env("DB_SSLMODE"), "disable"), "Database SSL mode")
 	if err := flagSet.Parse(args[1:]); err != nil {
 		return Config{}, fmt.Errorf("parse flags: %w", err)
 	}
@@ -39,7 +51,18 @@ func Load(
 		Host:            *host,
 		Port:            *port,
 		ShutdownTimeout: timeout,
+		DBHost:          *dbHost,
+		DBPort:          *dbPort,
+		DBUser:          *dbUser,
+		DBPassword:      *dbPassword,
+		DBName:          *dbName,
+		DBSSLMode:       *dbSSLMode,
 	}, nil
+}
+
+func (c Config) DatabaseURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode)
 }
 
 func fallback(value, def string) string {

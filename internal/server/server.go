@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"koditon-go/internal/config"
+	"koditon-go/internal/db"
 )
 
-func New(logger *log.Logger, cfg config.Config) http.Handler {
+func New(logger *log.Logger, cfg config.Config, queries *db.Queries) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, logger, cfg)
+	addRoutes(mux, logger, cfg, queries)
 
 	var handler http.Handler = mux
 	handler = loggingMiddleware(logger, handler)
