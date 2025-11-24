@@ -11,18 +11,20 @@ import (
 )
 
 type Server struct {
-	logger         *slog.Logger
-	cfg            config.Config
-	db             *db.Queries
-	hintatiedotAPI *hintatiedot.Client
+	logger          *slog.Logger
+	cfg             config.Config
+	db              *db.Queries
+	hintatiedotAPI  *hintatiedot.Client
+	hintatiedotSync *hintatiedot.SyncService
 }
 
 func New(logger *slog.Logger, cfg config.Config, queries *db.Queries, hintatiedotClient *hintatiedot.Client) *Server {
 	return &Server{
-		logger:         logger.With("component", "server"),
-		cfg:            cfg,
-		db:             queries,
-		hintatiedotAPI: hintatiedotClient,
+		logger:          logger.With("component", "server"),
+		cfg:             cfg,
+		db:              queries,
+		hintatiedotAPI:  hintatiedotClient,
+		hintatiedotSync: hintatiedot.NewSyncService(queries, hintatiedotClient, logger.With("component", "hintatiedot-sync")),
 	}
 }
 
@@ -39,10 +41,28 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rw, r)
+
 		s.logger.InfoContext(
 			r.Context(),
+			"request started",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"remote_addr", r.RemoteAddr,
+		)
+
+		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rw, r)
+
+		logLevel := slog.LevelInfo
+		if rw.status >= 500 {
+			logLevel = slog.LevelError
+		} else if rw.status >= 400 {
+			logLevel = slog.LevelWarn
+		}
+
+		s.logger.Log(
+			r.Context(),
+			logLevel,
 			"request completed",
 			"method", r.Method,
 			"path", r.URL.Path,

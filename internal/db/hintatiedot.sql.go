@@ -83,9 +83,7 @@ SELECT
     ht.hintatiedot_transactions_id,
     ht.hintatiedot_transactions_description,
     ht.hintatiedot_transactions_type,
-    ht.hintatiedot_transactions_area
-
-,
+    ht.hintatiedot_transactions_area,
     ht.hintatiedot_transactions_price,
     ht.hintatiedot_transactions_price_per_square_meter,
     ht.hintatiedot_transactions_build_year,
@@ -94,8 +92,8 @@ SELECT
     ht.hintatiedot_transactions_condition,
     ht.hintatiedot_transactions_plot,
     ht.hintatiedot_transactions_energy_class,
-    ht.created_at,
-    ht.updated_at,
+    ht.hintatiedot_transactions_created_at,
+    ht.hintatiedot_transactions_updated_at,
     ht.hintatiedot_transactions_category,
     hn.hintatiedot_neighborhoods_id,
     hn.hintatiedot_neighborhoods_name,
@@ -110,7 +108,7 @@ LEFT JOIN public.hintatiedot_postal_codes AS hp
     ON hn.hintatiedot_neighborhoods_postal_code_id = hp.hintatiedot_postal_codes_id
 LEFT JOIN public.hintatiedot_cities AS hc
     ON hn.hintatiedot_neighborhoods_city_id = hc.hintatiedot_cities_id
-ORDER BY ht.created_at DESC
+ORDER BY ht.hintatiedot_transactions_created_at DESC
 `
 
 type ListTransactionsByNeighborhoodsRow struct {
@@ -126,8 +124,8 @@ type ListTransactionsByNeighborhoodsRow struct {
 	HintatiedotTransactionsCondition           pgtype.Text        `db:"hintatiedot_transactions_condition" json:"hintatiedot_transactions_condition"`
 	HintatiedotTransactionsPlot                pgtype.Text        `db:"hintatiedot_transactions_plot" json:"hintatiedot_transactions_plot"`
 	HintatiedotTransactionsEnergyClass         pgtype.Text        `db:"hintatiedot_transactions_energy_class" json:"hintatiedot_transactions_energy_class"`
-	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HintatiedotTransactionsCreatedAt           pgtype.Timestamptz `db:"hintatiedot_transactions_created_at" json:"hintatiedot_transactions_created_at"`
+	HintatiedotTransactionsUpdatedAt           pgtype.Timestamptz `db:"hintatiedot_transactions_updated_at" json:"hintatiedot_transactions_updated_at"`
 	HintatiedotTransactionsCategory            string             `db:"hintatiedot_transactions_category" json:"hintatiedot_transactions_category"`
 	HintatiedotNeighborhoodsID                 pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
 	HintatiedotNeighborhoodsName               pgtype.Text        `db:"hintatiedot_neighborhoods_name" json:"hintatiedot_neighborhoods_name"`
@@ -157,8 +155,8 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 			&i.HintatiedotTransactionsCondition,
 			&i.HintatiedotTransactionsPlot,
 			&i.HintatiedotTransactionsEnergyClass,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.HintatiedotTransactionsCreatedAt,
+			&i.HintatiedotTransactionsUpdatedAt,
 			&i.HintatiedotTransactionsCategory,
 			&i.HintatiedotNeighborhoodsID,
 			&i.HintatiedotNeighborhoodsName,
@@ -177,8 +175,10 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 
 const upsertHintatiedotCity = `-- name: UpsertHintatiedotCity :one
 INSERT INTO public.hintatiedot_cities (
-    hintatiedot_cities_name
-) VALUES ($1)
+    hintatiedot_cities_name,
+    hintatiedot_cities_created_at,
+    hintatiedot_cities_updated_at
+) VALUES ($1, now(), now())
 ON CONFLICT (hintatiedot_cities_name) DO UPDATE
 SET hintatiedot_cities_updated_at = now()
 RETURNING hintatiedot_cities_id, hintatiedot_cities_name, hintatiedot_cities_created_at, hintatiedot_cities_updated_at
@@ -200,8 +200,10 @@ const upsertHintatiedotNeighborhood = `-- name: UpsertHintatiedotNeighborhood :o
 INSERT INTO public.hintatiedot_neighborhoods (
     hintatiedot_neighborhoods_name,
     hintatiedot_neighborhoods_city_id,
-    hintatiedot_neighborhoods_postal_code_id
-) VALUES ($1, $2, $3)
+    hintatiedot_neighborhoods_postal_code_id,
+    hintatiedot_neighborhoods_created_at,
+    hintatiedot_neighborhoods_updated_at
+) VALUES ($1, $2, $3, now(), now())
 ON CONFLICT (hintatiedot_neighborhoods_name, hintatiedot_neighborhoods_city_id) DO UPDATE
 SET hintatiedot_neighborhoods_postal_code_id = EXCLUDED.hintatiedot_neighborhoods_postal_code_id,
     hintatiedot_neighborhoods_updated_at = now()
@@ -232,12 +234,16 @@ const upsertHintatiedotNeighborhoodsBulk = `-- name: UpsertHintatiedotNeighborho
 INSERT INTO public.hintatiedot_neighborhoods (
     hintatiedot_neighborhoods_name,
     hintatiedot_neighborhoods_city_id,
-    hintatiedot_neighborhoods_postal_code_id
+    hintatiedot_neighborhoods_postal_code_id,
+    hintatiedot_neighborhoods_created_at,
+    hintatiedot_neighborhoods_updated_at
 )
 SELECT
     name,
     $1,
-    NULL::uuid
+    NULL::uuid,
+    now(),
+    now()
 FROM unnest($2::text[]) AS t(name)
 ON CONFLICT (hintatiedot_neighborhoods_name, hintatiedot_neighborhoods_city_id) DO UPDATE
 SET hintatiedot_neighborhoods_postal_code_id = EXCLUDED.hintatiedot_neighborhoods_postal_code_id,
@@ -280,8 +286,10 @@ func (q *Queries) UpsertHintatiedotNeighborhoodsBulk(ctx context.Context, arg Up
 const upsertHintatiedotPostalCode = `-- name: UpsertHintatiedotPostalCode :one
 INSERT INTO public.hintatiedot_postal_codes (
     hintatiedot_postal_codes_code,
-    hintatiedot_postal_codes_city_id
-) VALUES ($1, $2)
+    hintatiedot_postal_codes_city_id,
+    hintatiedot_postal_codes_created_at,
+    hintatiedot_postal_codes_updated_at
+) VALUES ($1, $2, now(), now())
 ON CONFLICT (hintatiedot_postal_codes_code) DO UPDATE
 SET hintatiedot_postal_codes_city_id = EXCLUDED.hintatiedot_postal_codes_city_id,
     hintatiedot_postal_codes_updated_at = now()
@@ -309,9 +317,11 @@ func (q *Queries) UpsertHintatiedotPostalCode(ctx context.Context, arg UpsertHin
 const upsertHintatiedotPostalCodesBulk = `-- name: UpsertHintatiedotPostalCodesBulk :many
 INSERT INTO public.hintatiedot_postal_codes (
     hintatiedot_postal_codes_code,
-    hintatiedot_postal_codes_city_id
+    hintatiedot_postal_codes_city_id,
+    hintatiedot_postal_codes_created_at,
+    hintatiedot_postal_codes_updated_at
 )
-SELECT code, $1
+SELECT code, $1, now(), now()
 FROM unnest($2::text[]) AS t(code)
 ON CONFLICT (hintatiedot_postal_codes_code) DO UPDATE
 SET hintatiedot_postal_codes_city_id = EXCLUDED.hintatiedot_postal_codes_city_id,
@@ -365,9 +375,11 @@ INSERT INTO public.hintatiedot_transactions (
     hintatiedot_transactions_plot,
     hintatiedot_transactions_energy_class,
     hintatiedot_transactions_category,
-    hintatiedot_neighborhoods_id
+    hintatiedot_neighborhoods_id,
+    hintatiedot_transactions_created_at,
+    hintatiedot_transactions_updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now()
 )
 ON CONFLICT (hintatiedot_transactions_id) DO UPDATE
 SET hintatiedot_transactions_description = EXCLUDED.hintatiedot_transactions_description,
@@ -382,8 +394,9 @@ SET hintatiedot_transactions_description = EXCLUDED.hintatiedot_transactions_des
     hintatiedot_transactions_plot = EXCLUDED.hintatiedot_transactions_plot,
     hintatiedot_transactions_energy_class = EXCLUDED.hintatiedot_transactions_energy_class,
     hintatiedot_transactions_category = EXCLUDED.hintatiedot_transactions_category,
-    hintatiedot_neighborhoods_id = EXCLUDED.hintatiedot_neighborhoods_id
-RETURNING hintatiedot_transactions_id, hintatiedot_transactions_description, hintatiedot_transactions_type, hintatiedot_transactions_area, hintatiedot_transactions_price, hintatiedot_transactions_price_per_square_meter, hintatiedot_transactions_build_year, hintatiedot_transactions_floor, hintatiedot_transactions_elevator, hintatiedot_transactions_condition, hintatiedot_transactions_plot, hintatiedot_transactions_energy_class, created_at, updated_at, hintatiedot_transactions_category, hintatiedot_neighborhoods_id
+    hintatiedot_neighborhoods_id = EXCLUDED.hintatiedot_neighborhoods_id,
+    hintatiedot_transactions_updated_at = now()
+RETURNING hintatiedot_transactions_id, hintatiedot_transactions_description, hintatiedot_transactions_type, hintatiedot_transactions_area, hintatiedot_transactions_price, hintatiedot_transactions_price_per_square_meter, hintatiedot_transactions_build_year, hintatiedot_transactions_floor, hintatiedot_transactions_elevator, hintatiedot_transactions_condition, hintatiedot_transactions_plot, hintatiedot_transactions_energy_class, hintatiedot_transactions_created_at, hintatiedot_transactions_updated_at, hintatiedot_transactions_category, hintatiedot_neighborhoods_id
 `
 
 type UpsertHintatiedotTransactionParams struct {
@@ -434,8 +447,8 @@ func (q *Queries) UpsertHintatiedotTransaction(ctx context.Context, arg UpsertHi
 		&i.HintatiedotTransactionsCondition,
 		&i.HintatiedotTransactionsPlot,
 		&i.HintatiedotTransactionsEnergyClass,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.HintatiedotTransactionsCreatedAt,
+		&i.HintatiedotTransactionsUpdatedAt,
 		&i.HintatiedotTransactionsCategory,
 		&i.HintatiedotNeighborhoodsID,
 	)
@@ -456,7 +469,9 @@ INSERT INTO public.hintatiedot_transactions (
     hintatiedot_transactions_plot,
     hintatiedot_transactions_energy_class,
     hintatiedot_transactions_category,
-    hintatiedot_neighborhoods_id
+    hintatiedot_neighborhoods_id,
+    hintatiedot_transactions_created_at,
+    hintatiedot_transactions_updated_at
 )
 SELECT
     descriptions,
@@ -471,7 +486,9 @@ SELECT
     plots,
     energy_classes,
     categories,
-    neighborhood_ids
+    neighborhood_ids,
+    now(),
+    now()
 FROM unnest(
     $1::text[],
     $2::text[],
@@ -516,7 +533,7 @@ ON CONFLICT (
     hintatiedot_transactions_energy_class,
     hintatiedot_transactions_category
 ) DO UPDATE
-SET updated_at = now()
+SET hintatiedot_transactions_updated_at = now()
 `
 
 type UpsertHintatiedotTransactionsBulkParams struct {

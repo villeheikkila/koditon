@@ -66,8 +66,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) Hintatied
 		Condition:           row.HintatiedotTransactionsCondition.String,
 		Plot:                row.HintatiedotTransactionsPlot.String,
 		EnergyClass:         util.FromPgText(row.HintatiedotTransactionsEnergyClass),
-		FirstSeenAt:         row.CreatedAt.Time,
-		LastSeenAt:          row.UpdatedAt.Time,
 		Category:            row.HintatiedotTransactionsCategory,
 	}
 }

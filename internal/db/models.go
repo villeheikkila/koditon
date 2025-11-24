@@ -45,8 +45,8 @@ type HintatiedotTransaction struct {
 	HintatiedotTransactionsCondition           pgtype.Text        `db:"hintatiedot_transactions_condition" json:"hintatiedot_transactions_condition"`
 	HintatiedotTransactionsPlot                pgtype.Text        `db:"hintatiedot_transactions_plot" json:"hintatiedot_transactions_plot"`
 	HintatiedotTransactionsEnergyClass         pgtype.Text        `db:"hintatiedot_transactions_energy_class" json:"hintatiedot_transactions_energy_class"`
-	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HintatiedotTransactionsCreatedAt           pgtype.Timestamptz `db:"hintatiedot_transactions_created_at" json:"hintatiedot_transactions_created_at"`
+	HintatiedotTransactionsUpdatedAt           pgtype.Timestamptz `db:"hintatiedot_transactions_updated_at" json:"hintatiedot_transactions_updated_at"`
 	HintatiedotTransactionsCategory            string             `db:"hintatiedot_transactions_category" json:"hintatiedot_transactions_category"`
 	HintatiedotNeighborhoodsID                 pgtype.UUID        `db:"hintatiedot_neighborhoods_id" json:"hintatiedot_neighborhoods_id"`
 }

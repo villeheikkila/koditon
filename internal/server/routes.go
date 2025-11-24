@@ -17,6 +17,7 @@ func (s *Server) addRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/transactions", s.handleListTransactions)
 	mux.HandleFunc("/api/v1/transactions/fetch", s.handleTransactions)
 	mux.HandleFunc("/api/v1/hintatiedot/cities", s.handleFetchHintatiedotCities)
+	mux.HandleFunc("/api/v1/hintatiedot/sync", s.handleSyncHintatiedotCity)
 	mux.Handle("/", http.NotFoundHandler())
 }
 
@@ -132,6 +133,49 @@ func (s *Server) handleFetchHintatiedotCities(w http.ResponseWriter, r *http.Req
 
 	if err := encode(w, r, http.StatusOK, map[string][]string{"cities": cities}); err != nil {
 		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
+	}
+}
+
+func (s *Server) handleSyncHintatiedotCity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type request struct {
+		City string `json:"city"`
+	}
+	type response struct {
+		Status string `json:"status"`
+		City   string `json:"city"`
+	}
+
+	payload, err := decode[request](r)
+	if err != nil {
+		s.logger.WarnContext(r.Context(), "invalid sync city payload", "err", err, "content_type", r.Header.Get("Content-Type"))
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	city := strings.TrimSpace(payload.City)
+	if city == "" {
+		s.logger.WarnContext(r.Context(), "sync city request missing city name")
+		http.Error(w, "City is required", http.StatusBadRequest)
+		return
+	}
+
+	s.logger.InfoContext(r.Context(), "initiating city sync", "city", city)
+
+	if err := s.hintatiedotSync.SyncCity(r.Context(), city); err != nil {
+		s.logger.ErrorContext(r.Context(), "city sync failed", "city", city, "err", err)
+		http.Error(w, fmt.Sprintf("Failed to sync city: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.InfoContext(r.Context(), "city sync succeeded", "city", city)
+
+	if err := encode(w, r, http.StatusOK, response{Status: "ok", City: city}); err != nil {
+		s.logger.ErrorContext(r.Context(), "failed to encode sync city response", "city", city, "err", err)
 	}
 }
 

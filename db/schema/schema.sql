@@ -38,8 +38,23 @@ CREATE TABLE public.hintatiedot_transactions (
     hintatiedot_transactions_condition              text,
     hintatiedot_transactions_plot                   text,
     hintatiedot_transactions_energy_class           text,
-    created_at                                      timestamptz      NOT NULL,
-    updated_at                                      timestamptz      NOT NULL,
+    hintatiedot_transactions_created_at             timestamptz      NOT NULL DEFAULT now(),
+    hintatiedot_transactions_updated_at             timestamptz      NOT NULL DEFAULT now(),
     hintatiedot_transactions_category               text             NOT NULL,
-    hintatiedot_neighborhoods_id                    uuid             REFERENCES public.hintatiedot_neighborhoods(hintatiedot_neighborhoods_id)
+    hintatiedot_neighborhoods_id                    uuid             REFERENCES public.hintatiedot_neighborhoods(hintatiedot_neighborhoods_id),
+    CONSTRAINT hintatiedot_transactions_unique UNIQUE (
+        hintatiedot_neighborhoods_id,
+        hintatiedot_transactions_description,
+        hintatiedot_transactions_type,
+        hintatiedot_transactions_area,
+        hintatiedot_transactions_price,
+        hintatiedot_transactions_price_per_square_meter,
+        hintatiedot_transactions_build_year,
+        hintatiedot_transactions_floor,
+        hintatiedot_transactions_elevator,
+        hintatiedot_transactions_condition,
+        hintatiedot_transactions_plot,
+        hintatiedot_transactions_energy_class,
+        hintatiedot_transactions_category
+    )
 );
