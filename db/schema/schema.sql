@@ -38,8 +38,23 @@ CREATE TABLE public.prices_transactions (
     prices_transactions_condition              text,
     prices_transactions_plot                   text,
     prices_transactions_energy_class           text,
-    created_at                                      timestamptz      NOT NULL,
-    updated_at                                      timestamptz      NOT NULL,
+    prices_transactions_created_at             timestamptz      NOT NULL DEFAULT now(),
+    prices_transactions_updated_at             timestamptz      NOT NULL DEFAULT now(),
     prices_transactions_category               text             NOT NULL,
-    prices_neighborhoods_id                    uuid             REFERENCES public.prices_neighborhoods(prices_neighborhoods_id)
+    prices_neighborhoods_id                    uuid             REFERENCES public.prices_neighborhoods(prices_neighborhoods_id),
+    CONSTRAINT prices_transactions_unique UNIQUE (
+        prices_neighborhoods_id,
+        prices_transactions_description,
+        prices_transactions_type,
+        prices_transactions_area,
+        prices_transactions_price,
+        prices_transactions_price_per_square_meter,
+        prices_transactions_build_year,
+        prices_transactions_floor,
+        prices_transactions_elevator,
+        prices_transactions_condition,
+        prices_transactions_plot,
+        prices_transactions_energy_class,
+        prices_transactions_category
+    )
 );

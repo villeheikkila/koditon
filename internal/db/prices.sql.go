@@ -83,9 +83,7 @@ SELECT
     ht.prices_transactions_id,
     ht.prices_transactions_description,
     ht.prices_transactions_type,
-    ht.prices_transactions_area
-
-,
+    ht.prices_transactions_area,
     ht.prices_transactions_price,
     ht.prices_transactions_price_per_square_meter,
     ht.prices_transactions_build_year,
@@ -94,8 +92,8 @@ SELECT
     ht.prices_transactions_condition,
     ht.prices_transactions_plot,
     ht.prices_transactions_energy_class,
-    ht.created_at,
-    ht.updated_at,
+    ht.prices_transactions_created_at,
+    ht.prices_transactions_updated_at,
     ht.prices_transactions_category,
     hn.prices_neighborhoods_id,
     hn.prices_neighborhoods_name,
@@ -110,7 +108,7 @@ LEFT JOIN public.prices_postal_codes AS hp
     ON hn.prices_neighborhoods_postal_code_id = hp.prices_postal_codes_id
 LEFT JOIN public.prices_cities AS hc
     ON hn.prices_neighborhoods_city_id = hc.prices_cities_id
-ORDER BY ht.created_at DESC
+ORDER BY ht.prices_transactions_created_at DESC
 `
 
 type ListTransactionsByNeighborhoodsRow struct {
@@ -126,8 +124,8 @@ type ListTransactionsByNeighborhoodsRow struct {
 	PricesTransactionsCondition           pgtype.Text        `db:"prices_transactions_condition" json:"prices_transactions_condition"`
 	PricesTransactionsPlot                pgtype.Text        `db:"prices_transactions_plot" json:"prices_transactions_plot"`
 	PricesTransactionsEnergyClass         pgtype.Text        `db:"prices_transactions_energy_class" json:"prices_transactions_energy_class"`
-	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PricesTransactionsCreatedAt           pgtype.Timestamptz `db:"prices_transactions_created_at" json:"prices_transactions_created_at"`
+	PricesTransactionsUpdatedAt           pgtype.Timestamptz `db:"prices_transactions_updated_at" json:"prices_transactions_updated_at"`
 	PricesTransactionsCategory            string             `db:"prices_transactions_category" json:"prices_transactions_category"`
 	PricesNeighborhoodsID                 pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
 	PricesNeighborhoodsName               pgtype.Text        `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
@@ -157,8 +155,8 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 			&i.PricesTransactionsCondition,
 			&i.PricesTransactionsPlot,
 			&i.PricesTransactionsEnergyClass,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.PricesTransactionsCreatedAt,
+			&i.PricesTransactionsUpdatedAt,
 			&i.PricesTransactionsCategory,
 			&i.PricesNeighborhoodsID,
 			&i.PricesNeighborhoodsName,
@@ -177,8 +175,10 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 
 const upsertPricesCity = `-- name: UpsertPricesCity :one
 INSERT INTO public.prices_cities (
-    prices_cities_name
-) VALUES ($1)
+    prices_cities_name,
+    prices_cities_created_at,
+    prices_cities_updated_at
+) VALUES ($1, now(), now())
 ON CONFLICT (prices_cities_name) DO UPDATE
 SET prices_cities_updated_at = now()
 RETURNING prices_cities_id, prices_cities_name, prices_cities_created_at, prices_cities_updated_at
@@ -200,8 +200,10 @@ const upsertPricesNeighborhood = `-- name: UpsertPricesNeighborhood :one
 INSERT INTO public.prices_neighborhoods (
     prices_neighborhoods_name,
     prices_neighborhoods_city_id,
-    prices_neighborhoods_postal_code_id
-) VALUES ($1, $2, $3)
+    prices_neighborhoods_postal_code_id,
+    prices_neighborhoods_created_at,
+    prices_neighborhoods_updated_at
+) VALUES ($1, $2, $3, now(), now())
 ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
 SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
     prices_neighborhoods_updated_at = now()
@@ -232,12 +234,16 @@ const upsertPricesNeighborhoodsBulk = `-- name: UpsertPricesNeighborhoodsBulk :m
 INSERT INTO public.prices_neighborhoods (
     prices_neighborhoods_name,
     prices_neighborhoods_city_id,
-    prices_neighborhoods_postal_code_id
+    prices_neighborhoods_postal_code_id,
+    prices_neighborhoods_created_at,
+    prices_neighborhoods_updated_at
 )
 SELECT
     name,
     $1,
-    NULL::uuid
+    NULL::uuid,
+    now(),
+    now()
 FROM unnest($2::text[]) AS t(name)
 ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
 SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
@@ -280,8 +286,10 @@ func (q *Queries) UpsertPricesNeighborhoodsBulk(ctx context.Context, arg UpsertP
 const upsertPricesPostalCode = `-- name: UpsertPricesPostalCode :one
 INSERT INTO public.prices_postal_codes (
     prices_postal_codes_code,
-    prices_postal_codes_city_id
-) VALUES ($1, $2)
+    prices_postal_codes_city_id,
+    prices_postal_codes_created_at,
+    prices_postal_codes_updated_at
+) VALUES ($1, $2, now(), now())
 ON CONFLICT (prices_postal_codes_code) DO UPDATE
 SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
     prices_postal_codes_updated_at = now()
@@ -309,9 +317,11 @@ func (q *Queries) UpsertPricesPostalCode(ctx context.Context, arg UpsertPricesPo
 const upsertPricesPostalCodesBulk = `-- name: UpsertPricesPostalCodesBulk :many
 INSERT INTO public.prices_postal_codes (
     prices_postal_codes_code,
-    prices_postal_codes_city_id
+    prices_postal_codes_city_id,
+    prices_postal_codes_created_at,
+    prices_postal_codes_updated_at
 )
-SELECT code, $1
+SELECT code, $1, now(), now()
 FROM unnest($2::text[]) AS t(code)
 ON CONFLICT (prices_postal_codes_code) DO UPDATE
 SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
@@ -365,9 +375,11 @@ INSERT INTO public.prices_transactions (
     prices_transactions_plot,
     prices_transactions_energy_class,
     prices_transactions_category,
-    prices_neighborhoods_id
+    prices_neighborhoods_id,
+    prices_transactions_created_at,
+    prices_transactions_updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now()
 )
 ON CONFLICT (prices_transactions_id) DO UPDATE
 SET prices_transactions_description = EXCLUDED.prices_transactions_description,
@@ -382,8 +394,9 @@ SET prices_transactions_description = EXCLUDED.prices_transactions_description,
     prices_transactions_plot = EXCLUDED.prices_transactions_plot,
     prices_transactions_energy_class = EXCLUDED.prices_transactions_energy_class,
     prices_transactions_category = EXCLUDED.prices_transactions_category,
-    prices_neighborhoods_id = EXCLUDED.prices_neighborhoods_id
-RETURNING prices_transactions_id, prices_transactions_description, prices_transactions_type, prices_transactions_area, prices_transactions_price, prices_transactions_price_per_square_meter, prices_transactions_build_year, prices_transactions_floor, prices_transactions_elevator, prices_transactions_condition, prices_transactions_plot, prices_transactions_energy_class, created_at, updated_at, prices_transactions_category, prices_neighborhoods_id
+    prices_neighborhoods_id = EXCLUDED.prices_neighborhoods_id,
+    prices_transactions_updated_at = now()
+RETURNING prices_transactions_id, prices_transactions_description, prices_transactions_type, prices_transactions_area, prices_transactions_price, prices_transactions_price_per_square_meter, prices_transactions_build_year, prices_transactions_floor, prices_transactions_elevator, prices_transactions_condition, prices_transactions_plot, prices_transactions_energy_class, prices_transactions_created_at, prices_transactions_updated_at, prices_transactions_category, prices_neighborhoods_id
 `
 
 type UpsertPricesTransactionParams struct {
@@ -434,8 +447,8 @@ func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg UpsertPricesT
 		&i.PricesTransactionsCondition,
 		&i.PricesTransactionsPlot,
 		&i.PricesTransactionsEnergyClass,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PricesTransactionsCreatedAt,
+		&i.PricesTransactionsUpdatedAt,
 		&i.PricesTransactionsCategory,
 		&i.PricesNeighborhoodsID,
 	)
@@ -456,7 +469,9 @@ INSERT INTO public.prices_transactions (
     prices_transactions_plot,
     prices_transactions_energy_class,
     prices_transactions_category,
-    prices_neighborhoods_id
+    prices_neighborhoods_id,
+    prices_transactions_created_at,
+    prices_transactions_updated_at
 )
 SELECT
     descriptions,
@@ -471,7 +486,9 @@ SELECT
     plots,
     energy_classes,
     categories,
-    neighborhood_ids
+    neighborhood_ids,
+    now(),
+    now()
 FROM unnest(
     $1::text[],
     $2::text[],
@@ -516,7 +533,7 @@ ON CONFLICT (
     prices_transactions_energy_class,
     prices_transactions_category
 ) DO UPDATE
-SET updated_at = now()
+SET prices_transactions_updated_at = now()
 `
 
 type UpsertPricesTransactionsBulkParams struct {

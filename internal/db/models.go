@@ -45,8 +45,8 @@ type PricesTransaction struct {
 	PricesTransactionsCondition           pgtype.Text        `db:"prices_transactions_condition" json:"prices_transactions_condition"`
 	PricesTransactionsPlot                pgtype.Text        `db:"prices_transactions_plot" json:"prices_transactions_plot"`
 	PricesTransactionsEnergyClass         pgtype.Text        `db:"prices_transactions_energy_class" json:"prices_transactions_energy_class"`
-	CreatedAt                                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PricesTransactionsCreatedAt           pgtype.Timestamptz `db:"prices_transactions_created_at" json:"prices_transactions_created_at"`
+	PricesTransactionsUpdatedAt           pgtype.Timestamptz `db:"prices_transactions_updated_at" json:"prices_transactions_updated_at"`
 	PricesTransactionsCategory            string             `db:"prices_transactions_category" json:"prices_transactions_category"`
 	PricesNeighborhoodsID                 pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
 }

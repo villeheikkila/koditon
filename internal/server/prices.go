@@ -66,8 +66,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) PricesRes
 		Condition:           row.PricesTransactionsCondition.String,
 		Plot:                row.PricesTransactionsPlot.String,
 		EnergyClass:         util.FromPgText(row.PricesTransactionsEnergyClass),
-		FirstSeenAt:         row.CreatedAt.Time,
-		LastSeenAt:          row.UpdatedAt.Time,
 		Category:            row.PricesTransactionsCategory,
 	}
 }
