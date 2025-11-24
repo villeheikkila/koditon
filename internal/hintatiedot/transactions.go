@@ -118,7 +118,6 @@ func (c *Client) parseTransactions(doc *goquery.Document, city string) ([]*Trans
 		}
 		apartments = append(apartments, apartment)
 	})
-
 	return apartments, nil
 }
 
@@ -140,7 +139,6 @@ func (c *Client) GetAllTransactions(ctx context.Context, city string) ([]*Transa
 	var allApartments []*TransactionEntity
 	nextPage := new(int)
 	*nextPage = 0
-
 	for nextPage != nil {
 		page := *nextPage
 		if page > 0 {

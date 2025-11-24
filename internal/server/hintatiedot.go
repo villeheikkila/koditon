@@ -16,7 +16,7 @@ type HintatiedotResponse struct {
 	PricePerSquareMeter int32                       `json:"price_per_square_meter"`
 	BuildYear           int32                       `json:"build_year"`
 	Floor               string                      `json:"floor"`
-	Elevator            string                      `json:"elevator"`
+	Elevator            bool                        `json:"elevator"`
 	Condition           string                      `json:"condition"`
 	Plot                string                      `json:"plot"`
 	EnergyClass         util.Nullable[string]       `json:"energy_class,omitzero"`
@@ -48,7 +48,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) Hintatied
 	if row.HintatiedotNeighborhoodsName.Valid {
 		neighborhoodName = row.HintatiedotNeighborhoodsName.String
 	}
-
 	return HintatiedotResponse{
 		ID: row.HintatiedotTransactionsID.String(),
 		Neighborhood: TransactionNeighborhoodInfo{
@@ -63,7 +62,7 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) Hintatied
 		PricePerSquareMeter: row.HintatiedotTransactionsPricePerSquareMeter,
 		BuildYear:           row.HintatiedotTransactionsBuildYear,
 		Floor:               row.HintatiedotTransactionsFloor.String,
-		Elevator:            formatBool(row.HintatiedotTransactionsElevator),
+		Elevator:            row.HintatiedotTransactionsElevator,
 		Condition:           row.HintatiedotTransactionsCondition.String,
 		Plot:                row.HintatiedotTransactionsPlot.String,
 		EnergyClass:         util.FromPgText(row.HintatiedotTransactionsEnergyClass),
@@ -76,7 +75,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) Hintatied
 func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []CityResponse {
 	cityMap := make(map[string]*CityResponse)
 	var cityOrder []string
-
 	for _, row := range rows {
 		cityID := row.HintatiedotCitiesID.String()
 
@@ -88,7 +86,6 @@ func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []City
 			}
 			cityOrder = append(cityOrder, cityID)
 		}
-
 		if row.HintatiedotNeighborhoodsID.Valid {
 			cityMap[cityID].Neighborhoods = append(cityMap[cityID].Neighborhoods, NeighborhoodResponse{
 				ID:         row.HintatiedotNeighborhoodsID.String(),
@@ -97,7 +94,6 @@ func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []City
 			})
 		}
 	}
-
 	result := make([]CityResponse, 0, len(cityOrder))
 	for _, cityID := range cityOrder {
 		result = append(result, *cityMap[cityID])

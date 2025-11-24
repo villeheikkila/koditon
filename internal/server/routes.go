@@ -15,6 +15,7 @@ func (s *Server) addRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/ping", s.handlePing)
 	mux.HandleFunc("/api/v1/cities", s.handleListCities)
 	mux.HandleFunc("/api/v1/transactions", s.handleListTransactions)
+	mux.HandleFunc("/api/v1/transactions/fetch", s.handleTransactions)
 	mux.HandleFunc("/api/v1/hintatiedot/cities", s.handleFetchHintatiedotCities)
 	mux.Handle("/", http.NotFoundHandler())
 }
@@ -45,19 +46,27 @@ func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
+	transactions, err := s.hintatiedotAPI.GetAllTransactions(r.Context(), "Helsinki")
+	if err != nil {
+		s.logger.ErrorContext(r.Context(), "fetch all transactions from hintatiedot", "err", err)
+		http.Error(w, "Failed to fetch transactions", http.StatusInternalServerError)
+		return
+	}
+	s.logger.InfoContext(r.Context(), "list of transactions fetched", "count", len(transactions))
+}
+
 func (s *Server) handleListCities(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	cities, err := s.db.ListCitiesWithNeighborhoods(r.Context())
 	if err != nil {
 		s.logger.ErrorContext(r.Context(), "list cities with neighborhoods", "err", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
 	response := mapCitiesWithNeighborhoods(cities)
 	if err := encode(w, r, http.StatusOK, response); err != nil {
 		s.logger.ErrorContext(r.Context(), "encode response", "err", err)
@@ -69,12 +78,10 @@ func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	// Parse neighborhood UUIDs from query parameter
 	neighborhoodIDs := []pgtype.UUID{}
 	if v := r.URL.Query().Get("neighborhoods"); v != "" {
-		uuidStrings := strings.Split(v, ",")
-		for _, uuidStr := range uuidStrings {
+		uuidStrings := strings.SplitSeq(v, ",")
+		for uuidStr := range uuidStrings {
 			uuidStr = strings.TrimSpace(uuidStr)
 			if uuidStr == "" {
 				continue
