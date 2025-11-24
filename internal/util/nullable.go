@@ -7,14 +7,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Nullable is a generic type for handling optional values in JSON responses.
-// It omits the field entirely when the value is null/invalid.
 type Nullable[T any] struct {
 	Value T
 	Valid bool
 }
 
-// MarshalJSON implements json.Marshaler for Nullable.
 func (n Nullable[T]) MarshalJSON() ([]byte, error) {
 	if !n.Valid {
 		return []byte("null"), nil
@@ -22,7 +19,6 @@ func (n Nullable[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(n.Value)
 }
 
-// UnmarshalJSON implements json.Unmarshaler for Nullable.
 func (n *Nullable[T]) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		n.Valid = false
@@ -48,7 +44,6 @@ func FromSQLNullString(ns sql.NullString) Nullable[string] {
 	}
 }
 
-// FromSQLNullInt32 converts sql.NullInt32 to Nullable[int32].
 func FromSQLNullInt32(ni sql.NullInt32) Nullable[int32] {
 	return Nullable[int32]{
 		Value: ni.Int32,
@@ -56,7 +51,6 @@ func FromSQLNullInt32(ni sql.NullInt32) Nullable[int32] {
 	}
 }
 
-// FromSQLNullInt64 converts sql.NullInt64 to Nullable[int64].
 func FromSQLNullInt64(ni sql.NullInt64) Nullable[int64] {
 	return Nullable[int64]{
 		Value: ni.Int64,
@@ -64,7 +58,6 @@ func FromSQLNullInt64(ni sql.NullInt64) Nullable[int64] {
 	}
 }
 
-// FromSQLNullFloat64 converts sql.NullFloat64 to Nullable[float64].
 func FromSQLNullFloat64(nf sql.NullFloat64) Nullable[float64] {
 	return Nullable[float64]{
 		Value: nf.Float64,
@@ -72,7 +65,6 @@ func FromSQLNullFloat64(nf sql.NullFloat64) Nullable[float64] {
 	}
 }
 
-// FromSQLNullBool converts sql.NullBool to Nullable[bool].
 func FromSQLNullBool(nb sql.NullBool) Nullable[bool] {
 	return Nullable[bool]{
 		Value: nb.Bool,
@@ -80,7 +72,6 @@ func FromSQLNullBool(nb sql.NullBool) Nullable[bool] {
 	}
 }
 
-// FromPgText converts pgtype.Text to Nullable[string].
 func FromPgText(pt pgtype.Text) Nullable[string] {
 	return Nullable[string]{
 		Value: pt.String,
@@ -88,7 +79,6 @@ func FromPgText(pt pgtype.Text) Nullable[string] {
 	}
 }
 
-// FromPgInt4 converts pgtype.Int4 to Nullable[int32].
 func FromPgInt4(pi pgtype.Int4) Nullable[int32] {
 	return Nullable[int32]{
 		Value: pi.Int32,
@@ -96,7 +86,6 @@ func FromPgInt4(pi pgtype.Int4) Nullable[int32] {
 	}
 }
 
-// FromPgInt8 converts pgtype.Int8 to Nullable[int64].
 func FromPgInt8(pi pgtype.Int8) Nullable[int64] {
 	return Nullable[int64]{
 		Value: pi.Int64,
@@ -104,7 +93,6 @@ func FromPgInt8(pi pgtype.Int8) Nullable[int64] {
 	}
 }
 
-// FromPgFloat8 converts pgtype.Float8 to Nullable[float64].
 func FromPgFloat8(pf pgtype.Float8) Nullable[float64] {
 	return Nullable[float64]{
 		Value: pf.Float64,
@@ -112,7 +100,6 @@ func FromPgFloat8(pf pgtype.Float8) Nullable[float64] {
 	}
 }
 
-// FromPgBool converts pgtype.Bool to Nullable[bool].
 func FromPgBool(pb pgtype.Bool) Nullable[bool] {
 	return Nullable[bool]{
 		Value: pb.Bool,

@@ -16,7 +16,7 @@ type PricesResponse struct {
 	PricePerSquareMeter int32                       `json:"price_per_square_meter"`
 	BuildYear           int32                       `json:"build_year"`
 	Floor               string                      `json:"floor"`
-	Elevator            string                      `json:"elevator"`
+	Elevator            bool                        `json:"elevator"`
 	Condition           string                      `json:"condition"`
 	Plot                string                      `json:"plot"`
 	EnergyClass         util.Nullable[string]       `json:"energy_class,omitzero"`
@@ -48,7 +48,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) PricesRes
 	if row.PricesNeighborhoodsName.Valid {
 		neighborhoodName = row.PricesNeighborhoodsName.String
 	}
-
 	return PricesResponse{
 		ID: row.PricesTransactionsID.String(),
 		Neighborhood: TransactionNeighborhoodInfo{
@@ -63,7 +62,7 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) PricesRes
 		PricePerSquareMeter: row.PricesTransactionsPricePerSquareMeter,
 		BuildYear:           row.PricesTransactionsBuildYear,
 		Floor:               row.PricesTransactionsFloor.String,
-		Elevator:            formatBool(row.PricesTransactionsElevator),
+		Elevator:            row.PricesTransactionsElevator,
 		Condition:           row.PricesTransactionsCondition.String,
 		Plot:                row.PricesTransactionsPlot.String,
 		EnergyClass:         util.FromPgText(row.PricesTransactionsEnergyClass),
@@ -76,7 +75,6 @@ func mapTransactionResponse(row db.ListTransactionsByNeighborhoodsRow) PricesRes
 func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []CityResponse {
 	cityMap := make(map[string]*CityResponse)
 	var cityOrder []string
-
 	for _, row := range rows {
 		cityID := row.PricesCitiesID.String()
 
@@ -88,7 +86,6 @@ func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []City
 			}
 			cityOrder = append(cityOrder, cityID)
 		}
-
 		if row.PricesNeighborhoodsID.Valid {
 			cityMap[cityID].Neighborhoods = append(cityMap[cityID].Neighborhoods, NeighborhoodResponse{
 				ID:         row.PricesNeighborhoodsID.String(),
@@ -97,7 +94,6 @@ func mapCitiesWithNeighborhoods(rows []db.ListCitiesWithNeighborhoodsRow) []City
 			})
 		}
 	}
-
 	result := make([]CityResponse, 0, len(cityOrder))
 	for _, cityID := range cityOrder {
 		result = append(result, *cityMap[cityID])

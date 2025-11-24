@@ -174,3 +174,385 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 	}
 	return items, nil
 }
+
+const upsertPricesCity = `-- name: UpsertPricesCity :one
+INSERT INTO public.prices_cities (
+    prices_cities_name
+) VALUES ($1)
+ON CONFLICT (prices_cities_name) DO UPDATE
+SET prices_cities_updated_at = now()
+RETURNING prices_cities_id, prices_cities_name, prices_cities_created_at, prices_cities_updated_at
+`
+
+func (q *Queries) UpsertPricesCity(ctx context.Context, pricesCitiesName string) (PricesCity, error) {
+	row := q.db.QueryRow(ctx, upsertPricesCity, pricesCitiesName)
+	var i PricesCity
+	err := row.Scan(
+		&i.PricesCitiesID,
+		&i.PricesCitiesName,
+		&i.PricesCitiesCreatedAt,
+		&i.PricesCitiesUpdatedAt,
+	)
+	return i, err
+}
+
+const upsertPricesNeighborhood = `-- name: UpsertPricesNeighborhood :one
+INSERT INTO public.prices_neighborhoods (
+    prices_neighborhoods_name,
+    prices_neighborhoods_city_id,
+    prices_neighborhoods_postal_code_id
+) VALUES ($1, $2, $3)
+ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
+SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
+    prices_neighborhoods_updated_at = now()
+RETURNING prices_neighborhoods_id, prices_neighborhoods_name, prices_neighborhoods_city_id, prices_neighborhoods_postal_code_id, prices_neighborhoods_created_at, prices_neighborhoods_updated_at
+`
+
+type UpsertPricesNeighborhoodParams struct {
+	PricesNeighborhoodsName         string      `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
+	PricesNeighborhoodsCityID       pgtype.UUID `db:"prices_neighborhoods_city_id" json:"prices_neighborhoods_city_id"`
+	PricesNeighborhoodsPostalCodeID pgtype.UUID `db:"prices_neighborhoods_postal_code_id" json:"prices_neighborhoods_postal_code_id"`
+}
+
+func (q *Queries) UpsertPricesNeighborhood(ctx context.Context, arg UpsertPricesNeighborhoodParams) (PricesNeighborhood, error) {
+	row := q.db.QueryRow(ctx, upsertPricesNeighborhood, arg.PricesNeighborhoodsName, arg.PricesNeighborhoodsCityID, arg.PricesNeighborhoodsPostalCodeID)
+	var i PricesNeighborhood
+	err := row.Scan(
+		&i.PricesNeighborhoodsID,
+		&i.PricesNeighborhoodsName,
+		&i.PricesNeighborhoodsCityID,
+		&i.PricesNeighborhoodsPostalCodeID,
+		&i.PricesNeighborhoodsCreatedAt,
+		&i.PricesNeighborhoodsUpdatedAt,
+	)
+	return i, err
+}
+
+const upsertPricesNeighborhoodsBulk = `-- name: UpsertPricesNeighborhoodsBulk :many
+INSERT INTO public.prices_neighborhoods (
+    prices_neighborhoods_name,
+    prices_neighborhoods_city_id,
+    prices_neighborhoods_postal_code_id
+)
+SELECT
+    name,
+    $1,
+    NULL::uuid
+FROM unnest($2::text[]) AS t(name)
+ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
+SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
+    prices_neighborhoods_updated_at = now()
+RETURNING prices_neighborhoods_id, prices_neighborhoods_name, prices_neighborhoods_city_id, prices_neighborhoods_postal_code_id, prices_neighborhoods_created_at, prices_neighborhoods_updated_at
+`
+
+type UpsertPricesNeighborhoodsBulkParams struct {
+	CityID pgtype.UUID `db:"city_id" json:"city_id"`
+	Names  []string    `db:"names" json:"names"`
+}
+
+func (q *Queries) UpsertPricesNeighborhoodsBulk(ctx context.Context, arg UpsertPricesNeighborhoodsBulkParams) ([]PricesNeighborhood, error) {
+	rows, err := q.db.Query(ctx, upsertPricesNeighborhoodsBulk, arg.CityID, arg.Names)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PricesNeighborhood{}
+	for rows.Next() {
+		var i PricesNeighborhood
+		if err := rows.Scan(
+			&i.PricesNeighborhoodsID,
+			&i.PricesNeighborhoodsName,
+			&i.PricesNeighborhoodsCityID,
+			&i.PricesNeighborhoodsPostalCodeID,
+			&i.PricesNeighborhoodsCreatedAt,
+			&i.PricesNeighborhoodsUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertPricesPostalCode = `-- name: UpsertPricesPostalCode :one
+INSERT INTO public.prices_postal_codes (
+    prices_postal_codes_code,
+    prices_postal_codes_city_id
+) VALUES ($1, $2)
+ON CONFLICT (prices_postal_codes_code) DO UPDATE
+SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
+    prices_postal_codes_updated_at = now()
+RETURNING prices_postal_codes_id, prices_postal_codes_code, prices_postal_codes_city_id, prices_postal_codes_created_at, prices_postal_codes_updated_at
+`
+
+type UpsertPricesPostalCodeParams struct {
+	PricesPostalCodesCode   string      `db:"prices_postal_codes_code" json:"prices_postal_codes_code"`
+	PricesPostalCodesCityID pgtype.UUID `db:"prices_postal_codes_city_id" json:"prices_postal_codes_city_id"`
+}
+
+func (q *Queries) UpsertPricesPostalCode(ctx context.Context, arg UpsertPricesPostalCodeParams) (PricesPostalCode, error) {
+	row := q.db.QueryRow(ctx, upsertPricesPostalCode, arg.PricesPostalCodesCode, arg.PricesPostalCodesCityID)
+	var i PricesPostalCode
+	err := row.Scan(
+		&i.PricesPostalCodesID,
+		&i.PricesPostalCodesCode,
+		&i.PricesPostalCodesCityID,
+		&i.PricesPostalCodesCreatedAt,
+		&i.PricesPostalCodesUpdatedAt,
+	)
+	return i, err
+}
+
+const upsertPricesPostalCodesBulk = `-- name: UpsertPricesPostalCodesBulk :many
+INSERT INTO public.prices_postal_codes (
+    prices_postal_codes_code,
+    prices_postal_codes_city_id
+)
+SELECT code, $1
+FROM unnest($2::text[]) AS t(code)
+ON CONFLICT (prices_postal_codes_code) DO UPDATE
+SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
+    prices_postal_codes_updated_at = now()
+RETURNING prices_postal_codes_id, prices_postal_codes_code, prices_postal_codes_city_id, prices_postal_codes_created_at, prices_postal_codes_updated_at
+`
+
+type UpsertPricesPostalCodesBulkParams struct {
+	CityID pgtype.UUID `db:"city_id" json:"city_id"`
+	Codes  []string    `db:"codes" json:"codes"`
+}
+
+func (q *Queries) UpsertPricesPostalCodesBulk(ctx context.Context, arg UpsertPricesPostalCodesBulkParams) ([]PricesPostalCode, error) {
+	rows, err := q.db.Query(ctx, upsertPricesPostalCodesBulk, arg.CityID, arg.Codes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PricesPostalCode{}
+	for rows.Next() {
+		var i PricesPostalCode
+		if err := rows.Scan(
+			&i.PricesPostalCodesID,
+			&i.PricesPostalCodesCode,
+			&i.PricesPostalCodesCityID,
+			&i.PricesPostalCodesCreatedAt,
+			&i.PricesPostalCodesUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertPricesTransaction = `-- name: UpsertPricesTransaction :one
+INSERT INTO public.prices_transactions (
+    prices_transactions_id,
+    prices_transactions_description,
+    prices_transactions_type,
+    prices_transactions_area,
+    prices_transactions_price,
+    prices_transactions_price_per_square_meter,
+    prices_transactions_build_year,
+    prices_transactions_floor,
+    prices_transactions_elevator,
+    prices_transactions_condition,
+    prices_transactions_plot,
+    prices_transactions_energy_class,
+    prices_transactions_category,
+    prices_neighborhoods_id
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+)
+ON CONFLICT (prices_transactions_id) DO UPDATE
+SET prices_transactions_description = EXCLUDED.prices_transactions_description,
+    prices_transactions_type = EXCLUDED.prices_transactions_type,
+    prices_transactions_area = EXCLUDED.prices_transactions_area,
+    prices_transactions_price = EXCLUDED.prices_transactions_price,
+    prices_transactions_price_per_square_meter = EXCLUDED.prices_transactions_price_per_square_meter,
+    prices_transactions_build_year = EXCLUDED.prices_transactions_build_year,
+    prices_transactions_floor = EXCLUDED.prices_transactions_floor,
+    prices_transactions_elevator = EXCLUDED.prices_transactions_elevator,
+    prices_transactions_condition = EXCLUDED.prices_transactions_condition,
+    prices_transactions_plot = EXCLUDED.prices_transactions_plot,
+    prices_transactions_energy_class = EXCLUDED.prices_transactions_energy_class,
+    prices_transactions_category = EXCLUDED.prices_transactions_category,
+    prices_neighborhoods_id = EXCLUDED.prices_neighborhoods_id
+RETURNING prices_transactions_id, prices_transactions_description, prices_transactions_type, prices_transactions_area, prices_transactions_price, prices_transactions_price_per_square_meter, prices_transactions_build_year, prices_transactions_floor, prices_transactions_elevator, prices_transactions_condition, prices_transactions_plot, prices_transactions_energy_class, created_at, updated_at, prices_transactions_category, prices_neighborhoods_id
+`
+
+type UpsertPricesTransactionParams struct {
+	PricesTransactionsID                  pgtype.UUID `db:"prices_transactions_id" json:"prices_transactions_id"`
+	PricesTransactionsDescription         string      `db:"prices_transactions_description" json:"prices_transactions_description"`
+	PricesTransactionsType                string      `db:"prices_transactions_type" json:"prices_transactions_type"`
+	PricesTransactionsArea                float64     `db:"prices_transactions_area" json:"prices_transactions_area"`
+	PricesTransactionsPrice               int32       `db:"prices_transactions_price" json:"prices_transactions_price"`
+	PricesTransactionsPricePerSquareMeter int32       `db:"prices_transactions_price_per_square_meter" json:"prices_transactions_price_per_square_meter"`
+	PricesTransactionsBuildYear           int32       `db:"prices_transactions_build_year" json:"prices_transactions_build_year"`
+	PricesTransactionsFloor               pgtype.Text `db:"prices_transactions_floor" json:"prices_transactions_floor"`
+	PricesTransactionsElevator            bool        `db:"prices_transactions_elevator" json:"prices_transactions_elevator"`
+	PricesTransactionsCondition           pgtype.Text `db:"prices_transactions_condition" json:"prices_transactions_condition"`
+	PricesTransactionsPlot                pgtype.Text `db:"prices_transactions_plot" json:"prices_transactions_plot"`
+	PricesTransactionsEnergyClass         pgtype.Text `db:"prices_transactions_energy_class" json:"prices_transactions_energy_class"`
+	PricesTransactionsCategory            string      `db:"prices_transactions_category" json:"prices_transactions_category"`
+	PricesNeighborhoodsID                 pgtype.UUID `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
+}
+
+func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg UpsertPricesTransactionParams) (PricesTransaction, error) {
+	row := q.db.QueryRow(ctx, upsertPricesTransaction,
+		arg.PricesTransactionsID,
+		arg.PricesTransactionsDescription,
+		arg.PricesTransactionsType,
+		arg.PricesTransactionsArea,
+		arg.PricesTransactionsPrice,
+		arg.PricesTransactionsPricePerSquareMeter,
+		arg.PricesTransactionsBuildYear,
+		arg.PricesTransactionsFloor,
+		arg.PricesTransactionsElevator,
+		arg.PricesTransactionsCondition,
+		arg.PricesTransactionsPlot,
+		arg.PricesTransactionsEnergyClass,
+		arg.PricesTransactionsCategory,
+		arg.PricesNeighborhoodsID,
+	)
+	var i PricesTransaction
+	err := row.Scan(
+		&i.PricesTransactionsID,
+		&i.PricesTransactionsDescription,
+		&i.PricesTransactionsType,
+		&i.PricesTransactionsArea,
+		&i.PricesTransactionsPrice,
+		&i.PricesTransactionsPricePerSquareMeter,
+		&i.PricesTransactionsBuildYear,
+		&i.PricesTransactionsFloor,
+		&i.PricesTransactionsElevator,
+		&i.PricesTransactionsCondition,
+		&i.PricesTransactionsPlot,
+		&i.PricesTransactionsEnergyClass,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PricesTransactionsCategory,
+		&i.PricesNeighborhoodsID,
+	)
+	return i, err
+}
+
+const upsertPricesTransactionsBulk = `-- name: UpsertPricesTransactionsBulk :execrows
+INSERT INTO public.prices_transactions (
+    prices_transactions_description,
+    prices_transactions_type,
+    prices_transactions_area,
+    prices_transactions_price,
+    prices_transactions_price_per_square_meter,
+    prices_transactions_build_year,
+    prices_transactions_floor,
+    prices_transactions_elevator,
+    prices_transactions_condition,
+    prices_transactions_plot,
+    prices_transactions_energy_class,
+    prices_transactions_category,
+    prices_neighborhoods_id
+)
+SELECT
+    descriptions,
+    types,
+    areas,
+    prices,
+    price_per_square_meters,
+    build_years,
+    floors,
+    elevators,
+    conditions,
+    plots,
+    energy_classes,
+    categories,
+    neighborhood_ids
+FROM unnest(
+    $1::text[],
+    $2::text[],
+    $3::double precision[],
+    $4::int[],
+    $5::int[],
+    $6::int[],
+    $7::text[],
+    $8::boolean[],
+    $9::text[],
+    $10::text[],
+    $11::text[],
+    $12::text[],
+    $13::uuid[]
+) AS t(
+    descriptions,
+    types,
+    areas,
+    prices,
+    price_per_square_meters,
+    build_years,
+    floors,
+    elevators,
+    conditions,
+    plots,
+    energy_classes,
+    categories,
+    neighborhood_ids
+)
+ON CONFLICT (
+    prices_neighborhoods_id,
+    prices_transactions_description,
+    prices_transactions_type,
+    prices_transactions_area,
+    prices_transactions_price,
+    prices_transactions_price_per_square_meter,
+    prices_transactions_build_year,
+    prices_transactions_floor,
+    prices_transactions_elevator,
+    prices_transactions_condition,
+    prices_transactions_plot,
+    prices_transactions_energy_class,
+    prices_transactions_category
+) DO UPDATE
+SET updated_at = now()
+`
+
+type UpsertPricesTransactionsBulkParams struct {
+	Descriptions         []string      `db:"descriptions" json:"descriptions"`
+	Types                []string      `db:"types" json:"types"`
+	Areas                []float64     `db:"areas" json:"areas"`
+	Prices               []int32       `db:"prices" json:"prices"`
+	PricePerSquareMeters []int32       `db:"price_per_square_meters" json:"price_per_square_meters"`
+	BuildYears           []int32       `db:"build_years" json:"build_years"`
+	Floors               []string      `db:"floors" json:"floors"`
+	Elevators            []bool        `db:"elevators" json:"elevators"`
+	Conditions           []string      `db:"conditions" json:"conditions"`
+	Plots                []string      `db:"plots" json:"plots"`
+	EnergyClasses        []string      `db:"energy_classes" json:"energy_classes"`
+	Categories           []string      `db:"categories" json:"categories"`
+	NeighborhoodIds      []pgtype.UUID `db:"neighborhood_ids" json:"neighborhood_ids"`
+}
+
+func (q *Queries) UpsertPricesTransactionsBulk(ctx context.Context, arg UpsertPricesTransactionsBulkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertPricesTransactionsBulk,
+		arg.Descriptions,
+		arg.Types,
+		arg.Areas,
+		arg.Prices,
+		arg.PricePerSquareMeters,
+		arg.BuildYears,
+		arg.Floors,
+		arg.Elevators,
+		arg.Conditions,
+		arg.Plots,
+		arg.EnergyClasses,
+		arg.Categories,
+		arg.NeighborhoodIds,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
