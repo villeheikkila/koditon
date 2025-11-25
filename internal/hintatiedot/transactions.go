@@ -144,7 +144,6 @@ func (c *Client) GetAllTransactions(ctx context.Context, city string) ([]*Transa
 		if page > 0 {
 			time.Sleep(1 * time.Second)
 		}
-
 		startTime := time.Now()
 		c.logger.Info("starting to parse hintatiedot page",
 			"city", city,

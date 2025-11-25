@@ -31,8 +31,7 @@ func NewSyncService(queries *db.Queries, api *Client, logger *slog.Logger) *Sync
 
 func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 	s.logger.InfoContext(ctx, "starting city sync", "city", city)
-
-	// Upsert city
+	// city
 	s.logger.DebugContext(ctx, "upserting city", "city", city)
 	cityRow, err := s.queries.UpsertHintatiedotCity(ctx, city)
 	if err != nil {
@@ -41,8 +40,7 @@ func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 	}
 	cityID := cityRow.HintatiedotCitiesID
 	s.logger.InfoContext(ctx, "city upserted", "city", city, "city_id", cityID)
-
-	// Fetch and upsert postal codes
+	// postal codes
 	s.logger.DebugContext(ctx, "fetching postal codes", "city", city)
 	postalCodes, err := s.api.FetchPostalCodes(ctx, city)
 	if err != nil {
@@ -78,7 +76,28 @@ func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 	}
 	neighborhoods = util.UniqueStrings(neighborhoods)
 	s.logger.InfoContext(ctx, "fetched neighborhoods", "city", city, "count", len(neighborhoods))
-
+	s.logger.DebugContext(ctx, "fetching transactions", "city", city)
+	transactions, err := s.api.GetAllTransactions(ctx, city)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to fetch transactions", "city", city, "err", err)
+		return fmt.Errorf("fetch transactions for %q: %w", city, err)
+	}
+	s.logger.InfoContext(ctx, "fetched transactions", "city", city, "count", len(transactions))
+	// collect neighborhoods from transactions
+	s.logger.DebugContext(ctx, "collecting neighborhoods from transactions", "city", city)
+	transactionNeighborhoods := make(map[string]bool)
+	for _, tx := range transactions {
+		normalized := strings.TrimSpace(tx.Neighborhood)
+		if normalized != "" {
+			transactionNeighborhoods[normalized] = true
+		}
+	}
+	for name := range transactionNeighborhoods {
+		neighborhoods = append(neighborhoods, name)
+	}
+	neighborhoods = util.UniqueStrings(neighborhoods)
+	s.logger.InfoContext(ctx, "collected all neighborhoods", "city", city, "count", len(neighborhoods))
+	// upsert neighborhoods
 	neighborhoodIDs := make(map[string]pgtype.UUID, len(neighborhoods))
 	if len(neighborhoods) > 0 {
 		s.logger.DebugContext(ctx, "bulk upserting neighborhoods", "city", city, "count", len(neighborhoods))
@@ -96,16 +115,6 @@ func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 		}
 		s.logger.InfoContext(ctx, "neighborhoods upserted", "city", city, "count", len(rows))
 	}
-
-	// Fetch and upsert transactions
-	s.logger.DebugContext(ctx, "fetching transactions", "city", city)
-	transactions, err := s.api.GetAllTransactions(ctx, city)
-	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to fetch transactions", "city", city, "err", err)
-		return fmt.Errorf("fetch transactions for %q: %w", city, err)
-	}
-	s.logger.InfoContext(ctx, "fetched transactions", "city", city, "count", len(transactions))
-
 	if len(transactions) > 0 {
 		s.logger.DebugContext(ctx, "building transaction params", "city", city, "count", len(transactions))
 		params, err := s.buildTransactionParams(transactions, neighborhoodIDs)
