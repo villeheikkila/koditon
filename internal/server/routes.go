@@ -10,24 +10,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var _ ServerInterface = (*Server)(nil)
+
 func (s *Server) addRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/healthz", s.handleHealth)
-	mux.HandleFunc("/api/v1/ping", s.handlePing)
-	mux.HandleFunc("/api/v1/cities", s.handleListCities)
-	mux.HandleFunc("/api/v1/transactions", s.handleListTransactions)
-	mux.HandleFunc("/api/v1/transactions/fetch", s.handleTransactions)
-	mux.HandleFunc("/api/v1/hintatiedot/cities", s.handleFetchHintatiedotCities)
-	mux.HandleFunc("/api/v1/hintatiedot/sync", s.handleSyncHintatiedotCity)
+	HandlerFromMux(s, mux)
 	mux.Handle("/", http.NotFoundHandler())
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Healthz(w http.ResponseWriter, r *http.Request) {
 	_ = encode(w, r, http.StatusOK, map[string]string{
 		"status": "ok",
 	})
 }
 
-func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Ping(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		Message string `json:"message"`
 	}
@@ -47,7 +43,7 @@ func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) FetchTransactions(w http.ResponseWriter, r *http.Request) {
 	transactions, err := s.hintatiedotAPI.GetAllTransactions(r.Context(), "Helsinki")
 	if err != nil {
 		s.logger.ErrorContext(r.Context(), "fetch all transactions from hintatiedot", "err", err)
@@ -57,7 +53,7 @@ func (s *Server) handleTransactions(w http.ResponseWriter, r *http.Request) {
 	s.logger.InfoContext(r.Context(), "list of transactions fetched", "count", len(transactions))
 }
 
-func (s *Server) handleListCities(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ListCities(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -74,27 +70,21 @@ func (s *Server) handleListCities(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ListTransactions(w http.ResponseWriter, r *http.Request, params ListTransactionsParams) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	neighborhoodIDs := []pgtype.UUID{}
-	if v := r.URL.Query().Get("neighborhoods"); v != "" {
-		uuidStrings := strings.SplitSeq(v, ",")
-		for uuidStr := range uuidStrings {
-			uuidStr = strings.TrimSpace(uuidStr)
-			if uuidStr == "" {
-				continue
-			}
-			parsedUUID, err := parseUUID(uuidStr)
-			if err != nil {
-				s.logger.WarnContext(r.Context(), "invalid neighborhood UUID", "uuid", uuidStr, "err", err)
-				http.Error(w, "Invalid neighborhood UUID", http.StatusBadRequest)
-				return
-			}
-			neighborhoodIDs = append(neighborhoodIDs, parsedUUID)
+
+	neighborhoodIDs := make([]pgtype.UUID, len(params.Neighborhoods))
+	for i, neighborhoodID := range params.Neighborhoods {
+		parsedUUID, err := parseUUID(neighborhoodID.String())
+		if err != nil {
+			s.logger.WarnContext(r.Context(), "invalid neighborhood UUID", "uuid", neighborhoodID.String(), "err", err)
+			http.Error(w, "Invalid neighborhood UUID", http.StatusBadRequest)
+			return
 		}
+		neighborhoodIDs[i] = parsedUUID
 	}
 
 	if len(neighborhoodIDs) == 0 {
@@ -118,7 +108,7 @@ func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (s *Server) handleFetchHintatiedotCities(w http.ResponseWriter, r *http.Request) {
+func (s *Server) FetchHintatiedotCities(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -136,7 +126,7 @@ func (s *Server) handleFetchHintatiedotCities(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (s *Server) handleSyncHintatiedotCity(w http.ResponseWriter, r *http.Request) {
+func (s *Server) SyncHintatiedotCity(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

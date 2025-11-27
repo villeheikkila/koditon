@@ -1,0 +1,305 @@
+openapi: 3.0.3
+info:
+  title: Koditon API
+  version: "0.1.0"
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      operationId: healthz
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/ping:
+    post:
+      summary: Echo a message
+      operationId: ping
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PingRequest"
+      responses:
+        "200":
+          description: Echoed message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+        "400":
+          description: Invalid request payload
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/cities:
+    get:
+      summary: List cities with neighborhoods
+      operationId: listCities
+      responses:
+        "200":
+          description: City list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/City"
+        "500":
+          description: Failed to fetch cities
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/transactions:
+    get:
+      summary: List transactions for neighborhoods
+      operationId: listTransactions
+      parameters:
+        - name: neighborhoods
+          in: query
+          description: Comma-separated list of neighborhood IDs
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+      responses:
+        "200":
+          description: Matching transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HintatiedotTransaction"
+        "400":
+          description: Invalid neighborhood IDs
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Failed to fetch transactions
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/transactions/fetch:
+    post:
+      summary: Fetch transactions from Hintatiedot for Helsinki
+      operationId: fetchTransactions
+      responses:
+        "200":
+          description: Fetch started
+  /api/v1/hintatiedot/cities:
+    get:
+      summary: Fetch cities from Hintatiedot
+      operationId: fetchHintatiedotCities
+      responses:
+        "200":
+          description: Available cities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HintatiedotCitiesResponse"
+        "500":
+          description: Failed to fetch cities
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/hintatiedot/sync:
+    post:
+      summary: Sync a city from Hintatiedot
+      operationId: syncHintatiedotCity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncHintatiedotRequest"
+      responses:
+        "200":
+          description: Sync succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncHintatiedotResponse"
+        "400":
+          description: Invalid request
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Sync failed
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    PingRequest:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    PingResponse:
+      type: object
+      properties:
+        echo:
+          type: string
+      required:
+        - echo
+    City:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        neighborhoods:
+          type: array
+          items:
+            $ref: "#/components/schemas/Neighborhood"
+      required:
+        - id
+        - name
+        - neighborhoods
+    Neighborhood:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        postal_code:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - postal_code
+    TransactionNeighborhood:
+      type: object
+      properties:
+        code:
+          type: string
+          format: uuid
+        postal_code:
+          type: string
+          nullable: true
+        name:
+          type: string
+      required:
+        - code
+        - postal_code
+        - name
+    HintatiedotTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        neighborhood:
+          $ref: "#/components/schemas/TransactionNeighborhood"
+        description:
+          type: string
+        type:
+          type: string
+        area:
+          type: number
+          format: double
+        price:
+          type: integer
+          format: int32
+        price_per_square_meter:
+          type: integer
+          format: int32
+        build_year:
+          type: integer
+          format: int32
+        floor:
+          type: string
+        elevator:
+          type: boolean
+        condition:
+          type: string
+        plot:
+          type: string
+        energy_class:
+          type: string
+          nullable: true
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        category:
+          type: string
+      required:
+        - id
+        - neighborhood
+        - description
+        - type
+        - area
+        - price
+        - price_per_square_meter
+        - build_year
+        - floor
+        - elevator
+        - condition
+        - plot
+        - energy_class
+        - first_seen_at
+        - last_seen_at
+        - category
+    HintatiedotCitiesResponse:
+      type: object
+      properties:
+        cities:
+          type: array
+          items:
+            type: string
+      required:
+        - cities
+    SyncHintatiedotRequest:
+      type: object
+      properties:
+        city:
+          type: string
+      required:
+        - city
+    SyncHintatiedotResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        city:
+          type: string
+      required:
+        - status
+        - city
