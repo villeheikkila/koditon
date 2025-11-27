@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
 )
@@ -66,9 +68,11 @@ func run(
 		return fmt.Errorf("create hintatiedot client: %w", err)
 	}
 	srv := server.New(logger, cfg, queries, hintatiedotClient)
+	mux := http.NewServeMux()
+	api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
-		Handler: srv.Handler(),
+		Handler: srv.Handler(mux, api),
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
@@ -90,6 +94,9 @@ func run(
 		appLogger.Info("shutting down", "timeout", cfg.ShutdownTimeout)
 		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
 			return fmt.Errorf("server shutdown: %w", shutdownErr)
+		}
+		if serveErr := <-errCh; serveErr != nil {
+			return fmt.Errorf("http server: %w", serveErr)
 		}
 		return nil
 	case serveErr := <-errCh:

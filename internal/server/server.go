@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
 	"koditon-go/internal/config"
 	"koditon-go/internal/db"
@@ -31,9 +30,7 @@ func New(logger *slog.Logger, cfg config.Config, queries *db.Queries, hintatiedo
 	}
 }
 
-func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
+func (s *Server) Handler(mux *http.ServeMux, api huma.API) http.Handler {
 	s.addRoutes(api)
 	var handler http.Handler = mux
 	handler = s.loggingMiddleware(handler)
