@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
+
 	"koditon-go/internal/config"
 	"koditon-go/internal/db"
 	"koditon-go/internal/hintatiedot"
@@ -30,18 +33,16 @@ func New(logger *slog.Logger, cfg config.Config, queries *db.Queries, hintatiedo
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	s.addRoutes(mux)
-
+	api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
+	s.addRoutes(api)
 	var handler http.Handler = mux
 	handler = s.loggingMiddleware(handler)
-
 	return handler
 }
 
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-
 		s.logger.InfoContext(
 			r.Context(),
 			"request started",
@@ -49,17 +50,14 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 			"path", r.URL.Path,
 			"remote_addr", r.RemoteAddr,
 		)
-
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
-
 		logLevel := slog.LevelInfo
 		if rw.status >= 500 {
 			logLevel = slog.LevelError
 		} else if rw.status >= 400 {
 			logLevel = slog.LevelWarn
 		}
-
 		s.logger.Log(
 			r.Context(),
 			logLevel,
