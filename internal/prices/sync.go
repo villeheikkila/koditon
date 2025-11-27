@@ -66,8 +66,7 @@ func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 		}
 		s.logger.InfoContext(ctx, "postal codes upserted", "city", city, "count", len(rows))
 	}
-
-	// Fetch and upsert neighborhoods
+	// fetch and upsert neighborhoods
 	s.logger.DebugContext(ctx, "fetching neighborhoods", "city", city)
 	neighborhoods, err := s.api.FetchNeighborhoods(ctx, city)
 	if err != nil {
@@ -140,15 +139,15 @@ func (s *SyncService) SyncCity(ctx context.Context, city string) error {
 	return nil
 }
 
-func parseElevator(val string) bool {
+func parseElevator(val string) (bool, error) {
 	val = strings.TrimSpace(strings.ToLower(val))
 	switch val {
 	case "on":
-		return true
+		return true, nil
 	case "ei":
-		return false
+		return false, nil
 	default:
-		return false
+		return false, fmt.Errorf("invalid elevator value: %q", val)
 	}
 }
 
@@ -181,6 +180,13 @@ func (s *SyncService) buildTransactionParams(transactions []*TransactionEntity, 
 			)
 			return nil, fmt.Errorf("neighborhood %q missing ID during transaction build", tx.Neighborhood)
 		}
+		elevator, err := parseElevator(tx.Elevator)
+		if err != nil {
+			s.logger.Error("invalid elevator value during transaction build",
+				"elevator_value", tx.Elevator,
+				"transaction_index", i,
+				"err", err)
+		}
 		params.Descriptions[i] = tx.Description
 		params.Types[i] = strings.TrimSpace(tx.Type)
 		params.Areas[i] = tx.Area
@@ -188,7 +194,7 @@ func (s *SyncService) buildTransactionParams(transactions []*TransactionEntity, 
 		params.PricePerSquareMeters[i] = int32(tx.PricePerSquareMeter)
 		params.BuildYears[i] = int32(tx.BuildYear)
 		params.Floors[i] = strings.TrimSpace(tx.Floor)
-		params.Elevators[i] = parseElevator(tx.Elevator)
+		params.Elevators[i] = elevator
 		params.Conditions[i] = strings.TrimSpace(tx.Condition)
 		params.Plots[i] = strings.TrimSpace(tx.Plot)
 		params.EnergyClasses[i] = strings.TrimSpace(tx.EnergyClass)

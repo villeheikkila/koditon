@@ -1,0 +1,6 @@
+package: server
+generate:
+  - types
+  - std-http-server
+  - spec
+output: internal/server/openapi.gen.go
