@@ -4,25 +4,6 @@
  * Koditon API
  * OpenAPI spec version: 0.1.0
  */
-import * as axios from 'axios';
-import type {
-  AxiosError,
-  AxiosRequestConfig,
-  AxiosResponse
-} from 'axios';
-
-import useSwr from 'swr';
-import type {
-  Arguments,
-  Key,
-  SWRConfiguration
-} from 'swr';
-
-import useSWRMutation from 'swr/mutation';
-import type {
-  SWRMutationConfiguration
-} from 'swr/mutation';
-
 import type {
   ErrorModel,
   FetchTransactionsOutputBody,
@@ -35,7 +16,7 @@ import type {
   PingResponse,
   SyncPricesRequest,
   SyncPricesResponse
-} from '.././model';
+} from '.././models';
 
 
 // https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
@@ -66,284 +47,355 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
 
 
 
-  
-  
-  
-/**
- * @summary List cities with neighborhoods
- */
-export const listCities = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<ListCities200>> => {
-    return axios.default.get(
-      `/api/v1/cities`,options
-    );
-  }
-
-
-
-export const getListCitiesKey = () => [`/api/v1/cities`] as const;
-
-export type ListCitiesQueryResult = NonNullable<Awaited<ReturnType<typeof listCities>>>
-export type ListCitiesQueryError = AxiosError<ErrorModel>
+export type HTTPStatusCode1xx = 100 | 101 | 102 | 103;
+export type HTTPStatusCode2xx = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207;
+export type HTTPStatusCode3xx = 300 | 301 | 302 | 303 | 304 | 305 | 307 | 308;
+export type HTTPStatusCode4xx = 400 | 401 | 402 | 403 | 404 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 419 | 420 | 421 | 422 | 423 | 424 | 426 | 428 | 429 | 431 | 451;
+export type HTTPStatusCode5xx = 500 | 501 | 502 | 503 | 504 | 505 | 507 | 511;
+export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatusCode3xx | HTTPStatusCode4xx | HTTPStatusCode5xx;
 
 /**
  * @summary List cities with neighborhoods
  */
-export const useListCities = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof listCities>>, TError> & { swrKey?: Key, enabled?: boolean }, axios?: AxiosRequestConfig }
-) => {
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getListCitiesKey() : null);
-  const swrFn = () => listCities(axiosOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
+export type listCitiesResponse200 = {
+  data: ListCities200
+  status: 200
 }
-/**
- * @summary Fetch cities from Prices
- */
-export const fetchPricesCities = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<PricesCitiesResponse>> => {
-    return axios.default.get(
-      `/api/v1/prices/cities`,options
-    );
-  }
 
-
-
-export const getFetchPricesCitiesKey = () => [`/api/v1/prices/cities`] as const;
-
-export type FetchPricesCitiesQueryResult = NonNullable<Awaited<ReturnType<typeof fetchPricesCities>>>
-export type FetchPricesCitiesQueryError = AxiosError<ErrorModel>
-
-/**
- * @summary Fetch cities from Prices
- */
-export const useFetchPricesCities = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof fetchPricesCities>>, TError> & { swrKey?: Key, enabled?: boolean }, axios?: AxiosRequestConfig }
-) => {
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getFetchPricesCitiesKey() : null);
-  const swrFn = () => fetchPricesCities(axiosOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
+export type listCitiesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
 }
-/**
- * @summary Sync a city from Prices
- */
-export const syncPricesCity = (
-    syncPricesRequest: NonReadonly<SyncPricesRequest>, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<SyncPricesResponse>> => {
-    return axios.default.post(
-      `/api/v1/prices/sync`,
-      syncPricesRequest,options
-    );
-  }
+    
+export type listCitiesResponseSuccess = (listCitiesResponse200) & {
+  headers: Headers;
+};
+export type listCitiesResponseError = (listCitiesResponseDefault) & {
+  headers: Headers;
+};
+
+export type listCitiesResponse = (listCitiesResponseSuccess | listCitiesResponseError)
+
+export const getListCitiesUrl = () => {
 
 
+  
 
-export const getSyncPricesCityMutationFetcher = ( options?: AxiosRequestConfig) => {
-  return (_: Key, { arg }: { arg: NonReadonly<SyncPricesRequest> }) => {
-    return syncPricesCity(arg, options);
-  }
+  return `http://localhost:8080/api/v1/cities`
 }
-export const getSyncPricesCityMutationKey = () => [`/api/v1/prices/sync`] as const;
 
-export type SyncPricesCityMutationResult = NonNullable<Awaited<ReturnType<typeof syncPricesCity>>>
-export type SyncPricesCityMutationError = AxiosError<ErrorModel>
-
-/**
- * @summary Sync a city from Prices
- */
-export const useSyncPricesCity = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof syncPricesCity>>, TError, Key, NonReadonly<SyncPricesRequest>, Awaited<ReturnType<typeof syncPricesCity>>> & { swrKey?: string }, axios?: AxiosRequestConfig}
-) => {
-
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getSyncPricesCityMutationKey();
-  const swrFn = getSyncPricesCityMutationFetcher(axiosOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-/**
- * @summary Echo a message
- */
-export const ping = (
-    pingRequest: NonReadonly<PingRequest>, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<PingResponse>> => {
-    return axios.default.post(
-      `/api/v1/ping`,
-      pingRequest,options
-    );
-  }
-
-
-
-export const getPingMutationFetcher = ( options?: AxiosRequestConfig) => {
-  return (_: Key, { arg }: { arg: NonReadonly<PingRequest> }) => {
-    return ping(arg, options);
-  }
-}
-export const getPingMutationKey = () => [`/api/v1/ping`] as const;
-
-export type PingMutationResult = NonNullable<Awaited<ReturnType<typeof ping>>>
-export type PingMutationError = AxiosError<ErrorModel>
-
-/**
- * @summary Echo a message
- */
-export const usePing = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof ping>>, TError, Key, NonReadonly<PingRequest>, Awaited<ReturnType<typeof ping>>> & { swrKey?: string }, axios?: AxiosRequestConfig}
-) => {
-
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getPingMutationKey();
-  const swrFn = getPingMutationFetcher(axiosOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-/**
- * @summary List transactions for neighborhoods
- */
-export const listTransactions = (
-    params?: ListTransactionsParams, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<ListTransactions200>> => {
-    return axios.default.get(
-      `/api/v1/transactions`,{
+export const listCities = async ( options?: RequestInit): Promise<listCitiesResponse> => {
+  
+  const res = await fetch(getListCitiesUrl(),
+  {      
     ...options,
-        params: {...params, ...options?.params},}
-    );
+    method: 'GET'
+    
+    
   }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: listCitiesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listCitiesResponse
+}
 
 
+/**
+ * @summary Fetch cities from Prices
+ */
+export type fetchPricesCitiesResponse200 = {
+  data: PricesCitiesResponse
+  status: 200
+}
 
-export const getListTransactionsKey = (params?: ListTransactionsParams,) => [`/api/v1/transactions`, ...(params ? [params]: [])] as const;
+export type fetchPricesCitiesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type fetchPricesCitiesResponseSuccess = (fetchPricesCitiesResponse200) & {
+  headers: Headers;
+};
+export type fetchPricesCitiesResponseError = (fetchPricesCitiesResponseDefault) & {
+  headers: Headers;
+};
 
-export type ListTransactionsQueryResult = NonNullable<Awaited<ReturnType<typeof listTransactions>>>
-export type ListTransactionsQueryError = AxiosError<ErrorModel>
+export type fetchPricesCitiesResponse = (fetchPricesCitiesResponseSuccess | fetchPricesCitiesResponseError)
+
+export const getFetchPricesCitiesUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/api/v1/prices/cities`
+}
+
+export const fetchPricesCities = async ( options?: RequestInit): Promise<fetchPricesCitiesResponse> => {
+  
+  const res = await fetch(getFetchPricesCitiesUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: fetchPricesCitiesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as fetchPricesCitiesResponse
+}
+
+
+/**
+ * @summary Sync a city from Prices
+ */
+export type syncPricesCityResponse200 = {
+  data: SyncPricesResponse
+  status: 200
+}
+
+export type syncPricesCityResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type syncPricesCityResponseSuccess = (syncPricesCityResponse200) & {
+  headers: Headers;
+};
+export type syncPricesCityResponseError = (syncPricesCityResponseDefault) & {
+  headers: Headers;
+};
+
+export type syncPricesCityResponse = (syncPricesCityResponseSuccess | syncPricesCityResponseError)
+
+export const getSyncPricesCityUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/api/v1/prices/sync`
+}
+
+export const syncPricesCity = async (syncPricesRequest: NonReadonly<SyncPricesRequest>, options?: RequestInit): Promise<syncPricesCityResponse> => {
+  
+  const res = await fetch(getSyncPricesCityUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      syncPricesRequest,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: syncPricesCityResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as syncPricesCityResponse
+}
+
+
+/**
+ * @summary Echo a message
+ */
+export type pingResponse200 = {
+  data: PingResponse
+  status: 200
+}
+
+export type pingResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type pingResponseSuccess = (pingResponse200) & {
+  headers: Headers;
+};
+export type pingResponseError = (pingResponseDefault) & {
+  headers: Headers;
+};
+
+export type pingResponse = (pingResponseSuccess | pingResponseError)
+
+export const getPingUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/api/v1/ping`
+}
+
+export const ping = async (pingRequest: NonReadonly<PingRequest>, options?: RequestInit): Promise<pingResponse> => {
+  
+  const res = await fetch(getPingUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pingRequest,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: pingResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as pingResponse
+}
+
 
 /**
  * @summary List transactions for neighborhoods
  */
-export const useListTransactions = <TError = AxiosError<ErrorModel>>(
-  params?: ListTransactionsParams, options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof listTransactions>>, TError> & { swrKey?: Key, enabled?: boolean }, axios?: AxiosRequestConfig }
-) => {
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getListTransactionsKey(params) : null);
-  const swrFn = () => listTransactions(params, axiosOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
+export type listTransactionsResponse200 = {
+  data: ListTransactions200
+  status: 200
 }
+
+export type listTransactionsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type listTransactionsResponseSuccess = (listTransactionsResponse200) & {
+  headers: Headers;
+};
+export type listTransactionsResponseError = (listTransactionsResponseDefault) & {
+  headers: Headers;
+};
+
+export type listTransactionsResponse = (listTransactionsResponseSuccess | listTransactionsResponseError)
+
+export const getListTransactionsUrl = (params?: ListTransactionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `http://localhost:8080/api/v1/transactions?${stringifiedParams}` : `http://localhost:8080/api/v1/transactions`
+}
+
+export const listTransactions = async (params?: ListTransactionsParams, options?: RequestInit): Promise<listTransactionsResponse> => {
+  
+  const res = await fetch(getListTransactionsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: listTransactionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listTransactionsResponse
+}
+
+
 /**
  * @summary Fetch transactions from Prices for Helsinki
  */
-export const fetchTransactions = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<FetchTransactionsOutputBody>> => {
-    return axios.default.post(
-      `/api/v1/transactions/fetch`,undefined,options
-    );
-  }
-
-
-
-export const getFetchTransactionsMutationFetcher = ( options?: AxiosRequestConfig) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return fetchTransactions(options);
-  }
+export type fetchTransactionsResponse200 = {
+  data: FetchTransactionsOutputBody
+  status: 200
 }
-export const getFetchTransactionsMutationKey = () => [`/api/v1/transactions/fetch`] as const;
 
-export type FetchTransactionsMutationResult = NonNullable<Awaited<ReturnType<typeof fetchTransactions>>>
-export type FetchTransactionsMutationError = AxiosError<ErrorModel>
-
-/**
- * @summary Fetch transactions from Prices for Helsinki
- */
-export const useFetchTransactions = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof fetchTransactions>>, TError, Key, Arguments, Awaited<ReturnType<typeof fetchTransactions>>> & { swrKey?: string }, axios?: AxiosRequestConfig}
-) => {
-
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getFetchTransactionsMutationKey();
-  const swrFn = getFetchTransactionsMutationFetcher(axiosOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
+export type fetchTransactionsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
 }
-/**
- * @summary Health check
- */
-export const healthz = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<HealthResponse>> => {
-    return axios.default.get(
-      `/healthz`,options
-    );
+    
+export type fetchTransactionsResponseSuccess = (fetchTransactionsResponse200) & {
+  headers: Headers;
+};
+export type fetchTransactionsResponseError = (fetchTransactionsResponseDefault) & {
+  headers: Headers;
+};
+
+export type fetchTransactionsResponse = (fetchTransactionsResponseSuccess | fetchTransactionsResponseError)
+
+export const getFetchTransactionsUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/api/v1/transactions/fetch`
+}
+
+export const fetchTransactions = async ( options?: RequestInit): Promise<fetchTransactionsResponse> => {
+  
+  const res = await fetch(getFetchTransactionsUrl(),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
   }
+)
 
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: fetchTransactionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as fetchTransactionsResponse
+}
 
-
-export const getHealthzKey = () => [`/healthz`] as const;
-
-export type HealthzQueryResult = NonNullable<Awaited<ReturnType<typeof healthz>>>
-export type HealthzQueryError = AxiosError<ErrorModel>
 
 /**
  * @summary Health check
  */
-export const useHealthz = <TError = AxiosError<ErrorModel>>(
-   options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof healthz>>, TError> & { swrKey?: Key, enabled?: boolean }, axios?: AxiosRequestConfig }
-) => {
-  const {swr: swrOptions, axios: axiosOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getHealthzKey() : null);
-  const swrFn = () => healthz(axiosOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
+export type healthzResponse200 = {
+  data: HealthResponse
+  status: 200
 }
+
+export type healthzResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type healthzResponseSuccess = (healthzResponse200) & {
+  headers: Headers;
+};
+export type healthzResponseError = (healthzResponseDefault) & {
+  headers: Headers;
+};
+
+export type healthzResponse = (healthzResponseSuccess | healthzResponseError)
+
+export const getHealthzUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/healthz`
+}
+
+export const healthz = async ( options?: RequestInit): Promise<healthzResponse> => {
+  
+  const res = await fetch(getHealthzUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: healthzResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as healthzResponse
+}
+
+
