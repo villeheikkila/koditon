@@ -16,6 +16,11 @@
 			path = Source;
 			sourceTree = "<group>";
 		};
+		5C37437A2EDCDB9300BB4D2C /* Packages */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Packages;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +37,7 @@
 		5C37435D2EDC429800BB4D2C = {
 			isa = PBXGroup;
 			children = (
+				5C37437A2EDCDB9300BB4D2C /* Packages */,
 				5C3743682EDC429800BB4D2C /* Source */,
 				5C3743672EDC429800BB4D2C /* Products */,
 			);
@@ -62,6 +68,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5C3743682EDC429800BB4D2C /* Source */,
+				5C37437A2EDCDB9300BB4D2C /* Packages */,
 			);
 			name = apple;
 			packageProductDependencies = (

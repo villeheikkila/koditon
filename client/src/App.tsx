@@ -1,56 +1,81 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import type { listCitiesResponse } from "./generated/default/default.ts";
 import { listCities } from "./generated/default/default.ts";
 import type { City, Neighborhood } from "./generated/models";
 
-type AsyncState = "idle" | "loading" | "ready" | "error";
+type LoadState =
+  | { state: "idle" | "ready" }
+  | { state: "loading"; message: string }
+  | { state: "error"; message: string };
+
+type ListCitiesSuccess = Extract<listCitiesResponse, { status: 200 }>;
+
+const isListCitiesSuccess = (
+  response: listCitiesResponse,
+): response is ListCitiesSuccess => response.status === 200;
+
+const normalizeCities = (payload: City[] | null | undefined): City[] =>
+  Array.isArray(payload)
+    ? payload.filter((city): city is City => Boolean(city))
+    : [];
 
 function App() {
   const [cities, setCities] = useState<City[]>([]);
-  const [selectedCityId, setSelectedCityId] = useState<string>("");
-  const [selectedNeighborhoodId, setSelectedNeighborhoodId] =
-    useState<string>("");
-  const [status, setStatus] = useState<AsyncState>("idle");
-  const [statusMessage, setStatusMessage] = useState<string>("");
+  const [selectedCityId, setSelectedCityId] = useState<City["id"] | null>(null);
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<
+    Neighborhood["id"] | null
+  >(null);
+  const [status, setStatus] = useState<LoadState>({ state: "idle" });
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadCities = async () => {
-      setStatus("loading");
-      setStatusMessage("Loading cities...");
+      setStatus({ state: "loading", message: "Loading cities..." });
 
       try {
-        const response = await listCities();
+        const response = await listCities({ signal: controller.signal });
 
-        if (response.status !== 200) {
-          setStatus("error");
-          setStatusMessage("Failed to load cities");
+        if (!isListCitiesSuccess(response)) {
+          setStatus({
+            state: "error",
+            message: "Failed to load cities",
+          });
           return;
         }
 
-        const payload = response.data ?? [];
+        const payload = normalizeCities(response.data);
         setCities(payload);
 
         if (payload.length > 0) {
-          setSelectedCityId(payload[0].id);
-          const firstNeighborhood = payload[0].neighborhoods?.[0];
-          setSelectedNeighborhoodId(firstNeighborhood?.id ?? "");
+          setSelectedCityId(payload[0]?.id ?? null);
+          const firstNeighborhood = payload[0]?.neighborhoods?.[0];
+          setSelectedNeighborhoodId(firstNeighborhood?.id ?? null);
+        } else {
+          setSelectedCityId(null);
+          setSelectedNeighborhoodId(null);
         }
 
-        setStatus("ready");
-        setStatusMessage("");
+        setStatus({ state: "ready" });
       } catch (error) {
-        setStatus("error");
+        if (controller.signal.aborted) {
+          return;
+        }
         const fallbackMessage =
           error instanceof Error ? error.message : "Unknown error";
-        setStatusMessage(fallbackMessage);
+        setStatus({ state: "error", message: fallbackMessage });
       }
     };
 
     loadCities();
+
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (!selectedCityId) {
+      setSelectedNeighborhoodId(null);
       return;
     }
 
@@ -58,7 +83,7 @@ function App() {
     const neighborhoods = city?.neighborhoods ?? [];
 
     if (neighborhoods.length === 0) {
-      setSelectedNeighborhoodId("");
+      setSelectedNeighborhoodId(null);
       return;
     }
 
@@ -67,16 +92,17 @@ function App() {
     );
 
     if (!neighborhoodStillSelected) {
-      setSelectedNeighborhoodId(neighborhoods[0].id);
+      setSelectedNeighborhoodId(neighborhoods[0]?.id ?? null);
     }
   }, [cities, selectedCityId, selectedNeighborhoodId]);
 
   const selectedCity = useMemo(
-    () => cities.find((city) => city.id === selectedCityId),
+    () =>
+      selectedCityId ? cities.find((city) => city.id === selectedCityId) : null,
     [cities, selectedCityId],
   );
 
-  const neighborhoods: Neighborhood[] = useMemo(
+  const neighborhoods = useMemo<Neighborhood[]>(
     () => selectedCity?.neighborhoods ?? [],
     [selectedCity],
   );
@@ -98,12 +124,14 @@ function App() {
             <label htmlFor="city-select">City</label>
             <select
               id="city-select"
-              value={selectedCityId}
-              onChange={(event) => setSelectedCityId(event.target.value)}
-              disabled={status === "loading" || cities.length === 0}
+              value={selectedCityId ?? ""}
+              onChange={(event) =>
+                setSelectedCityId(event.target.value || null)
+              }
+              disabled={status.state === "loading" || cities.length === 0}
             >
-              {status === "loading" && <option>Loading...</option>}
-              {status !== "loading" && cities.length === 0 && (
+              {status.state === "loading" && <option>Loading...</option>}
+              {status.state !== "loading" && cities.length === 0 && (
                 <option>No cities available</option>
               )}
               {cities.map((city) => (
@@ -118,11 +146,15 @@ function App() {
             <label htmlFor="neighborhood-select">Neighborhood</label>
             <select
               id="neighborhood-select"
-              value={selectedNeighborhoodId}
+              value={selectedNeighborhoodId ?? ""}
               onChange={(event) =>
-                setSelectedNeighborhoodId(event.target.value)
+                setSelectedNeighborhoodId(event.target.value || null)
               }
-              disabled={neighborhoods.length === 0 || status !== "ready"}
+              disabled={
+                neighborhoods.length === 0 ||
+                status.state !== "ready" ||
+                !selectedCityId
+              }
             >
               {neighborhoods.length === 0 && <option>No neighborhoods</option>}
               {neighborhoods.map((neighborhood) => (
@@ -135,11 +167,11 @@ function App() {
         </div>
 
         <div className="status">
-          {status === "loading" && <p>Loading cities...</p>}
-          {status === "error" && (
-            <p className="error">Error: {statusMessage || "Unknown error"}</p>
+          {status.state === "loading" && <p>{status.message}</p>}
+          {status.state === "error" && (
+            <p className="error">Error: {status.message || "Unknown error"}</p>
           )}
-          {status === "ready" && selectedCity && (
+          {status.state === "ready" && selectedCity && (
             <p>
               Selected {selectedCity.name}. Neighborhoods:{" "}
               {neighborhoods.length || "none listed"}.
