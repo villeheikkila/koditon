@@ -28,7 +28,6 @@ func (n *Nullable[T]) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &n.Value)
 }
 
-// NewNullable creates a Nullable with a valid value.
 func NewNullable[T any](value T) Nullable[T] {
 	return Nullable[T]{
 		Value: value,
@@ -36,7 +35,6 @@ func NewNullable[T any](value T) Nullable[T] {
 	}
 }
 
-// FromSQLNullString converts sql.NullString to Nullable[string].
 func FromSQLNullString(ns sql.NullString) Nullable[string] {
 	return Nullable[string]{
 		Value: ns.String,

@@ -9,6 +9,7 @@
 *.dylib
 *.test
 *.out
+.cache
 
 # Coverage and profiling
 /coverage/
@@ -33,3 +34,4 @@ coverage.out
 *.swp
 *.swo
 .gocache
+.task
