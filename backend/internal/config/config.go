@@ -1,76 +1,91 @@
 package config
 
 import (
-	"flag"
 	"fmt"
-	"io"
+	"log/slog"
+	"strings"
 	"time"
+
+	"github.com/caarlos0/env/v11"
+	"github.com/joho/godotenv"
 )
 
-type Config struct {
-	Host               string
-	Port               string
-	ShutdownTimeout    time.Duration
-	DBHost             string
-	DBPort             string
-	DBUser             string
-	DBPassword         string
-	DBName             string
-	DBSSLMode          string
-	HintatiedotBaseURL string
+type Environment string
+
+const (
+	EnvDevelopment Environment = "development"
+	EnvProduction  Environment = "production"
+)
+
+func (e Environment) IsDevelopment() bool {
+	return e == EnvDevelopment
 }
 
-func Load(
-	args []string,
-	getenv func(string) string,
-	stderr io.Writer,
-) (Config, error) {
-	dotEnv, err := loadDotEnv(defaultDotEnvPaths()...)
-	if err != nil {
-		return Config{}, err
+type Config struct {
+	Host            string        `env:"APP_HOST,required"`
+	Port            string        `env:"APP_PORT,required"`
+	ShutdownTimeout time.Duration `env:"APP_SHUTDOWN_TIMEOUT,required"`
+	Environment     Environment   `env:"APP_ENV" envDefault:"development"`
+	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
+	DB              DBConfig      `envPrefix:"DB_"`
+	Prices          PricesConfig
+	Shortcut        ShortcutConfig
+	Frontdoor       FrontdoorConfig
+}
+
+func (c Config) SlogLevel() slog.Level {
+	switch strings.ToLower(c.LogLevel) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
-	env := getenvWithDotEnv(dotEnv, getenv)
-	flagSet := flag.NewFlagSet(args[0], flag.ContinueOnError)
-	flagSet.SetOutput(stderr)
-	host := flagSet.String("host", fallback(env("APP_HOST"), "0.0.0.0"), "HTTP listen host")
-	port := flagSet.String("port", fallback(env("APP_PORT"), "8080"), "HTTP listen port")
-	shutdown := flagSet.String("shutdown-timeout", fallback(env("APP_SHUTDOWN_TIMEOUT"), "10s"), "graceful shutdown timeout (e.g. 5s)")
-	dbHost := flagSet.String("db-host", fallback(env("DB_HOST"), "localhost"), "Database host")
-	dbPort := flagSet.String("db-port", fallback(env("DB_PORT"), "5432"), "Database port")
-	dbUser := flagSet.String("db-user", fallback(env("DB_USER"), "postgres"), "Database user")
-	dbPassword := flagSet.String("db-password", fallback(env("DB_PASSWORD"), "postgres"), "Database password")
-	dbName := flagSet.String("db-name", fallback(env("DB_NAME"), "koditon"), "Database name")
-	dbSSLMode := flagSet.String("db-sslmode", fallback(env("DB_SSLMODE"), "disable"), "Database SSL mode")
-	hintatiedotBaseURL := flagSet.String("hintatiedot-base-url", env("HINTATIEDOT_BASE_URL"), "Hintatiedot base API URL")
-	if err := flagSet.Parse(args[1:]); err != nil {
-		return Config{}, fmt.Errorf("parse flags: %w", err)
+}
+
+type DBConfig struct {
+	Host     string `env:"HOST,required"`
+	Port     string `env:"PORT,required"`
+	User     string `env:"USER,required"`
+	Password string `env:"PASSWORD,required"`
+	Name     string `env:"NAME,required"`
+	SSLMode  string `env:"SSLMODE,required"`
+}
+
+type PricesConfig struct {
+	BaseURL string `env:"PRICES_BASE_URL,required"`
+}
+
+type ShortcutConfig struct {
+	BaseURL     string `env:"SHORTCUT_BASE_URL,required"`
+	DocsBaseURL string `env:"SHORTCUT_DOCS_BASE_URL,required"`
+	AdBaseURL   string `env:"SHORTCUT_AD_BASE_URL,required"`
+	UserAgent   string `env:"SHORTCUT_USER_AGENT,required"`
+	SitemapBase string `env:"SHORTCUT_SITEMAP_BASE_URL,required"`
+}
+
+type FrontdoorConfig struct {
+	BaseURL     string `env:"FRONTDOOR_BASE_URL,required"`
+	UserAgent   string `env:"FRONTDOOR_USER_AGENT,required"`
+	Cookie      string `env:"FRONTDOOR_COOKIE,required"`
+	SitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL,required"`
+}
+
+func Load() (Config, error) {
+	_ = godotenv.Load(".env.local", ".env")
+	var cfg Config
+	if err := env.Parse(&cfg); err != nil {
+		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
-	timeout, err := time.ParseDuration(*shutdown)
-	if err != nil {
-		return Config{}, fmt.Errorf("invalid shutdown timeout %q: %w", *shutdown, err)
-	}
-	return Config{
-		Host:               *host,
-		Port:               *port,
-		ShutdownTimeout:    timeout,
-		DBHost:             *dbHost,
-		DBPort:             *dbPort,
-		DBUser:             *dbUser,
-		DBPassword:         *dbPassword,
-		DBName:             *dbName,
-		DBSSLMode:          *dbSSLMode,
-		HintatiedotBaseURL: *hintatiedotBaseURL,
-	}, nil
+	return cfg, nil
 }
 
 func (c Config) DatabaseURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode)
-}
-
-func fallback(value, def string) string {
-	if value == "" {
-		return def
-	}
-	return value
+		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.Name, c.DB.SSLMode)
 }

@@ -1,0 +1,118 @@
+version: "3"
+
+tasks:
+  backend:dev:
+    desc: Run the server with automatic reload on source/.env changes
+    dotenv: ["./.env"]
+    dir: backend
+    cmds:
+      - reflex --regex='\.go$' --decoration=none --start-service -- sh -c 'go run ./cmd'
+    env:
+      CGO_ENABLED: "0"
+
+  db:new:
+    desc: Create a new timestamped migration (NAME required)
+    dotenv: ["../.env"]
+    dir: backend/db/migrations
+    cmds:
+      - tern new {{.NAME}}
+
+  db:migrate:
+    desc: Apply all pending migrations to the latest version
+    dotenv: ["../../.env"]
+    dir: backend/db/migrations
+    cmds:
+      - tern migrate
+
+  db:status:
+    desc: Show current migration state
+    dotenv: ["../.env"]
+    dir: backend/db/migrations
+    cmds:
+      - tern status
+
+  db:drop:
+    desc: Drop the database (WARNING - destructive operation)
+    dotenv: [".env"]
+    dir: backend
+    cmds:
+      - psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d postgres -c "DROP DATABASE IF EXISTS {{.DB_NAME}};"
+
+  db:create:
+    desc: Create the database
+    dotenv: [".env"]
+    dir: backend
+    cmds:
+      - psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d postgres -c "CREATE DATABASE {{.DB_NAME}};"
+
+  db:reset:
+    desc: Drop, create, and migrate the database (WARNING - destructive operation)
+    dotenv: [".env"]
+    dir: backend
+    cmds:
+      - task: db:drop
+      - task: db:create
+      - task: db:migrate
+      - echo "Database reset complete. Run 'task db:generate' to regenerate code."
+
+  db:import:
+    desc: Import a data file into the database (FILE required)
+    dotenv: [".env"]
+    dir: backend
+    cmds:
+      - psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f {{.FILE}}
+    env:
+      PGPASSWORD: '{{.DB_PASSWORD | default "postgres"}}'
+      DB_HOST: localhost
+      DB_PORT: "54320"
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+
+  db:generate:
+    desc: Generate type-safe Go code from SQL queries
+    dotenv: [".env"]
+    dir: backend
+    cmds:
+      - sqlc generate -f sqlc.yaml
+    env:
+      DB_HOST: localhost
+      DB_PORT: "54320"
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    sources:
+      - backend/db/schema/**/*.sql
+      - backend/internal/*/queries.sql
+    generates:
+      - backend/internal/*/db/**/*
+
+  client:dev:
+    desc: Run the client dev server
+    dir: client
+    cmds:
+      - npm run dev
+
+  client:build:
+    desc: Build the client app
+    dir: client
+    cmds:
+      - npm run build
+
+  client:lint:
+    desc: Lint the client app
+    dir: client
+    cmds:
+      - npm run lint
+
+  client:preview:
+    desc: Preview the built client
+    dir: client
+    cmds:
+      - npm run preview
+
+  client:generate:
+    desc: Generate the client API SDK from OpenAPI
+    dir: client
+    cmds:
+      - npm run generate

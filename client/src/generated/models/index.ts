@@ -5,25 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './city';
-export * from './cityNeighborhoods';
 export * from './errorDetail';
 export * from './errorModel';
 export * from './errorModelErrors';
-export * from './fetchTransactionsOutputBody';
 export * from './healthResponse';
-export * from './hintatiedotCitiesResponse';
-export * from './hintatiedotCitiesResponseCities';
-export * from './hintatiedotTransaction';
-export * from './hintatiedotTransactionEnergyClass';
-export * from './listCities200';
-export * from './listTransactions200';
-export * from './listTransactionsParams';
-export * from './neighborhood';
-export * from './neighborhoodPostalCode';
 export * from './pingRequest';
 export * from './pingResponse';
-export * from './syncHintatiedotRequest';
-export * from './syncHintatiedotResponse';
-export * from './transactionNeighborhood';
-export * from './transactionNeighborhoodPostalCode';
