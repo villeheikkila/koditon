@@ -1,8 +1,6 @@
 package prices
 
 import (
-	"strings"
-
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"koditon-go/internal/prices/client"
@@ -11,19 +9,27 @@ import (
 )
 
 func mapUpsertCityParams(name string) string {
-	return name
+	return util.TrimUnicodeSpace(name)
 }
 
 func mapUpsertPostalCodesBulkParams(codes []string, cityID pgtype.UUID) *db.UpsertPricesPostalCodesBulkParams {
+	trimmed := make([]string, len(codes))
+	for i, code := range codes {
+		trimmed[i] = util.TrimUnicodeSpace(code)
+	}
 	return &db.UpsertPricesPostalCodesBulkParams{
-		Codes:  codes,
+		Codes:  trimmed,
 		CityID: cityID,
 	}
 }
 
 func mapUpsertNeighborhoodsBulkParams(names []string, cityID pgtype.UUID) *db.UpsertPricesNeighborhoodsBulkParams {
+	trimmed := make([]string, len(names))
+	for i, name := range names {
+		trimmed[i] = util.TrimUnicodeSpace(name)
+	}
 	return &db.UpsertPricesNeighborhoodsBulkParams{
-		Names:  names,
+		Names:  trimmed,
 		CityID: cityID,
 	}
 }
@@ -56,18 +62,18 @@ func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, n
 		if err != nil {
 			return nil, err
 		}
-		params.Descriptions[i] = tx.Description
-		params.Types[i] = strings.TrimSpace(tx.Type)
+		params.Descriptions[i] = util.TrimUnicodeSpace(tx.Description)
+		params.Types[i] = util.TrimUnicodeSpace(tx.Type)
 		params.Areas[i] = tx.Area
 		params.Prices[i] = int32(tx.Price)
 		params.PricePerSquareMeters[i] = int32(tx.PricePerSquareMeter)
 		params.BuildYears[i] = int32(tx.BuildYear)
-		params.Floors[i] = strings.TrimSpace(tx.Floor)
+		params.Floors[i] = util.TrimUnicodeSpace(tx.Floor)
 		params.Elevators[i] = elevator
-		params.Conditions[i] = strings.TrimSpace(tx.Condition)
-		params.Plots[i] = strings.TrimSpace(tx.Plot)
-		params.EnergyClasses[i] = strings.TrimSpace(tx.EnergyClass)
-		params.Categories[i] = strings.TrimSpace(tx.Category)
+		params.Conditions[i] = util.TrimUnicodeSpace(tx.Condition)
+		params.Plots[i] = util.TrimUnicodeSpace(tx.Plot)
+		params.EnergyClasses[i] = util.TrimUnicodeSpace(tx.EnergyClass)
+		params.Categories[i] = util.TrimUnicodeSpace(tx.Category)
 		params.PeriodIdentifiers[i] = periodIdentifier
 		params.NeighborhoodIds[i] = neighborhoodID
 	}

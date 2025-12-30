@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"koditon-go/internal/util"
 )
 
 func (c *Client) GetTransactionsForPage(ctx context.Context, params *ApartmentSearchParams, page int) (*TransactionResponse, error) {
@@ -92,31 +94,31 @@ func (c *Client) parseTransactions(doc *goquery.Document, city string) ([]*Trans
 		if cols.Length() > 0 && cols.Eq(0).HasClass("section") {
 			strong := cols.Eq(0).Find("strong").First()
 			if strong.Length() > 0 {
-				currentCategory = strings.TrimSpace(strong.Text())
+				currentCategory = util.TrimUnicodeSpace(strong.Text())
 			}
 			return
 		}
 		if cols.Length() < 12 {
 			return
 		}
-		firstCol := strings.TrimSpace(cols.Eq(0).Text())
+		firstCol := util.TrimUnicodeSpace(cols.Eq(0).Text())
 		if firstCol == "" || cols.Eq(0).HasClass("fullWidth") {
 			return
 		}
 		apartment := &TransactionEntity{
 			City:                city,
-			Neighborhood:        strings.TrimSpace(cols.Eq(0).Text()),
-			Description:         strings.TrimSpace(cols.Eq(1).Text()),
-			Type:                strings.TrimSpace(cols.Eq(2).Text()),
+			Neighborhood:        util.TrimUnicodeSpace(cols.Eq(0).Text()),
+			Description:         util.TrimUnicodeSpace(cols.Eq(1).Text()),
+			Type:                util.TrimUnicodeSpace(cols.Eq(2).Text()),
 			Area:                parseFloat(cols.Eq(3).Text()),
 			Price:               parseInt(cols.Eq(4).Text()),
 			PricePerSquareMeter: parseInt(cols.Eq(5).Text()),
 			BuildYear:           parseInt(cols.Eq(6).Text()),
-			Floor:               strings.TrimSpace(cols.Eq(7).Text()),
-			Elevator:            strings.TrimSpace(cols.Eq(8).Text()),
-			Condition:           strings.TrimSpace(cols.Eq(9).Text()),
-			Plot:                strings.TrimSpace(cols.Eq(10).Text()),
-			EnergyClass:         strings.TrimSpace(cols.Eq(11).Text()),
+			Floor:               util.TrimUnicodeSpace(cols.Eq(7).Text()),
+			Elevator:            util.TrimUnicodeSpace(cols.Eq(8).Text()),
+			Condition:           util.TrimUnicodeSpace(cols.Eq(9).Text()),
+			Plot:                util.TrimUnicodeSpace(cols.Eq(10).Text()),
+			EnergyClass:         util.TrimUnicodeSpace(cols.Eq(11).Text()),
 			Category:            currentCategory,
 		}
 		apartments = append(apartments, apartment)
@@ -125,15 +127,16 @@ func (c *Client) parseTransactions(doc *goquery.Document, city string) ([]*Trans
 }
 
 func parseFloat(s string) float64 {
-	s = strings.TrimSpace(s)
+	s = util.TrimUnicodeSpace(s)
 	s = strings.ReplaceAll(s, ",", ".")
 	val, _ := strconv.ParseFloat(s, 64)
 	return val
 }
 
 func parseInt(s string) int {
-	s = strings.TrimSpace(s)
+	s = util.TrimUnicodeSpace(s)
 	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "\u00a0", "")
 	val, _ := strconv.Atoi(s)
 	return val
 }

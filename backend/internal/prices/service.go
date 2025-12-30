@@ -77,7 +77,7 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 	}
 	transactionNeighborhoods := make(map[string]bool)
 	for _, tx := range transactions {
-		normalized := strings.TrimSpace(tx.Neighborhood)
+		normalized := util.TrimUnicodeSpace(tx.Neighborhood)
 		if normalized != "" {
 			transactionNeighborhoods[normalized] = true
 		}
@@ -111,7 +111,8 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 }
 
 func parseElevator(val string) (bool, error) {
-	val = strings.TrimSpace(strings.ToLower(val))
+	val = util.TrimUnicodeSpace(val)
+	val = strings.ToLower(val)
 	switch val {
 	case "on":
 		return true, nil

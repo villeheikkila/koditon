@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"unicode"
 )
 
+func TrimUnicodeSpace(s string) string {
+	return strings.TrimFunc(s, unicode.IsSpace)
+}
+
 func NormalizeString(v string) string {
-	return strings.TrimSpace(v)
+	return TrimUnicodeSpace(v)
 }
 
 func UniqueStrings(values []string) []string {
