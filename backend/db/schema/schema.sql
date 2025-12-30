@@ -99,7 +99,6 @@ CREATE SCHEMA IF NOT EXISTS task_queue;
 SELECT pgmq.create('tasks');
 SELECT pgmq.create('tasks_dlq');
 
-SELECT pgmq.enable_notify_insert('tasks');
 
 -- ============================================
 -- ENTITY REGISTRY

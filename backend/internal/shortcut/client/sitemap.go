@@ -16,9 +16,18 @@ import (
 type SitemapURLType string
 
 const (
-	SitemapURLTypeListing  SitemapURLType = "listing"
-	SitemapURLTypeRental   SitemapURLType = "rental"
-	SitemapURLTypeBuilding SitemapURLType = "building"
+	SitemapURLTypeListing           SitemapURLType = "listing"
+	SitemapURLTypeRental            SitemapURLType = "rental"
+	SitemapURLTypeBuilding          SitemapURLType = "building"
+	SitemapURLTypeBuildingLander    SitemapURLType = "building_lander"
+	SitemapURLTypeCommercial        SitemapURLType = "commercial"
+	SitemapURLTypePlot              SitemapURLType = "plot"
+	SitemapURLTypeFarm              SitemapURLType = "farm"
+	SitemapURLTypeGarage            SitemapURLType = "garage"
+	SitemapURLTypeVacationHome      SitemapURLType = "vacation_home"
+	SitemapURLTypeRentalVacation    SitemapURLType = "rental_vacation"
+	SitemapURLTypeRentalGarage      SitemapURLType = "rental_garage"
+	SitemapURLTypeCommercialForSale SitemapURLType = "commercial_for_sale"
 )
 
 type ShortcutSitemapEntry struct {
@@ -27,7 +36,6 @@ type ShortcutSitemapEntry struct {
 	Type SitemapURLType
 }
 
-// GetSitemapEntries fetches and parses sitemap entries for the Shortcut site (ads, rentals, buildings).
 func (c *Client) GetSitemapEntries(ctx context.Context) ([]ShortcutSitemapEntry, error) {
 	indexURL := joinURL(c.sitemapBaseURL, "/sitemaps/index.xml")
 	indexXML, err := c.fetchSitemapXML(ctx, indexURL)
@@ -49,9 +57,12 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]ShortcutSitemapEntry,
 			continue
 		}
 		for _, loc := range extractLocs(sitemapXML) {
-			if entry, ok := parseShortcutEntry(loc); ok {
-				entries = append(entries, *entry)
+			entry, ok := parseShortcutEntry(loc)
+			if !ok {
+				c.logger.Warn("unknown URL pattern in sitemap, skipping", "url", loc)
+				continue
 			}
+			entries = append(entries, *entry)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -70,20 +81,45 @@ func parseShortcutEntry(raw string) (*ShortcutSitemapEntry, bool) {
 	if len(parts) < 1 {
 		return nil, false
 	}
-	id, err := strconv.Atoi(parts[len(parts)-1])
-	if err != nil {
-		return nil, false
-	}
+	var id int
 	var entryType SitemapURLType
-	switch {
-	case strings.Contains(raw, "/myytavat-asunnot/"):
-		entryType = SitemapURLTypeListing
-	case strings.Contains(raw, "/vuokra-asunnot/"):
-		entryType = SitemapURLTypeRental
-	case strings.Contains(raw, "/talo/"):
-		entryType = SitemapURLTypeBuilding
-	default:
-		return nil, false
+	if len(parts) == 1 && parts[0] == "talo" {
+		id = 0
+		entryType = SitemapURLTypeBuildingLander
+	} else {
+		parsedID, err := strconv.Atoi(parts[len(parts)-1])
+		if err != nil {
+			return nil, false
+		}
+		id = parsedID
+	}
+	if entryType == "" {
+		switch {
+		case strings.Contains(raw, "/myytavat-asunnot/"):
+			entryType = SitemapURLTypeListing
+		case strings.Contains(raw, "/vuokra-asunnot/"):
+			entryType = SitemapURLTypeRental
+		case strings.Contains(raw, "/talo/"):
+			entryType = SitemapURLTypeBuilding
+		case strings.Contains(raw, "/vuokrattavat-toimitilat/"):
+			entryType = SitemapURLTypeCommercial
+		case strings.Contains(raw, "/myytavat-toimitilat/"):
+			entryType = SitemapURLTypeCommercialForSale
+		case strings.Contains(raw, "/myytavat-tontit/"):
+			entryType = SitemapURLTypePlot
+		case strings.Contains(raw, "/myytavat-metsatilat-ja-maatilat/"):
+			entryType = SitemapURLTypeFarm
+		case strings.Contains(raw, "/myytavat-autotallit/"):
+			entryType = SitemapURLTypeGarage
+		case strings.Contains(raw, "/myytavat-loma-asunnot/"):
+			entryType = SitemapURLTypeVacationHome
+		case strings.Contains(raw, "/vuokrattavat-loma-asunnot/"):
+			entryType = SitemapURLTypeRentalVacation
+		case strings.Contains(raw, "/vuokrattavat-autotallit/"):
+			entryType = SitemapURLTypeRentalGarage
+		default:
+			return nil, false
+		}
 	}
 	return &ShortcutSitemapEntry{ID: id, URL: u, Type: entryType}, true
 }

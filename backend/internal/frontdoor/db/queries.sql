@@ -30,7 +30,20 @@ INSERT INTO public.frontdoor_ads (
 ) VALUES ($1, $2, now(), now(), now())
 ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
 SET frontdoor_ads_last_seen_at = now(),
-    frontdoor_ads_updated_at = now(),
+    frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
+RETURNING *;
+
+-- name: BatchUpsertFrontdoorAdsFromSitemap :many
+INSERT INTO public.frontdoor_ads (
+    frontdoor_ads_external_id,
+    frontdoor_ads_url,
+    frontdoor_ads_first_seen_at,
+    frontdoor_ads_last_seen_at,
+    frontdoor_ads_updated_at
+)
+SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
+ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
+SET frontdoor_ads_last_seen_at = now(),
     frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
 RETURNING *;
 
@@ -96,9 +109,20 @@ INSERT INTO public.frontdoor_buildings (
 ) VALUES ($1, now(), now(), now(), $2, $3)
 ON CONFLICT (frontdoor_buildings_housing_company_id) DO UPDATE
 SET frontdoor_buildings_last_seen_at = now(),
-    frontdoor_buildings_updated_at = now(),
     frontdoor_buildings_url = COALESCE(EXCLUDED.frontdoor_buildings_url, frontdoor_buildings.frontdoor_buildings_url),
     frontdoor_buildings_housing_company_friendly_id = COALESCE(EXCLUDED.frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings.frontdoor_buildings_housing_company_friendly_id)
+RETURNING *;
+
+-- name: BatchUpsertFrontdoorBuildingsFromSitemap :many
+INSERT INTO public.frontdoor_buildings (
+    frontdoor_buildings_url,
+    frontdoor_buildings_first_seen_at,
+    frontdoor_buildings_last_seen_at,
+    frontdoor_buildings_updated_at
+)
+SELECT UNNEST($1::text[]), now(), now(), now()
+ON CONFLICT (frontdoor_buildings_url) DO UPDATE
+SET frontdoor_buildings_last_seen_at = now()
 RETURNING *;
 
 -- name: GetFrontdoorBuildingURLByHousingCompanyID :one

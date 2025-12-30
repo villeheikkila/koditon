@@ -8,10 +8,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func mapUpsertBuildingFromSitemapParams(entry client.ShortcutSitemapEntry) *db.UpsertShortcutBuildingFromSitemapParams {
-	return &db.UpsertShortcutBuildingFromSitemapParams{
-		ShortcutBuildingsExternalID: int64(entry.ID),
-		ShortcutBuildingsUrl:        entry.URL.String(),
+func mapBatchUpsertBuildingsFromSitemapParams(entries []client.ShortcutSitemapEntry) *db.BatchUpsertShortcutBuildingsFromSitemapParams {
+	externalIDs := make([]int64, len(entries))
+	urls := make([]string, len(entries))
+	for i, entry := range entries {
+		externalIDs[i] = int64(entry.ID)
+		urls[i] = entry.URL.String()
+	}
+	return &db.BatchUpsertShortcutBuildingsFromSitemapParams{
+		Column1: externalIDs,
+		Column2: urls,
+	}
+}
+
+func mapBatchUpsertAdsFromSitemapParams(entries []client.ShortcutSitemapEntry, adTypes []AdType) *db.BatchUpsertShortcutAdsFromSitemapParams {
+	ids := make([]int64, len(entries))
+	urls := make([]string, len(entries))
+	types := make([]string, len(entries))
+	for i, entry := range entries {
+		ids[i] = int64(entry.ID)
+		urls[i] = entry.URL.String()
+		types[i] = string(adTypes[i])
+	}
+	return &db.BatchUpsertShortcutAdsFromSitemapParams{
+		Column1: ids,
+		Column2: urls,
+		Column3: types,
 	}
 }
 

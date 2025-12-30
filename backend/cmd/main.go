@@ -81,6 +81,7 @@ func run(
 	)
 	frontdoorService := frontdoor.NewService(
 		pool,
+		logger,
 		cfg.Frontdoor.BaseURL,
 		cfg.Frontdoor.UserAgent,
 		cfg.Frontdoor.Cookie,

@@ -25,8 +25,19 @@ INSERT INTO public.shortcut_buildings (
     $1, $2
 )
 ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
-    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url,
-    shortcut_buildings_updated_at = CURRENT_TIMESTAMP
+    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
+WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
+RETURNING *;
+
+-- name: BatchUpsertShortcutBuildingsFromSitemap :many
+INSERT INTO public.shortcut_buildings (
+    shortcut_buildings_external_id,
+    shortcut_buildings_url
+)
+SELECT UNNEST($1::bigint[]), UNNEST($2::text[])
+ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
+    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
+WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
 RETURNING *;
 
 -- name: UpsertShortcutBuilding :one
@@ -98,15 +109,45 @@ SELECT * FROM public.shortcut_ads
 ORDER BY shortcut_ads_last_seen_at DESC
 LIMIT $1 OFFSET $2;
 
+-- name: UpsertShortcutAdFromSitemap :one
+INSERT INTO public.shortcut_ads (
+    shortcut_ads_id,
+    shortcut_ads_url,
+    shortcut_ads_type,
+    shortcut_ads_last_seen_at
+) VALUES (
+    $1, $2, $3, now()
+)
+ON CONFLICT (shortcut_ads_id) DO UPDATE SET
+    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
+    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
+    shortcut_ads_last_seen_at = now()
+RETURNING *;
+
+-- name: BatchUpsertShortcutAdsFromSitemap :many
+INSERT INTO public.shortcut_ads (
+    shortcut_ads_id,
+    shortcut_ads_url,
+    shortcut_ads_type,
+    shortcut_ads_last_seen_at
+)
+SELECT UNNEST($1::bigint[]), UNNEST($2::text[]), UNNEST($3::text[]), now()
+ON CONFLICT (shortcut_ads_id) DO UPDATE SET
+    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
+    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
+    shortcut_ads_last_seen_at = now()
+RETURNING *;
+
 -- name: UpsertShortcutAd :one
 INSERT INTO public.shortcut_ads (
     shortcut_ads_id,
     shortcut_ads_url,
     shortcut_ads_type,
     shortcut_ads_data,
-    shortcut_ads_building_id
+    shortcut_ads_building_id,
+    shortcut_ads_last_seen_at
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, now()
 )
 ON CONFLICT (shortcut_ads_id) DO UPDATE SET
     shortcut_ads_url = EXCLUDED.shortcut_ads_url,

@@ -75,6 +75,8 @@ CREATE TABLE public.frontdoor_buildings (
 );
 
 CREATE UNIQUE INDEX frontdoor_buildings_housing_company_id_unique ON public.frontdoor_buildings USING btree (frontdoor_buildings_housing_company_id);
+CREATE UNIQUE INDEX frontdoor_buildings_housing_company_friendly_id_unique ON public.frontdoor_buildings USING btree (frontdoor_buildings_housing_company_friendly_id) WHERE frontdoor_buildings_housing_company_friendly_id IS NOT NULL;
+CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings USING btree (frontdoor_buildings_url);
 CREATE INDEX idx_frontdoor_buildings_processed_at ON public.frontdoor_buildings(frontdoor_buildings_processed_at);
 CREATE INDEX idx_frontdoor_buildings_business_id ON public.frontdoor_buildings(frontdoor_buildings_business_id);
 

@@ -75,7 +75,6 @@ CREATE SCHEMA IF NOT EXISTS task_queue;
 
 SELECT pgmq.create('tasks');
 SELECT pgmq.create('tasks_dlq');
-SELECT pgmq.enable_notify_insert('tasks');
 
 CREATE TABLE task_queue.entity_registry (
     entity_id TEXT NOT NULL PRIMARY KEY,
@@ -494,8 +493,7 @@ BEGIN
     FROM task_queue.task
     WHERE entity_id = 'frontdoor:sitemap'
       AND task_type = 'frontdoor_sitemap_sync'
-      AND run
-_on = CURRENT_DATE
+      AND run_on = CURRENT_DATE
     LIMIT 1;
     IF FOUND THEN
         IF v_existing_task.status IN ('pending', 'processing') THEN
@@ -975,6 +973,8 @@ CREATE TABLE public.frontdoor_buildings (
 
 CREATE INDEX idx_frontdoor_buildings_processed_at ON public.frontdoor_buildings(frontdoor_buildings_processed_at);
 CREATE INDEX idx_frontdoor_buildings_business_id ON public.frontdoor_buildings(frontdoor_buildings_business_id);
+CREATE UNIQUE INDEX frontdoor_buildings_housing_company_friendly_id_unique ON public.frontdoor_buildings USING btree (frontdoor_buildings_housing_company_friendly_id) WHERE frontdoor_buildings_housing_company_friendly_id IS NOT NULL;
+CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings USING btree (frontdoor_buildings_url);
 
 CREATE TABLE public.frontdoor_building_announcements (
     frontdoor_building_announcements_id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -1158,55 +1158,3 @@ COMMENT ON FUNCTION task_queue.fnc__get_entity_sync_status(TEXT) IS
 
 COMMENT ON VIEW task_queue.vw_entity_sync_health IS
 'Dashboard view showing sync health status for all entities with success rates and error information.';
-
----- create above / drop below ----
-
-DROP VIEW IF EXISTS task_queue.vw_entity_sync_health;
-DROP VIEW IF EXISTS task_queue.fnc__status_summary;
-DROP VIEW IF EXISTS task_queue.fnc__active_workers;
-DROP VIEW IF EXISTS task_queue.fnc__recent_failures;
-DROP VIEW IF EXISTS task_queue.fnc__stuck_tasks;
-DROP VIEW IF EXISTS task_queue.fnc__daily_progress;
-
-DROP FUNCTION IF EXISTS task_queue.fnc__get_entity_sync_status(TEXT);
-DROP FUNCTION IF EXISTS task_queue.fnc__get_sync_statistics();
-DROP FUNCTION IF EXISTS task_queue.fnc__schedule_prices_cities_init();
-DROP FUNCTION IF EXISTS task_queue.fnc__schedule_shortcut_sitemap_sync();
-DROP FUNCTION IF EXISTS task_queue.fnc__schedule_frontdoor_sitemap_sync();
-DROP FUNCTION IF EXISTS task_queue.fnc__requeue_from_dlq(BIGINT, INT, INT);
-DROP FUNCTION IF EXISTS task_queue.fnc__move_to_dlq(BIGINT, JSONB);
-DROP FUNCTION IF EXISTS task_queue.fnc__requeue_stuck_tasks();
-DROP FUNCTION IF EXISTS task_queue.fnc__schedule_daily_syncs(TEXT);
-DROP FUNCTION IF EXISTS task_queue.fnc__enqueue_task(BIGINT);
-DROP FUNCTION IF EXISTS task_queue.fnc__register_entities(TEXT[], TEXT, TEXT);
-DROP FUNCTION IF EXISTS task_queue.fnc__register_entity(TEXT, TEXT, TEXT, TEXT, JSONB);
-
-DROP TABLE IF EXISTS public.shortcut_tokens CASCADE;
-DROP TABLE IF EXISTS public.frontdoor_building_announcements CASCADE;
-DROP TABLE IF EXISTS public.frontdoor_buildings CASCADE;
-DROP TABLE IF EXISTS public.frontdoor_ads CASCADE;
-DROP TABLE IF EXISTS public.shortcut_ads CASCADE;
-DROP TABLE IF EXISTS public.shortcut_building_rentals CASCADE;
-DROP TABLE IF EXISTS public.shortcut_building_listings CASCADE;
-DROP TABLE IF EXISTS public.shortcut_buildings CASCADE;
-
-DROP TABLE IF EXISTS task_queue.dead_letter_queue CASCADE;
-DROP TABLE IF EXISTS task_queue.task CASCADE;
-DROP TABLE IF EXISTS task_queue.task_type_entity_type_mapping CASCADE;
-DROP TABLE IF EXISTS task_queue.entity_registry CASCADE;
-
-SELECT pgmq.drop_queue('tasks_dlq');
-SELECT pgmq.drop_queue('tasks');
-
-DROP SCHEMA IF EXISTS task_queue CASCADE;
-
-DROP TABLE IF EXISTS public.prices_transactions CASCADE;
-DROP TABLE IF EXISTS public.prices_neighborhoods CASCADE;
-DROP TABLE IF EXISTS public.prices_postal_codes CASCADE;
-DROP TABLE IF EXISTS public.prices_cities CASCADE;
-
-DROP EXTENSION IF EXISTS pg_cron CASCADE;
-DROP EXTENSION IF EXISTS pgmq CASCADE;
-DROP EXTENSION IF EXISTS postgis CASCADE;
-DROP SCHEMA IF EXISTS postgis CASCADE;
-DROP EXTENSION IF EXISTS "uuid-ossp" CASCADE;

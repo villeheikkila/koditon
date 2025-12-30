@@ -2,8 +2,8 @@ package frontdoor
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"koditon-go/internal/frontdoor/client"
@@ -15,10 +15,12 @@ import (
 type Service struct {
 	client  *client.Client
 	queries *db.Queries
+	logger  *slog.Logger
 }
 
 func NewService(
 	dbtx db.DBTX,
+	logger *slog.Logger,
 	baseURL string,
 	userAgent string,
 	cookie string,
@@ -33,6 +35,7 @@ func NewService(
 	return &Service{
 		client:  frontdoorClient,
 		queries: db.New(dbtx),
+		logger:  logger.With("component", "frontdoor"),
 	}
 }
 
@@ -49,54 +52,30 @@ func (s *Service) SyncSitemap(ctx context.Context) (adIDs []string, buildingIDs 
 			adEntries = append(adEntries, entry)
 		case client.EntryTypeBuilding:
 			buildingEntries = append(buildingEntries, entry)
+		default:
 		}
 	}
-	var upsertErrors []error
 	if len(adEntries) > 0 {
-		successCount := 0
-		adIDs = make([]string, 0, len(adEntries))
-		for _, entry := range adEntries {
-			params := &db.UpsertFrontdoorAdFromSitemapParams{
-				FrontdoorAdsExternalID: entry.ID,
-				FrontdoorAdsUrl:        entry.URL.String(),
-			}
-			if _, upsertErr := s.queries.UpsertFrontdoorAdFromSitemap(ctx, params); upsertErr != nil {
-				upsertErrors = append(upsertErrors, fmt.Errorf("upsert ad %s: %w", entry.ID, upsertErr))
-				continue
-			}
-			entityID := fmt.Sprintf("ad:%s", entry.ID)
-			adIDs = append(adIDs, entityID)
-			successCount++
+		params := mapBatchUpsertAdsFromSitemapParams(adEntries)
+		ads, upsertErr := s.queries.BatchUpsertFrontdoorAdsFromSitemap(ctx, params)
+		if upsertErr != nil {
+			return nil, nil, fmt.Errorf("batch upsert ads: %w", upsertErr)
 		}
-		_ = successCount
+		adIDs = make([]string, len(ads))
+		for i, ad := range ads {
+			adIDs[i] = fmt.Sprintf("ad:%s", ad.FrontdoorAdsExternalID)
+		}
 	}
 	if len(buildingEntries) > 0 {
-		successCount := 0
-		buildingIDs = make([]string, 0, len(buildingEntries))
-		for _, entry := range buildingEntries {
-			housingCompanyID, parseErr := strconv.ParseInt(entry.ID, 10, 64)
-			if parseErr != nil {
-				upsertErrors = append(upsertErrors, fmt.Errorf("parse housing company ID %s: %w", entry.ID, parseErr))
-				continue
-			}
-			url := entry.URL.String()
-			params := &db.UpsertFrontdoorBuildingParams{
-				FrontdoorBuildingsUrl: &url,
-				FrontdoorBuildingsHousingCompanyID:         pgtype.Int8{Int64: housingCompanyID, Valid: true},
-				FrontdoorBuildingsHousingCompanyFriendlyID: &entry.ID,
-			}
-			if _, upsertErr := s.queries.UpsertFrontdoorBuilding(ctx, params); upsertErr != nil {
-				upsertErrors = append(upsertErrors, fmt.Errorf("upsert building %d: %w", housingCompanyID, upsertErr))
-				continue
-			}
-			entityID := fmt.Sprintf("building:%d", housingCompanyID)
-			buildingIDs = append(buildingIDs, entityID)
-			successCount++
+		params := mapBatchUpsertBuildingsFromSitemapParams(buildingEntries)
+		buildings, upsertErr := s.queries.BatchUpsertFrontdoorBuildingsFromSitemap(ctx, params)
+		if upsertErr != nil {
+			return nil, nil, fmt.Errorf("batch upsert buildings: %w", upsertErr)
 		}
-		_ = successCount
-	}
-	if len(adIDs) == 0 && len(buildingIDs) == 0 && len(upsertErrors) > 0 {
-		return nil, nil, fmt.Errorf("all upserts failed: %w", errors.Join(upsertErrors...))
+		buildingIDs = make([]string, len(buildings))
+		for i, building := range buildings {
+			buildingIDs[i] = fmt.Sprintf("building:%s", building.FrontdoorBuildingsID.String())
+		}
 	}
 	return adIDs, buildingIDs, nil
 }

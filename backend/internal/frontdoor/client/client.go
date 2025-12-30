@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -204,7 +205,7 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]SitemapEntry, error) 
 			continue
 		}
 		for _, loc := range extractLocs(sitemapXML) {
-			if entry, ok := c.parseEntry(loc); ok {
+			if entry, ok := c.parseEntry(slog.Default(), loc); ok {
 				entries = append(entries, *entry)
 			}
 		}
@@ -250,7 +251,7 @@ func extractInitialState(body []byte) (json.RawMessage, error) {
 	return raw, nil
 }
 
-func (c *Client) parseEntry(raw string) (*SitemapEntry, bool) {
+func (c *Client) parseEntry(logger *slog.Logger, raw string) (*SitemapEntry, bool) {
 	adPrefix := c.sitemapBaseURL + "/kohde/"
 	buildingPrefix := c.sitemapBaseURL + "/talo/"
 	u, err := url.Parse(raw)
@@ -261,16 +262,14 @@ func (c *Client) parseEntry(raw string) (*SitemapEntry, bool) {
 		id := trimAfterSeparators(remaining)
 		return &SitemapEntry{ID: id, Type: EntryTypeAd, URL: u}, true
 	}
-
 	if remaining, ok := strings.CutPrefix(raw, buildingPrefix); ok {
 		id := trimAfterSeparators(remaining)
-		// Skip building entries with hyphens in the ID
 		if strings.Contains(id, "-") {
+			logger.Warn("skipping building entry with hyphen in ID", "id", id, "url", raw)
 			return nil, false
 		}
 		return &SitemapEntry{ID: id, Type: EntryTypeBuilding, URL: u}, true
 	}
-
 	return nil, false
 }
 

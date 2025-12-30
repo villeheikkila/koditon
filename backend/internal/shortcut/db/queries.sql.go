@@ -12,6 +12,121 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const batchUpsertShortcutAdsFromSitemap = `-- name: BatchUpsertShortcutAdsFromSitemap :many
+INSERT INTO public.shortcut_ads (
+    shortcut_ads_id,
+    shortcut_ads_url,
+    shortcut_ads_type,
+    shortcut_ads_last_seen_at
+)
+SELECT UNNEST($1::bigint[]), UNNEST($2::text[]), UNNEST($3::text[]), now()
+ON CONFLICT (shortcut_ads_id) DO UPDATE SET
+    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
+    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
+    shortcut_ads_last_seen_at = now()
+RETURNING shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id
+`
+
+type BatchUpsertShortcutAdsFromSitemapParams struct {
+	Column1 []int64  `db:"column_1" json:"column_1"`
+	Column2 []string `db:"column_2" json:"column_2"`
+	Column3 []string `db:"column_3" json:"column_3"`
+}
+
+func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg *BatchUpsertShortcutAdsFromSitemapParams) ([]ShortcutAd, error) {
+	rows, err := q.db.Query(ctx, batchUpsertShortcutAdsFromSitemap, arg.Column1, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ShortcutAd{}
+	for rows.Next() {
+		var i ShortcutAd
+		if err := rows.Scan(
+			&i.ShortcutAdsID,
+			&i.ShortcutAdsUrl,
+			&i.ShortcutAdsType,
+			&i.ShortcutAdsFirstSeenAt,
+			&i.ShortcutAdsLastSeenAt,
+			&i.ShortcutAdsData,
+			&i.ShortcutAdsUpdatedAt,
+			&i.ShortcutAdsBuildingID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const batchUpsertShortcutBuildingsFromSitemap = `-- name: BatchUpsertShortcutBuildingsFromSitemap :many
+INSERT INTO public.shortcut_buildings (
+    shortcut_buildings_external_id,
+    shortcut_buildings_url
+)
+SELECT UNNEST($1::bigint[]), UNNEST($2::text[])
+ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
+    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
+WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
+RETURNING shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom
+`
+
+type BatchUpsertShortcutBuildingsFromSitemapParams struct {
+	Column1 []int64  `db:"column_1" json:"column_1"`
+	Column2 []string `db:"column_2" json:"column_2"`
+}
+
+func (q *Queries) BatchUpsertShortcutBuildingsFromSitemap(ctx context.Context, arg *BatchUpsertShortcutBuildingsFromSitemapParams) ([]ShortcutBuilding, error) {
+	rows, err := q.db.Query(ctx, batchUpsertShortcutBuildingsFromSitemap, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ShortcutBuilding{}
+	for rows.Next() {
+		var i ShortcutBuilding
+		if err := rows.Scan(
+			&i.ShortcutBuildingsID,
+			&i.ShortcutBuildingsExternalID,
+			&i.ShortcutBuildingsBuildingID,
+			&i.ShortcutBuildingsBuildingType,
+			&i.ShortcutBuildingsBuildingSubtype,
+			&i.ShortcutBuildingsConstructionYear,
+			&i.ShortcutBuildingsFloorCount,
+			&i.ShortcutBuildingsApartmentCount,
+			&i.ShortcutBuildingsHeatingSystem,
+			&i.ShortcutBuildingsBuildingMaterial,
+			&i.ShortcutBuildingsPlotType,
+			&i.ShortcutBuildingsWallStructure,
+			&i.ShortcutBuildingsHeatSource,
+			&i.ShortcutBuildingsHasElevator,
+			&i.ShortcutBuildingsHasSauna,
+			&i.ShortcutBuildingsLatitude,
+			&i.ShortcutBuildingsLongitude,
+			&i.ShortcutBuildingsAdditionalAddresses,
+			&i.ShortcutBuildingsUrl,
+			&i.ShortcutBuildingsCreatedAt,
+			&i.ShortcutBuildingsUpdatedAt,
+			&i.ShortcutBuildingsAddress,
+			&i.ShortcutBuildingsProcessedAt,
+			&i.ShortcutBuildingsPageNotFound,
+			&i.ShortcutBuildingsFrameConstructionMethod,
+			&i.ShortcutBuildingsHousingCompany,
+			&i.ShortcutBuildingsGeom,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteShortcutToken = `-- name: DeleteShortcutToken :exec
 DELETE FROM public.shortcut_tokens
 WHERE shortcut_tokens_cuid = $1
@@ -478,9 +593,10 @@ INSERT INTO public.shortcut_ads (
     shortcut_ads_url,
     shortcut_ads_type,
     shortcut_ads_data,
-    shortcut_ads_building_id
+    shortcut_ads_building_id,
+    shortcut_ads_last_seen_at
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, now()
 )
 ON CONFLICT (shortcut_ads_id) DO UPDATE SET
     shortcut_ads_url = EXCLUDED.shortcut_ads_url,
@@ -508,6 +624,44 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg *UpsertShortcutAdPar
 		arg.ShortcutAdsData,
 		arg.ShortcutAdsBuildingID,
 	)
+	var i ShortcutAd
+	err := row.Scan(
+		&i.ShortcutAdsID,
+		&i.ShortcutAdsUrl,
+		&i.ShortcutAdsType,
+		&i.ShortcutAdsFirstSeenAt,
+		&i.ShortcutAdsLastSeenAt,
+		&i.ShortcutAdsData,
+		&i.ShortcutAdsUpdatedAt,
+		&i.ShortcutAdsBuildingID,
+	)
+	return i, err
+}
+
+const upsertShortcutAdFromSitemap = `-- name: UpsertShortcutAdFromSitemap :one
+INSERT INTO public.shortcut_ads (
+    shortcut_ads_id,
+    shortcut_ads_url,
+    shortcut_ads_type,
+    shortcut_ads_last_seen_at
+) VALUES (
+    $1, $2, $3, now()
+)
+ON CONFLICT (shortcut_ads_id) DO UPDATE SET
+    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
+    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
+    shortcut_ads_last_seen_at = now()
+RETURNING shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id
+`
+
+type UpsertShortcutAdFromSitemapParams struct {
+	ShortcutAdsID   int64  `db:"shortcut_ads_id" json:"shortcut_ads_id"`
+	ShortcutAdsUrl  string `db:"shortcut_ads_url" json:"shortcut_ads_url"`
+	ShortcutAdsType string `db:"shortcut_ads_type" json:"shortcut_ads_type"`
+}
+
+func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg *UpsertShortcutAdFromSitemapParams) (ShortcutAd, error) {
+	row := q.db.QueryRow(ctx, upsertShortcutAdFromSitemap, arg.ShortcutAdsID, arg.ShortcutAdsUrl, arg.ShortcutAdsType)
 	var i ShortcutAd
 	err := row.Scan(
 		&i.ShortcutAdsID,
@@ -662,8 +816,8 @@ INSERT INTO public.shortcut_buildings (
     $1, $2
 )
 ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
-    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url,
-    shortcut_buildings_updated_at = CURRENT_TIMESTAMP
+    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
+WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
 RETURNING shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom
 `
 

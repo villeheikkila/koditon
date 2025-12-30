@@ -10,6 +10,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+func mapBatchUpsertAdsFromSitemapParams(entries []client.SitemapEntry) *db.BatchUpsertFrontdoorAdsFromSitemapParams {
+	externalIDs := make([]string, len(entries))
+	urls := make([]string, len(entries))
+	for i, entry := range entries {
+		externalIDs[i] = entry.ID
+		urls[i] = entry.URL.String()
+	}
+	return &db.BatchUpsertFrontdoorAdsFromSitemapParams{
+		Column1: externalIDs,
+		Column2: urls,
+	}
+}
+
+func mapBatchUpsertBuildingsFromSitemapParams(entries []client.SitemapEntry) []string {
+	urls := make([]string, len(entries))
+	for i, entry := range entries {
+		urls[i] = entry.URL.String()
+	}
+	return urls
+}
+
 func mapAdParams(friendlyID string, ad *client.AdResponse) *db.UpdateFrontdoorAdDataParams {
 	params := &db.UpdateFrontdoorAdDataParams{
 		FrontdoorAdsExternalID: friendlyID,

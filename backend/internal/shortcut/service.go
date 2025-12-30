@@ -16,6 +16,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AdType string
+
+const (
+	AdTypeListing AdType = "listing"
+	AdTypeRental  AdType = "rental"
+)
+
 type Service struct {
 	client  *client.Client
 	queries *db.Queries
@@ -32,9 +39,6 @@ func NewService(
 	sitemapBase string,
 ) *Service {
 	queries := db.New(dbtx)
-	// Token management: We store tokens with a long expiry (1 year) and rely on the API
-	// returning 401 to trigger token refresh. This allows tokens to be reused as long as
-	// they're valid according to the API, rather than trying to predict expiry times.
 	tokenLoad := func(ctx context.Context) (*client.Tokens, error) {
 		dbToken, err := queries.GetValidShortcutToken(ctx)
 		if err != nil {
@@ -92,37 +96,52 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 			rentalEntries = append(rentalEntries, entry)
 		}
 	}
-	adEntries := append(listingEntries, rentalEntries...)
-	var upsertErrors []error
 	if len(buildingEntries) > 0 {
-		buildingIDs = make([]string, 0, len(buildingEntries))
-		for _, entry := range buildingEntries {
-			params := mapUpsertBuildingFromSitemapParams(entry)
-			building, upsertErr := s.queries.UpsertShortcutBuildingFromSitemap(ctx, params)
-			if upsertErr != nil {
-				upsertErrors = append(upsertErrors, fmt.Errorf("upsert building %d: %w", entry.ID, upsertErr))
-				continue
-			}
-			entityID := fmt.Sprintf("building:%s", building.ShortcutBuildingsID.String())
-			buildingIDs = append(buildingIDs, entityID)
+		params := mapBatchUpsertBuildingsFromSitemapParams(buildingEntries)
+		buildings, upsertErr := s.queries.BatchUpsertShortcutBuildingsFromSitemap(ctx, params)
+		if upsertErr != nil {
+			return nil, nil, fmt.Errorf("batch upsert buildings: %w", upsertErr)
+		}
+		buildingIDs = make([]string, len(buildings))
+		for i, building := range buildings {
+			buildingIDs[i] = fmt.Sprintf("building:%s", building.ShortcutBuildingsID.String())
 		}
 	}
+	adEntries := append(listingEntries, rentalEntries...)
 	if len(adEntries) > 0 {
-		adIDs = make([]string, 0, len(adEntries))
+		seenAdIDs := make(map[int]struct{})
+		validEntries := make([]client.ShortcutSitemapEntry, 0, len(adEntries))
+		validAdTypes := make([]AdType, 0, len(adEntries))
 		for _, entry := range adEntries {
-			adID := int64(entry.ID)
-			params := mapUpsertAdParams(adID, entry.URL.String(), "unknown", nil, pgtype.UUID{Valid: false})
-			ad, upsertErr := s.queries.UpsertShortcutAd(ctx, params)
-			if upsertErr != nil {
-				upsertErrors = append(upsertErrors, fmt.Errorf("upsert ad %d: %w", entry.ID, upsertErr))
+			if _, seen := seenAdIDs[entry.ID]; seen {
+				s.logger.Debug("duplicate ad ID in sitemap, skipping", "ad_id", entry.ID)
 				continue
 			}
-			entityID := fmt.Sprintf("ad:%d", ad.ShortcutAdsID)
-			adIDs = append(adIDs, entityID)
+			seenAdIDs[entry.ID] = struct{}{}
+			var adType AdType
+			switch entry.Type {
+			case client.SitemapURLTypeListing:
+				adType = AdTypeListing
+			case client.SitemapURLTypeRental:
+				adType = AdTypeRental
+			default:
+				s.logger.Warn("unknown ad type from sitemap, skipping", "ad_id", entry.ID, "type", entry.Type)
+				continue
+			}
+			validEntries = append(validEntries, entry)
+			validAdTypes = append(validAdTypes, adType)
 		}
-	}
-	if len(buildingIDs) == 0 && len(adIDs) == 0 && len(upsertErrors) > 0 {
-		return nil, nil, fmt.Errorf("all upserts failed: %w", errors.Join(upsertErrors...))
+		if len(validEntries) > 0 {
+			params := mapBatchUpsertAdsFromSitemapParams(validEntries, validAdTypes)
+			ads, upsertErr := s.queries.BatchUpsertShortcutAdsFromSitemap(ctx, params)
+			if upsertErr != nil {
+				return nil, nil, fmt.Errorf("batch upsert ads: %w", upsertErr)
+			}
+			adIDs = make([]string, len(ads))
+			for i, ad := range ads {
+				adIDs[i] = fmt.Sprintf("ad:%d", ad.ShortcutAdsID)
+			}
+		}
 	}
 	return buildingIDs, adIDs, nil
 }
@@ -136,16 +155,20 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err := json.Unmarshal(adData, &adDataMap); err != nil {
 		return fmt.Errorf("unmarshal ad data (ad_id=%d): %w", adID, err)
 	}
-	adType := "unknown"
+	var adType AdType
 	if cardType, ok := adDataMap["cardType"].(float64); ok {
 		switch int(cardType) {
 		case 100:
-			adType = "sale"
+			adType = AdTypeListing
 		case 101:
-			adType = "rent"
+			adType = AdTypeRental
 		default:
-			adType = fmt.Sprintf("type_%d", int(cardType))
+			s.logger.Warn("unknown cardType from ad data, skipping sync", "ad_id", adID, "card_type", int(cardType))
+			return nil
 		}
+	} else {
+		s.logger.Warn("missing cardType in ad data, skipping sync", "ad_id", adID)
+		return nil
 	}
 	var shortcutBuildingID pgtype.UUID
 	if buildingData, ok := adDataMap["buildingData"].(map[string]any); ok {
@@ -161,7 +184,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err != nil {
 		return fmt.Errorf("get existing ad (ad_id=%d): %w", adID, err)
 	}
-	params := mapUpsertAdParams(adID, existingAd.ShortcutAdsUrl, adType, adData, shortcutBuildingID)
+	params := mapUpsertAdParams(adID, existingAd.ShortcutAdsUrl, string(adType), adData, shortcutBuildingID)
 	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}

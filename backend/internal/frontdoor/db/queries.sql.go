@@ -13,6 +13,145 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const batchUpsertFrontdoorAdsFromSitemap = `-- name: BatchUpsertFrontdoorAdsFromSitemap :many
+INSERT INTO public.frontdoor_ads (
+    frontdoor_ads_external_id,
+    frontdoor_ads_url,
+    frontdoor_ads_first_seen_at,
+    frontdoor_ads_last_seen_at,
+    frontdoor_ads_updated_at
+)
+SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
+ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
+SET frontdoor_ads_last_seen_at = now(),
+    frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
+RETURNING frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time
+`
+
+type BatchUpsertFrontdoorAdsFromSitemapParams struct {
+	Column1 []string `db:"column_1" json:"column_1"`
+	Column2 []string `db:"column_2" json:"column_2"`
+}
+
+func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg *BatchUpsertFrontdoorAdsFromSitemapParams) ([]FrontdoorAd, error) {
+	rows, err := q.db.Query(ctx, batchUpsertFrontdoorAdsFromSitemap, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FrontdoorAd{}
+	for rows.Next() {
+		var i FrontdoorAd
+		if err := rows.Scan(
+			&i.FrontdoorAdsID,
+			&i.FrontdoorAdsExternalID,
+			&i.FrontdoorAdsUrl,
+			&i.FrontdoorAdsFirstSeenAt,
+			&i.FrontdoorAdsLastSeenAt,
+			&i.FrontdoorAdsUpdatedAt,
+			&i.FrontdoorAdsData,
+			&i.FrontdoorAdsProcessedAt,
+			&i.FrontdoorAdsPageNotFound,
+			&i.FrontdoorAdsPublishingTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const batchUpsertFrontdoorBuildingsFromSitemap = `-- name: BatchUpsertFrontdoorBuildingsFromSitemap :many
+INSERT INTO public.frontdoor_buildings (
+    frontdoor_buildings_url,
+    frontdoor_buildings_first_seen_at,
+    frontdoor_buildings_last_seen_at,
+    frontdoor_buildings_updated_at
+)
+SELECT UNNEST($1::text[]), now(), now(), now()
+ON CONFLICT (frontdoor_buildings_url) DO UPDATE
+SET frontdoor_buildings_last_seen_at = now()
+RETURNING frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom
+`
+
+func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, dollar_1 []string) ([]FrontdoorBuilding, error) {
+	rows, err := q.db.Query(ctx, batchUpsertFrontdoorBuildingsFromSitemap, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FrontdoorBuilding{}
+	for rows.Next() {
+		var i FrontdoorBuilding
+		if err := rows.Scan(
+			&i.FrontdoorBuildingsID,
+			&i.FrontdoorBuildingsUrl,
+			&i.FrontdoorBuildingsFirstSeenAt,
+			&i.FrontdoorBuildingsLastSeenAt,
+			&i.FrontdoorBuildingsUpdatedAt,
+			&i.FrontdoorBuildingsCompanyName,
+			&i.FrontdoorBuildingsBusinessID,
+			&i.FrontdoorBuildingsApartmentCount,
+			&i.FrontdoorBuildingsFloorCount,
+			&i.FrontdoorBuildingsConstructionEndYear,
+			&i.FrontdoorBuildingsBuildYear,
+			&i.FrontdoorBuildingsHasElevator,
+			&i.FrontdoorBuildingsHasSauna,
+			&i.FrontdoorBuildingsEnergyCertificateCode,
+			&i.FrontdoorBuildingsPlotHoldingType,
+			&i.FrontdoorBuildingsOuterRoofMaterial,
+			&i.FrontdoorBuildingsOuterRoofType,
+			&i.FrontdoorBuildingsHeating,
+			&i.FrontdoorBuildingsHeatingFuel,
+			&i.FrontdoorBuildingsStreetAddress,
+			&i.FrontdoorBuildingsHouseNumber,
+			&i.FrontdoorBuildingsPostcode,
+			&i.FrontdoorBuildingsPostArea,
+			&i.FrontdoorBuildingsMunicipality,
+			&i.FrontdoorBuildingsDistrict,
+			&i.FrontdoorBuildingsLatitude,
+			&i.FrontdoorBuildingsLongitude,
+			&i.FrontdoorBuildingsElevatorRenovated,
+			&i.FrontdoorBuildingsElevatorRenovatedYear,
+			&i.FrontdoorBuildingsFacadeRenovated,
+			&i.FrontdoorBuildingsFacadeRenovatedYear,
+			&i.FrontdoorBuildingsWindowRenovated,
+			&i.FrontdoorBuildingsWindowRenovatedYear,
+			&i.FrontdoorBuildingsRoofRenovated,
+			&i.FrontdoorBuildingsRoofRenovatedYear,
+			&i.FrontdoorBuildingsPipeRenovated,
+			&i.FrontdoorBuildingsPipeRenovatedYear,
+			&i.FrontdoorBuildingsBalconyRenovated,
+			&i.FrontdoorBuildingsBalconyRenovatedYear,
+			&i.FrontdoorBuildingsElectricityRenovated,
+			&i.FrontdoorBuildingsElectricityRenovatedYear,
+			&i.FrontdoorBuildingsContactPhone,
+			&i.FrontdoorBuildingsContactOfficeName,
+			&i.FrontdoorBuildingsContactOfficeID,
+			&i.FrontdoorBuildingsDescription,
+			&i.FrontdoorBuildingsCarStorageDescription,
+			&i.FrontdoorBuildingsOtherInfo,
+			&i.FrontdoorBuildingsAdditionalAddresses,
+			&i.FrontdoorBuildingsLinks,
+			&i.FrontdoorBuildingsData,
+			&i.FrontdoorBuildingsProcessedAt,
+			&i.FrontdoorBuildingsHousingCompanyID,
+			&i.FrontdoorBuildingsHousingCompanyFriendlyID,
+			&i.FrontdoorBuildingsGeom,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFrontdoorAdByExternalID = `-- name: GetFrontdoorAdByExternalID :one
 SELECT frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time FROM public.frontdoor_ads
 WHERE frontdoor_ads_external_id = $1
@@ -919,7 +1058,6 @@ INSERT INTO public.frontdoor_ads (
 ) VALUES ($1, $2, now(), now(), now())
 ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
 SET frontdoor_ads_last_seen_at = now(),
-    frontdoor_ads_updated_at = now(),
     frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
 RETURNING frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time
 `
@@ -971,7 +1109,6 @@ INSERT INTO public.frontdoor_buildings (
 ) VALUES ($1, now(), now(), now(), $2, $3)
 ON CONFLICT (frontdoor_buildings_housing_company_id) DO UPDATE
 SET frontdoor_buildings_last_seen_at = now(),
-    frontdoor_buildings_updated_at = now(),
     frontdoor_buildings_url = COALESCE(EXCLUDED.frontdoor_buildings_url, frontdoor_buildings.frontdoor_buildings_url),
     frontdoor_buildings_housing_company_friendly_id = COALESCE(EXCLUDED.frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings.frontdoor_buildings_housing_company_friendly_id)
 RETURNING frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom
