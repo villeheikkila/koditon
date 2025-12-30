@@ -416,7 +416,7 @@ ON CONFLICT (
     prices_neighborhoods_id
 ) DO UPDATE
 SET prices_transactions_updated_at = now()
-RETURNING prices_transactions_id, prices_transactions_neighborhood, prices_transactions_description, prices_transactions_type, prices_transactions_area, prices_transactions_price, prices_transactions_price_per_square_meter, prices_transactions_build_year, prices_transactions_floor, prices_transactions_elevator, prices_transactions_condition, prices_transactions_plot, prices_transactions_energy_class, prices_transactions_period_identifier, prices_transactions_created_at, prices_transactions_updated_at, prices_transactions_category, prices_neighborhoods_id
+RETURNING prices_transactions_id, prices_transactions_description, prices_transactions_type, prices_transactions_area, prices_transactions_price, prices_transactions_price_per_square_meter, prices_transactions_build_year, prices_transactions_floor, prices_transactions_elevator, prices_transactions_condition, prices_transactions_plot, prices_transactions_energy_class, prices_transactions_period_identifier, prices_transactions_created_at, prices_transactions_updated_at, prices_transactions_category, prices_neighborhoods_id
 `
 
 type UpsertPricesTransactionParams struct {
@@ -456,7 +456,6 @@ func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg *UpsertPrices
 	var i PricesTransaction
 	err := row.Scan(
 		&i.PricesTransactionsID,
-		&i.PricesTransactionsNeighborhood,
 		&i.PricesTransactionsDescription,
 		&i.PricesTransactionsType,
 		&i.PricesTransactionsArea,

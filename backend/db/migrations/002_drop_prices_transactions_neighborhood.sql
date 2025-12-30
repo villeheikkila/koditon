@@ -1,0 +1,1 @@
+ALTER TABLE public.prices_transactions DROP COLUMN prices_transactions_neighborhood;

@@ -27,7 +27,6 @@ CREATE TABLE public.prices_neighborhoods (
 
 CREATE TABLE public.prices_transactions (
     prices_transactions_id                          uuid             PRIMARY KEY DEFAULT uuid_generate_v4(),
-    prices_transactions_neighborhood                text             NOT NULL,
     prices_transactions_description                 text             NOT NULL,
     prices_transactions_type                        text             NOT NULL,
     prices_transactions_area                        double precision NOT NULL,

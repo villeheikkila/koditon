@@ -34,7 +34,6 @@ type PricesPostalCode struct {
 
 type PricesTransaction struct {
 	PricesTransactionsID                  pgtype.UUID        `db:"prices_transactions_id" json:"prices_transactions_id"`
-	PricesTransactionsNeighborhood        string             `db:"prices_transactions_neighborhood" json:"prices_transactions_neighborhood"`
 	PricesTransactionsDescription         string             `db:"prices_transactions_description" json:"prices_transactions_description"`
 	PricesTransactionsType                string             `db:"prices_transactions_type" json:"prices_transactions_type"`
 	PricesTransactionsArea                float64            `db:"prices_transactions_area" json:"prices_transactions_area"`
