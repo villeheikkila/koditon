@@ -13,6 +13,7 @@
 - `go test ./...`: run unit and integration tests.
 - `go vet ./...`: static analysis; run before proposing changes.
 - Database tooling: `task tools:db` installs tern + sqlc; `task db:new NAME=...` creates timestamped migration; `task db:up` applies pending migrations; `task db:status` shows state; `task db:force VERSION=...` pins migration state; `task sqlc` regenerates `internal/db`.
+- **No down migrations**: Never add down migrations. Migrations are forward-only; use new migrations to fix or undo changes if needed.
 
 ## Coding Style & Naming Conventions
 - Go fmt first: `task gofmt` or editor save hook; use `goimports` style imports.

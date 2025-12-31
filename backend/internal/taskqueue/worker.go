@@ -20,13 +20,14 @@ import (
 
 // Task types
 const (
-	TaskTypeFrontdoorSitemapSync = "frontdoor_sitemap_sync"
-	TaskTypeFrontdoorSync        = "frontdoor_sync"
-	TaskTypeShortcutSitemapSync  = "shortcut_sitemap_sync"
-	TaskTypeShortcutScraperSync  = "shortcut_scraper_sync"
-	TaskTypeShortcutAPISync      = "shortcut_api_sync"
-	TaskTypePricesCitiesInit     = "prices_cities_init"
-	TaskTypePricesSync           = "prices_sync"
+	TaskTypeFrontdoorSitemapSync             = "frontdoor_sitemap_sync"
+	TaskTypeFrontdoorSync                    = "frontdoor_sync"
+	TaskTypeShortcutSitemapSync              = "shortcut_sitemap_sync"
+	TaskTypeShortcutScraperSync              = "shortcut_scraper_sync"
+	TaskTypeShortcutAPISync                  = "shortcut_api_sync"
+	TaskTypePricesCitiesInit                 = "prices_cities_init"
+	TaskTypePricesSync                       = "prices_sync"
+	TaskTypePricesNeighborhoodPostalCodeSync = "prices_neighborhood_postal_code_sync"
 )
 
 // Entity prefixes

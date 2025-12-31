@@ -75,6 +75,79 @@ func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCities
 	return items, nil
 }
 
+const listPricesCities = `-- name: ListPricesCities :many
+SELECT
+    prices_cities_id,
+    prices_cities_name,
+    prices_cities_created_at,
+    prices_cities_updated_at
+FROM public.prices_cities
+ORDER BY prices_cities_name
+`
+
+func (q *Queries) ListPricesCities(ctx context.Context) ([]PricesCity, error) {
+	rows, err := q.db.Query(ctx, listPricesCities)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PricesCity{}
+	for rows.Next() {
+		var i PricesCity
+		if err := rows.Scan(
+			&i.PricesCitiesID,
+			&i.PricesCitiesName,
+			&i.PricesCitiesCreatedAt,
+			&i.PricesCitiesUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPricesPostalCodesByCity = `-- name: ListPricesPostalCodesByCity :many
+SELECT
+    prices_postal_codes_id,
+    prices_postal_codes_code,
+    prices_postal_codes_city_id,
+    prices_postal_codes_created_at,
+    prices_postal_codes_updated_at
+FROM public.prices_postal_codes
+WHERE prices_postal_codes_city_id = $1
+ORDER BY prices_postal_codes_code
+`
+
+func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID pgtype.UUID) ([]PricesPostalCode, error) {
+	rows, err := q.db.Query(ctx, listPricesPostalCodesByCity, cityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PricesPostalCode{}
+	for rows.Next() {
+		var i PricesPostalCode
+		if err := rows.Scan(
+			&i.PricesPostalCodesID,
+			&i.PricesPostalCodesCode,
+			&i.PricesPostalCodesCityID,
+			&i.PricesPostalCodesCreatedAt,
+			&i.PricesPostalCodesUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionsByNeighborhoods = `-- name: ListTransactionsByNeighborhoods :many
 WITH selected_neighborhoods AS (
     SELECT UNNEST($1::uuid[]) AS neighborhood_id
@@ -174,6 +247,25 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateNeighborhoodPostalCode = `-- name: UpdateNeighborhoodPostalCode :exec
+UPDATE public.prices_neighborhoods
+SET prices_neighborhoods_postal_code_id = $1,
+    prices_neighborhoods_updated_at = now()
+WHERE prices_neighborhoods_name = $2
+  AND prices_neighborhoods_city_id = $3
+`
+
+type UpdateNeighborhoodPostalCodeParams struct {
+	PostalCodeID pgtype.UUID `db:"postal_code_id" json:"postal_code_id"`
+	Name         string      `db:"name" json:"name"`
+	CityID       pgtype.UUID `db:"city_id" json:"city_id"`
+}
+
+func (q *Queries) UpdateNeighborhoodPostalCode(ctx context.Context, arg *UpdateNeighborhoodPostalCodeParams) error {
+	_, err := q.db.Exec(ctx, updateNeighborhoodPostalCode, arg.PostalCodeID, arg.Name, arg.CityID)
+	return err
 }
 
 const upsertPricesCity = `-- name: UpsertPricesCity :one

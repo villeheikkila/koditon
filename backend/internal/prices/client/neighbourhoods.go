@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-type postalCodesResponse struct {
-	PostalCodes string `json:"postalCodes"`
+type neighborhoodsResponse struct {
+	Neighborhoods string `json:"neighborhoods"`
 }
 
-func (c *Client) FetchPostalCodes(ctx context.Context, city string) ([]string, error) {
-	endpoint, err := c.baseURL.Parse("/haku/searchForm/fetchPostalCodes")
+func (c *Client) FetchNeighborhoods(ctx context.Context, city string) ([]string, error) {
+	endpoint, err := c.baseURL.Parse("/haku/searchForm/fetchNeighborhoods")
 	if err != nil {
-		return nil, fmt.Errorf("build fetchPostalCodes URL: %w", err)
+		return nil, fmt.Errorf("build fetchNeighborhoods URL: %w", err)
 	}
 	body := strings.NewReader(url.Values{
 		"lang": {"fi_FI"},
@@ -26,9 +26,9 @@ func (c *Client) FetchPostalCodes(ctx context.Context, city string) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	var payload postalCodesResponse
+	var payload neighborhoodsResponse
 	if err := c.doRequest(ctx, req, &payload); err != nil {
 		return nil, err
 	}
-	return parseList(payload.PostalCodes), nil
+	return parseList(payload.Neighborhoods), nil
 }

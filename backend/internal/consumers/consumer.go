@@ -99,6 +99,8 @@ func (c *Consumer) handleTask(taskCtx context.Context, task taskqueuedb.TaskQueu
 		err = c.handlePricesCitiesInit(taskCtx, taskLogger)
 	case taskqueue.TaskTypePricesSync:
 		err = c.handlePricesSync(taskCtx, taskLogger, task)
+	case taskqueue.TaskTypePricesNeighborhoodPostalCodeSync:
+		err = c.handlePricesNeighborhoodPostalCodeSync(taskCtx, taskLogger)
 	default:
 		return taskqueue.NewPermanentError(
 			fmt.Errorf("unknown task type: %s", task.TaskType),

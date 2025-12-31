@@ -261,3 +261,30 @@ ON CONFLICT (
     prices_transactions_period_identifier
 ) DO UPDATE
 SET prices_transactions_updated_at = now();
+
+-- name: ListPricesPostalCodesByCity :many
+SELECT
+    prices_postal_codes_id,
+    prices_postal_codes_code,
+    prices_postal_codes_city_id,
+    prices_postal_codes_created_at,
+    prices_postal_codes_updated_at
+FROM public.prices_postal_codes
+WHERE prices_postal_codes_city_id = sqlc.arg(city_id)
+ORDER BY prices_postal_codes_code;
+
+-- name: UpdateNeighborhoodPostalCode :exec
+UPDATE public.prices_neighborhoods
+SET prices_neighborhoods_postal_code_id = sqlc.arg(postal_code_id),
+    prices_neighborhoods_updated_at = now()
+WHERE prices_neighborhoods_name = sqlc.arg(name)
+  AND prices_neighborhoods_city_id = sqlc.arg(city_id);
+
+-- name: ListPricesCities :many
+SELECT
+    prices_cities_id,
+    prices_cities_name,
+    prices_cities_created_at,
+    prices_cities_updated_at
+FROM public.prices_cities
+ORDER BY prices_cities_name;

@@ -159,3 +159,24 @@ func (c *Client) GetAllTransactions(ctx context.Context, city string) ([]*Transa
 	}
 	return allApartments, nil
 }
+
+func (c *Client) GetAllTransactionsForPostalCode(ctx context.Context, city, postalCode string) ([]*TransactionEntity, error) {
+	var allApartments []*TransactionEntity
+	nextPage := new(int)
+	*nextPage = 0
+	params := NewApartmentSearchParams(city)
+	params.PostalCodes = []string{postalCode}
+	for nextPage != nil {
+		page := *nextPage
+		if page > 0 {
+			time.Sleep(1 * time.Second)
+		}
+		response, err := c.GetTransactionsForPage(ctx, params, page)
+		if err != nil {
+			return nil, fmt.Errorf("fetch page %d for postal code %s: %w", page, postalCode, err)
+		}
+		allApartments = append(allApartments, response.Apartments...)
+		nextPage = response.NextPage
+	}
+	return allApartments, nil
+}

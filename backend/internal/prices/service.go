@@ -45,6 +45,90 @@ func (s *Service) FetchCities(ctx context.Context) ([]string, error) {
 	return cities, nil
 }
 
+type SyncNeighborhoodPostalCodesProgress struct {
+	City       string
+	PostalCode string
+	Page       int
+	Updated    int
+}
+
+func (s *Service) SyncNeighborhoodPostalCodes(ctx context.Context, progressFn func(SyncNeighborhoodPostalCodesProgress)) error {
+	cities, err := s.queries.ListPricesCities(ctx)
+	if err != nil {
+		return fmt.Errorf("list cities: %w", err)
+	}
+	for _, city := range cities {
+		postalCodes, err := s.queries.ListPricesPostalCodesByCity(ctx, city.PricesCitiesID)
+		if err != nil {
+			return fmt.Errorf("list postal codes for city %q: %w", city.PricesCitiesName, err)
+		}
+		for _, pc := range postalCodes {
+			updated, err := s.syncNeighborhoodsForPostalCode(ctx, city, pc, progressFn)
+			if err != nil {
+				return fmt.Errorf("sync neighborhoods for postal code %q in %q: %w", pc.PricesPostalCodesCode, city.PricesCitiesName, err)
+			}
+			if progressFn != nil {
+				progressFn(SyncNeighborhoodPostalCodesProgress{
+					City:       city.PricesCitiesName,
+					PostalCode: pc.PricesPostalCodesCode,
+					Updated:    updated,
+				})
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Service) syncNeighborhoodsForPostalCode(
+	ctx context.Context,
+	city db.PricesCity,
+	pc db.PricesPostalCode,
+	progressFn func(SyncNeighborhoodPostalCodesProgress),
+) (int, error) {
+	neighborhoodNames := make(map[string]struct{})
+	nextPage := new(int)
+	*nextPage = 0
+	page := 0
+	for nextPage != nil {
+		page = *nextPage
+		if progressFn != nil {
+			progressFn(SyncNeighborhoodPostalCodesProgress{
+				City:       city.PricesCitiesName,
+				PostalCode: pc.PricesPostalCodesCode,
+				Page:       page,
+			})
+		}
+		response, err := s.client.GetTransactionsForPage(ctx, &client.ApartmentSearchParams{
+			City:        city.PricesCitiesName,
+			PostalCodes: []string{pc.PricesPostalCodesCode},
+			RenderType:  "renderTypeTable",
+		}, page)
+		if err != nil {
+			return 0, fmt.Errorf("fetch page %d: %w", page, err)
+		}
+		for _, tx := range response.Apartments {
+			name := util.TrimUnicodeSpace(tx.Neighborhood)
+			if name != "" {
+				neighborhoodNames[name] = struct{}{}
+			}
+		}
+		nextPage = response.NextPage
+	}
+	updated := 0
+	for name := range neighborhoodNames {
+		err := s.queries.UpdateNeighborhoodPostalCode(ctx, &db.UpdateNeighborhoodPostalCodeParams{
+			PostalCodeID: pc.PricesPostalCodesID,
+			Name:         name,
+			CityID:       city.PricesCitiesID,
+		})
+		if err != nil {
+			return updated, fmt.Errorf("update neighborhood %q: %w", name, err)
+		}
+		updated++
+	}
+	return updated, nil
+}
+
 func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
 	if err != nil {
