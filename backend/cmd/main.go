@@ -13,6 +13,7 @@ import (
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/taskqueue"
+	"koditon-go/internal/telegram"
 	"log/slog"
 	"net"
 	"net/http"
@@ -192,7 +193,16 @@ func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 	if cfg.Environment.IsDevelopment() {
 		opts.AddSource = true
 	}
-	return slog.New(tint.NewHandler(w, opts))
+	handler := slog.Handler(tint.NewHandler(w, opts))
+	if cfg.Telegram.BotToken != "" && cfg.Telegram.ChatID != "" {
+		handler = telegram.NewHandler(
+			cfg.Telegram.BotToken,
+			cfg.Telegram.ChatID,
+			slog.LevelWarn,
+			handler,
+		)
+	}
+	return slog.New(handler)
 }
 
 func formatLevel(level slog.Level) string {

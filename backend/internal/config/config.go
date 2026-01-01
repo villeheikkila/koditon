@@ -32,6 +32,7 @@ type Config struct {
 	Shortcut        ShortcutConfig
 	Frontdoor       FrontdoorConfig
 	OpenRouter      OpenRouterConfig
+	Telegram        TelegramConfig
 }
 
 func (c Config) SlogLevel() slog.Level {
@@ -79,6 +80,11 @@ type FrontdoorConfig struct {
 
 type OpenRouterConfig struct {
 	APIKey string `env:"OPENROUTER_API_KEY,required"`
+}
+
+type TelegramConfig struct {
+	BotToken string `env:"TELEGRAM_BOT_TOKEN"`
+	ChatID   string `env:"TELEGRAM_CHAT_ID"`
 }
 
 func Load() (Config, error) {
