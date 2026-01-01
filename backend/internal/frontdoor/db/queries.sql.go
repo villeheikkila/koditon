@@ -15,17 +15,17 @@ import (
 
 const batchUpsertFrontdoorAdsFromSitemap = `-- name: BatchUpsertFrontdoorAdsFromSitemap :many
 INSERT INTO public.frontdoor_ads (
-    frontdoor_ads_external_id,
-    frontdoor_ads_url,
-    frontdoor_ads_first_seen_at,
-    frontdoor_ads_last_seen_at,
-    frontdoor_ads_updated_at
+    frontdoor_ad_external_id,
+    frontdoor_ad_url,
+    frontdoor_ad_first_seen_at,
+    frontdoor_ad_last_seen_at,
+    frontdoor_ad_updated_at
 )
 SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
-ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
-SET frontdoor_ads_last_seen_at = now(),
-    frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
-RETURNING frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
+SET frontdoor_ad_last_seen_at = now(),
+    frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time
 `
 
 type BatchUpsertFrontdoorAdsFromSitemapParams struct {
@@ -43,16 +43,16 @@ func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg *B
 	for rows.Next() {
 		var i FrontdoorAd
 		if err := rows.Scan(
-			&i.FrontdoorAdsID,
-			&i.FrontdoorAdsExternalID,
-			&i.FrontdoorAdsUrl,
-			&i.FrontdoorAdsFirstSeenAt,
-			&i.FrontdoorAdsLastSeenAt,
-			&i.FrontdoorAdsUpdatedAt,
-			&i.FrontdoorAdsData,
-			&i.FrontdoorAdsProcessedAt,
-			&i.FrontdoorAdsPageNotFound,
-			&i.FrontdoorAdsPublishingTime,
+			&i.FrontdoorAdID,
+			&i.FrontdoorAdExternalID,
+			&i.FrontdoorAdUrl,
+			&i.FrontdoorAdFirstSeenAt,
+			&i.FrontdoorAdLastSeenAt,
+			&i.FrontdoorAdUpdatedAt,
+			&i.FrontdoorAdData,
+			&i.FrontdoorAdProcessedAt,
+			&i.FrontdoorAdPageNotFound,
+			&i.FrontdoorAdPublishingTime,
 		); err != nil {
 			return nil, err
 		}
@@ -66,15 +66,15 @@ func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg *B
 
 const batchUpsertFrontdoorBuildingsFromSitemap = `-- name: BatchUpsertFrontdoorBuildingsFromSitemap :many
 INSERT INTO public.frontdoor_buildings (
-    frontdoor_buildings_url,
-    frontdoor_buildings_first_seen_at,
-    frontdoor_buildings_last_seen_at,
-    frontdoor_buildings_updated_at
+    frontdoor_building_url,
+    frontdoor_building_first_seen_at,
+    frontdoor_building_last_seen_at,
+    frontdoor_building_updated_at
 )
 SELECT UNNEST($1::text[]), now(), now(), now()
-ON CONFLICT (frontdoor_buildings_url) DO UPDATE
-SET frontdoor_buildings_last_seen_at = now()
-RETURNING frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom
+ON CONFLICT (frontdoor_building_url) DO UPDATE
+SET frontdoor_building_last_seen_at = now()
+RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom
 `
 
 func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, dollar_1 []string) ([]FrontdoorBuilding, error) {
@@ -87,60 +87,60 @@ func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, 
 	for rows.Next() {
 		var i FrontdoorBuilding
 		if err := rows.Scan(
-			&i.FrontdoorBuildingsID,
-			&i.FrontdoorBuildingsUrl,
-			&i.FrontdoorBuildingsFirstSeenAt,
-			&i.FrontdoorBuildingsLastSeenAt,
-			&i.FrontdoorBuildingsUpdatedAt,
-			&i.FrontdoorBuildingsCompanyName,
-			&i.FrontdoorBuildingsBusinessID,
-			&i.FrontdoorBuildingsApartmentCount,
-			&i.FrontdoorBuildingsFloorCount,
-			&i.FrontdoorBuildingsConstructionEndYear,
-			&i.FrontdoorBuildingsBuildYear,
-			&i.FrontdoorBuildingsHasElevator,
-			&i.FrontdoorBuildingsHasSauna,
-			&i.FrontdoorBuildingsEnergyCertificateCode,
-			&i.FrontdoorBuildingsPlotHoldingType,
-			&i.FrontdoorBuildingsOuterRoofMaterial,
-			&i.FrontdoorBuildingsOuterRoofType,
-			&i.FrontdoorBuildingsHeating,
-			&i.FrontdoorBuildingsHeatingFuel,
-			&i.FrontdoorBuildingsStreetAddress,
-			&i.FrontdoorBuildingsHouseNumber,
-			&i.FrontdoorBuildingsPostcode,
-			&i.FrontdoorBuildingsPostArea,
-			&i.FrontdoorBuildingsMunicipality,
-			&i.FrontdoorBuildingsDistrict,
-			&i.FrontdoorBuildingsLatitude,
-			&i.FrontdoorBuildingsLongitude,
-			&i.FrontdoorBuildingsElevatorRenovated,
-			&i.FrontdoorBuildingsElevatorRenovatedYear,
-			&i.FrontdoorBuildingsFacadeRenovated,
-			&i.FrontdoorBuildingsFacadeRenovatedYear,
-			&i.FrontdoorBuildingsWindowRenovated,
-			&i.FrontdoorBuildingsWindowRenovatedYear,
-			&i.FrontdoorBuildingsRoofRenovated,
-			&i.FrontdoorBuildingsRoofRenovatedYear,
-			&i.FrontdoorBuildingsPipeRenovated,
-			&i.FrontdoorBuildingsPipeRenovatedYear,
-			&i.FrontdoorBuildingsBalconyRenovated,
-			&i.FrontdoorBuildingsBalconyRenovatedYear,
-			&i.FrontdoorBuildingsElectricityRenovated,
-			&i.FrontdoorBuildingsElectricityRenovatedYear,
-			&i.FrontdoorBuildingsContactPhone,
-			&i.FrontdoorBuildingsContactOfficeName,
-			&i.FrontdoorBuildingsContactOfficeID,
-			&i.FrontdoorBuildingsDescription,
-			&i.FrontdoorBuildingsCarStorageDescription,
-			&i.FrontdoorBuildingsOtherInfo,
-			&i.FrontdoorBuildingsAdditionalAddresses,
-			&i.FrontdoorBuildingsLinks,
-			&i.FrontdoorBuildingsData,
-			&i.FrontdoorBuildingsProcessedAt,
-			&i.FrontdoorBuildingsHousingCompanyID,
-			&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-			&i.FrontdoorBuildingsGeom,
+			&i.FrontdoorBuildingID,
+			&i.FrontdoorBuildingUrl,
+			&i.FrontdoorBuildingFirstSeenAt,
+			&i.FrontdoorBuildingLastSeenAt,
+			&i.FrontdoorBuildingUpdatedAt,
+			&i.FrontdoorBuildingCompanyName,
+			&i.FrontdoorBuildingBusinessID,
+			&i.FrontdoorBuildingApartmentCount,
+			&i.FrontdoorBuildingFloorCount,
+			&i.FrontdoorBuildingConstructionEndYear,
+			&i.FrontdoorBuildingBuildYear,
+			&i.FrontdoorBuildingHasElevator,
+			&i.FrontdoorBuildingHasSauna,
+			&i.FrontdoorBuildingEnergyCertificateCode,
+			&i.FrontdoorBuildingPlotHoldingType,
+			&i.FrontdoorBuildingOuterRoofMaterial,
+			&i.FrontdoorBuildingOuterRoofType,
+			&i.FrontdoorBuildingHeating,
+			&i.FrontdoorBuildingHeatingFuel,
+			&i.FrontdoorBuildingStreetAddress,
+			&i.FrontdoorBuildingHouseNumber,
+			&i.FrontdoorBuildingPostcode,
+			&i.FrontdoorBuildingPostArea,
+			&i.FrontdoorBuildingMunicipality,
+			&i.FrontdoorBuildingDistrict,
+			&i.FrontdoorBuildingLatitude,
+			&i.FrontdoorBuildingLongitude,
+			&i.FrontdoorBuildingElevatorRenovated,
+			&i.FrontdoorBuildingElevatorRenovatedYear,
+			&i.FrontdoorBuildingFacadeRenovated,
+			&i.FrontdoorBuildingFacadeRenovatedYear,
+			&i.FrontdoorBuildingWindowRenovated,
+			&i.FrontdoorBuildingWindowRenovatedYear,
+			&i.FrontdoorBuildingRoofRenovated,
+			&i.FrontdoorBuildingRoofRenovatedYear,
+			&i.FrontdoorBuildingPipeRenovated,
+			&i.FrontdoorBuildingPipeRenovatedYear,
+			&i.FrontdoorBuildingBalconyRenovated,
+			&i.FrontdoorBuildingBalconyRenovatedYear,
+			&i.FrontdoorBuildingElectricityRenovated,
+			&i.FrontdoorBuildingElectricityRenovatedYear,
+			&i.FrontdoorBuildingContactPhone,
+			&i.FrontdoorBuildingContactOfficeName,
+			&i.FrontdoorBuildingContactOfficeID,
+			&i.FrontdoorBuildingDescription,
+			&i.FrontdoorBuildingCarStorageDescription,
+			&i.FrontdoorBuildingOtherInfo,
+			&i.FrontdoorBuildingAdditionalAddresses,
+			&i.FrontdoorBuildingLinks,
+			&i.FrontdoorBuildingData,
+			&i.FrontdoorBuildingProcessedAt,
+			&i.FrontdoorBuildingHousingCompanyID,
+			&i.FrontdoorBuildingHousingCompanyFriendlyID,
+			&i.FrontdoorBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -153,232 +153,232 @@ func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, 
 }
 
 const getFrontdoorAdByExternalID = `-- name: GetFrontdoorAdByExternalID :one
-SELECT frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time FROM public.frontdoor_ads
-WHERE frontdoor_ads_external_id = $1
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time FROM public.frontdoor_ads
+WHERE frontdoor_ad_external_id = $1
 `
 
-func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdsExternalID string) (FrontdoorAd, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorAdByExternalID, frontdoorAdsExternalID)
+func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdExternalID string) (FrontdoorAd, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorAdByExternalID, frontdoorAdExternalID)
 	var i FrontdoorAd
 	err := row.Scan(
-		&i.FrontdoorAdsID,
-		&i.FrontdoorAdsExternalID,
-		&i.FrontdoorAdsUrl,
-		&i.FrontdoorAdsFirstSeenAt,
-		&i.FrontdoorAdsLastSeenAt,
-		&i.FrontdoorAdsUpdatedAt,
-		&i.FrontdoorAdsData,
-		&i.FrontdoorAdsProcessedAt,
-		&i.FrontdoorAdsPageNotFound,
-		&i.FrontdoorAdsPublishingTime,
+		&i.FrontdoorAdID,
+		&i.FrontdoorAdExternalID,
+		&i.FrontdoorAdUrl,
+		&i.FrontdoorAdFirstSeenAt,
+		&i.FrontdoorAdLastSeenAt,
+		&i.FrontdoorAdUpdatedAt,
+		&i.FrontdoorAdData,
+		&i.FrontdoorAdProcessedAt,
+		&i.FrontdoorAdPageNotFound,
+		&i.FrontdoorAdPublishingTime,
 	)
 	return i, err
 }
 
 const getFrontdoorBuildingAnnouncementByID = `-- name: GetFrontdoorBuildingAnnouncementByID :one
-SELECT frontdoor_building_announcements_id, frontdoor_building_announcements_external_id, frontdoor_building_announcements_friendly_id, frontdoor_building_announcements_unpublishing_time, frontdoor_building_announcements_address_line1, frontdoor_building_announcements_address_line2, frontdoor_building_announcements_location, frontdoor_building_announcements_search_price, frontdoor_building_announcements_notify_price_changed, frontdoor_building_announcements_property_type, frontdoor_building_announcements_property_subtype, frontdoor_building_announcements_construction_finished_year, frontdoor_building_announcements_main_image_uri, frontdoor_building_announcements_has_open_bidding, frontdoor_building_announcements_room_structure, frontdoor_building_announcements_area, frontdoor_building_announcements_total_area, frontdoor_building_announcements_price_per_square, frontdoor_building_announcements_days_on_market, frontdoor_building_announcements_new_building, frontdoor_building_announcements_main_image_hidden, frontdoor_building_announcements_is_company_announcement, frontdoor_building_announcements_show_bidding_indicators, frontdoor_building_announcements_published, frontdoor_building_announcements_rent_period, frontdoor_building_announcements_rental_unique_no, frontdoor_building_announcements_building_id, frontdoor_building_announcements_first_seen_at, frontdoor_building_announcements_last_seen_at, frontdoor_building_announcements_unpublishing_time_date FROM public.frontdoor_building_announcements
-WHERE frontdoor_building_announcements_id = $1
+SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date FROM public.frontdoor_building_announcements
+WHERE frontdoor_building_announcement_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, frontdoorBuildingAnnouncementsID pgtype.UUID) (FrontdoorBuildingAnnouncement, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingAnnouncementByID, frontdoorBuildingAnnouncementsID)
+func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, frontdoorBuildingAnnouncementID pgtype.UUID) (FrontdoorBuildingAnnouncement, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingAnnouncementByID, frontdoorBuildingAnnouncementID)
 	var i FrontdoorBuildingAnnouncement
 	err := row.Scan(
-		&i.FrontdoorBuildingAnnouncementsID,
-		&i.FrontdoorBuildingAnnouncementsExternalID,
-		&i.FrontdoorBuildingAnnouncementsFriendlyID,
-		&i.FrontdoorBuildingAnnouncementsUnpublishingTime,
-		&i.FrontdoorBuildingAnnouncementsAddressLine1,
-		&i.FrontdoorBuildingAnnouncementsAddressLine2,
-		&i.FrontdoorBuildingAnnouncementsLocation,
-		&i.FrontdoorBuildingAnnouncementsSearchPrice,
-		&i.FrontdoorBuildingAnnouncementsNotifyPriceChanged,
-		&i.FrontdoorBuildingAnnouncementsPropertyType,
-		&i.FrontdoorBuildingAnnouncementsPropertySubtype,
-		&i.FrontdoorBuildingAnnouncementsConstructionFinishedYear,
-		&i.FrontdoorBuildingAnnouncementsMainImageUri,
-		&i.FrontdoorBuildingAnnouncementsHasOpenBidding,
-		&i.FrontdoorBuildingAnnouncementsRoomStructure,
-		&i.FrontdoorBuildingAnnouncementsArea,
-		&i.FrontdoorBuildingAnnouncementsTotalArea,
-		&i.FrontdoorBuildingAnnouncementsPricePerSquare,
-		&i.FrontdoorBuildingAnnouncementsDaysOnMarket,
-		&i.FrontdoorBuildingAnnouncementsNewBuilding,
-		&i.FrontdoorBuildingAnnouncementsMainImageHidden,
-		&i.FrontdoorBuildingAnnouncementsIsCompanyAnnouncement,
-		&i.FrontdoorBuildingAnnouncementsShowBiddingIndicators,
-		&i.FrontdoorBuildingAnnouncementsPublished,
-		&i.FrontdoorBuildingAnnouncementsRentPeriod,
-		&i.FrontdoorBuildingAnnouncementsRentalUniqueNo,
-		&i.FrontdoorBuildingAnnouncementsBuildingID,
-		&i.FrontdoorBuildingAnnouncementsFirstSeenAt,
-		&i.FrontdoorBuildingAnnouncementsLastSeenAt,
-		&i.FrontdoorBuildingAnnouncementsUnpublishingTimeDate,
+		&i.FrontdoorBuildingAnnouncementID,
+		&i.FrontdoorBuildingAnnouncementExternalID,
+		&i.FrontdoorBuildingAnnouncementFriendlyID,
+		&i.FrontdoorBuildingAnnouncementUnpublishingTime,
+		&i.FrontdoorBuildingAnnouncementAddressLine1,
+		&i.FrontdoorBuildingAnnouncementAddressLine2,
+		&i.FrontdoorBuildingAnnouncementLocation,
+		&i.FrontdoorBuildingAnnouncementSearchPrice,
+		&i.FrontdoorBuildingAnnouncementNotifyPriceChanged,
+		&i.FrontdoorBuildingAnnouncementPropertyType,
+		&i.FrontdoorBuildingAnnouncementPropertySubtype,
+		&i.FrontdoorBuildingAnnouncementConstructionFinishedYear,
+		&i.FrontdoorBuildingAnnouncementMainImageUri,
+		&i.FrontdoorBuildingAnnouncementHasOpenBidding,
+		&i.FrontdoorBuildingAnnouncementRoomStructure,
+		&i.FrontdoorBuildingAnnouncementArea,
+		&i.FrontdoorBuildingAnnouncementTotalArea,
+		&i.FrontdoorBuildingAnnouncementPricePerSquare,
+		&i.FrontdoorBuildingAnnouncementDaysOnMarket,
+		&i.FrontdoorBuildingAnnouncementNewBuilding,
+		&i.FrontdoorBuildingAnnouncementMainImageHidden,
+		&i.FrontdoorBuildingAnnouncementIsCompanyAnnouncement,
+		&i.FrontdoorBuildingAnnouncementShowBiddingIndicators,
+		&i.FrontdoorBuildingAnnouncementPublished,
+		&i.FrontdoorBuildingAnnouncementRentPeriod,
+		&i.FrontdoorBuildingAnnouncementRentalUniqueNo,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingAnnouncementFirstSeenAt,
+		&i.FrontdoorBuildingAnnouncementLastSeenAt,
+		&i.FrontdoorBuildingAnnouncementUnpublishingTimeDate,
 	)
 	return i, err
 }
 
 const getFrontdoorBuildingByHousingCompanyID = `-- name: GetFrontdoorBuildingByHousingCompanyID :one
-SELECT frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom FROM public.frontdoor_buildings
-WHERE frontdoor_buildings_housing_company_id = $1
+SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom FROM public.frontdoor_buildings
+WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingByHousingCompanyID(ctx context.Context, frontdoorBuildingsHousingCompanyID pgtype.Int8) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingByHousingCompanyID, frontdoorBuildingsHousingCompanyID)
+func (q *Queries) GetFrontdoorBuildingByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID pgtype.Int8) (FrontdoorBuilding, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingByHousingCompanyID, frontdoorBuildingHousingCompanyID)
 	var i FrontdoorBuilding
 	err := row.Scan(
-		&i.FrontdoorBuildingsID,
-		&i.FrontdoorBuildingsUrl,
-		&i.FrontdoorBuildingsFirstSeenAt,
-		&i.FrontdoorBuildingsLastSeenAt,
-		&i.FrontdoorBuildingsUpdatedAt,
-		&i.FrontdoorBuildingsCompanyName,
-		&i.FrontdoorBuildingsBusinessID,
-		&i.FrontdoorBuildingsApartmentCount,
-		&i.FrontdoorBuildingsFloorCount,
-		&i.FrontdoorBuildingsConstructionEndYear,
-		&i.FrontdoorBuildingsBuildYear,
-		&i.FrontdoorBuildingsHasElevator,
-		&i.FrontdoorBuildingsHasSauna,
-		&i.FrontdoorBuildingsEnergyCertificateCode,
-		&i.FrontdoorBuildingsPlotHoldingType,
-		&i.FrontdoorBuildingsOuterRoofMaterial,
-		&i.FrontdoorBuildingsOuterRoofType,
-		&i.FrontdoorBuildingsHeating,
-		&i.FrontdoorBuildingsHeatingFuel,
-		&i.FrontdoorBuildingsStreetAddress,
-		&i.FrontdoorBuildingsHouseNumber,
-		&i.FrontdoorBuildingsPostcode,
-		&i.FrontdoorBuildingsPostArea,
-		&i.FrontdoorBuildingsMunicipality,
-		&i.FrontdoorBuildingsDistrict,
-		&i.FrontdoorBuildingsLatitude,
-		&i.FrontdoorBuildingsLongitude,
-		&i.FrontdoorBuildingsElevatorRenovated,
-		&i.FrontdoorBuildingsElevatorRenovatedYear,
-		&i.FrontdoorBuildingsFacadeRenovated,
-		&i.FrontdoorBuildingsFacadeRenovatedYear,
-		&i.FrontdoorBuildingsWindowRenovated,
-		&i.FrontdoorBuildingsWindowRenovatedYear,
-		&i.FrontdoorBuildingsRoofRenovated,
-		&i.FrontdoorBuildingsRoofRenovatedYear,
-		&i.FrontdoorBuildingsPipeRenovated,
-		&i.FrontdoorBuildingsPipeRenovatedYear,
-		&i.FrontdoorBuildingsBalconyRenovated,
-		&i.FrontdoorBuildingsBalconyRenovatedYear,
-		&i.FrontdoorBuildingsElectricityRenovated,
-		&i.FrontdoorBuildingsElectricityRenovatedYear,
-		&i.FrontdoorBuildingsContactPhone,
-		&i.FrontdoorBuildingsContactOfficeName,
-		&i.FrontdoorBuildingsContactOfficeID,
-		&i.FrontdoorBuildingsDescription,
-		&i.FrontdoorBuildingsCarStorageDescription,
-		&i.FrontdoorBuildingsOtherInfo,
-		&i.FrontdoorBuildingsAdditionalAddresses,
-		&i.FrontdoorBuildingsLinks,
-		&i.FrontdoorBuildingsData,
-		&i.FrontdoorBuildingsProcessedAt,
-		&i.FrontdoorBuildingsHousingCompanyID,
-		&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-		&i.FrontdoorBuildingsGeom,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingUrl,
+		&i.FrontdoorBuildingFirstSeenAt,
+		&i.FrontdoorBuildingLastSeenAt,
+		&i.FrontdoorBuildingUpdatedAt,
+		&i.FrontdoorBuildingCompanyName,
+		&i.FrontdoorBuildingBusinessID,
+		&i.FrontdoorBuildingApartmentCount,
+		&i.FrontdoorBuildingFloorCount,
+		&i.FrontdoorBuildingConstructionEndYear,
+		&i.FrontdoorBuildingBuildYear,
+		&i.FrontdoorBuildingHasElevator,
+		&i.FrontdoorBuildingHasSauna,
+		&i.FrontdoorBuildingEnergyCertificateCode,
+		&i.FrontdoorBuildingPlotHoldingType,
+		&i.FrontdoorBuildingOuterRoofMaterial,
+		&i.FrontdoorBuildingOuterRoofType,
+		&i.FrontdoorBuildingHeating,
+		&i.FrontdoorBuildingHeatingFuel,
+		&i.FrontdoorBuildingStreetAddress,
+		&i.FrontdoorBuildingHouseNumber,
+		&i.FrontdoorBuildingPostcode,
+		&i.FrontdoorBuildingPostArea,
+		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingDistrict,
+		&i.FrontdoorBuildingLatitude,
+		&i.FrontdoorBuildingLongitude,
+		&i.FrontdoorBuildingElevatorRenovated,
+		&i.FrontdoorBuildingElevatorRenovatedYear,
+		&i.FrontdoorBuildingFacadeRenovated,
+		&i.FrontdoorBuildingFacadeRenovatedYear,
+		&i.FrontdoorBuildingWindowRenovated,
+		&i.FrontdoorBuildingWindowRenovatedYear,
+		&i.FrontdoorBuildingRoofRenovated,
+		&i.FrontdoorBuildingRoofRenovatedYear,
+		&i.FrontdoorBuildingPipeRenovated,
+		&i.FrontdoorBuildingPipeRenovatedYear,
+		&i.FrontdoorBuildingBalconyRenovated,
+		&i.FrontdoorBuildingBalconyRenovatedYear,
+		&i.FrontdoorBuildingElectricityRenovated,
+		&i.FrontdoorBuildingElectricityRenovatedYear,
+		&i.FrontdoorBuildingContactPhone,
+		&i.FrontdoorBuildingContactOfficeName,
+		&i.FrontdoorBuildingContactOfficeID,
+		&i.FrontdoorBuildingDescription,
+		&i.FrontdoorBuildingCarStorageDescription,
+		&i.FrontdoorBuildingOtherInfo,
+		&i.FrontdoorBuildingAdditionalAddresses,
+		&i.FrontdoorBuildingLinks,
+		&i.FrontdoorBuildingData,
+		&i.FrontdoorBuildingProcessedAt,
+		&i.FrontdoorBuildingHousingCompanyID,
+		&i.FrontdoorBuildingHousingCompanyFriendlyID,
+		&i.FrontdoorBuildingGeom,
 	)
 	return i, err
 }
 
 const getFrontdoorBuildingByID = `-- name: GetFrontdoorBuildingByID :one
-SELECT frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom FROM public.frontdoor_buildings
-WHERE frontdoor_buildings_id = $1
+SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom FROM public.frontdoor_buildings
+WHERE frontdoor_building_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingByID(ctx context.Context, frontdoorBuildingsID pgtype.UUID) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingByID, frontdoorBuildingsID)
+func (q *Queries) GetFrontdoorBuildingByID(ctx context.Context, frontdoorBuildingID pgtype.UUID) (FrontdoorBuilding, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingByID, frontdoorBuildingID)
 	var i FrontdoorBuilding
 	err := row.Scan(
-		&i.FrontdoorBuildingsID,
-		&i.FrontdoorBuildingsUrl,
-		&i.FrontdoorBuildingsFirstSeenAt,
-		&i.FrontdoorBuildingsLastSeenAt,
-		&i.FrontdoorBuildingsUpdatedAt,
-		&i.FrontdoorBuildingsCompanyName,
-		&i.FrontdoorBuildingsBusinessID,
-		&i.FrontdoorBuildingsApartmentCount,
-		&i.FrontdoorBuildingsFloorCount,
-		&i.FrontdoorBuildingsConstructionEndYear,
-		&i.FrontdoorBuildingsBuildYear,
-		&i.FrontdoorBuildingsHasElevator,
-		&i.FrontdoorBuildingsHasSauna,
-		&i.FrontdoorBuildingsEnergyCertificateCode,
-		&i.FrontdoorBuildingsPlotHoldingType,
-		&i.FrontdoorBuildingsOuterRoofMaterial,
-		&i.FrontdoorBuildingsOuterRoofType,
-		&i.FrontdoorBuildingsHeating,
-		&i.FrontdoorBuildingsHeatingFuel,
-		&i.FrontdoorBuildingsStreetAddress,
-		&i.FrontdoorBuildingsHouseNumber,
-		&i.FrontdoorBuildingsPostcode,
-		&i.FrontdoorBuildingsPostArea,
-		&i.FrontdoorBuildingsMunicipality,
-		&i.FrontdoorBuildingsDistrict,
-		&i.FrontdoorBuildingsLatitude,
-		&i.FrontdoorBuildingsLongitude,
-		&i.FrontdoorBuildingsElevatorRenovated,
-		&i.FrontdoorBuildingsElevatorRenovatedYear,
-		&i.FrontdoorBuildingsFacadeRenovated,
-		&i.FrontdoorBuildingsFacadeRenovatedYear,
-		&i.FrontdoorBuildingsWindowRenovated,
-		&i.FrontdoorBuildingsWindowRenovatedYear,
-		&i.FrontdoorBuildingsRoofRenovated,
-		&i.FrontdoorBuildingsRoofRenovatedYear,
-		&i.FrontdoorBuildingsPipeRenovated,
-		&i.FrontdoorBuildingsPipeRenovatedYear,
-		&i.FrontdoorBuildingsBalconyRenovated,
-		&i.FrontdoorBuildingsBalconyRenovatedYear,
-		&i.FrontdoorBuildingsElectricityRenovated,
-		&i.FrontdoorBuildingsElectricityRenovatedYear,
-		&i.FrontdoorBuildingsContactPhone,
-		&i.FrontdoorBuildingsContactOfficeName,
-		&i.FrontdoorBuildingsContactOfficeID,
-		&i.FrontdoorBuildingsDescription,
-		&i.FrontdoorBuildingsCarStorageDescription,
-		&i.FrontdoorBuildingsOtherInfo,
-		&i.FrontdoorBuildingsAdditionalAddresses,
-		&i.FrontdoorBuildingsLinks,
-		&i.FrontdoorBuildingsData,
-		&i.FrontdoorBuildingsProcessedAt,
-		&i.FrontdoorBuildingsHousingCompanyID,
-		&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-		&i.FrontdoorBuildingsGeom,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingUrl,
+		&i.FrontdoorBuildingFirstSeenAt,
+		&i.FrontdoorBuildingLastSeenAt,
+		&i.FrontdoorBuildingUpdatedAt,
+		&i.FrontdoorBuildingCompanyName,
+		&i.FrontdoorBuildingBusinessID,
+		&i.FrontdoorBuildingApartmentCount,
+		&i.FrontdoorBuildingFloorCount,
+		&i.FrontdoorBuildingConstructionEndYear,
+		&i.FrontdoorBuildingBuildYear,
+		&i.FrontdoorBuildingHasElevator,
+		&i.FrontdoorBuildingHasSauna,
+		&i.FrontdoorBuildingEnergyCertificateCode,
+		&i.FrontdoorBuildingPlotHoldingType,
+		&i.FrontdoorBuildingOuterRoofMaterial,
+		&i.FrontdoorBuildingOuterRoofType,
+		&i.FrontdoorBuildingHeating,
+		&i.FrontdoorBuildingHeatingFuel,
+		&i.FrontdoorBuildingStreetAddress,
+		&i.FrontdoorBuildingHouseNumber,
+		&i.FrontdoorBuildingPostcode,
+		&i.FrontdoorBuildingPostArea,
+		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingDistrict,
+		&i.FrontdoorBuildingLatitude,
+		&i.FrontdoorBuildingLongitude,
+		&i.FrontdoorBuildingElevatorRenovated,
+		&i.FrontdoorBuildingElevatorRenovatedYear,
+		&i.FrontdoorBuildingFacadeRenovated,
+		&i.FrontdoorBuildingFacadeRenovatedYear,
+		&i.FrontdoorBuildingWindowRenovated,
+		&i.FrontdoorBuildingWindowRenovatedYear,
+		&i.FrontdoorBuildingRoofRenovated,
+		&i.FrontdoorBuildingRoofRenovatedYear,
+		&i.FrontdoorBuildingPipeRenovated,
+		&i.FrontdoorBuildingPipeRenovatedYear,
+		&i.FrontdoorBuildingBalconyRenovated,
+		&i.FrontdoorBuildingBalconyRenovatedYear,
+		&i.FrontdoorBuildingElectricityRenovated,
+		&i.FrontdoorBuildingElectricityRenovatedYear,
+		&i.FrontdoorBuildingContactPhone,
+		&i.FrontdoorBuildingContactOfficeName,
+		&i.FrontdoorBuildingContactOfficeID,
+		&i.FrontdoorBuildingDescription,
+		&i.FrontdoorBuildingCarStorageDescription,
+		&i.FrontdoorBuildingOtherInfo,
+		&i.FrontdoorBuildingAdditionalAddresses,
+		&i.FrontdoorBuildingLinks,
+		&i.FrontdoorBuildingData,
+		&i.FrontdoorBuildingProcessedAt,
+		&i.FrontdoorBuildingHousingCompanyID,
+		&i.FrontdoorBuildingHousingCompanyFriendlyID,
+		&i.FrontdoorBuildingGeom,
 	)
 	return i, err
 }
 
 const getFrontdoorBuildingIDByHousingCompanyID = `-- name: GetFrontdoorBuildingIDByHousingCompanyID :one
-SELECT frontdoor_buildings_id FROM public.frontdoor_buildings
-WHERE frontdoor_buildings_housing_company_id = $1
+SELECT frontdoor_building_id FROM public.frontdoor_buildings
+WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingIDByHousingCompanyID(ctx context.Context, frontdoorBuildingsHousingCompanyID pgtype.Int8) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingIDByHousingCompanyID, frontdoorBuildingsHousingCompanyID)
-	var frontdoor_buildings_id pgtype.UUID
-	err := row.Scan(&frontdoor_buildings_id)
-	return frontdoor_buildings_id, err
+func (q *Queries) GetFrontdoorBuildingIDByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID pgtype.Int8) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingIDByHousingCompanyID, frontdoorBuildingHousingCompanyID)
+	var frontdoor_building_id pgtype.UUID
+	err := row.Scan(&frontdoor_building_id)
+	return frontdoor_building_id, err
 }
 
 const getFrontdoorBuildingURLByHousingCompanyID = `-- name: GetFrontdoorBuildingURLByHousingCompanyID :one
-SELECT frontdoor_buildings_url FROM public.frontdoor_buildings
-WHERE frontdoor_buildings_housing_company_id = $1
+SELECT frontdoor_building_url FROM public.frontdoor_buildings
+WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingURLByHousingCompanyID(ctx context.Context, frontdoorBuildingsHousingCompanyID pgtype.Int8) (*string, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingURLByHousingCompanyID, frontdoorBuildingsHousingCompanyID)
-	var frontdoor_buildings_url *string
-	err := row.Scan(&frontdoor_buildings_url)
-	return frontdoor_buildings_url, err
+func (q *Queries) GetFrontdoorBuildingURLByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID pgtype.Int8) (*string, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingURLByHousingCompanyID, frontdoorBuildingHousingCompanyID)
+	var frontdoor_building_url *string
+	err := row.Scan(&frontdoor_building_url)
+	return frontdoor_building_url, err
 }
 
 const listFrontdoorAds = `-- name: ListFrontdoorAds :many
-SELECT frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time FROM public.frontdoor_ads
-ORDER BY frontdoor_ads_last_seen_at DESC
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time FROM public.frontdoor_ads
+ORDER BY frontdoor_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -397,16 +397,16 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg *ListFrontdoorAdsPar
 	for rows.Next() {
 		var i FrontdoorAd
 		if err := rows.Scan(
-			&i.FrontdoorAdsID,
-			&i.FrontdoorAdsExternalID,
-			&i.FrontdoorAdsUrl,
-			&i.FrontdoorAdsFirstSeenAt,
-			&i.FrontdoorAdsLastSeenAt,
-			&i.FrontdoorAdsUpdatedAt,
-			&i.FrontdoorAdsData,
-			&i.FrontdoorAdsProcessedAt,
-			&i.FrontdoorAdsPageNotFound,
-			&i.FrontdoorAdsPublishingTime,
+			&i.FrontdoorAdID,
+			&i.FrontdoorAdExternalID,
+			&i.FrontdoorAdUrl,
+			&i.FrontdoorAdFirstSeenAt,
+			&i.FrontdoorAdLastSeenAt,
+			&i.FrontdoorAdUpdatedAt,
+			&i.FrontdoorAdData,
+			&i.FrontdoorAdProcessedAt,
+			&i.FrontdoorAdPageNotFound,
+			&i.FrontdoorAdPublishingTime,
 		); err != nil {
 			return nil, err
 		}
@@ -419,13 +419,13 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg *ListFrontdoorAdsPar
 }
 
 const listFrontdoorBuildingAnnouncements = `-- name: ListFrontdoorBuildingAnnouncements :many
-SELECT frontdoor_building_announcements_id, frontdoor_building_announcements_external_id, frontdoor_building_announcements_friendly_id, frontdoor_building_announcements_unpublishing_time, frontdoor_building_announcements_address_line1, frontdoor_building_announcements_address_line2, frontdoor_building_announcements_location, frontdoor_building_announcements_search_price, frontdoor_building_announcements_notify_price_changed, frontdoor_building_announcements_property_type, frontdoor_building_announcements_property_subtype, frontdoor_building_announcements_construction_finished_year, frontdoor_building_announcements_main_image_uri, frontdoor_building_announcements_has_open_bidding, frontdoor_building_announcements_room_structure, frontdoor_building_announcements_area, frontdoor_building_announcements_total_area, frontdoor_building_announcements_price_per_square, frontdoor_building_announcements_days_on_market, frontdoor_building_announcements_new_building, frontdoor_building_announcements_main_image_hidden, frontdoor_building_announcements_is_company_announcement, frontdoor_building_announcements_show_bidding_indicators, frontdoor_building_announcements_published, frontdoor_building_announcements_rent_period, frontdoor_building_announcements_rental_unique_no, frontdoor_building_announcements_building_id, frontdoor_building_announcements_first_seen_at, frontdoor_building_announcements_last_seen_at, frontdoor_building_announcements_unpublishing_time_date FROM public.frontdoor_building_announcements
-WHERE frontdoor_building_announcements_building_id = $1
-ORDER BY frontdoor_building_announcements_last_seen_at DESC
+SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date FROM public.frontdoor_building_announcements
+WHERE frontdoor_building_id = $1
+ORDER BY frontdoor_building_announcement_last_seen_at DESC
 `
 
-func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, frontdoorBuildingAnnouncementsBuildingID pgtype.UUID) ([]FrontdoorBuildingAnnouncement, error) {
-	rows, err := q.db.Query(ctx, listFrontdoorBuildingAnnouncements, frontdoorBuildingAnnouncementsBuildingID)
+func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, frontdoorBuildingID pgtype.UUID) ([]FrontdoorBuildingAnnouncement, error) {
+	rows, err := q.db.Query(ctx, listFrontdoorBuildingAnnouncements, frontdoorBuildingID)
 	if err != nil {
 		return nil, err
 	}
@@ -434,36 +434,36 @@ func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, frontd
 	for rows.Next() {
 		var i FrontdoorBuildingAnnouncement
 		if err := rows.Scan(
-			&i.FrontdoorBuildingAnnouncementsID,
-			&i.FrontdoorBuildingAnnouncementsExternalID,
-			&i.FrontdoorBuildingAnnouncementsFriendlyID,
-			&i.FrontdoorBuildingAnnouncementsUnpublishingTime,
-			&i.FrontdoorBuildingAnnouncementsAddressLine1,
-			&i.FrontdoorBuildingAnnouncementsAddressLine2,
-			&i.FrontdoorBuildingAnnouncementsLocation,
-			&i.FrontdoorBuildingAnnouncementsSearchPrice,
-			&i.FrontdoorBuildingAnnouncementsNotifyPriceChanged,
-			&i.FrontdoorBuildingAnnouncementsPropertyType,
-			&i.FrontdoorBuildingAnnouncementsPropertySubtype,
-			&i.FrontdoorBuildingAnnouncementsConstructionFinishedYear,
-			&i.FrontdoorBuildingAnnouncementsMainImageUri,
-			&i.FrontdoorBuildingAnnouncementsHasOpenBidding,
-			&i.FrontdoorBuildingAnnouncementsRoomStructure,
-			&i.FrontdoorBuildingAnnouncementsArea,
-			&i.FrontdoorBuildingAnnouncementsTotalArea,
-			&i.FrontdoorBuildingAnnouncementsPricePerSquare,
-			&i.FrontdoorBuildingAnnouncementsDaysOnMarket,
-			&i.FrontdoorBuildingAnnouncementsNewBuilding,
-			&i.FrontdoorBuildingAnnouncementsMainImageHidden,
-			&i.FrontdoorBuildingAnnouncementsIsCompanyAnnouncement,
-			&i.FrontdoorBuildingAnnouncementsShowBiddingIndicators,
-			&i.FrontdoorBuildingAnnouncementsPublished,
-			&i.FrontdoorBuildingAnnouncementsRentPeriod,
-			&i.FrontdoorBuildingAnnouncementsRentalUniqueNo,
-			&i.FrontdoorBuildingAnnouncementsBuildingID,
-			&i.FrontdoorBuildingAnnouncementsFirstSeenAt,
-			&i.FrontdoorBuildingAnnouncementsLastSeenAt,
-			&i.FrontdoorBuildingAnnouncementsUnpublishingTimeDate,
+			&i.FrontdoorBuildingAnnouncementID,
+			&i.FrontdoorBuildingAnnouncementExternalID,
+			&i.FrontdoorBuildingAnnouncementFriendlyID,
+			&i.FrontdoorBuildingAnnouncementUnpublishingTime,
+			&i.FrontdoorBuildingAnnouncementAddressLine1,
+			&i.FrontdoorBuildingAnnouncementAddressLine2,
+			&i.FrontdoorBuildingAnnouncementLocation,
+			&i.FrontdoorBuildingAnnouncementSearchPrice,
+			&i.FrontdoorBuildingAnnouncementNotifyPriceChanged,
+			&i.FrontdoorBuildingAnnouncementPropertyType,
+			&i.FrontdoorBuildingAnnouncementPropertySubtype,
+			&i.FrontdoorBuildingAnnouncementConstructionFinishedYear,
+			&i.FrontdoorBuildingAnnouncementMainImageUri,
+			&i.FrontdoorBuildingAnnouncementHasOpenBidding,
+			&i.FrontdoorBuildingAnnouncementRoomStructure,
+			&i.FrontdoorBuildingAnnouncementArea,
+			&i.FrontdoorBuildingAnnouncementTotalArea,
+			&i.FrontdoorBuildingAnnouncementPricePerSquare,
+			&i.FrontdoorBuildingAnnouncementDaysOnMarket,
+			&i.FrontdoorBuildingAnnouncementNewBuilding,
+			&i.FrontdoorBuildingAnnouncementMainImageHidden,
+			&i.FrontdoorBuildingAnnouncementIsCompanyAnnouncement,
+			&i.FrontdoorBuildingAnnouncementShowBiddingIndicators,
+			&i.FrontdoorBuildingAnnouncementPublished,
+			&i.FrontdoorBuildingAnnouncementRentPeriod,
+			&i.FrontdoorBuildingAnnouncementRentalUniqueNo,
+			&i.FrontdoorBuildingID,
+			&i.FrontdoorBuildingAnnouncementFirstSeenAt,
+			&i.FrontdoorBuildingAnnouncementLastSeenAt,
+			&i.FrontdoorBuildingAnnouncementUnpublishingTimeDate,
 		); err != nil {
 			return nil, err
 		}
@@ -476,8 +476,8 @@ func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, frontd
 }
 
 const listFrontdoorBuildings = `-- name: ListFrontdoorBuildings :many
-SELECT frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom FROM public.frontdoor_buildings
-ORDER BY frontdoor_buildings_last_seen_at DESC
+SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom FROM public.frontdoor_buildings
+ORDER BY frontdoor_building_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -496,60 +496,60 @@ func (q *Queries) ListFrontdoorBuildings(ctx context.Context, arg *ListFrontdoor
 	for rows.Next() {
 		var i FrontdoorBuilding
 		if err := rows.Scan(
-			&i.FrontdoorBuildingsID,
-			&i.FrontdoorBuildingsUrl,
-			&i.FrontdoorBuildingsFirstSeenAt,
-			&i.FrontdoorBuildingsLastSeenAt,
-			&i.FrontdoorBuildingsUpdatedAt,
-			&i.FrontdoorBuildingsCompanyName,
-			&i.FrontdoorBuildingsBusinessID,
-			&i.FrontdoorBuildingsApartmentCount,
-			&i.FrontdoorBuildingsFloorCount,
-			&i.FrontdoorBuildingsConstructionEndYear,
-			&i.FrontdoorBuildingsBuildYear,
-			&i.FrontdoorBuildingsHasElevator,
-			&i.FrontdoorBuildingsHasSauna,
-			&i.FrontdoorBuildingsEnergyCertificateCode,
-			&i.FrontdoorBuildingsPlotHoldingType,
-			&i.FrontdoorBuildingsOuterRoofMaterial,
-			&i.FrontdoorBuildingsOuterRoofType,
-			&i.FrontdoorBuildingsHeating,
-			&i.FrontdoorBuildingsHeatingFuel,
-			&i.FrontdoorBuildingsStreetAddress,
-			&i.FrontdoorBuildingsHouseNumber,
-			&i.FrontdoorBuildingsPostcode,
-			&i.FrontdoorBuildingsPostArea,
-			&i.FrontdoorBuildingsMunicipality,
-			&i.FrontdoorBuildingsDistrict,
-			&i.FrontdoorBuildingsLatitude,
-			&i.FrontdoorBuildingsLongitude,
-			&i.FrontdoorBuildingsElevatorRenovated,
-			&i.FrontdoorBuildingsElevatorRenovatedYear,
-			&i.FrontdoorBuildingsFacadeRenovated,
-			&i.FrontdoorBuildingsFacadeRenovatedYear,
-			&i.FrontdoorBuildingsWindowRenovated,
-			&i.FrontdoorBuildingsWindowRenovatedYear,
-			&i.FrontdoorBuildingsRoofRenovated,
-			&i.FrontdoorBuildingsRoofRenovatedYear,
-			&i.FrontdoorBuildingsPipeRenovated,
-			&i.FrontdoorBuildingsPipeRenovatedYear,
-			&i.FrontdoorBuildingsBalconyRenovated,
-			&i.FrontdoorBuildingsBalconyRenovatedYear,
-			&i.FrontdoorBuildingsElectricityRenovated,
-			&i.FrontdoorBuildingsElectricityRenovatedYear,
-			&i.FrontdoorBuildingsContactPhone,
-			&i.FrontdoorBuildingsContactOfficeName,
-			&i.FrontdoorBuildingsContactOfficeID,
-			&i.FrontdoorBuildingsDescription,
-			&i.FrontdoorBuildingsCarStorageDescription,
-			&i.FrontdoorBuildingsOtherInfo,
-			&i.FrontdoorBuildingsAdditionalAddresses,
-			&i.FrontdoorBuildingsLinks,
-			&i.FrontdoorBuildingsData,
-			&i.FrontdoorBuildingsProcessedAt,
-			&i.FrontdoorBuildingsHousingCompanyID,
-			&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-			&i.FrontdoorBuildingsGeom,
+			&i.FrontdoorBuildingID,
+			&i.FrontdoorBuildingUrl,
+			&i.FrontdoorBuildingFirstSeenAt,
+			&i.FrontdoorBuildingLastSeenAt,
+			&i.FrontdoorBuildingUpdatedAt,
+			&i.FrontdoorBuildingCompanyName,
+			&i.FrontdoorBuildingBusinessID,
+			&i.FrontdoorBuildingApartmentCount,
+			&i.FrontdoorBuildingFloorCount,
+			&i.FrontdoorBuildingConstructionEndYear,
+			&i.FrontdoorBuildingBuildYear,
+			&i.FrontdoorBuildingHasElevator,
+			&i.FrontdoorBuildingHasSauna,
+			&i.FrontdoorBuildingEnergyCertificateCode,
+			&i.FrontdoorBuildingPlotHoldingType,
+			&i.FrontdoorBuildingOuterRoofMaterial,
+			&i.FrontdoorBuildingOuterRoofType,
+			&i.FrontdoorBuildingHeating,
+			&i.FrontdoorBuildingHeatingFuel,
+			&i.FrontdoorBuildingStreetAddress,
+			&i.FrontdoorBuildingHouseNumber,
+			&i.FrontdoorBuildingPostcode,
+			&i.FrontdoorBuildingPostArea,
+			&i.FrontdoorBuildingMunicipality,
+			&i.FrontdoorBuildingDistrict,
+			&i.FrontdoorBuildingLatitude,
+			&i.FrontdoorBuildingLongitude,
+			&i.FrontdoorBuildingElevatorRenovated,
+			&i.FrontdoorBuildingElevatorRenovatedYear,
+			&i.FrontdoorBuildingFacadeRenovated,
+			&i.FrontdoorBuildingFacadeRenovatedYear,
+			&i.FrontdoorBuildingWindowRenovated,
+			&i.FrontdoorBuildingWindowRenovatedYear,
+			&i.FrontdoorBuildingRoofRenovated,
+			&i.FrontdoorBuildingRoofRenovatedYear,
+			&i.FrontdoorBuildingPipeRenovated,
+			&i.FrontdoorBuildingPipeRenovatedYear,
+			&i.FrontdoorBuildingBalconyRenovated,
+			&i.FrontdoorBuildingBalconyRenovatedYear,
+			&i.FrontdoorBuildingElectricityRenovated,
+			&i.FrontdoorBuildingElectricityRenovatedYear,
+			&i.FrontdoorBuildingContactPhone,
+			&i.FrontdoorBuildingContactOfficeName,
+			&i.FrontdoorBuildingContactOfficeID,
+			&i.FrontdoorBuildingDescription,
+			&i.FrontdoorBuildingCarStorageDescription,
+			&i.FrontdoorBuildingOtherInfo,
+			&i.FrontdoorBuildingAdditionalAddresses,
+			&i.FrontdoorBuildingLinks,
+			&i.FrontdoorBuildingData,
+			&i.FrontdoorBuildingProcessedAt,
+			&i.FrontdoorBuildingHousingCompanyID,
+			&i.FrontdoorBuildingHousingCompanyFriendlyID,
+			&i.FrontdoorBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -562,9 +562,9 @@ func (q *Queries) ListFrontdoorBuildings(ctx context.Context, arg *ListFrontdoor
 }
 
 const listUnprocessedFrontdoorAds = `-- name: ListUnprocessedFrontdoorAds :many
-SELECT frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time FROM public.frontdoor_ads
-WHERE frontdoor_ads_processed_at IS NULL AND frontdoor_ads_page_not_found = false
-ORDER BY frontdoor_ads_first_seen_at ASC
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time FROM public.frontdoor_ads
+WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
+ORDER BY frontdoor_ad_first_seen_at ASC
 LIMIT $1
 `
 
@@ -578,16 +578,16 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, limit int64) 
 	for rows.Next() {
 		var i FrontdoorAd
 		if err := rows.Scan(
-			&i.FrontdoorAdsID,
-			&i.FrontdoorAdsExternalID,
-			&i.FrontdoorAdsUrl,
-			&i.FrontdoorAdsFirstSeenAt,
-			&i.FrontdoorAdsLastSeenAt,
-			&i.FrontdoorAdsUpdatedAt,
-			&i.FrontdoorAdsData,
-			&i.FrontdoorAdsProcessedAt,
-			&i.FrontdoorAdsPageNotFound,
-			&i.FrontdoorAdsPublishingTime,
+			&i.FrontdoorAdID,
+			&i.FrontdoorAdExternalID,
+			&i.FrontdoorAdUrl,
+			&i.FrontdoorAdFirstSeenAt,
+			&i.FrontdoorAdLastSeenAt,
+			&i.FrontdoorAdUpdatedAt,
+			&i.FrontdoorAdData,
+			&i.FrontdoorAdProcessedAt,
+			&i.FrontdoorAdPageNotFound,
+			&i.FrontdoorAdPublishingTime,
 		); err != nil {
 			return nil, err
 		}
@@ -600,9 +600,9 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, limit int64) 
 }
 
 const listUnprocessedFrontdoorBuildings = `-- name: ListUnprocessedFrontdoorBuildings :many
-SELECT frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom FROM public.frontdoor_buildings
-WHERE frontdoor_buildings_processed_at IS NULL
-ORDER BY frontdoor_buildings_first_seen_at ASC
+SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom FROM public.frontdoor_buildings
+WHERE frontdoor_building_processed_at IS NULL
+ORDER BY frontdoor_building_first_seen_at ASC
 LIMIT $1
 `
 
@@ -616,60 +616,60 @@ func (q *Queries) ListUnprocessedFrontdoorBuildings(ctx context.Context, limit i
 	for rows.Next() {
 		var i FrontdoorBuilding
 		if err := rows.Scan(
-			&i.FrontdoorBuildingsID,
-			&i.FrontdoorBuildingsUrl,
-			&i.FrontdoorBuildingsFirstSeenAt,
-			&i.FrontdoorBuildingsLastSeenAt,
-			&i.FrontdoorBuildingsUpdatedAt,
-			&i.FrontdoorBuildingsCompanyName,
-			&i.FrontdoorBuildingsBusinessID,
-			&i.FrontdoorBuildingsApartmentCount,
-			&i.FrontdoorBuildingsFloorCount,
-			&i.FrontdoorBuildingsConstructionEndYear,
-			&i.FrontdoorBuildingsBuildYear,
-			&i.FrontdoorBuildingsHasElevator,
-			&i.FrontdoorBuildingsHasSauna,
-			&i.FrontdoorBuildingsEnergyCertificateCode,
-			&i.FrontdoorBuildingsPlotHoldingType,
-			&i.FrontdoorBuildingsOuterRoofMaterial,
-			&i.FrontdoorBuildingsOuterRoofType,
-			&i.FrontdoorBuildingsHeating,
-			&i.FrontdoorBuildingsHeatingFuel,
-			&i.FrontdoorBuildingsStreetAddress,
-			&i.FrontdoorBuildingsHouseNumber,
-			&i.FrontdoorBuildingsPostcode,
-			&i.FrontdoorBuildingsPostArea,
-			&i.FrontdoorBuildingsMunicipality,
-			&i.FrontdoorBuildingsDistrict,
-			&i.FrontdoorBuildingsLatitude,
-			&i.FrontdoorBuildingsLongitude,
-			&i.FrontdoorBuildingsElevatorRenovated,
-			&i.FrontdoorBuildingsElevatorRenovatedYear,
-			&i.FrontdoorBuildingsFacadeRenovated,
-			&i.FrontdoorBuildingsFacadeRenovatedYear,
-			&i.FrontdoorBuildingsWindowRenovated,
-			&i.FrontdoorBuildingsWindowRenovatedYear,
-			&i.FrontdoorBuildingsRoofRenovated,
-			&i.FrontdoorBuildingsRoofRenovatedYear,
-			&i.FrontdoorBuildingsPipeRenovated,
-			&i.FrontdoorBuildingsPipeRenovatedYear,
-			&i.FrontdoorBuildingsBalconyRenovated,
-			&i.FrontdoorBuildingsBalconyRenovatedYear,
-			&i.FrontdoorBuildingsElectricityRenovated,
-			&i.FrontdoorBuildingsElectricityRenovatedYear,
-			&i.FrontdoorBuildingsContactPhone,
-			&i.FrontdoorBuildingsContactOfficeName,
-			&i.FrontdoorBuildingsContactOfficeID,
-			&i.FrontdoorBuildingsDescription,
-			&i.FrontdoorBuildingsCarStorageDescription,
-			&i.FrontdoorBuildingsOtherInfo,
-			&i.FrontdoorBuildingsAdditionalAddresses,
-			&i.FrontdoorBuildingsLinks,
-			&i.FrontdoorBuildingsData,
-			&i.FrontdoorBuildingsProcessedAt,
-			&i.FrontdoorBuildingsHousingCompanyID,
-			&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-			&i.FrontdoorBuildingsGeom,
+			&i.FrontdoorBuildingID,
+			&i.FrontdoorBuildingUrl,
+			&i.FrontdoorBuildingFirstSeenAt,
+			&i.FrontdoorBuildingLastSeenAt,
+			&i.FrontdoorBuildingUpdatedAt,
+			&i.FrontdoorBuildingCompanyName,
+			&i.FrontdoorBuildingBusinessID,
+			&i.FrontdoorBuildingApartmentCount,
+			&i.FrontdoorBuildingFloorCount,
+			&i.FrontdoorBuildingConstructionEndYear,
+			&i.FrontdoorBuildingBuildYear,
+			&i.FrontdoorBuildingHasElevator,
+			&i.FrontdoorBuildingHasSauna,
+			&i.FrontdoorBuildingEnergyCertificateCode,
+			&i.FrontdoorBuildingPlotHoldingType,
+			&i.FrontdoorBuildingOuterRoofMaterial,
+			&i.FrontdoorBuildingOuterRoofType,
+			&i.FrontdoorBuildingHeating,
+			&i.FrontdoorBuildingHeatingFuel,
+			&i.FrontdoorBuildingStreetAddress,
+			&i.FrontdoorBuildingHouseNumber,
+			&i.FrontdoorBuildingPostcode,
+			&i.FrontdoorBuildingPostArea,
+			&i.FrontdoorBuildingMunicipality,
+			&i.FrontdoorBuildingDistrict,
+			&i.FrontdoorBuildingLatitude,
+			&i.FrontdoorBuildingLongitude,
+			&i.FrontdoorBuildingElevatorRenovated,
+			&i.FrontdoorBuildingElevatorRenovatedYear,
+			&i.FrontdoorBuildingFacadeRenovated,
+			&i.FrontdoorBuildingFacadeRenovatedYear,
+			&i.FrontdoorBuildingWindowRenovated,
+			&i.FrontdoorBuildingWindowRenovatedYear,
+			&i.FrontdoorBuildingRoofRenovated,
+			&i.FrontdoorBuildingRoofRenovatedYear,
+			&i.FrontdoorBuildingPipeRenovated,
+			&i.FrontdoorBuildingPipeRenovatedYear,
+			&i.FrontdoorBuildingBalconyRenovated,
+			&i.FrontdoorBuildingBalconyRenovatedYear,
+			&i.FrontdoorBuildingElectricityRenovated,
+			&i.FrontdoorBuildingElectricityRenovatedYear,
+			&i.FrontdoorBuildingContactPhone,
+			&i.FrontdoorBuildingContactOfficeName,
+			&i.FrontdoorBuildingContactOfficeID,
+			&i.FrontdoorBuildingDescription,
+			&i.FrontdoorBuildingCarStorageDescription,
+			&i.FrontdoorBuildingOtherInfo,
+			&i.FrontdoorBuildingAdditionalAddresses,
+			&i.FrontdoorBuildingLinks,
+			&i.FrontdoorBuildingData,
+			&i.FrontdoorBuildingProcessedAt,
+			&i.FrontdoorBuildingHousingCompanyID,
+			&i.FrontdoorBuildingHousingCompanyFriendlyID,
+			&i.FrontdoorBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -683,366 +683,366 @@ func (q *Queries) ListUnprocessedFrontdoorBuildings(ctx context.Context, limit i
 
 const markFrontdoorAdNotFound = `-- name: MarkFrontdoorAdNotFound :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ads_page_not_found = true, frontdoor_ads_updated_at = now()
-WHERE frontdoor_ads_id = $1
+SET frontdoor_ad_page_not_found = true, frontdoor_ad_updated_at = now()
+WHERE frontdoor_ad_id = $1
 `
 
-func (q *Queries) MarkFrontdoorAdNotFound(ctx context.Context, frontdoorAdsID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markFrontdoorAdNotFound, frontdoorAdsID)
+func (q *Queries) MarkFrontdoorAdNotFound(ctx context.Context, frontdoorAdID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markFrontdoorAdNotFound, frontdoorAdID)
 	return err
 }
 
 const markFrontdoorAdNotFoundByExternalID = `-- name: MarkFrontdoorAdNotFoundByExternalID :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ads_page_not_found = true,
-    frontdoor_ads_processed_at = NOW(),
-    frontdoor_ads_updated_at = NOW()
-WHERE frontdoor_ads_external_id = $1
+SET frontdoor_ad_page_not_found = true,
+    frontdoor_ad_processed_at = NOW(),
+    frontdoor_ad_updated_at = NOW()
+WHERE frontdoor_ad_external_id = $1
 `
 
-func (q *Queries) MarkFrontdoorAdNotFoundByExternalID(ctx context.Context, frontdoorAdsExternalID string) error {
-	_, err := q.db.Exec(ctx, markFrontdoorAdNotFoundByExternalID, frontdoorAdsExternalID)
+func (q *Queries) MarkFrontdoorAdNotFoundByExternalID(ctx context.Context, frontdoorAdExternalID string) error {
+	_, err := q.db.Exec(ctx, markFrontdoorAdNotFoundByExternalID, frontdoorAdExternalID)
 	return err
 }
 
 const markFrontdoorAdProcessed = `-- name: MarkFrontdoorAdProcessed :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ads_processed_at = now(), frontdoor_ads_updated_at = now()
-WHERE frontdoor_ads_id = $1
+SET frontdoor_ad_processed_at = now(), frontdoor_ad_updated_at = now()
+WHERE frontdoor_ad_id = $1
 `
 
-func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, frontdoorAdsID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markFrontdoorAdProcessed, frontdoorAdsID)
+func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, frontdoorAdID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markFrontdoorAdProcessed, frontdoorAdID)
 	return err
 }
 
 const markFrontdoorBuildingProcessed = `-- name: MarkFrontdoorBuildingProcessed :exec
 UPDATE public.frontdoor_buildings
-SET frontdoor_buildings_processed_at = now(), frontdoor_buildings_updated_at = now()
-WHERE frontdoor_buildings_id = $1
+SET frontdoor_building_processed_at = now(), frontdoor_building_updated_at = now()
+WHERE frontdoor_building_id = $1
 `
 
-func (q *Queries) MarkFrontdoorBuildingProcessed(ctx context.Context, frontdoorBuildingsID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markFrontdoorBuildingProcessed, frontdoorBuildingsID)
+func (q *Queries) MarkFrontdoorBuildingProcessed(ctx context.Context, frontdoorBuildingID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markFrontdoorBuildingProcessed, frontdoorBuildingID)
 	return err
 }
 
 const updateFrontdoorAdData = `-- name: UpdateFrontdoorAdData :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ads_data = $2::jsonb,
-    frontdoor_ads_processed_at = NOW(),
-    frontdoor_ads_updated_at = NOW(),
-    frontdoor_ads_page_not_found = false
-WHERE frontdoor_ads_external_id = $1
+SET frontdoor_ad_data = $2::jsonb,
+    frontdoor_ad_processed_at = NOW(),
+    frontdoor_ad_updated_at = NOW(),
+    frontdoor_ad_page_not_found = false
+WHERE frontdoor_ad_external_id = $1
 `
 
 type UpdateFrontdoorAdDataParams struct {
-	FrontdoorAdsExternalID string          `db:"frontdoor_ads_external_id" json:"frontdoor_ads_external_id"`
-	Column2                json.RawMessage `db:"column_2" json:"column_2"`
+	FrontdoorAdExternalID string          `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
+	Column2               json.RawMessage `db:"column_2" json:"column_2"`
 }
 
 func (q *Queries) UpdateFrontdoorAdData(ctx context.Context, arg *UpdateFrontdoorAdDataParams) error {
-	_, err := q.db.Exec(ctx, updateFrontdoorAdData, arg.FrontdoorAdsExternalID, arg.Column2)
+	_, err := q.db.Exec(ctx, updateFrontdoorAdData, arg.FrontdoorAdExternalID, arg.Column2)
 	return err
 }
 
 const updateFrontdoorBuildingDetails = `-- name: UpdateFrontdoorBuildingDetails :one
 UPDATE public.frontdoor_buildings
-SET frontdoor_buildings_company_name = $2,
-    frontdoor_buildings_business_id = $3,
+SET frontdoor_building_company_name = $2,
+    frontdoor_building_business_id = $3,
 
-    frontdoor_buildings_apartment_count = $4,
-    frontdoor_buildings_floor_count = $5,
-    frontdoor_buildings_construction_end_year = $6,
-    frontdoor_buildings_build_year = $7,
-    frontdoor_buildings_has_elevator = $8,
-    frontdoor_buildings_has_sauna = $9,
-    frontdoor_buildings_energy_certificate_code = $10,
-    frontdoor_buildings_plot_holding_type = $11,
-    frontdoor_buildings_outer_roof_material = $12,
-    frontdoor_buildings_outer_roof_type = $13,
-    frontdoor_buildings_heating = $14,
-    frontdoor_buildings_heating_fuel = $15,
-    frontdoor_buildings_street_address = $16,
-    frontdoor_buildings_house_number = $17,
-    frontdoor_buildings_postcode = $18,
-    frontdoor_buildings_post_area = $19,
-    frontdoor_buildings_municipality = $20,
-    frontdoor_buildings_district = $21,
-    frontdoor_buildings_latitude = $22,
-    frontdoor_buildings_longitude = $23,
-    frontdoor_buildings_description = $24,
-    frontdoor_buildings_car_storage_description = $25,
-    frontdoor_buildings_other_info = $26,
-    frontdoor_buildings_data = $27,
-    frontdoor_buildings_processed_at = now(),
-    frontdoor_buildings_updated_at = now()
-WHERE frontdoor_buildings_id = $1
-RETURNING frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom
+    frontdoor_building_apartment_count = $4,
+    frontdoor_building_floor_count = $5,
+    frontdoor_building_construction_end_year = $6,
+    frontdoor_building_build_year = $7,
+    frontdoor_building_has_elevator = $8,
+    frontdoor_building_has_sauna = $9,
+    frontdoor_building_energy_certificate_code = $10,
+    frontdoor_building_plot_holding_type = $11,
+    frontdoor_building_outer_roof_material = $12,
+    frontdoor_building_outer_roof_type = $13,
+    frontdoor_building_heating = $14,
+    frontdoor_building_heating_fuel = $15,
+    frontdoor_building_street_address = $16,
+    frontdoor_building_house_number = $17,
+    frontdoor_building_postcode = $18,
+    frontdoor_building_post_area = $19,
+    frontdoor_building_municipality = $20,
+    frontdoor_building_district = $21,
+    frontdoor_building_latitude = $22,
+    frontdoor_building_longitude = $23,
+    frontdoor_building_description = $24,
+    frontdoor_building_car_storage_description = $25,
+    frontdoor_building_other_info = $26,
+    frontdoor_building_data = $27,
+    frontdoor_building_processed_at = now(),
+    frontdoor_building_updated_at = now()
+WHERE frontdoor_building_id = $1
+RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom
 `
 
 type UpdateFrontdoorBuildingDetailsParams struct {
-	FrontdoorBuildingsID                    pgtype.UUID   `db:"frontdoor_buildings_id" json:"frontdoor_buildings_id"`
-	FrontdoorBuildingsCompanyName           *string       `db:"frontdoor_buildings_company_name" json:"frontdoor_buildings_company_name"`
-	FrontdoorBuildingsBusinessID            *string       `db:"frontdoor_buildings_business_id" json:"frontdoor_buildings_business_id"`
-	FrontdoorBuildingsApartmentCount        pgtype.Int4   `db:"frontdoor_buildings_apartment_count" json:"frontdoor_buildings_apartment_count"`
-	FrontdoorBuildingsFloorCount            pgtype.Int4   `db:"frontdoor_buildings_floor_count" json:"frontdoor_buildings_floor_count"`
-	FrontdoorBuildingsConstructionEndYear   pgtype.Int4   `db:"frontdoor_buildings_construction_end_year" json:"frontdoor_buildings_construction_end_year"`
-	FrontdoorBuildingsBuildYear             pgtype.Int4   `db:"frontdoor_buildings_build_year" json:"frontdoor_buildings_build_year"`
-	FrontdoorBuildingsHasElevator           pgtype.Bool   `db:"frontdoor_buildings_has_elevator" json:"frontdoor_buildings_has_elevator"`
-	FrontdoorBuildingsHasSauna              pgtype.Bool   `db:"frontdoor_buildings_has_sauna" json:"frontdoor_buildings_has_sauna"`
-	FrontdoorBuildingsEnergyCertificateCode *string       `db:"frontdoor_buildings_energy_certificate_code" json:"frontdoor_buildings_energy_certificate_code"`
-	FrontdoorBuildingsPlotHoldingType       *string       `db:"frontdoor_buildings_plot_holding_type" json:"frontdoor_buildings_plot_holding_type"`
-	FrontdoorBuildingsOuterRoofMaterial     *string       `db:"frontdoor_buildings_outer_roof_material" json:"frontdoor_buildings_outer_roof_material"`
-	FrontdoorBuildingsOuterRoofType         *string       `db:"frontdoor_buildings_outer_roof_type" json:"frontdoor_buildings_outer_roof_type"`
-	FrontdoorBuildingsHeating               *string       `db:"frontdoor_buildings_heating" json:"frontdoor_buildings_heating"`
-	FrontdoorBuildingsHeatingFuel           []string      `db:"frontdoor_buildings_heating_fuel" json:"frontdoor_buildings_heating_fuel"`
-	FrontdoorBuildingsStreetAddress         *string       `db:"frontdoor_buildings_street_address" json:"frontdoor_buildings_street_address"`
-	FrontdoorBuildingsHouseNumber           *string       `db:"frontdoor_buildings_house_number" json:"frontdoor_buildings_house_number"`
-	FrontdoorBuildingsPostcode              *string       `db:"frontdoor_buildings_postcode" json:"frontdoor_buildings_postcode"`
-	FrontdoorBuildingsPostArea              *string       `db:"frontdoor_buildings_post_area" json:"frontdoor_buildings_post_area"`
-	FrontdoorBuildingsMunicipality          *string       `db:"frontdoor_buildings_municipality" json:"frontdoor_buildings_municipality"`
-	FrontdoorBuildingsDistrict              *string       `db:"frontdoor_buildings_district" json:"frontdoor_buildings_district"`
-	FrontdoorBuildingsLatitude              pgtype.Float8 `db:"frontdoor_buildings_latitude" json:"frontdoor_buildings_latitude"`
-	FrontdoorBuildingsLongitude             pgtype.Float8 `db:"frontdoor_buildings_longitude" json:"frontdoor_buildings_longitude"`
-	FrontdoorBuildingsDescription           *string       `db:"frontdoor_buildings_description" json:"frontdoor_buildings_description"`
-	FrontdoorBuildingsCarStorageDescription *string       `db:"frontdoor_buildings_car_storage_description" json:"frontdoor_buildings_car_storage_description"`
-	FrontdoorBuildingsOtherInfo             *string       `db:"frontdoor_buildings_other_info" json:"frontdoor_buildings_other_info"`
-	FrontdoorBuildingsData                  []byte        `db:"frontdoor_buildings_data" json:"frontdoor_buildings_data"`
+	FrontdoorBuildingID                    pgtype.UUID   `db:"frontdoor_building_id" json:"frontdoor_building_id"`
+	FrontdoorBuildingCompanyName           *string       `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID            *string       `db:"frontdoor_building_business_id" json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount        pgtype.Int4   `db:"frontdoor_building_apartment_count" json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount            pgtype.Int4   `db:"frontdoor_building_floor_count" json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear   pgtype.Int4   `db:"frontdoor_building_construction_end_year" json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear             pgtype.Int4   `db:"frontdoor_building_build_year" json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator           pgtype.Bool   `db:"frontdoor_building_has_elevator" json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna              pgtype.Bool   `db:"frontdoor_building_has_sauna" json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode *string       `db:"frontdoor_building_energy_certificate_code" json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType       *string       `db:"frontdoor_building_plot_holding_type" json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial     *string       `db:"frontdoor_building_outer_roof_material" json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType         *string       `db:"frontdoor_building_outer_roof_type" json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating               *string       `db:"frontdoor_building_heating" json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel           []string      `db:"frontdoor_building_heating_fuel" json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress         *string       `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber           *string       `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode              *string       `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea              *string       `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality          *string       `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict              *string       `db:"frontdoor_building_district" json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude              pgtype.Float8 `db:"frontdoor_building_latitude" json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude             pgtype.Float8 `db:"frontdoor_building_longitude" json:"frontdoor_building_longitude"`
+	FrontdoorBuildingDescription           *string       `db:"frontdoor_building_description" json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription *string       `db:"frontdoor_building_car_storage_description" json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo             *string       `db:"frontdoor_building_other_info" json:"frontdoor_building_other_info"`
+	FrontdoorBuildingData                  []byte        `db:"frontdoor_building_data" json:"frontdoor_building_data"`
 }
 
 func (q *Queries) UpdateFrontdoorBuildingDetails(ctx context.Context, arg *UpdateFrontdoorBuildingDetailsParams) (FrontdoorBuilding, error) {
 	row := q.db.QueryRow(ctx, updateFrontdoorBuildingDetails,
-		arg.FrontdoorBuildingsID,
-		arg.FrontdoorBuildingsCompanyName,
-		arg.FrontdoorBuildingsBusinessID,
-		arg.FrontdoorBuildingsApartmentCount,
-		arg.FrontdoorBuildingsFloorCount,
-		arg.FrontdoorBuildingsConstructionEndYear,
-		arg.FrontdoorBuildingsBuildYear,
-		arg.FrontdoorBuildingsHasElevator,
-		arg.FrontdoorBuildingsHasSauna,
-		arg.FrontdoorBuildingsEnergyCertificateCode,
-		arg.FrontdoorBuildingsPlotHoldingType,
-		arg.FrontdoorBuildingsOuterRoofMaterial,
-		arg.FrontdoorBuildingsOuterRoofType,
-		arg.FrontdoorBuildingsHeating,
-		arg.FrontdoorBuildingsHeatingFuel,
-		arg.FrontdoorBuildingsStreetAddress,
-		arg.FrontdoorBuildingsHouseNumber,
-		arg.FrontdoorBuildingsPostcode,
-		arg.FrontdoorBuildingsPostArea,
-		arg.FrontdoorBuildingsMunicipality,
-		arg.FrontdoorBuildingsDistrict,
-		arg.FrontdoorBuildingsLatitude,
-		arg.FrontdoorBuildingsLongitude,
-		arg.FrontdoorBuildingsDescription,
-		arg.FrontdoorBuildingsCarStorageDescription,
-		arg.FrontdoorBuildingsOtherInfo,
-		arg.FrontdoorBuildingsData,
+		arg.FrontdoorBuildingID,
+		arg.FrontdoorBuildingCompanyName,
+		arg.FrontdoorBuildingBusinessID,
+		arg.FrontdoorBuildingApartmentCount,
+		arg.FrontdoorBuildingFloorCount,
+		arg.FrontdoorBuildingConstructionEndYear,
+		arg.FrontdoorBuildingBuildYear,
+		arg.FrontdoorBuildingHasElevator,
+		arg.FrontdoorBuildingHasSauna,
+		arg.FrontdoorBuildingEnergyCertificateCode,
+		arg.FrontdoorBuildingPlotHoldingType,
+		arg.FrontdoorBuildingOuterRoofMaterial,
+		arg.FrontdoorBuildingOuterRoofType,
+		arg.FrontdoorBuildingHeating,
+		arg.FrontdoorBuildingHeatingFuel,
+		arg.FrontdoorBuildingStreetAddress,
+		arg.FrontdoorBuildingHouseNumber,
+		arg.FrontdoorBuildingPostcode,
+		arg.FrontdoorBuildingPostArea,
+		arg.FrontdoorBuildingMunicipality,
+		arg.FrontdoorBuildingDistrict,
+		arg.FrontdoorBuildingLatitude,
+		arg.FrontdoorBuildingLongitude,
+		arg.FrontdoorBuildingDescription,
+		arg.FrontdoorBuildingCarStorageDescription,
+		arg.FrontdoorBuildingOtherInfo,
+		arg.FrontdoorBuildingData,
 	)
 	var i FrontdoorBuilding
 	err := row.Scan(
-		&i.FrontdoorBuildingsID,
-		&i.FrontdoorBuildingsUrl,
-		&i.FrontdoorBuildingsFirstSeenAt,
-		&i.FrontdoorBuildingsLastSeenAt,
-		&i.FrontdoorBuildingsUpdatedAt,
-		&i.FrontdoorBuildingsCompanyName,
-		&i.FrontdoorBuildingsBusinessID,
-		&i.FrontdoorBuildingsApartmentCount,
-		&i.FrontdoorBuildingsFloorCount,
-		&i.FrontdoorBuildingsConstructionEndYear,
-		&i.FrontdoorBuildingsBuildYear,
-		&i.FrontdoorBuildingsHasElevator,
-		&i.FrontdoorBuildingsHasSauna,
-		&i.FrontdoorBuildingsEnergyCertificateCode,
-		&i.FrontdoorBuildingsPlotHoldingType,
-		&i.FrontdoorBuildingsOuterRoofMaterial,
-		&i.FrontdoorBuildingsOuterRoofType,
-		&i.FrontdoorBuildingsHeating,
-		&i.FrontdoorBuildingsHeatingFuel,
-		&i.FrontdoorBuildingsStreetAddress,
-		&i.FrontdoorBuildingsHouseNumber,
-		&i.FrontdoorBuildingsPostcode,
-		&i.FrontdoorBuildingsPostArea,
-		&i.FrontdoorBuildingsMunicipality,
-		&i.FrontdoorBuildingsDistrict,
-		&i.FrontdoorBuildingsLatitude,
-		&i.FrontdoorBuildingsLongitude,
-		&i.FrontdoorBuildingsElevatorRenovated,
-		&i.FrontdoorBuildingsElevatorRenovatedYear,
-		&i.FrontdoorBuildingsFacadeRenovated,
-		&i.FrontdoorBuildingsFacadeRenovatedYear,
-		&i.FrontdoorBuildingsWindowRenovated,
-		&i.FrontdoorBuildingsWindowRenovatedYear,
-		&i.FrontdoorBuildingsRoofRenovated,
-		&i.FrontdoorBuildingsRoofRenovatedYear,
-		&i.FrontdoorBuildingsPipeRenovated,
-		&i.FrontdoorBuildingsPipeRenovatedYear,
-		&i.FrontdoorBuildingsBalconyRenovated,
-		&i.FrontdoorBuildingsBalconyRenovatedYear,
-		&i.FrontdoorBuildingsElectricityRenovated,
-		&i.FrontdoorBuildingsElectricityRenovatedYear,
-		&i.FrontdoorBuildingsContactPhone,
-		&i.FrontdoorBuildingsContactOfficeName,
-		&i.FrontdoorBuildingsContactOfficeID,
-		&i.FrontdoorBuildingsDescription,
-		&i.FrontdoorBuildingsCarStorageDescription,
-		&i.FrontdoorBuildingsOtherInfo,
-		&i.FrontdoorBuildingsAdditionalAddresses,
-		&i.FrontdoorBuildingsLinks,
-		&i.FrontdoorBuildingsData,
-		&i.FrontdoorBuildingsProcessedAt,
-		&i.FrontdoorBuildingsHousingCompanyID,
-		&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-		&i.FrontdoorBuildingsGeom,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingUrl,
+		&i.FrontdoorBuildingFirstSeenAt,
+		&i.FrontdoorBuildingLastSeenAt,
+		&i.FrontdoorBuildingUpdatedAt,
+		&i.FrontdoorBuildingCompanyName,
+		&i.FrontdoorBuildingBusinessID,
+		&i.FrontdoorBuildingApartmentCount,
+		&i.FrontdoorBuildingFloorCount,
+		&i.FrontdoorBuildingConstructionEndYear,
+		&i.FrontdoorBuildingBuildYear,
+		&i.FrontdoorBuildingHasElevator,
+		&i.FrontdoorBuildingHasSauna,
+		&i.FrontdoorBuildingEnergyCertificateCode,
+		&i.FrontdoorBuildingPlotHoldingType,
+		&i.FrontdoorBuildingOuterRoofMaterial,
+		&i.FrontdoorBuildingOuterRoofType,
+		&i.FrontdoorBuildingHeating,
+		&i.FrontdoorBuildingHeatingFuel,
+		&i.FrontdoorBuildingStreetAddress,
+		&i.FrontdoorBuildingHouseNumber,
+		&i.FrontdoorBuildingPostcode,
+		&i.FrontdoorBuildingPostArea,
+		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingDistrict,
+		&i.FrontdoorBuildingLatitude,
+		&i.FrontdoorBuildingLongitude,
+		&i.FrontdoorBuildingElevatorRenovated,
+		&i.FrontdoorBuildingElevatorRenovatedYear,
+		&i.FrontdoorBuildingFacadeRenovated,
+		&i.FrontdoorBuildingFacadeRenovatedYear,
+		&i.FrontdoorBuildingWindowRenovated,
+		&i.FrontdoorBuildingWindowRenovatedYear,
+		&i.FrontdoorBuildingRoofRenovated,
+		&i.FrontdoorBuildingRoofRenovatedYear,
+		&i.FrontdoorBuildingPipeRenovated,
+		&i.FrontdoorBuildingPipeRenovatedYear,
+		&i.FrontdoorBuildingBalconyRenovated,
+		&i.FrontdoorBuildingBalconyRenovatedYear,
+		&i.FrontdoorBuildingElectricityRenovated,
+		&i.FrontdoorBuildingElectricityRenovatedYear,
+		&i.FrontdoorBuildingContactPhone,
+		&i.FrontdoorBuildingContactOfficeName,
+		&i.FrontdoorBuildingContactOfficeID,
+		&i.FrontdoorBuildingDescription,
+		&i.FrontdoorBuildingCarStorageDescription,
+		&i.FrontdoorBuildingOtherInfo,
+		&i.FrontdoorBuildingAdditionalAddresses,
+		&i.FrontdoorBuildingLinks,
+		&i.FrontdoorBuildingData,
+		&i.FrontdoorBuildingProcessedAt,
+		&i.FrontdoorBuildingHousingCompanyID,
+		&i.FrontdoorBuildingHousingCompanyFriendlyID,
+		&i.FrontdoorBuildingGeom,
 	)
 	return i, err
 }
 
 const updateFrontdoorBuildingDetailsByHousingCompanyID = `-- name: UpdateFrontdoorBuildingDetailsByHousingCompanyID :exec
 UPDATE public.frontdoor_buildings
-SET frontdoor_buildings_company_name = $2,
-    frontdoor_buildings_business_id = $3,
-    frontdoor_buildings_apartment_count = $4,
-    frontdoor_buildings_floor_count = $5,
-    frontdoor_buildings_construction_end_year = $6,
-    frontdoor_buildings_build_year = $7,
-    frontdoor_buildings_has_elevator = $8,
-    frontdoor_buildings_has_sauna = $9,
-    frontdoor_buildings_energy_certificate_code = $10,
-    frontdoor_buildings_plot_holding_type = $11,
-    frontdoor_buildings_outer_roof_material = $12,
-    frontdoor_buildings_outer_roof_type = $13,
-    frontdoor_buildings_heating = $14,
-    frontdoor_buildings_heating_fuel = $15,
-    frontdoor_buildings_street_address = $16,
-    frontdoor_buildings_house_number = $17,
-    frontdoor_buildings_postcode = $18,
-    frontdoor_buildings_post_area = $19,
-    frontdoor_buildings_municipality = $20,
-    frontdoor_buildings_district = $21,
-    frontdoor_buildings_latitude = $22,
-    frontdoor_buildings_longitude = $23,
-    frontdoor_buildings_elevator_renovated = $24,
-    frontdoor_buildings_elevator_renovated_year = $25,
-    frontdoor_buildings_facade_renovated = $26,
-    frontdoor_buildings_facade_renovated_year = $27,
-    frontdoor_buildings_window_renovated = $28,
-    frontdoor_buildings_window_renovated_year = $29,
-    frontdoor_buildings_roof_renovated = $30,
-    frontdoor_buildings_roof_renovated_year = $31,
-    frontdoor_buildings_pipe_renovated = $32,
-    frontdoor_buildings_pipe_renovated_year = $33,
-    frontdoor_buildings_balcony_renovated = $34,
-    frontdoor_buildings_balcony_renovated_year = $35,
-    frontdoor_buildings_electricity_renovated = $36,
-    frontdoor_buildings_electricity_renovated_year = $37,
-    frontdoor_buildings_contact_phone = $38,
-    frontdoor_buildings_contact_office_name = $39,
-    frontdoor_buildings_contact_office_id = $40,
-    frontdoor_buildings_description = $41,
-    frontdoor_buildings_car_storage_description = $42,
-    frontdoor_buildings_other_info = $43,
-    frontdoor_buildings_data = $44::jsonb,
-    frontdoor_buildings_processed_at = NOW(),
-    frontdoor_buildings_updated_at = NOW()
-WHERE frontdoor_buildings_housing_company_id = $1
+SET frontdoor_building_company_name = $2,
+    frontdoor_building_business_id = $3,
+    frontdoor_building_apartment_count = $4,
+    frontdoor_building_floor_count = $5,
+    frontdoor_building_construction_end_year = $6,
+    frontdoor_building_build_year = $7,
+    frontdoor_building_has_elevator = $8,
+    frontdoor_building_has_sauna = $9,
+    frontdoor_building_energy_certificate_code = $10,
+    frontdoor_building_plot_holding_type = $11,
+    frontdoor_building_outer_roof_material = $12,
+    frontdoor_building_outer_roof_type = $13,
+    frontdoor_building_heating = $14,
+    frontdoor_building_heating_fuel = $15,
+    frontdoor_building_street_address = $16,
+    frontdoor_building_house_number = $17,
+    frontdoor_building_postcode = $18,
+    frontdoor_building_post_area = $19,
+    frontdoor_building_municipality = $20,
+    frontdoor_building_district = $21,
+    frontdoor_building_latitude = $22,
+    frontdoor_building_longitude = $23,
+    frontdoor_building_elevator_renovated = $24,
+    frontdoor_building_elevator_renovated_year = $25,
+    frontdoor_building_facade_renovated = $26,
+    frontdoor_building_facade_renovated_year = $27,
+    frontdoor_building_window_renovated = $28,
+    frontdoor_building_window_renovated_year = $29,
+    frontdoor_building_roof_renovated = $30,
+    frontdoor_building_roof_renovated_year = $31,
+    frontdoor_building_pipe_renovated = $32,
+    frontdoor_building_pipe_renovated_year = $33,
+    frontdoor_building_balcony_renovated = $34,
+    frontdoor_building_balcony_renovated_year = $35,
+    frontdoor_building_electricity_renovated = $36,
+    frontdoor_building_electricity_renovated_year = $37,
+    frontdoor_building_contact_phone = $38,
+    frontdoor_building_contact_office_name = $39,
+    frontdoor_building_contact_office_id = $40,
+    frontdoor_building_description = $41,
+    frontdoor_building_car_storage_description = $42,
+    frontdoor_building_other_info = $43,
+    frontdoor_building_data = $44::jsonb,
+    frontdoor_building_processed_at = NOW(),
+    frontdoor_building_updated_at = NOW()
+WHERE frontdoor_building_housing_company_id = $1
 `
 
 type UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams struct {
-	FrontdoorBuildingsHousingCompanyID         pgtype.Int8     `db:"frontdoor_buildings_housing_company_id" json:"frontdoor_buildings_housing_company_id"`
-	FrontdoorBuildingsCompanyName              *string         `db:"frontdoor_buildings_company_name" json:"frontdoor_buildings_company_name"`
-	FrontdoorBuildingsBusinessID               *string         `db:"frontdoor_buildings_business_id" json:"frontdoor_buildings_business_id"`
-	FrontdoorBuildingsApartmentCount           pgtype.Int4     `db:"frontdoor_buildings_apartment_count" json:"frontdoor_buildings_apartment_count"`
-	FrontdoorBuildingsFloorCount               pgtype.Int4     `db:"frontdoor_buildings_floor_count" json:"frontdoor_buildings_floor_count"`
-	FrontdoorBuildingsConstructionEndYear      pgtype.Int4     `db:"frontdoor_buildings_construction_end_year" json:"frontdoor_buildings_construction_end_year"`
-	FrontdoorBuildingsBuildYear                pgtype.Int4     `db:"frontdoor_buildings_build_year" json:"frontdoor_buildings_build_year"`
-	FrontdoorBuildingsHasElevator              pgtype.Bool     `db:"frontdoor_buildings_has_elevator" json:"frontdoor_buildings_has_elevator"`
-	FrontdoorBuildingsHasSauna                 pgtype.Bool     `db:"frontdoor_buildings_has_sauna" json:"frontdoor_buildings_has_sauna"`
-	FrontdoorBuildingsEnergyCertificateCode    *string         `db:"frontdoor_buildings_energy_certificate_code" json:"frontdoor_buildings_energy_certificate_code"`
-	FrontdoorBuildingsPlotHoldingType          *string         `db:"frontdoor_buildings_plot_holding_type" json:"frontdoor_buildings_plot_holding_type"`
-	FrontdoorBuildingsOuterRoofMaterial        *string         `db:"frontdoor_buildings_outer_roof_material" json:"frontdoor_buildings_outer_roof_material"`
-	FrontdoorBuildingsOuterRoofType            *string         `db:"frontdoor_buildings_outer_roof_type" json:"frontdoor_buildings_outer_roof_type"`
-	FrontdoorBuildingsHeating                  *string         `db:"frontdoor_buildings_heating" json:"frontdoor_buildings_heating"`
-	FrontdoorBuildingsHeatingFuel              []string        `db:"frontdoor_buildings_heating_fuel" json:"frontdoor_buildings_heating_fuel"`
-	FrontdoorBuildingsStreetAddress            *string         `db:"frontdoor_buildings_street_address" json:"frontdoor_buildings_street_address"`
-	FrontdoorBuildingsHouseNumber              *string         `db:"frontdoor_buildings_house_number" json:"frontdoor_buildings_house_number"`
-	FrontdoorBuildingsPostcode                 *string         `db:"frontdoor_buildings_postcode" json:"frontdoor_buildings_postcode"`
-	FrontdoorBuildingsPostArea                 *string         `db:"frontdoor_buildings_post_area" json:"frontdoor_buildings_post_area"`
-	FrontdoorBuildingsMunicipality             *string         `db:"frontdoor_buildings_municipality" json:"frontdoor_buildings_municipality"`
-	FrontdoorBuildingsDistrict                 *string         `db:"frontdoor_buildings_district" json:"frontdoor_buildings_district"`
-	FrontdoorBuildingsLatitude                 pgtype.Float8   `db:"frontdoor_buildings_latitude" json:"frontdoor_buildings_latitude"`
-	FrontdoorBuildingsLongitude                pgtype.Float8   `db:"frontdoor_buildings_longitude" json:"frontdoor_buildings_longitude"`
-	FrontdoorBuildingsElevatorRenovated        pgtype.Bool     `db:"frontdoor_buildings_elevator_renovated" json:"frontdoor_buildings_elevator_renovated"`
-	FrontdoorBuildingsElevatorRenovatedYear    pgtype.Int4     `db:"frontdoor_buildings_elevator_renovated_year" json:"frontdoor_buildings_elevator_renovated_year"`
-	FrontdoorBuildingsFacadeRenovated          pgtype.Bool     `db:"frontdoor_buildings_facade_renovated" json:"frontdoor_buildings_facade_renovated"`
-	FrontdoorBuildingsFacadeRenovatedYear      pgtype.Int4     `db:"frontdoor_buildings_facade_renovated_year" json:"frontdoor_buildings_facade_renovated_year"`
-	FrontdoorBuildingsWindowRenovated          pgtype.Bool     `db:"frontdoor_buildings_window_renovated" json:"frontdoor_buildings_window_renovated"`
-	FrontdoorBuildingsWindowRenovatedYear      pgtype.Int4     `db:"frontdoor_buildings_window_renovated_year" json:"frontdoor_buildings_window_renovated_year"`
-	FrontdoorBuildingsRoofRenovated            pgtype.Bool     `db:"frontdoor_buildings_roof_renovated" json:"frontdoor_buildings_roof_renovated"`
-	FrontdoorBuildingsRoofRenovatedYear        pgtype.Int4     `db:"frontdoor_buildings_roof_renovated_year" json:"frontdoor_buildings_roof_renovated_year"`
-	FrontdoorBuildingsPipeRenovated            pgtype.Bool     `db:"frontdoor_buildings_pipe_renovated" json:"frontdoor_buildings_pipe_renovated"`
-	FrontdoorBuildingsPipeRenovatedYear        pgtype.Int4     `db:"frontdoor_buildings_pipe_renovated_year" json:"frontdoor_buildings_pipe_renovated_year"`
-	FrontdoorBuildingsBalconyRenovated         pgtype.Bool     `db:"frontdoor_buildings_balcony_renovated" json:"frontdoor_buildings_balcony_renovated"`
-	FrontdoorBuildingsBalconyRenovatedYear     pgtype.Int4     `db:"frontdoor_buildings_balcony_renovated_year" json:"frontdoor_buildings_balcony_renovated_year"`
-	FrontdoorBuildingsElectricityRenovated     pgtype.Bool     `db:"frontdoor_buildings_electricity_renovated" json:"frontdoor_buildings_electricity_renovated"`
-	FrontdoorBuildingsElectricityRenovatedYear pgtype.Int4     `db:"frontdoor_buildings_electricity_renovated_year" json:"frontdoor_buildings_electricity_renovated_year"`
-	FrontdoorBuildingsContactPhone             *string         `db:"frontdoor_buildings_contact_phone" json:"frontdoor_buildings_contact_phone"`
-	FrontdoorBuildingsContactOfficeName        *string         `db:"frontdoor_buildings_contact_office_name" json:"frontdoor_buildings_contact_office_name"`
-	FrontdoorBuildingsContactOfficeID          pgtype.Int4     `db:"frontdoor_buildings_contact_office_id" json:"frontdoor_buildings_contact_office_id"`
-	FrontdoorBuildingsDescription              *string         `db:"frontdoor_buildings_description" json:"frontdoor_buildings_description"`
-	FrontdoorBuildingsCarStorageDescription    *string         `db:"frontdoor_buildings_car_storage_description" json:"frontdoor_buildings_car_storage_description"`
-	FrontdoorBuildingsOtherInfo                *string         `db:"frontdoor_buildings_other_info" json:"frontdoor_buildings_other_info"`
-	Column44                                   json.RawMessage `db:"column_44" json:"column_44"`
+	FrontdoorBuildingHousingCompanyID         pgtype.Int8     `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingCompanyName              *string         `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string         `db:"frontdoor_building_business_id" json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           pgtype.Int4     `db:"frontdoor_building_apartment_count" json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               pgtype.Int4     `db:"frontdoor_building_floor_count" json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      pgtype.Int4     `db:"frontdoor_building_construction_end_year" json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                pgtype.Int4     `db:"frontdoor_building_build_year" json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              pgtype.Bool     `db:"frontdoor_building_has_elevator" json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 pgtype.Bool     `db:"frontdoor_building_has_sauna" json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string         `db:"frontdoor_building_energy_certificate_code" json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string         `db:"frontdoor_building_plot_holding_type" json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string         `db:"frontdoor_building_outer_roof_material" json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string         `db:"frontdoor_building_outer_roof_type" json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string         `db:"frontdoor_building_heating" json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string        `db:"frontdoor_building_heating_fuel" json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string         `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string         `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string         `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string         `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string         `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string         `db:"frontdoor_building_district" json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 pgtype.Float8   `db:"frontdoor_building_latitude" json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                pgtype.Float8   `db:"frontdoor_building_longitude" json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        pgtype.Bool     `db:"frontdoor_building_elevator_renovated" json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    pgtype.Int4     `db:"frontdoor_building_elevator_renovated_year" json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          pgtype.Bool     `db:"frontdoor_building_facade_renovated" json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      pgtype.Int4     `db:"frontdoor_building_facade_renovated_year" json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          pgtype.Bool     `db:"frontdoor_building_window_renovated" json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      pgtype.Int4     `db:"frontdoor_building_window_renovated_year" json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            pgtype.Bool     `db:"frontdoor_building_roof_renovated" json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        pgtype.Int4     `db:"frontdoor_building_roof_renovated_year" json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            pgtype.Bool     `db:"frontdoor_building_pipe_renovated" json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        pgtype.Int4     `db:"frontdoor_building_pipe_renovated_year" json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         pgtype.Bool     `db:"frontdoor_building_balcony_renovated" json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     pgtype.Int4     `db:"frontdoor_building_balcony_renovated_year" json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     pgtype.Bool     `db:"frontdoor_building_electricity_renovated" json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear pgtype.Int4     `db:"frontdoor_building_electricity_renovated_year" json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string         `db:"frontdoor_building_contact_phone" json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string         `db:"frontdoor_building_contact_office_name" json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          pgtype.Int4     `db:"frontdoor_building_contact_office_id" json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string         `db:"frontdoor_building_description" json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string         `db:"frontdoor_building_car_storage_description" json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string         `db:"frontdoor_building_other_info" json:"frontdoor_building_other_info"`
+	Column44                                  json.RawMessage `db:"column_44" json:"column_44"`
 }
 
 func (q *Queries) UpdateFrontdoorBuildingDetailsByHousingCompanyID(ctx context.Context, arg *UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams) error {
 	_, err := q.db.Exec(ctx, updateFrontdoorBuildingDetailsByHousingCompanyID,
-		arg.FrontdoorBuildingsHousingCompanyID,
-		arg.FrontdoorBuildingsCompanyName,
-		arg.FrontdoorBuildingsBusinessID,
-		arg.FrontdoorBuildingsApartmentCount,
-		arg.FrontdoorBuildingsFloorCount,
-		arg.FrontdoorBuildingsConstructionEndYear,
-		arg.FrontdoorBuildingsBuildYear,
-		arg.FrontdoorBuildingsHasElevator,
-		arg.FrontdoorBuildingsHasSauna,
-		arg.FrontdoorBuildingsEnergyCertificateCode,
-		arg.FrontdoorBuildingsPlotHoldingType,
-		arg.FrontdoorBuildingsOuterRoofMaterial,
-		arg.FrontdoorBuildingsOuterRoofType,
-		arg.FrontdoorBuildingsHeating,
-		arg.FrontdoorBuildingsHeatingFuel,
-		arg.FrontdoorBuildingsStreetAddress,
-		arg.FrontdoorBuildingsHouseNumber,
-		arg.FrontdoorBuildingsPostcode,
-		arg.FrontdoorBuildingsPostArea,
-		arg.FrontdoorBuildingsMunicipality,
-		arg.FrontdoorBuildingsDistrict,
-		arg.FrontdoorBuildingsLatitude,
-		arg.FrontdoorBuildingsLongitude,
-		arg.FrontdoorBuildingsElevatorRenovated,
-		arg.FrontdoorBuildingsElevatorRenovatedYear,
-		arg.FrontdoorBuildingsFacadeRenovated,
-		arg.FrontdoorBuildingsFacadeRenovatedYear,
-		arg.FrontdoorBuildingsWindowRenovated,
-		arg.FrontdoorBuildingsWindowRenovatedYear,
-		arg.FrontdoorBuildingsRoofRenovated,
-		arg.FrontdoorBuildingsRoofRenovatedYear,
-		arg.FrontdoorBuildingsPipeRenovated,
-		arg.FrontdoorBuildingsPipeRenovatedYear,
-		arg.FrontdoorBuildingsBalconyRenovated,
-		arg.FrontdoorBuildingsBalconyRenovatedYear,
-		arg.FrontdoorBuildingsElectricityRenovated,
-		arg.FrontdoorBuildingsElectricityRenovatedYear,
-		arg.FrontdoorBuildingsContactPhone,
-		arg.FrontdoorBuildingsContactOfficeName,
-		arg.FrontdoorBuildingsContactOfficeID,
-		arg.FrontdoorBuildingsDescription,
-		arg.FrontdoorBuildingsCarStorageDescription,
-		arg.FrontdoorBuildingsOtherInfo,
+		arg.FrontdoorBuildingHousingCompanyID,
+		arg.FrontdoorBuildingCompanyName,
+		arg.FrontdoorBuildingBusinessID,
+		arg.FrontdoorBuildingApartmentCount,
+		arg.FrontdoorBuildingFloorCount,
+		arg.FrontdoorBuildingConstructionEndYear,
+		arg.FrontdoorBuildingBuildYear,
+		arg.FrontdoorBuildingHasElevator,
+		arg.FrontdoorBuildingHasSauna,
+		arg.FrontdoorBuildingEnergyCertificateCode,
+		arg.FrontdoorBuildingPlotHoldingType,
+		arg.FrontdoorBuildingOuterRoofMaterial,
+		arg.FrontdoorBuildingOuterRoofType,
+		arg.FrontdoorBuildingHeating,
+		arg.FrontdoorBuildingHeatingFuel,
+		arg.FrontdoorBuildingStreetAddress,
+		arg.FrontdoorBuildingHouseNumber,
+		arg.FrontdoorBuildingPostcode,
+		arg.FrontdoorBuildingPostArea,
+		arg.FrontdoorBuildingMunicipality,
+		arg.FrontdoorBuildingDistrict,
+		arg.FrontdoorBuildingLatitude,
+		arg.FrontdoorBuildingLongitude,
+		arg.FrontdoorBuildingElevatorRenovated,
+		arg.FrontdoorBuildingElevatorRenovatedYear,
+		arg.FrontdoorBuildingFacadeRenovated,
+		arg.FrontdoorBuildingFacadeRenovatedYear,
+		arg.FrontdoorBuildingWindowRenovated,
+		arg.FrontdoorBuildingWindowRenovatedYear,
+		arg.FrontdoorBuildingRoofRenovated,
+		arg.FrontdoorBuildingRoofRenovatedYear,
+		arg.FrontdoorBuildingPipeRenovated,
+		arg.FrontdoorBuildingPipeRenovatedYear,
+		arg.FrontdoorBuildingBalconyRenovated,
+		arg.FrontdoorBuildingBalconyRenovatedYear,
+		arg.FrontdoorBuildingElectricityRenovated,
+		arg.FrontdoorBuildingElectricityRenovatedYear,
+		arg.FrontdoorBuildingContactPhone,
+		arg.FrontdoorBuildingContactOfficeName,
+		arg.FrontdoorBuildingContactOfficeID,
+		arg.FrontdoorBuildingDescription,
+		arg.FrontdoorBuildingCarStorageDescription,
+		arg.FrontdoorBuildingOtherInfo,
 		arg.Column44,
 	)
 	return err
@@ -1050,47 +1050,47 @@ func (q *Queries) UpdateFrontdoorBuildingDetailsByHousingCompanyID(ctx context.C
 
 const upsertFrontdoorAdFromSitemap = `-- name: UpsertFrontdoorAdFromSitemap :one
 INSERT INTO public.frontdoor_ads (
-    frontdoor_ads_external_id,
-    frontdoor_ads_url,
-    frontdoor_ads_first_seen_at,
-    frontdoor_ads_last_seen_at,
-    frontdoor_ads_updated_at
+    frontdoor_ad_external_id,
+    frontdoor_ad_url,
+    frontdoor_ad_first_seen_at,
+    frontdoor_ad_last_seen_at,
+    frontdoor_ad_updated_at
 ) VALUES ($1, $2, now(), now(), now())
-ON CONFLICT (frontdoor_ads_external_id) DO UPDATE
-SET frontdoor_ads_last_seen_at = now(),
-    frontdoor_ads_url = COALESCE(EXCLUDED.frontdoor_ads_url, frontdoor_ads.frontdoor_ads_url)
-RETURNING frontdoor_ads_id, frontdoor_ads_external_id, frontdoor_ads_url, frontdoor_ads_first_seen_at, frontdoor_ads_last_seen_at, frontdoor_ads_updated_at, frontdoor_ads_data, frontdoor_ads_processed_at, frontdoor_ads_page_not_found, frontdoor_ads_publishing_time
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
+SET frontdoor_ad_last_seen_at = now(),
+    frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time
 `
 
 type UpsertFrontdoorAdFromSitemapParams struct {
-	FrontdoorAdsExternalID string `db:"frontdoor_ads_external_id" json:"frontdoor_ads_external_id"`
-	FrontdoorAdsUrl        string `db:"frontdoor_ads_url" json:"frontdoor_ads_url"`
+	FrontdoorAdExternalID string `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl        string `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
 }
 
 func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg *UpsertFrontdoorAdFromSitemapParams) (FrontdoorAd, error) {
-	row := q.db.QueryRow(ctx, upsertFrontdoorAdFromSitemap, arg.FrontdoorAdsExternalID, arg.FrontdoorAdsUrl)
+	row := q.db.QueryRow(ctx, upsertFrontdoorAdFromSitemap, arg.FrontdoorAdExternalID, arg.FrontdoorAdUrl)
 	var i FrontdoorAd
 	err := row.Scan(
-		&i.FrontdoorAdsID,
-		&i.FrontdoorAdsExternalID,
-		&i.FrontdoorAdsUrl,
-		&i.FrontdoorAdsFirstSeenAt,
-		&i.FrontdoorAdsLastSeenAt,
-		&i.FrontdoorAdsUpdatedAt,
-		&i.FrontdoorAdsData,
-		&i.FrontdoorAdsProcessedAt,
-		&i.FrontdoorAdsPageNotFound,
-		&i.FrontdoorAdsPublishingTime,
+		&i.FrontdoorAdID,
+		&i.FrontdoorAdExternalID,
+		&i.FrontdoorAdUrl,
+		&i.FrontdoorAdFirstSeenAt,
+		&i.FrontdoorAdLastSeenAt,
+		&i.FrontdoorAdUpdatedAt,
+		&i.FrontdoorAdData,
+		&i.FrontdoorAdProcessedAt,
+		&i.FrontdoorAdPageNotFound,
+		&i.FrontdoorAdPublishingTime,
 	)
 	return i, err
 }
 
 const upsertFrontdoorAds = `-- name: UpsertFrontdoorAds :exec
-INSERT INTO public.frontdoor_ads (frontdoor_ads_external_id)
+INSERT INTO public.frontdoor_ads (frontdoor_ad_external_id)
 SELECT unnest($1::text[])
-ON CONFLICT (frontdoor_ads_external_id) DO UPDATE SET
-    frontdoor_ads_last_seen_at = NOW(),
-    frontdoor_ads_updated_at = NOW()
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE SET
+    frontdoor_ad_last_seen_at = NOW(),
+    frontdoor_ad_updated_at = NOW()
 `
 
 func (q *Queries) UpsertFrontdoorAds(ctx context.Context, dollar_1 []string) error {
@@ -1100,254 +1100,254 @@ func (q *Queries) UpsertFrontdoorAds(ctx context.Context, dollar_1 []string) err
 
 const upsertFrontdoorBuilding = `-- name: UpsertFrontdoorBuilding :one
 INSERT INTO public.frontdoor_buildings (
-    frontdoor_buildings_url,
-    frontdoor_buildings_first_seen_at,
-    frontdoor_buildings_last_seen_at,
-    frontdoor_buildings_updated_at,
-    frontdoor_buildings_housing_company_id,
-    frontdoor_buildings_housing_company_friendly_id
+    frontdoor_building_url,
+    frontdoor_building_first_seen_at,
+    frontdoor_building_last_seen_at,
+    frontdoor_building_updated_at,
+    frontdoor_building_housing_company_id,
+    frontdoor_building_housing_company_friendly_id
 ) VALUES ($1, now(), now(), now(), $2, $3)
-ON CONFLICT (frontdoor_buildings_housing_company_id) DO UPDATE
-SET frontdoor_buildings_last_seen_at = now(),
-    frontdoor_buildings_url = COALESCE(EXCLUDED.frontdoor_buildings_url, frontdoor_buildings.frontdoor_buildings_url),
-    frontdoor_buildings_housing_company_friendly_id = COALESCE(EXCLUDED.frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings.frontdoor_buildings_housing_company_friendly_id)
-RETURNING frontdoor_buildings_id, frontdoor_buildings_url, frontdoor_buildings_first_seen_at, frontdoor_buildings_last_seen_at, frontdoor_buildings_updated_at, frontdoor_buildings_company_name, frontdoor_buildings_business_id, frontdoor_buildings_apartment_count, frontdoor_buildings_floor_count, frontdoor_buildings_construction_end_year, frontdoor_buildings_build_year, frontdoor_buildings_has_elevator, frontdoor_buildings_has_sauna, frontdoor_buildings_energy_certificate_code, frontdoor_buildings_plot_holding_type, frontdoor_buildings_outer_roof_material, frontdoor_buildings_outer_roof_type, frontdoor_buildings_heating, frontdoor_buildings_heating_fuel, frontdoor_buildings_street_address, frontdoor_buildings_house_number, frontdoor_buildings_postcode, frontdoor_buildings_post_area, frontdoor_buildings_municipality, frontdoor_buildings_district, frontdoor_buildings_latitude, frontdoor_buildings_longitude, frontdoor_buildings_elevator_renovated, frontdoor_buildings_elevator_renovated_year, frontdoor_buildings_facade_renovated, frontdoor_buildings_facade_renovated_year, frontdoor_buildings_window_renovated, frontdoor_buildings_window_renovated_year, frontdoor_buildings_roof_renovated, frontdoor_buildings_roof_renovated_year, frontdoor_buildings_pipe_renovated, frontdoor_buildings_pipe_renovated_year, frontdoor_buildings_balcony_renovated, frontdoor_buildings_balcony_renovated_year, frontdoor_buildings_electricity_renovated, frontdoor_buildings_electricity_renovated_year, frontdoor_buildings_contact_phone, frontdoor_buildings_contact_office_name, frontdoor_buildings_contact_office_id, frontdoor_buildings_description, frontdoor_buildings_car_storage_description, frontdoor_buildings_other_info, frontdoor_buildings_additional_addresses, frontdoor_buildings_links, frontdoor_buildings_data, frontdoor_buildings_processed_at, frontdoor_buildings_housing_company_id, frontdoor_buildings_housing_company_friendly_id, frontdoor_buildings_geom
+ON CONFLICT (frontdoor_building_housing_company_id) DO UPDATE
+SET frontdoor_building_last_seen_at = now(),
+    frontdoor_building_url = COALESCE(EXCLUDED.frontdoor_building_url, frontdoor_buildings.frontdoor_building_url),
+    frontdoor_building_housing_company_friendly_id = COALESCE(EXCLUDED.frontdoor_building_housing_company_friendly_id, frontdoor_buildings.frontdoor_building_housing_company_friendly_id)
+RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom
 `
 
 type UpsertFrontdoorBuildingParams struct {
-	FrontdoorBuildingsUrl                      *string     `db:"frontdoor_buildings_url" json:"frontdoor_buildings_url"`
-	FrontdoorBuildingsHousingCompanyID         pgtype.Int8 `db:"frontdoor_buildings_housing_company_id" json:"frontdoor_buildings_housing_company_id"`
-	FrontdoorBuildingsHousingCompanyFriendlyID *string     `db:"frontdoor_buildings_housing_company_friendly_id" json:"frontdoor_buildings_housing_company_friendly_id"`
+	FrontdoorBuildingUrl                      *string     `db:"frontdoor_building_url" json:"frontdoor_building_url"`
+	FrontdoorBuildingHousingCompanyID         pgtype.Int8 `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string     `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
 }
 
 func (q *Queries) UpsertFrontdoorBuilding(ctx context.Context, arg *UpsertFrontdoorBuildingParams) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, upsertFrontdoorBuilding, arg.FrontdoorBuildingsUrl, arg.FrontdoorBuildingsHousingCompanyID, arg.FrontdoorBuildingsHousingCompanyFriendlyID)
+	row := q.db.QueryRow(ctx, upsertFrontdoorBuilding, arg.FrontdoorBuildingUrl, arg.FrontdoorBuildingHousingCompanyID, arg.FrontdoorBuildingHousingCompanyFriendlyID)
 	var i FrontdoorBuilding
 	err := row.Scan(
-		&i.FrontdoorBuildingsID,
-		&i.FrontdoorBuildingsUrl,
-		&i.FrontdoorBuildingsFirstSeenAt,
-		&i.FrontdoorBuildingsLastSeenAt,
-		&i.FrontdoorBuildingsUpdatedAt,
-		&i.FrontdoorBuildingsCompanyName,
-		&i.FrontdoorBuildingsBusinessID,
-		&i.FrontdoorBuildingsApartmentCount,
-		&i.FrontdoorBuildingsFloorCount,
-		&i.FrontdoorBuildingsConstructionEndYear,
-		&i.FrontdoorBuildingsBuildYear,
-		&i.FrontdoorBuildingsHasElevator,
-		&i.FrontdoorBuildingsHasSauna,
-		&i.FrontdoorBuildingsEnergyCertificateCode,
-		&i.FrontdoorBuildingsPlotHoldingType,
-		&i.FrontdoorBuildingsOuterRoofMaterial,
-		&i.FrontdoorBuildingsOuterRoofType,
-		&i.FrontdoorBuildingsHeating,
-		&i.FrontdoorBuildingsHeatingFuel,
-		&i.FrontdoorBuildingsStreetAddress,
-		&i.FrontdoorBuildingsHouseNumber,
-		&i.FrontdoorBuildingsPostcode,
-		&i.FrontdoorBuildingsPostArea,
-		&i.FrontdoorBuildingsMunicipality,
-		&i.FrontdoorBuildingsDistrict,
-		&i.FrontdoorBuildingsLatitude,
-		&i.FrontdoorBuildingsLongitude,
-		&i.FrontdoorBuildingsElevatorRenovated,
-		&i.FrontdoorBuildingsElevatorRenovatedYear,
-		&i.FrontdoorBuildingsFacadeRenovated,
-		&i.FrontdoorBuildingsFacadeRenovatedYear,
-		&i.FrontdoorBuildingsWindowRenovated,
-		&i.FrontdoorBuildingsWindowRenovatedYear,
-		&i.FrontdoorBuildingsRoofRenovated,
-		&i.FrontdoorBuildingsRoofRenovatedYear,
-		&i.FrontdoorBuildingsPipeRenovated,
-		&i.FrontdoorBuildingsPipeRenovatedYear,
-		&i.FrontdoorBuildingsBalconyRenovated,
-		&i.FrontdoorBuildingsBalconyRenovatedYear,
-		&i.FrontdoorBuildingsElectricityRenovated,
-		&i.FrontdoorBuildingsElectricityRenovatedYear,
-		&i.FrontdoorBuildingsContactPhone,
-		&i.FrontdoorBuildingsContactOfficeName,
-		&i.FrontdoorBuildingsContactOfficeID,
-		&i.FrontdoorBuildingsDescription,
-		&i.FrontdoorBuildingsCarStorageDescription,
-		&i.FrontdoorBuildingsOtherInfo,
-		&i.FrontdoorBuildingsAdditionalAddresses,
-		&i.FrontdoorBuildingsLinks,
-		&i.FrontdoorBuildingsData,
-		&i.FrontdoorBuildingsProcessedAt,
-		&i.FrontdoorBuildingsHousingCompanyID,
-		&i.FrontdoorBuildingsHousingCompanyFriendlyID,
-		&i.FrontdoorBuildingsGeom,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingUrl,
+		&i.FrontdoorBuildingFirstSeenAt,
+		&i.FrontdoorBuildingLastSeenAt,
+		&i.FrontdoorBuildingUpdatedAt,
+		&i.FrontdoorBuildingCompanyName,
+		&i.FrontdoorBuildingBusinessID,
+		&i.FrontdoorBuildingApartmentCount,
+		&i.FrontdoorBuildingFloorCount,
+		&i.FrontdoorBuildingConstructionEndYear,
+		&i.FrontdoorBuildingBuildYear,
+		&i.FrontdoorBuildingHasElevator,
+		&i.FrontdoorBuildingHasSauna,
+		&i.FrontdoorBuildingEnergyCertificateCode,
+		&i.FrontdoorBuildingPlotHoldingType,
+		&i.FrontdoorBuildingOuterRoofMaterial,
+		&i.FrontdoorBuildingOuterRoofType,
+		&i.FrontdoorBuildingHeating,
+		&i.FrontdoorBuildingHeatingFuel,
+		&i.FrontdoorBuildingStreetAddress,
+		&i.FrontdoorBuildingHouseNumber,
+		&i.FrontdoorBuildingPostcode,
+		&i.FrontdoorBuildingPostArea,
+		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingDistrict,
+		&i.FrontdoorBuildingLatitude,
+		&i.FrontdoorBuildingLongitude,
+		&i.FrontdoorBuildingElevatorRenovated,
+		&i.FrontdoorBuildingElevatorRenovatedYear,
+		&i.FrontdoorBuildingFacadeRenovated,
+		&i.FrontdoorBuildingFacadeRenovatedYear,
+		&i.FrontdoorBuildingWindowRenovated,
+		&i.FrontdoorBuildingWindowRenovatedYear,
+		&i.FrontdoorBuildingRoofRenovated,
+		&i.FrontdoorBuildingRoofRenovatedYear,
+		&i.FrontdoorBuildingPipeRenovated,
+		&i.FrontdoorBuildingPipeRenovatedYear,
+		&i.FrontdoorBuildingBalconyRenovated,
+		&i.FrontdoorBuildingBalconyRenovatedYear,
+		&i.FrontdoorBuildingElectricityRenovated,
+		&i.FrontdoorBuildingElectricityRenovatedYear,
+		&i.FrontdoorBuildingContactPhone,
+		&i.FrontdoorBuildingContactOfficeName,
+		&i.FrontdoorBuildingContactOfficeID,
+		&i.FrontdoorBuildingDescription,
+		&i.FrontdoorBuildingCarStorageDescription,
+		&i.FrontdoorBuildingOtherInfo,
+		&i.FrontdoorBuildingAdditionalAddresses,
+		&i.FrontdoorBuildingLinks,
+		&i.FrontdoorBuildingData,
+		&i.FrontdoorBuildingProcessedAt,
+		&i.FrontdoorBuildingHousingCompanyID,
+		&i.FrontdoorBuildingHousingCompanyFriendlyID,
+		&i.FrontdoorBuildingGeom,
 	)
 	return i, err
 }
 
 const upsertFrontdoorBuildingAnnouncement = `-- name: UpsertFrontdoorBuildingAnnouncement :one
 INSERT INTO public.frontdoor_building_announcements (
-    frontdoor_building_announcements_external_id,
-    frontdoor_building_announcements_friendly_id,
-    frontdoor_building_announcements_unpublishing_time,
-    frontdoor_building_announcements_address_line1,
-    frontdoor_building_announcements_address_line2,
-    frontdoor_building_announcements_location,
-    frontdoor_building_announcements_search_price,
-    frontdoor_building_announcements_notify_price_changed,
-    frontdoor_building_announcements_property_type,
-    frontdoor_building_announcements_property_subtype,
-    frontdoor_building_announcements_construction_finished_year,
-    frontdoor_building_announcements_main_image_uri,
-    frontdoor_building_announcements_has_open_bidding,
-    frontdoor_building_announcements_room_structure,
-    frontdoor_building_announcements_area,
-    frontdoor_building_announcements_total_area,
-    frontdoor_building_announcements_price_per_square,
-    frontdoor_building_announcements_days_on_market,
-    frontdoor_building_announcements_new_building,
-    frontdoor_building_announcements_main_image_hidden,
-    frontdoor_building_announcements_is_company_announcement,
-    frontdoor_building_announcements_show_bidding_indicators,
-    frontdoor_building_announcements_published,
-    frontdoor_building_announcements_rent_period,
-    frontdoor_building_announcements_rental_unique_no,
-    frontdoor_building_announcements_building_id,
-    frontdoor_building_announcements_first_seen_at,
-    frontdoor_building_announcements_last_seen_at,
-    frontdoor_building_announcements_unpublishing_time_date
+    frontdoor_building_announcement_external_id,
+    frontdoor_building_announcement_friendly_id,
+    frontdoor_building_announcement_unpublishing_time,
+    frontdoor_building_announcement_address_line1,
+    frontdoor_building_announcement_address_line2,
+    frontdoor_building_announcement_location,
+    frontdoor_building_announcement_search_price,
+    frontdoor_building_announcement_notify_price_changed,
+    frontdoor_building_announcement_property_type,
+    frontdoor_building_announcement_property_subtype,
+    frontdoor_building_announcement_construction_finished_year,
+    frontdoor_building_announcement_main_image_uri,
+    frontdoor_building_announcement_has_open_bidding,
+    frontdoor_building_announcement_room_structure,
+    frontdoor_building_announcement_area,
+    frontdoor_building_announcement_total_area,
+    frontdoor_building_announcement_price_per_square,
+    frontdoor_building_announcement_days_on_market,
+    frontdoor_building_announcement_new_building,
+    frontdoor_building_announcement_main_image_hidden,
+    frontdoor_building_announcement_is_company_announcement,
+    frontdoor_building_announcement_show_bidding_indicators,
+    frontdoor_building_announcement_published,
+    frontdoor_building_announcement_rent_period,
+    frontdoor_building_announcement_rental_unique_no,
+    frontdoor_building_id,
+    frontdoor_building_announcement_first_seen_at,
+    frontdoor_building_announcement_last_seen_at,
+    frontdoor_building_announcement_unpublishing_time_date
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
     $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
     $21, $22, $23, $24, $25, $26, now(), now(), $27
 )
-ON CONFLICT (frontdoor_building_announcements_external_id, frontdoor_building_announcements_unpublishing_time, frontdoor_building_announcements_search_price) DO UPDATE
-SET frontdoor_building_announcements_last_seen_at = now(),
-    frontdoor_building_announcements_friendly_id = COALESCE(EXCLUDED.frontdoor_building_announcements_friendly_id, frontdoor_building_announcements.frontdoor_building_announcements_friendly_id),
-    frontdoor_building_announcements_address_line1 = COALESCE(EXCLUDED.frontdoor_building_announcements_address_line1, frontdoor_building_announcements.frontdoor_building_announcements_address_line1),
-    frontdoor_building_announcements_address_line2 = COALESCE(EXCLUDED.frontdoor_building_announcements_address_line2, frontdoor_building_announcements.frontdoor_building_announcements_address_line2),
-    frontdoor_building_announcements_location = COALESCE(EXCLUDED.frontdoor_building_announcements_location, frontdoor_building_announcements.frontdoor_building_announcements_location),
-    frontdoor_building_announcements_notify_price_changed = COALESCE(EXCLUDED.frontdoor_building_announcements_notify_price_changed, frontdoor_building_announcements.frontdoor_building_announcements_notify_price_changed),
-    frontdoor_building_announcements_property_type = COALESCE(EXCLUDED.frontdoor_building_announcements_property_type, frontdoor_building_announcements.frontdoor_building_announcements_property_type),
-    frontdoor_building_announcements_property_subtype = COALESCE(EXCLUDED.frontdoor_building_announcements_property_subtype, frontdoor_building_announcements.frontdoor_building_announcements_property_subtype),
-    frontdoor_building_announcements_construction_finished_year = COALESCE(EXCLUDED.frontdoor_building_announcements_construction_finished_year, frontdoor_building_announcements.frontdoor_building_announcements_construction_finished_year),
-    frontdoor_building_announcements_main_image_uri = COALESCE(EXCLUDED.frontdoor_building_announcements_main_image_uri, frontdoor_building_announcements.frontdoor_building_announcements_main_image_uri),
-    frontdoor_building_announcements_has_open_bidding = COALESCE(EXCLUDED.frontdoor_building_announcements_has_open_bidding, frontdoor_building_announcements.frontdoor_building_announcements_has_open_bidding),
-    frontdoor_building_announcements_room_structure = COALESCE(EXCLUDED.frontdoor_building_announcements_room_structure, frontdoor_building_announcements.frontdoor_building_announcements_room_structure),
-    frontdoor_building_announcements_area = COALESCE(EXCLUDED.frontdoor_building_announcements_area, frontdoor_building_announcements.frontdoor_building_announcements_area),
-    frontdoor_building_announcements_total_area = COALESCE(EXCLUDED.frontdoor_building_announcements_total_area, frontdoor_building_announcements.frontdoor_building_announcements_total_area),
-    frontdoor_building_announcements_price_per_square = COALESCE(EXCLUDED.frontdoor_building_announcements_price_per_square, frontdoor_building_announcements.frontdoor_building_announcements_price_per_square),
-    frontdoor_building_announcements_days_on_market = COALESCE(EXCLUDED.frontdoor_building_announcements_days_on_market, frontdoor_building_announcements.frontdoor_building_announcements_days_on_market),
-    frontdoor_building_announcements_new_building = COALESCE(EXCLUDED.frontdoor_building_announcements_new_building, frontdoor_building_announcements.frontdoor_building_announcements_new_building),
-    frontdoor_building_announcements_main_image_hidden = COALESCE(EXCLUDED.frontdoor_building_announcements_main_image_hidden, frontdoor_building_announcements.frontdoor_building_announcements_main_image_hidden),
-    frontdoor_building_announcements_is_company_announcement = COALESCE(EXCLUDED.frontdoor_building_announcements_is_company_announcement, frontdoor_building_announcements.frontdoor_building_announcements_is_company_announcement),
-    frontdoor_building_announcements_show_bidding_indicators = COALESCE(EXCLUDED.frontdoor_building_announcements_show_bidding_indicators, frontdoor_building_announcements.frontdoor_building_announcements_show_bidding_indicators),
-    frontdoor_building_announcements_published = COALESCE(EXCLUDED.frontdoor_building_announcements_published, frontdoor_building_announcements.frontdoor_building_announcements_published),
-    frontdoor_building_announcements_rent_period = COALESCE(EXCLUDED.frontdoor_building_announcements_rent_period, frontdoor_building_announcements.frontdoor_building_announcements_rent_period),
-    frontdoor_building_announcements_rental_unique_no = COALESCE(EXCLUDED.frontdoor_building_announcements_rental_unique_no, frontdoor_building_announcements.frontdoor_building_announcements_rental_unique_no),
-    frontdoor_building_announcements_unpublishing_time_date = COALESCE(EXCLUDED.frontdoor_building_announcements_unpublishing_time_date, frontdoor_building_announcements.frontdoor_building_announcements_unpublishing_time_date)
-RETURNING frontdoor_building_announcements_id, frontdoor_building_announcements_external_id, frontdoor_building_announcements_friendly_id, frontdoor_building_announcements_unpublishing_time, frontdoor_building_announcements_address_line1, frontdoor_building_announcements_address_line2, frontdoor_building_announcements_location, frontdoor_building_announcements_search_price, frontdoor_building_announcements_notify_price_changed, frontdoor_building_announcements_property_type, frontdoor_building_announcements_property_subtype, frontdoor_building_announcements_construction_finished_year, frontdoor_building_announcements_main_image_uri, frontdoor_building_announcements_has_open_bidding, frontdoor_building_announcements_room_structure, frontdoor_building_announcements_area, frontdoor_building_announcements_total_area, frontdoor_building_announcements_price_per_square, frontdoor_building_announcements_days_on_market, frontdoor_building_announcements_new_building, frontdoor_building_announcements_main_image_hidden, frontdoor_building_announcements_is_company_announcement, frontdoor_building_announcements_show_bidding_indicators, frontdoor_building_announcements_published, frontdoor_building_announcements_rent_period, frontdoor_building_announcements_rental_unique_no, frontdoor_building_announcements_building_id, frontdoor_building_announcements_first_seen_at, frontdoor_building_announcements_last_seen_at, frontdoor_building_announcements_unpublishing_time_date
+ON CONFLICT (frontdoor_building_announcement_external_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_search_price) DO UPDATE
+SET frontdoor_building_announcement_last_seen_at = now(),
+    frontdoor_building_announcement_friendly_id = COALESCE(EXCLUDED.frontdoor_building_announcement_friendly_id, frontdoor_building_announcements.frontdoor_building_announcement_friendly_id),
+    frontdoor_building_announcement_address_line1 = COALESCE(EXCLUDED.frontdoor_building_announcement_address_line1, frontdoor_building_announcements.frontdoor_building_announcement_address_line1),
+    frontdoor_building_announcement_address_line2 = COALESCE(EXCLUDED.frontdoor_building_announcement_address_line2, frontdoor_building_announcements.frontdoor_building_announcement_address_line2),
+    frontdoor_building_announcement_location = COALESCE(EXCLUDED.frontdoor_building_announcement_location, frontdoor_building_announcements.frontdoor_building_announcement_location),
+    frontdoor_building_announcement_notify_price_changed = COALESCE(EXCLUDED.frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcements.frontdoor_building_announcement_notify_price_changed),
+    frontdoor_building_announcement_property_type = COALESCE(EXCLUDED.frontdoor_building_announcement_property_type, frontdoor_building_announcements.frontdoor_building_announcement_property_type),
+    frontdoor_building_announcement_property_subtype = COALESCE(EXCLUDED.frontdoor_building_announcement_property_subtype, frontdoor_building_announcements.frontdoor_building_announcement_property_subtype),
+    frontdoor_building_announcement_construction_finished_year = COALESCE(EXCLUDED.frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcements.frontdoor_building_announcement_construction_finished_year),
+    frontdoor_building_announcement_main_image_uri = COALESCE(EXCLUDED.frontdoor_building_announcement_main_image_uri, frontdoor_building_announcements.frontdoor_building_announcement_main_image_uri),
+    frontdoor_building_announcement_has_open_bidding = COALESCE(EXCLUDED.frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcements.frontdoor_building_announcement_has_open_bidding),
+    frontdoor_building_announcement_room_structure = COALESCE(EXCLUDED.frontdoor_building_announcement_room_structure, frontdoor_building_announcements.frontdoor_building_announcement_room_structure),
+    frontdoor_building_announcement_area = COALESCE(EXCLUDED.frontdoor_building_announcement_area, frontdoor_building_announcements.frontdoor_building_announcement_area),
+    frontdoor_building_announcement_total_area = COALESCE(EXCLUDED.frontdoor_building_announcement_total_area, frontdoor_building_announcements.frontdoor_building_announcement_total_area),
+    frontdoor_building_announcement_price_per_square = COALESCE(EXCLUDED.frontdoor_building_announcement_price_per_square, frontdoor_building_announcements.frontdoor_building_announcement_price_per_square),
+    frontdoor_building_announcement_days_on_market = COALESCE(EXCLUDED.frontdoor_building_announcement_days_on_market, frontdoor_building_announcements.frontdoor_building_announcement_days_on_market),
+    frontdoor_building_announcement_new_building = COALESCE(EXCLUDED.frontdoor_building_announcement_new_building, frontdoor_building_announcements.frontdoor_building_announcement_new_building),
+    frontdoor_building_announcement_main_image_hidden = COALESCE(EXCLUDED.frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcements.frontdoor_building_announcement_main_image_hidden),
+    frontdoor_building_announcement_is_company_announcement = COALESCE(EXCLUDED.frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcements.frontdoor_building_announcement_is_company_announcement),
+    frontdoor_building_announcement_show_bidding_indicators = COALESCE(EXCLUDED.frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcements.frontdoor_building_announcement_show_bidding_indicators),
+    frontdoor_building_announcement_published = COALESCE(EXCLUDED.frontdoor_building_announcement_published, frontdoor_building_announcements.frontdoor_building_announcement_published),
+    frontdoor_building_announcement_rent_period = COALESCE(EXCLUDED.frontdoor_building_announcement_rent_period, frontdoor_building_announcements.frontdoor_building_announcement_rent_period),
+    frontdoor_building_announcement_rental_unique_no = COALESCE(EXCLUDED.frontdoor_building_announcement_rental_unique_no, frontdoor_building_announcements.frontdoor_building_announcement_rental_unique_no),
+    frontdoor_building_announcement_unpublishing_time_date = COALESCE(EXCLUDED.frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcements.frontdoor_building_announcement_unpublishing_time_date)
+RETURNING frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date
 `
 
 type UpsertFrontdoorBuildingAnnouncementParams struct {
-	FrontdoorBuildingAnnouncementsExternalID               pgtype.Int4   `db:"frontdoor_building_announcements_external_id" json:"frontdoor_building_announcements_external_id"`
-	FrontdoorBuildingAnnouncementsFriendlyID               *string       `db:"frontdoor_building_announcements_friendly_id" json:"frontdoor_building_announcements_friendly_id"`
-	FrontdoorBuildingAnnouncementsUnpublishingTime         pgtype.Float8 `db:"frontdoor_building_announcements_unpublishing_time" json:"frontdoor_building_announcements_unpublishing_time"`
-	FrontdoorBuildingAnnouncementsAddressLine1             *string       `db:"frontdoor_building_announcements_address_line1" json:"frontdoor_building_announcements_address_line1"`
-	FrontdoorBuildingAnnouncementsAddressLine2             *string       `db:"frontdoor_building_announcements_address_line2" json:"frontdoor_building_announcements_address_line2"`
-	FrontdoorBuildingAnnouncementsLocation                 *string       `db:"frontdoor_building_announcements_location" json:"frontdoor_building_announcements_location"`
-	FrontdoorBuildingAnnouncementsSearchPrice              pgtype.Float8 `db:"frontdoor_building_announcements_search_price" json:"frontdoor_building_announcements_search_price"`
-	FrontdoorBuildingAnnouncementsNotifyPriceChanged       pgtype.Bool   `db:"frontdoor_building_announcements_notify_price_changed" json:"frontdoor_building_announcements_notify_price_changed"`
-	FrontdoorBuildingAnnouncementsPropertyType             *string       `db:"frontdoor_building_announcements_property_type" json:"frontdoor_building_announcements_property_type"`
-	FrontdoorBuildingAnnouncementsPropertySubtype          *string       `db:"frontdoor_building_announcements_property_subtype" json:"frontdoor_building_announcements_property_subtype"`
-	FrontdoorBuildingAnnouncementsConstructionFinishedYear pgtype.Int4   `db:"frontdoor_building_announcements_construction_finished_year" json:"frontdoor_building_announcements_construction_finished_year"`
-	FrontdoorBuildingAnnouncementsMainImageUri             *string       `db:"frontdoor_building_announcements_main_image_uri" json:"frontdoor_building_announcements_main_image_uri"`
-	FrontdoorBuildingAnnouncementsHasOpenBidding           pgtype.Bool   `db:"frontdoor_building_announcements_has_open_bidding" json:"frontdoor_building_announcements_has_open_bidding"`
-	FrontdoorBuildingAnnouncementsRoomStructure            *string       `db:"frontdoor_building_announcements_room_structure" json:"frontdoor_building_announcements_room_structure"`
-	FrontdoorBuildingAnnouncementsArea                     pgtype.Float8 `db:"frontdoor_building_announcements_area" json:"frontdoor_building_announcements_area"`
-	FrontdoorBuildingAnnouncementsTotalArea                pgtype.Float8 `db:"frontdoor_building_announcements_total_area" json:"frontdoor_building_announcements_total_area"`
-	FrontdoorBuildingAnnouncementsPricePerSquare           pgtype.Float8 `db:"frontdoor_building_announcements_price_per_square" json:"frontdoor_building_announcements_price_per_square"`
-	FrontdoorBuildingAnnouncementsDaysOnMarket             pgtype.Int4   `db:"frontdoor_building_announcements_days_on_market" json:"frontdoor_building_announcements_days_on_market"`
-	FrontdoorBuildingAnnouncementsNewBuilding              pgtype.Bool   `db:"frontdoor_building_announcements_new_building" json:"frontdoor_building_announcements_new_building"`
-	FrontdoorBuildingAnnouncementsMainImageHidden          pgtype.Bool   `db:"frontdoor_building_announcements_main_image_hidden" json:"frontdoor_building_announcements_main_image_hidden"`
-	FrontdoorBuildingAnnouncementsIsCompanyAnnouncement    pgtype.Bool   `db:"frontdoor_building_announcements_is_company_announcement" json:"frontdoor_building_announcements_is_company_announcement"`
-	FrontdoorBuildingAnnouncementsShowBiddingIndicators    pgtype.Bool   `db:"frontdoor_building_announcements_show_bidding_indicators" json:"frontdoor_building_announcements_show_bidding_indicators"`
-	FrontdoorBuildingAnnouncementsPublished                pgtype.Bool   `db:"frontdoor_building_announcements_published" json:"frontdoor_building_announcements_published"`
-	FrontdoorBuildingAnnouncementsRentPeriod               *string       `db:"frontdoor_building_announcements_rent_period" json:"frontdoor_building_announcements_rent_period"`
-	FrontdoorBuildingAnnouncementsRentalUniqueNo           pgtype.Int4   `db:"frontdoor_building_announcements_rental_unique_no" json:"frontdoor_building_announcements_rental_unique_no"`
-	FrontdoorBuildingAnnouncementsBuildingID               pgtype.UUID   `db:"frontdoor_building_announcements_building_id" json:"frontdoor_building_announcements_building_id"`
-	FrontdoorBuildingAnnouncementsUnpublishingTimeDate     *time.Time    `db:"frontdoor_building_announcements_unpublishing_time_date" json:"frontdoor_building_announcements_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementExternalID               pgtype.Int4   `db:"frontdoor_building_announcement_external_id" json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID               *string       `db:"frontdoor_building_announcement_friendly_id" json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTime         pgtype.Float8 `db:"frontdoor_building_announcement_unpublishing_time" json:"frontdoor_building_announcement_unpublishing_time"`
+	FrontdoorBuildingAnnouncementAddressLine1             *string       `db:"frontdoor_building_announcement_address_line1" json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2             *string       `db:"frontdoor_building_announcement_address_line2" json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation                 *string       `db:"frontdoor_building_announcement_location" json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice              pgtype.Float8 `db:"frontdoor_building_announcement_search_price" json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementNotifyPriceChanged       pgtype.Bool   `db:"frontdoor_building_announcement_notify_price_changed" json:"frontdoor_building_announcement_notify_price_changed"`
+	FrontdoorBuildingAnnouncementPropertyType             *string       `db:"frontdoor_building_announcement_property_type" json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype          *string       `db:"frontdoor_building_announcement_property_subtype" json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementConstructionFinishedYear pgtype.Int4   `db:"frontdoor_building_announcement_construction_finished_year" json:"frontdoor_building_announcement_construction_finished_year"`
+	FrontdoorBuildingAnnouncementMainImageUri             *string       `db:"frontdoor_building_announcement_main_image_uri" json:"frontdoor_building_announcement_main_image_uri"`
+	FrontdoorBuildingAnnouncementHasOpenBidding           pgtype.Bool   `db:"frontdoor_building_announcement_has_open_bidding" json:"frontdoor_building_announcement_has_open_bidding"`
+	FrontdoorBuildingAnnouncementRoomStructure            *string       `db:"frontdoor_building_announcement_room_structure" json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementArea                     pgtype.Float8 `db:"frontdoor_building_announcement_area" json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementTotalArea                pgtype.Float8 `db:"frontdoor_building_announcement_total_area" json:"frontdoor_building_announcement_total_area"`
+	FrontdoorBuildingAnnouncementPricePerSquare           pgtype.Float8 `db:"frontdoor_building_announcement_price_per_square" json:"frontdoor_building_announcement_price_per_square"`
+	FrontdoorBuildingAnnouncementDaysOnMarket             pgtype.Int4   `db:"frontdoor_building_announcement_days_on_market" json:"frontdoor_building_announcement_days_on_market"`
+	FrontdoorBuildingAnnouncementNewBuilding              pgtype.Bool   `db:"frontdoor_building_announcement_new_building" json:"frontdoor_building_announcement_new_building"`
+	FrontdoorBuildingAnnouncementMainImageHidden          pgtype.Bool   `db:"frontdoor_building_announcement_main_image_hidden" json:"frontdoor_building_announcement_main_image_hidden"`
+	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    pgtype.Bool   `db:"frontdoor_building_announcement_is_company_announcement" json:"frontdoor_building_announcement_is_company_announcement"`
+	FrontdoorBuildingAnnouncementShowBiddingIndicators    pgtype.Bool   `db:"frontdoor_building_announcement_show_bidding_indicators" json:"frontdoor_building_announcement_show_bidding_indicators"`
+	FrontdoorBuildingAnnouncementPublished                pgtype.Bool   `db:"frontdoor_building_announcement_published" json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod               *string       `db:"frontdoor_building_announcement_rent_period" json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo           pgtype.Int4   `db:"frontdoor_building_announcement_rental_unique_no" json:"frontdoor_building_announcement_rental_unique_no"`
+	FrontdoorBuildingID                                   pgtype.UUID   `db:"frontdoor_building_id" json:"frontdoor_building_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time    `db:"frontdoor_building_announcement_unpublishing_time_date" json:"frontdoor_building_announcement_unpublishing_time_date"`
 }
 
 func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg *UpsertFrontdoorBuildingAnnouncementParams) (FrontdoorBuildingAnnouncement, error) {
 	row := q.db.QueryRow(ctx, upsertFrontdoorBuildingAnnouncement,
-		arg.FrontdoorBuildingAnnouncementsExternalID,
-		arg.FrontdoorBuildingAnnouncementsFriendlyID,
-		arg.FrontdoorBuildingAnnouncementsUnpublishingTime,
-		arg.FrontdoorBuildingAnnouncementsAddressLine1,
-		arg.FrontdoorBuildingAnnouncementsAddressLine2,
-		arg.FrontdoorBuildingAnnouncementsLocation,
-		arg.FrontdoorBuildingAnnouncementsSearchPrice,
-		arg.FrontdoorBuildingAnnouncementsNotifyPriceChanged,
-		arg.FrontdoorBuildingAnnouncementsPropertyType,
-		arg.FrontdoorBuildingAnnouncementsPropertySubtype,
-		arg.FrontdoorBuildingAnnouncementsConstructionFinishedYear,
-		arg.FrontdoorBuildingAnnouncementsMainImageUri,
-		arg.FrontdoorBuildingAnnouncementsHasOpenBidding,
-		arg.FrontdoorBuildingAnnouncementsRoomStructure,
-		arg.FrontdoorBuildingAnnouncementsArea,
-		arg.FrontdoorBuildingAnnouncementsTotalArea,
-		arg.FrontdoorBuildingAnnouncementsPricePerSquare,
-		arg.FrontdoorBuildingAnnouncementsDaysOnMarket,
-		arg.FrontdoorBuildingAnnouncementsNewBuilding,
-		arg.FrontdoorBuildingAnnouncementsMainImageHidden,
-		arg.FrontdoorBuildingAnnouncementsIsCompanyAnnouncement,
-		arg.FrontdoorBuildingAnnouncementsShowBiddingIndicators,
-		arg.FrontdoorBuildingAnnouncementsPublished,
-		arg.FrontdoorBuildingAnnouncementsRentPeriod,
-		arg.FrontdoorBuildingAnnouncementsRentalUniqueNo,
-		arg.FrontdoorBuildingAnnouncementsBuildingID,
-		arg.FrontdoorBuildingAnnouncementsUnpublishingTimeDate,
+		arg.FrontdoorBuildingAnnouncementExternalID,
+		arg.FrontdoorBuildingAnnouncementFriendlyID,
+		arg.FrontdoorBuildingAnnouncementUnpublishingTime,
+		arg.FrontdoorBuildingAnnouncementAddressLine1,
+		arg.FrontdoorBuildingAnnouncementAddressLine2,
+		arg.FrontdoorBuildingAnnouncementLocation,
+		arg.FrontdoorBuildingAnnouncementSearchPrice,
+		arg.FrontdoorBuildingAnnouncementNotifyPriceChanged,
+		arg.FrontdoorBuildingAnnouncementPropertyType,
+		arg.FrontdoorBuildingAnnouncementPropertySubtype,
+		arg.FrontdoorBuildingAnnouncementConstructionFinishedYear,
+		arg.FrontdoorBuildingAnnouncementMainImageUri,
+		arg.FrontdoorBuildingAnnouncementHasOpenBidding,
+		arg.FrontdoorBuildingAnnouncementRoomStructure,
+		arg.FrontdoorBuildingAnnouncementArea,
+		arg.FrontdoorBuildingAnnouncementTotalArea,
+		arg.FrontdoorBuildingAnnouncementPricePerSquare,
+		arg.FrontdoorBuildingAnnouncementDaysOnMarket,
+		arg.FrontdoorBuildingAnnouncementNewBuilding,
+		arg.FrontdoorBuildingAnnouncementMainImageHidden,
+		arg.FrontdoorBuildingAnnouncementIsCompanyAnnouncement,
+		arg.FrontdoorBuildingAnnouncementShowBiddingIndicators,
+		arg.FrontdoorBuildingAnnouncementPublished,
+		arg.FrontdoorBuildingAnnouncementRentPeriod,
+		arg.FrontdoorBuildingAnnouncementRentalUniqueNo,
+		arg.FrontdoorBuildingID,
+		arg.FrontdoorBuildingAnnouncementUnpublishingTimeDate,
 	)
 	var i FrontdoorBuildingAnnouncement
 	err := row.Scan(
-		&i.FrontdoorBuildingAnnouncementsID,
-		&i.FrontdoorBuildingAnnouncementsExternalID,
-		&i.FrontdoorBuildingAnnouncementsFriendlyID,
-		&i.FrontdoorBuildingAnnouncementsUnpublishingTime,
-		&i.FrontdoorBuildingAnnouncementsAddressLine1,
-		&i.FrontdoorBuildingAnnouncementsAddressLine2,
-		&i.FrontdoorBuildingAnnouncementsLocation,
-		&i.FrontdoorBuildingAnnouncementsSearchPrice,
-		&i.FrontdoorBuildingAnnouncementsNotifyPriceChanged,
-		&i.FrontdoorBuildingAnnouncementsPropertyType,
-		&i.FrontdoorBuildingAnnouncementsPropertySubtype,
-		&i.FrontdoorBuildingAnnouncementsConstructionFinishedYear,
-		&i.FrontdoorBuildingAnnouncementsMainImageUri,
-		&i.FrontdoorBuildingAnnouncementsHasOpenBidding,
-		&i.FrontdoorBuildingAnnouncementsRoomStructure,
-		&i.FrontdoorBuildingAnnouncementsArea,
-		&i.FrontdoorBuildingAnnouncementsTotalArea,
-		&i.FrontdoorBuildingAnnouncementsPricePerSquare,
-		&i.FrontdoorBuildingAnnouncementsDaysOnMarket,
-		&i.FrontdoorBuildingAnnouncementsNewBuilding,
-		&i.FrontdoorBuildingAnnouncementsMainImageHidden,
-		&i.FrontdoorBuildingAnnouncementsIsCompanyAnnouncement,
-		&i.FrontdoorBuildingAnnouncementsShowBiddingIndicators,
-		&i.FrontdoorBuildingAnnouncementsPublished,
-		&i.FrontdoorBuildingAnnouncementsRentPeriod,
-		&i.FrontdoorBuildingAnnouncementsRentalUniqueNo,
-		&i.FrontdoorBuildingAnnouncementsBuildingID,
-		&i.FrontdoorBuildingAnnouncementsFirstSeenAt,
-		&i.FrontdoorBuildingAnnouncementsLastSeenAt,
-		&i.FrontdoorBuildingAnnouncementsUnpublishingTimeDate,
+		&i.FrontdoorBuildingAnnouncementID,
+		&i.FrontdoorBuildingAnnouncementExternalID,
+		&i.FrontdoorBuildingAnnouncementFriendlyID,
+		&i.FrontdoorBuildingAnnouncementUnpublishingTime,
+		&i.FrontdoorBuildingAnnouncementAddressLine1,
+		&i.FrontdoorBuildingAnnouncementAddressLine2,
+		&i.FrontdoorBuildingAnnouncementLocation,
+		&i.FrontdoorBuildingAnnouncementSearchPrice,
+		&i.FrontdoorBuildingAnnouncementNotifyPriceChanged,
+		&i.FrontdoorBuildingAnnouncementPropertyType,
+		&i.FrontdoorBuildingAnnouncementPropertySubtype,
+		&i.FrontdoorBuildingAnnouncementConstructionFinishedYear,
+		&i.FrontdoorBuildingAnnouncementMainImageUri,
+		&i.FrontdoorBuildingAnnouncementHasOpenBidding,
+		&i.FrontdoorBuildingAnnouncementRoomStructure,
+		&i.FrontdoorBuildingAnnouncementArea,
+		&i.FrontdoorBuildingAnnouncementTotalArea,
+		&i.FrontdoorBuildingAnnouncementPricePerSquare,
+		&i.FrontdoorBuildingAnnouncementDaysOnMarket,
+		&i.FrontdoorBuildingAnnouncementNewBuilding,
+		&i.FrontdoorBuildingAnnouncementMainImageHidden,
+		&i.FrontdoorBuildingAnnouncementIsCompanyAnnouncement,
+		&i.FrontdoorBuildingAnnouncementShowBiddingIndicators,
+		&i.FrontdoorBuildingAnnouncementPublished,
+		&i.FrontdoorBuildingAnnouncementRentPeriod,
+		&i.FrontdoorBuildingAnnouncementRentalUniqueNo,
+		&i.FrontdoorBuildingID,
+		&i.FrontdoorBuildingAnnouncementFirstSeenAt,
+		&i.FrontdoorBuildingAnnouncementLastSeenAt,
+		&i.FrontdoorBuildingAnnouncementUnpublishingTimeDate,
 	)
 	return i, err
 }
 
 const upsertFrontdoorBuildings = `-- name: UpsertFrontdoorBuildings :exec
-INSERT INTO public.frontdoor_buildings (frontdoor_buildings_housing_company_id)
+INSERT INTO public.frontdoor_buildings (frontdoor_building_housing_company_id)
 SELECT unnest($1::int8[])
-ON CONFLICT (frontdoor_buildings_housing_company_id) DO UPDATE SET
-    frontdoor_buildings_last_seen_at = NOW(),
-    frontdoor_buildings_updated_at = NOW()
+ON CONFLICT (frontdoor_building_housing_company_id) DO UPDATE SET
+    frontdoor_building_last_seen_at = NOW(),
+    frontdoor_building_updated_at = NOW()
 `
 
 func (q *Queries) UpsertFrontdoorBuildings(ctx context.Context, dollar_1 []int64) error {

@@ -63,7 +63,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (adIDs []string, buildingIDs 
 		}
 		adIDs = make([]string, len(ads))
 		for i, ad := range ads {
-			adIDs[i] = fmt.Sprintf("ad:%s", ad.FrontdoorAdsExternalID)
+			adIDs[i] = fmt.Sprintf("ad:%s", ad.FrontdoorAdExternalID)
 		}
 	}
 	if len(buildingEntries) > 0 {
@@ -74,7 +74,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (adIDs []string, buildingIDs 
 		}
 		buildingIDs = make([]string, len(buildings))
 		for i, building := range buildings {
-			buildingIDs[i] = fmt.Sprintf("building:%s", building.FrontdoorBuildingsID.String())
+			buildingIDs[i] = fmt.Sprintf("building:%s", building.FrontdoorBuildingID.String())
 		}
 	}
 	return adIDs, buildingIDs, nil

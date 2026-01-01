@@ -1,114 +1,114 @@
 -- name: ListCitiesWithNeighborhoods :many
 SELECT
-    hc.prices_cities_id,
-    hc.prices_cities_name,
-    hc.prices_cities_created_at,
-    hc.prices_cities_updated_at,
-    hn.prices_neighborhoods_id,
-    hn.prices_neighborhoods_name,
-    hn.prices_neighborhoods_created_at,
-    hn.prices_neighborhoods_updated_at,
-    hp.prices_postal_codes_id,
-    hp.prices_postal_codes_code
+    hc.prices_city_id,
+    hc.prices_city_name,
+    hc.prices_city_created_at,
+    hc.prices_city_updated_at,
+    hn.prices_neighborhood_id,
+    hn.prices_neighborhood_name,
+    hn.prices_neighborhood_created_at,
+    hn.prices_neighborhood_updated_at,
+    hp.prices_postal_code_id,
+    hp.prices_postal_code_code
 FROM public.prices_cities AS hc
 LEFT JOIN public.prices_neighborhoods AS hn
-    ON hn.prices_neighborhoods_city_id = hc.prices_cities_id
+    ON hn.prices_city_id = hc.prices_city_id
 LEFT JOIN public.prices_postal_codes AS hp
-    ON hn.prices_neighborhoods_postal_code_id = hp.prices_postal_codes_id
-ORDER BY hc.prices_cities_name, hn.prices_neighborhoods_name;
+    ON hn.prices_postal_code_id = hp.prices_postal_code_id
+ORDER BY hc.prices_city_name, hn.prices_neighborhood_name;
 
 -- name: ListTransactionsByNeighborhoods :many
 WITH selected_neighborhoods AS (
     SELECT UNNEST(sqlc.narg('neighborhood_ids')::uuid[]) AS neighborhood_id
 )
 SELECT
-    ht.prices_transactions_id,
-    ht.prices_transactions_description,
-    ht.prices_transactions_type,
-    ht.prices_transactions_area,
-    ht.prices_transactions_price,
-    ht.prices_transactions_price_per_square_meter,
-    ht.prices_transactions_build_year,
-    ht.prices_transactions_floor,
-    ht.prices_transactions_elevator,
-    ht.prices_transactions_condition,
-    ht.prices_transactions_plot,
-    ht.prices_transactions_energy_class,
-    ht.prices_transactions_period_identifier,
-    ht.prices_transactions_created_at,
-    ht.prices_transactions_updated_at,
-    ht.prices_transactions_category,
-    hn.prices_neighborhoods_id,
-    hn.prices_neighborhoods_name,
-    hp.prices_postal_codes_code,
-    hc.prices_cities_name
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    hn.prices_neighborhood_id,
+    hn.prices_neighborhood_name,
+    hp.prices_postal_code_code,
+    hc.prices_city_name
 FROM public.prices_transactions AS ht
 JOIN selected_neighborhoods AS sn
-    ON sn.neighborhood_id = ht.prices_neighborhoods_id
+    ON sn.neighborhood_id = ht.prices_neighborhood_id
 LEFT JOIN public.prices_neighborhoods AS hn
-    ON ht.prices_neighborhoods_id = hn.prices_neighborhoods_id
+    ON ht.prices_neighborhood_id = hn.prices_neighborhood_id
 LEFT JOIN public.prices_postal_codes AS hp
-    ON hn.prices_neighborhoods_postal_code_id = hp.prices_postal_codes_id
+    ON hn.prices_postal_code_id = hp.prices_postal_code_id
 LEFT JOIN public.prices_cities AS hc
-    ON hn.prices_neighborhoods_city_id = hc.prices_cities_id
-ORDER BY ht.prices_transactions_created_at DESC;
+    ON hn.prices_city_id = hc.prices_city_id
+ORDER BY ht.prices_transaction_created_at DESC;
 
 -- name: UpsertPricesCity :one
 INSERT INTO public.prices_cities (
-    prices_cities_name,
-    prices_cities_created_at,
-    prices_cities_updated_at
+    prices_city_name,
+    prices_city_created_at,
+    prices_city_updated_at
 ) VALUES (sqlc.arg(name), now(), now())
-ON CONFLICT (prices_cities_name) DO UPDATE
-SET prices_cities_updated_at = now()
+ON CONFLICT (prices_city_name) DO UPDATE
+SET prices_city_updated_at = now()
 RETURNING *;
 
 -- name: UpsertPricesPostalCode :one
 INSERT INTO public.prices_postal_codes (
-    prices_postal_codes_code,
-    prices_postal_codes_city_id,
-    prices_postal_codes_created_at,
-    prices_postal_codes_updated_at
+    prices_postal_code_code,
+    prices_city_id,
+    prices_postal_code_created_at,
+    prices_postal_code_updated_at
 ) VALUES (sqlc.arg(code), sqlc.arg(city_id), now(), now())
-ON CONFLICT (prices_postal_codes_code) DO UPDATE
-SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
-    prices_postal_codes_updated_at = now()
+ON CONFLICT (prices_postal_code_code) DO UPDATE
+SET prices_city_id = EXCLUDED.prices_city_id,
+    prices_postal_code_updated_at = now()
 RETURNING *;
 
 -- name: UpsertPricesPostalCodesBulk :many
 INSERT INTO public.prices_postal_codes (
-    prices_postal_codes_code,
-    prices_postal_codes_city_id,
-    prices_postal_codes_created_at,
-    prices_postal_codes_updated_at
+    prices_postal_code_code,
+    prices_city_id,
+    prices_postal_code_created_at,
+    prices_postal_code_updated_at
 )
 SELECT code, sqlc.arg(city_id), now(), now()
 FROM unnest(sqlc.arg(codes)::text[]) AS t(code)
-ON CONFLICT (prices_postal_codes_code) DO UPDATE
-SET prices_postal_codes_city_id = EXCLUDED.prices_postal_codes_city_id,
-    prices_postal_codes_updated_at = now()
+ON CONFLICT (prices_postal_code_code) DO UPDATE
+SET prices_city_id = EXCLUDED.prices_city_id,
+    prices_postal_code_updated_at = now()
 RETURNING *;
 
 -- name: UpsertPricesNeighborhood :one
 INSERT INTO public.prices_neighborhoods (
-    prices_neighborhoods_name,
-    prices_neighborhoods_city_id,
-    prices_neighborhoods_postal_code_id,
-    prices_neighborhoods_created_at,
-    prices_neighborhoods_updated_at
+    prices_neighborhood_name,
+    prices_city_id,
+    prices_postal_code_id,
+    prices_neighborhood_created_at,
+    prices_neighborhood_updated_at
 ) VALUES (sqlc.arg(name), sqlc.arg(city_id), sqlc.arg(postal_code_id), now(), now())
-ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
-SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
-    prices_neighborhoods_updated_at = now()
+ON CONFLICT (prices_neighborhood_name, prices_city_id) DO UPDATE
+SET prices_postal_code_id = EXCLUDED.prices_postal_code_id,
+    prices_neighborhood_updated_at = now()
 RETURNING *;
 
 -- name: UpsertPricesNeighborhoodsBulk :many
 INSERT INTO public.prices_neighborhoods (
-    prices_neighborhoods_name,
-    prices_neighborhoods_city_id,
-    prices_neighborhoods_postal_code_id,
-    prices_neighborhoods_created_at,
-    prices_neighborhoods_updated_at
+    prices_neighborhood_name,
+    prices_city_id,
+    prices_postal_code_id,
+    prices_neighborhood_created_at,
+    prices_neighborhood_updated_at
 )
 SELECT
     name,
@@ -117,29 +117,29 @@ SELECT
     now(),
     now()
 FROM unnest(sqlc.arg(names)::text[]) AS t(name)
-ON CONFLICT (prices_neighborhoods_name, prices_neighborhoods_city_id) DO UPDATE
-SET prices_neighborhoods_postal_code_id = EXCLUDED.prices_neighborhoods_postal_code_id,
-    prices_neighborhoods_updated_at = now()
+ON CONFLICT (prices_neighborhood_name, prices_city_id) DO UPDATE
+SET prices_postal_code_id = EXCLUDED.prices_postal_code_id,
+    prices_neighborhood_updated_at = now()
 RETURNING *;
 
 -- name: UpsertPricesTransaction :one
 INSERT INTO public.prices_transactions (
-    prices_transactions_description,
-    prices_transactions_type,
-    prices_transactions_area,
-    prices_transactions_price,
-    prices_transactions_price_per_square_meter,
-    prices_transactions_build_year,
-    prices_transactions_floor,
-    prices_transactions_elevator,
-    prices_transactions_condition,
-    prices_transactions_plot,
-    prices_transactions_energy_class,
-    prices_transactions_category,
-    prices_transactions_period_identifier,
-    prices_neighborhoods_id,
-    prices_transactions_created_at,
-    prices_transactions_updated_at
+    prices_transaction_description,
+    prices_transaction_type,
+    prices_transaction_area,
+    prices_transaction_price,
+    prices_transaction_price_per_square_meter,
+    prices_transaction_build_year,
+    prices_transaction_floor,
+    prices_transaction_elevator,
+    prices_transaction_condition,
+    prices_transaction_plot,
+    prices_transaction_energy_class,
+    prices_transaction_category,
+    prices_transaction_period_identifier,
+    prices_neighborhood_id,
+    prices_transaction_created_at,
+    prices_transaction_updated_at
 ) VALUES (
     sqlc.arg(description),
     sqlc.arg(type),
@@ -159,44 +159,60 @@ INSERT INTO public.prices_transactions (
     now()
 )
 ON CONFLICT (
-    prices_transactions_description,
-    prices_transactions_type,
-    prices_transactions_area,
-    prices_transactions_price,
-    prices_transactions_price_per_square_meter,
-    prices_transactions_build_year,
-    prices_transactions_floor,
-    prices_transactions_elevator,
-    prices_transactions_condition,
-    prices_transactions_plot,
-    prices_transactions_energy_class,
-    prices_transactions_category,
-    prices_transactions_period_identifier,
-    prices_neighborhoods_id
+    prices_neighborhood_id,
+    prices_transaction_description,
+    prices_transaction_type,
+    prices_transaction_area,
+    prices_transaction_price,
+    prices_transaction_price_per_square_meter,
+    prices_transaction_build_year,
+    prices_transaction_floor,
+    prices_transaction_elevator,
+    prices_transaction_condition,
+    prices_transaction_plot,
+    prices_transaction_energy_class,
+    prices_transaction_category
 ) DO UPDATE
-SET prices_transactions_updated_at = now()
+SET prices_transaction_updated_at = now(),
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months'
 RETURNING *;
 
 -- name: UpsertPricesTransactionsBulk :execrows
 INSERT INTO public.prices_transactions (
-    prices_transactions_description,
-    prices_transactions_type,
-    prices_transactions_area,
-    prices_transactions_price,
-    prices_transactions_price_per_square_meter,
-    prices_transactions_build_year,
-    prices_transactions_floor,
-    prices_transactions_elevator,
-    prices_transactions_condition,
-    prices_transactions_plot,
-    prices_transactions_energy_class,
-    prices_transactions_category,
-    prices_transactions_period_identifier,
-    prices_neighborhoods_id,
-    prices_transactions_created_at,
-    prices_transactions_updated_at
+    prices_transaction_description,
+    prices_transaction_type,
+    prices_transaction_area,
+    prices_transaction_price,
+    prices_transaction_price_per_square_meter,
+    prices_transaction_build_year,
+    prices_transaction_floor,
+    prices_transaction_elevator,
+    prices_transaction_condition,
+    prices_transaction_plot,
+    prices_transaction_energy_class,
+    prices_transaction_category,
+    prices_transaction_period_identifier,
+    prices_neighborhood_id,
+    prices_transaction_created_at,
+    prices_transaction_updated_at
 )
-SELECT
+SELECT DISTINCT ON (
+    neighborhood_ids,
+    descriptions,
+    types,
+    areas,
+    prices,
+    price_per_square_meters,
+    build_years,
+    NULLIF(floors, ''),
+    elevators,
+    NULLIF(conditions, ''),
+    NULLIF(plots, ''),
+    NULLIF(energy_classes, ''),
+    categories,
+    period_identifiers
+)
     descriptions,
     types,
     areas,
@@ -245,46 +261,84 @@ FROM unnest(
     neighborhood_ids
 )
 ON CONFLICT (
-    prices_neighborhoods_id,
-    prices_transactions_description,
-    prices_transactions_type,
-    prices_transactions_area,
-    prices_transactions_price,
-    prices_transactions_price_per_square_meter,
-    prices_transactions_build_year,
-    prices_transactions_floor,
-    prices_transactions_elevator,
-    prices_transactions_condition,
-    prices_transactions_plot,
-    prices_transactions_energy_class,
-    prices_transactions_category,
-    prices_transactions_period_identifier
+    prices_neighborhood_id,
+    prices_transaction_description,
+    prices_transaction_type,
+    prices_transaction_area,
+    prices_transaction_price,
+    prices_transaction_price_per_square_meter,
+    prices_transaction_build_year,
+    prices_transaction_floor,
+    prices_transaction_elevator,
+    prices_transaction_condition,
+    prices_transaction_plot,
+    prices_transaction_energy_class,
+    prices_transaction_category
 ) DO UPDATE
-SET prices_transactions_updated_at = now();
+SET prices_transaction_updated_at = now(),
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months';
 
 -- name: ListPricesPostalCodesByCity :many
 SELECT
-    prices_postal_codes_id,
-    prices_postal_codes_code,
-    prices_postal_codes_city_id,
-    prices_postal_codes_created_at,
-    prices_postal_codes_updated_at
+    prices_postal_code_id,
+    prices_postal_code_code,
+    prices_city_id,
+    prices_postal_code_created_at,
+    prices_postal_code_updated_at
 FROM public.prices_postal_codes
-WHERE prices_postal_codes_city_id = sqlc.arg(city_id)
-ORDER BY prices_postal_codes_code;
+WHERE prices_city_id = sqlc.arg(city_id)
+ORDER BY prices_postal_code_code;
 
 -- name: UpdateNeighborhoodPostalCode :exec
 UPDATE public.prices_neighborhoods
-SET prices_neighborhoods_postal_code_id = sqlc.arg(postal_code_id),
-    prices_neighborhoods_updated_at = now()
-WHERE prices_neighborhoods_name = sqlc.arg(name)
-  AND prices_neighborhoods_city_id = sqlc.arg(city_id);
+SET prices_postal_code_id = sqlc.arg(postal_code_id),
+    prices_neighborhood_updated_at = now()
+WHERE prices_neighborhood_name = sqlc.arg(name)
+  AND prices_city_id = sqlc.arg(city_id);
 
 -- name: ListPricesCities :many
 SELECT
-    prices_cities_id,
-    prices_cities_name,
-    prices_cities_created_at,
-    prices_cities_updated_at
+    prices_city_id,
+    prices_city_name,
+    prices_city_created_at,
+    prices_city_updated_at
 FROM public.prices_cities
-ORDER BY prices_cities_name;
+ORDER BY prices_city_name;
+
+-- name: ListUnmatchedNeighborhoodsBatch :many
+SELECT
+    pn.prices_neighborhood_id,
+    pn.prices_neighborhood_name,
+    pn.prices_city_id,
+    pc.prices_city_name,
+    COUNT(*) OVER (PARTITION BY pn.prices_city_id) as unmatched_in_city
+FROM public.prices_neighborhoods AS pn
+LEFT JOIN public.prices_cities AS pc
+    ON pn.prices_city_id = pc.prices_city_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NULL
+ORDER BY pc.prices_city_name, pn.prices_neighborhood_name
+LIMIT 50 OFFSET sqlc.arg(batch_offset);
+
+-- name: GetAvailablePostalCodesForMunicipality :many
+SELECT
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    pm.postal_municipality_name_fi
+FROM public.postal_postal_codes AS ppc
+JOIN public.postal_municipalities AS pm
+    ON ppc.postal_municipality_id = pm.postal_municipality_id
+WHERE pm.postal_municipality_name_fi = sqlc.arg(municipality_name)
+ORDER BY ppc.postal_postal_code_name_fi;
+
+-- name: UpdateNeighborhoodPostiPostalCode :exec
+UPDATE public.prices_neighborhoods
+SET prices_neighborhood_postal_postal_code_id = sqlc.arg(postal_code_id),
+    prices_neighborhood_updated_at = now()
+WHERE prices_neighborhood_id = sqlc.arg(neighborhood_id);
+
+-- name: CountUnmatchedNeighborhoods :one
+SELECT COUNT(*) as count
+FROM public.prices_neighborhoods
+WHERE prices_neighborhood_postal_postal_code_id IS NULL;

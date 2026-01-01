@@ -1,0 +1,119 @@
+-- Ad Areas
+-- name: UpsertPostalAdAreasBulk :many
+INSERT INTO public.postal_ad_areas (
+    postal_ad_area_code,
+    postal_ad_area_name_fi,
+    postal_ad_area_name_sv,
+    postal_ad_area_created_at,
+    postal_ad_area_updated_at
+)
+SELECT
+    codes,
+    names_fi,
+    NULLIF(names_sv, ''),
+    now(),
+    now()
+FROM unnest(
+    sqlc.arg(codes)::text[],
+    sqlc.arg(names_fi)::text[],
+    sqlc.arg(names_sv)::text[]
+) AS t(codes, names_fi, names_sv)
+ON CONFLICT (postal_ad_area_code) DO UPDATE
+SET postal_ad_area_name_fi = EXCLUDED.postal_ad_area_name_fi,
+    postal_ad_area_name_sv = EXCLUDED.postal_ad_area_name_sv,
+    postal_ad_area_updated_at = now()
+RETURNING *;
+
+-- Municipalities
+-- name: UpsertPostalMunicipalitiesBulk :many
+INSERT INTO public.postal_municipalities (
+    postal_municipality_code,
+    postal_municipality_name_fi,
+    postal_municipality_name_sv,
+    postal_municipality_language_ratio_code,
+    postal_municipality_created_at,
+    postal_municipality_updated_at
+)
+SELECT
+    codes,
+    names_fi,
+    NULLIF(names_sv, ''),
+    NULLIF(language_ratio_codes, ''),
+    now(),
+    now()
+FROM unnest(
+    sqlc.arg(codes)::text[],
+    sqlc.arg(names_fi)::text[],
+    sqlc.arg(names_sv)::text[],
+    sqlc.arg(language_ratio_codes)::text[]
+) AS t(codes, names_fi, names_sv, language_ratio_codes)
+ON CONFLICT (postal_municipality_code) DO UPDATE
+SET postal_municipality_name_fi = EXCLUDED.postal_municipality_name_fi,
+    postal_municipality_name_sv = EXCLUDED.postal_municipality_name_sv,
+    postal_municipality_language_ratio_code = EXCLUDED.postal_municipality_language_ratio_code,
+    postal_municipality_updated_at = now()
+RETURNING *;
+
+-- Postal Codes
+-- name: UpsertPostalPostalCodesBulk :execrows
+INSERT INTO public.postal_postal_codes (
+    postal_postal_code_date,
+    postal_postal_code_code,
+    postal_postal_code_name_fi,
+    postal_postal_code_name_sv,
+    postal_postal_code_abbr_fi,
+    postal_postal_code_abbr_sv,
+    postal_postal_code_valid_from,
+    postal_postal_code_type_code,
+    postal_ad_area_id,
+    postal_municipality_id,
+    postal_postal_code_created_at,
+    postal_postal_code_updated_at
+)
+SELECT
+    dates,
+    codes,
+    names_fi,
+    NULLIF(names_sv, ''),
+    NULLIF(abbrs_fi, ''),
+    NULLIF(abbrs_sv, ''),
+    valids_from,
+    NULLIF(type_codes, ''),
+    ad_area_ids,
+    municipality_ids,
+    now(),
+    now()
+FROM unnest(
+    sqlc.arg(dates)::date[],
+    sqlc.arg(codes)::text[],
+    sqlc.arg(names_fi)::text[],
+    sqlc.arg(names_sv)::text[],
+    sqlc.arg(abbrs_fi)::text[],
+    sqlc.arg(abbrs_sv)::text[],
+    sqlc.arg(valids_from)::date[],
+    sqlc.arg(type_codes)::text[],
+    sqlc.arg(ad_area_ids)::uuid[],
+    sqlc.arg(municipality_ids)::uuid[]
+) AS t(
+    dates,
+    codes,
+    names_fi,
+    names_sv,
+    abbrs_fi,
+    abbrs_sv,
+    valids_from,
+    type_codes,
+    ad_area_ids,
+    municipality_ids
+)
+ON CONFLICT (postal_postal_code_code) DO UPDATE
+SET postal_postal_code_date = EXCLUDED.postal_postal_code_date,
+    postal_postal_code_name_fi = EXCLUDED.postal_postal_code_name_fi,
+    postal_postal_code_name_sv = EXCLUDED.postal_postal_code_name_sv,
+    postal_postal_code_abbr_fi = EXCLUDED.postal_postal_code_abbr_fi,
+    postal_postal_code_abbr_sv = EXCLUDED.postal_postal_code_abbr_sv,
+    postal_postal_code_valid_from = EXCLUDED.postal_postal_code_valid_from,
+    postal_postal_code_type_code = EXCLUDED.postal_postal_code_type_code,
+    postal_ad_area_id = EXCLUDED.postal_ad_area_id,
+    postal_municipality_id = EXCLUDED.postal_municipality_id,
+    postal_postal_code_updated_at = now();

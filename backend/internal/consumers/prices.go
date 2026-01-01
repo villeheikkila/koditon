@@ -69,3 +69,22 @@ func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, l
 	logger.InfoContext(ctx, "completed prices neighborhood postal code sync")
 	return nil
 }
+
+func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger) error {
+	logger.InfoContext(ctx, "processing prices sync all task")
+	cfg := prices.DefaultSyncAllConfig()
+	cfg.Logger = logger
+	cfg.Concurrency = 5
+	result, err := c.pricesService.SyncAll(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("sync all prices: %w", err)
+	}
+	logger.InfoContext(ctx, "completed prices sync all",
+		"cities", result.CitiesProcessed,
+		"postal_codes", result.PostalCodesProcessed,
+		"neighborhoods", result.NeighborhoodsUpdated,
+		"transactions", result.TransactionsProcessed,
+		"errors", len(result.Errors),
+	)
+	return nil
+}

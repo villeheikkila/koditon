@@ -1,6 +1,8 @@
 package prices
 
 import (
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"koditon-go/internal/prices/client"
@@ -34,25 +36,34 @@ func mapUpsertNeighborhoodsBulkParams(names []string, cityID pgtype.UUID) *db.Up
 	}
 }
 
-func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, neighborhoodIDs map[string]pgtype.UUID, periodIdentifier string) (*db.UpsertPricesTransactionsBulkParams, error) {
-	count := len(transactions)
-	params := &db.UpsertPricesTransactionsBulkParams{
-		Descriptions:         make([]string, count),
-		Types:                make([]string, count),
-		Areas:                make([]float64, count),
-		Prices:               make([]int32, count),
-		PricePerSquareMeters: make([]int32, count),
-		BuildYears:           make([]int32, count),
-		Floors:               make([]string, count),
-		Elevators:            make([]bool, count),
-		Conditions:           make([]string, count),
-		Plots:                make([]string, count),
-		EnergyClasses:        make([]string, count),
-		Categories:           make([]string, count),
-		PeriodIdentifiers:    make([]string, count),
-		NeighborhoodIds:      make([]pgtype.UUID, count),
+type transactionKey struct {
+	neighborhoodID      string
+	description         string
+	txType              string
+	area                float64
+	price               int32
+	pricePerSquareMeter int32
+	buildYear           int32
+	floor               string
+	elevator            bool
+	condition           string
+	plot                string
+	energyClass         string
+	category            string
+	periodIdentifier    string
+}
+
+func emptyToNull(s string) string {
+	if util.TrimUnicodeSpace(s) == "" {
+		return ""
 	}
-	for i, tx := range transactions {
+	return util.TrimUnicodeSpace(s)
+}
+
+func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, neighborhoodIDs map[string]pgtype.UUID, periodIdentifier string) (*db.UpsertPricesTransactionsBulkParams, error) {
+	seen := make(map[transactionKey]struct{})
+	params := &db.UpsertPricesTransactionsBulkParams{}
+	for _, tx := range transactions {
 		key := util.NormalizeString(tx.Neighborhood)
 		neighborhoodID, ok := neighborhoodIDs[key]
 		if !ok {
@@ -62,20 +73,51 @@ func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, n
 		if err != nil {
 			return nil, err
 		}
-		params.Descriptions[i] = util.TrimUnicodeSpace(tx.Description)
-		params.Types[i] = util.TrimUnicodeSpace(tx.Type)
-		params.Areas[i] = tx.Area
-		params.Prices[i] = int32(tx.Price)
-		params.PricePerSquareMeters[i] = int32(tx.PricePerSquareMeter)
-		params.BuildYears[i] = int32(tx.BuildYear)
-		params.Floors[i] = util.TrimUnicodeSpace(tx.Floor)
-		params.Elevators[i] = elevator
-		params.Conditions[i] = util.TrimUnicodeSpace(tx.Condition)
-		params.Plots[i] = util.TrimUnicodeSpace(tx.Plot)
-		params.EnergyClasses[i] = util.TrimUnicodeSpace(tx.EnergyClass)
-		params.Categories[i] = util.TrimUnicodeSpace(tx.Category)
-		params.PeriodIdentifiers[i] = periodIdentifier
-		params.NeighborhoodIds[i] = neighborhoodID
+		description := util.TrimUnicodeSpace(tx.Description)
+		txType := util.TrimUnicodeSpace(tx.Type)
+		area := tx.Area
+		price := int32(tx.Price)
+		pricePerSqm := int32(tx.PricePerSquareMeter)
+		buildYear := int32(tx.BuildYear)
+		floor := emptyToNull(tx.Floor)
+		condition := emptyToNull(tx.Condition)
+		plot := emptyToNull(tx.Plot)
+		energyClass := emptyToNull(tx.EnergyClass)
+		category := util.TrimUnicodeSpace(tx.Category)
+		dedupKey := transactionKey{
+			neighborhoodID:      fmt.Sprintf("%v", neighborhoodID),
+			description:         description,
+			txType:              txType,
+			area:                area,
+			price:               price,
+			pricePerSquareMeter: pricePerSqm,
+			buildYear:           buildYear,
+			floor:               floor,
+			elevator:            elevator,
+			condition:           condition,
+			plot:                plot,
+			energyClass:         energyClass,
+			category:            category,
+			periodIdentifier:    periodIdentifier,
+		}
+		if _, exists := seen[dedupKey]; exists {
+			continue
+		}
+		seen[dedupKey] = struct{}{}
+		params.Descriptions = append(params.Descriptions, description)
+		params.Types = append(params.Types, txType)
+		params.Areas = append(params.Areas, area)
+		params.Prices = append(params.Prices, price)
+		params.PricePerSquareMeters = append(params.PricePerSquareMeters, pricePerSqm)
+		params.BuildYears = append(params.BuildYears, buildYear)
+		params.Floors = append(params.Floors, floor)
+		params.Elevators = append(params.Elevators, elevator)
+		params.Conditions = append(params.Conditions, condition)
+		params.Plots = append(params.Plots, plot)
+		params.EnergyClasses = append(params.EnergyClasses, energyClass)
+		params.Categories = append(params.Categories, category)
+		params.PeriodIdentifiers = append(params.PeriodIdentifiers, periodIdentifier)
+		params.NeighborhoodIds = append(params.NeighborhoodIds, neighborhoodID)
 	}
 	return params, nil
 }

@@ -9,45 +9,46 @@ import (
 )
 
 type PricesCity struct {
-	PricesCitiesID        pgtype.UUID        `db:"prices_cities_id" json:"prices_cities_id"`
-	PricesCitiesName      string             `db:"prices_cities_name" json:"prices_cities_name"`
-	PricesCitiesCreatedAt pgtype.Timestamptz `db:"prices_cities_created_at" json:"prices_cities_created_at"`
-	PricesCitiesUpdatedAt pgtype.Timestamptz `db:"prices_cities_updated_at" json:"prices_cities_updated_at"`
+	PricesCityID        pgtype.UUID        `db:"prices_city_id" json:"prices_city_id"`
+	PricesCityName      string             `db:"prices_city_name" json:"prices_city_name"`
+	PricesCityCreatedAt pgtype.Timestamptz `db:"prices_city_created_at" json:"prices_city_created_at"`
+	PricesCityUpdatedAt pgtype.Timestamptz `db:"prices_city_updated_at" json:"prices_city_updated_at"`
 }
 
 type PricesNeighborhood struct {
-	PricesNeighborhoodsID           pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
-	PricesNeighborhoodsName         string             `db:"prices_neighborhoods_name" json:"prices_neighborhoods_name"`
-	PricesNeighborhoodsCityID       pgtype.UUID        `db:"prices_neighborhoods_city_id" json:"prices_neighborhoods_city_id"`
-	PricesNeighborhoodsPostalCodeID pgtype.UUID        `db:"prices_neighborhoods_postal_code_id" json:"prices_neighborhoods_postal_code_id"`
-	PricesNeighborhoodsCreatedAt    pgtype.Timestamptz `db:"prices_neighborhoods_created_at" json:"prices_neighborhoods_created_at"`
-	PricesNeighborhoodsUpdatedAt    pgtype.Timestamptz `db:"prices_neighborhoods_updated_at" json:"prices_neighborhoods_updated_at"`
+	PricesNeighborhoodID                 pgtype.UUID        `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string             `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
+	PricesCityID                         pgtype.UUID        `db:"prices_city_id" json:"prices_city_id"`
+	PricesPostalCodeID                   pgtype.UUID        `db:"prices_postal_code_id" json:"prices_postal_code_id"`
+	PricesNeighborhoodCreatedAt          pgtype.Timestamptz `db:"prices_neighborhood_created_at" json:"prices_neighborhood_created_at"`
+	PricesNeighborhoodUpdatedAt          pgtype.Timestamptz `db:"prices_neighborhood_updated_at" json:"prices_neighborhood_updated_at"`
+	PricesNeighborhoodPostalPostalCodeID pgtype.UUID        `db:"prices_neighborhood_postal_postal_code_id" json:"prices_neighborhood_postal_postal_code_id"`
 }
 
 type PricesPostalCode struct {
-	PricesPostalCodesID        pgtype.UUID        `db:"prices_postal_codes_id" json:"prices_postal_codes_id"`
-	PricesPostalCodesCode      string             `db:"prices_postal_codes_code" json:"prices_postal_codes_code"`
-	PricesPostalCodesCityID    pgtype.UUID        `db:"prices_postal_codes_city_id" json:"prices_postal_codes_city_id"`
-	PricesPostalCodesCreatedAt pgtype.Timestamptz `db:"prices_postal_codes_created_at" json:"prices_postal_codes_created_at"`
-	PricesPostalCodesUpdatedAt pgtype.Timestamptz `db:"prices_postal_codes_updated_at" json:"prices_postal_codes_updated_at"`
+	PricesPostalCodeID        pgtype.UUID        `db:"prices_postal_code_id" json:"prices_postal_code_id"`
+	PricesPostalCodeCode      string             `db:"prices_postal_code_code" json:"prices_postal_code_code"`
+	PricesCityID              pgtype.UUID        `db:"prices_city_id" json:"prices_city_id"`
+	PricesPostalCodeCreatedAt pgtype.Timestamptz `db:"prices_postal_code_created_at" json:"prices_postal_code_created_at"`
+	PricesPostalCodeUpdatedAt pgtype.Timestamptz `db:"prices_postal_code_updated_at" json:"prices_postal_code_updated_at"`
 }
 
 type PricesTransaction struct {
-	PricesTransactionsID                  pgtype.UUID        `db:"prices_transactions_id" json:"prices_transactions_id"`
-	PricesTransactionsDescription         string             `db:"prices_transactions_description" json:"prices_transactions_description"`
-	PricesTransactionsType                string             `db:"prices_transactions_type" json:"prices_transactions_type"`
-	PricesTransactionsArea                float64            `db:"prices_transactions_area" json:"prices_transactions_area"`
-	PricesTransactionsPrice               int32              `db:"prices_transactions_price" json:"prices_transactions_price"`
-	PricesTransactionsPricePerSquareMeter int32              `db:"prices_transactions_price_per_square_meter" json:"prices_transactions_price_per_square_meter"`
-	PricesTransactionsBuildYear           int32              `db:"prices_transactions_build_year" json:"prices_transactions_build_year"`
-	PricesTransactionsFloor               *string            `db:"prices_transactions_floor" json:"prices_transactions_floor"`
-	PricesTransactionsElevator            bool               `db:"prices_transactions_elevator" json:"prices_transactions_elevator"`
-	PricesTransactionsCondition           *string            `db:"prices_transactions_condition" json:"prices_transactions_condition"`
-	PricesTransactionsPlot                *string            `db:"prices_transactions_plot" json:"prices_transactions_plot"`
-	PricesTransactionsEnergyClass         *string            `db:"prices_transactions_energy_class" json:"prices_transactions_energy_class"`
-	PricesTransactionsPeriodIdentifier    string             `db:"prices_transactions_period_identifier" json:"prices_transactions_period_identifier"`
-	PricesTransactionsCreatedAt           pgtype.Timestamptz `db:"prices_transactions_created_at" json:"prices_transactions_created_at"`
-	PricesTransactionsUpdatedAt           pgtype.Timestamptz `db:"prices_transactions_updated_at" json:"prices_transactions_updated_at"`
-	PricesTransactionsCategory            string             `db:"prices_transactions_category" json:"prices_transactions_category"`
-	PricesNeighborhoodsID                 pgtype.UUID        `db:"prices_neighborhoods_id" json:"prices_neighborhoods_id"`
+	PricesTransactionID                  pgtype.UUID        `db:"prices_transaction_id" json:"prices_transaction_id"`
+	PricesTransactionDescription         string             `db:"prices_transaction_description" json:"prices_transaction_description"`
+	PricesTransactionType                string             `db:"prices_transaction_type" json:"prices_transaction_type"`
+	PricesTransactionArea                float64            `db:"prices_transaction_area" json:"prices_transaction_area"`
+	PricesTransactionPrice               int32              `db:"prices_transaction_price" json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32              `db:"prices_transaction_price_per_square_meter" json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32              `db:"prices_transaction_build_year" json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string            `db:"prices_transaction_floor" json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool               `db:"prices_transaction_elevator" json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string            `db:"prices_transaction_condition" json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string            `db:"prices_transaction_plot" json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string            `db:"prices_transaction_energy_class" json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string             `db:"prices_transaction_period_identifier" json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           pgtype.Timestamptz `db:"prices_transaction_created_at" json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           pgtype.Timestamptz `db:"prices_transaction_updated_at" json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string             `db:"prices_transaction_category" json:"prices_transaction_category"`
+	PricesNeighborhoodID                 pgtype.UUID        `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
 }

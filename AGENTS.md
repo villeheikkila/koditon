@@ -35,6 +35,8 @@ The repository root contains a `Taskfile.yml` with shortcuts for common operatio
 - `task db:migrate`: applies pending database migrations
 - `task db:status`: shows current migration state
 - `task db:generate`: regenerates `internal/*/db` from `db/schema` and package-level `queries.sql` files
+- `task db:query QUERY="SELECT ..."`: runs a SQL query directly
+- `task db:query FILE=path/to/file.sql`: runs a SQL file
 
 ### Client Build & Quality
 - `task client:generate`: rebuilds the client SDK when API contracts or return types change

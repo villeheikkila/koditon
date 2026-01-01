@@ -133,7 +133,11 @@ func (c *Client) SendBatchWithDelay(ctx context.Context, queueName string, msgs 
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("send batch to queue %s: %w", queueName, err)
 	}
-	msgIDs, err := c.queries.SendBatch(ctx, queueName, msgs, int32(delaySecs))
+	rawMsgs := make([][]byte, len(msgs))
+	for i, msg := range msgs {
+		rawMsgs[i] = msg
+	}
+	msgIDs, err := c.queries.SendBatch(ctx, queueName, rawMsgs, int32(delaySecs))
 	if err != nil {
 		return nil, fmt.Errorf("send batch to queue %s: %w", queueName, err)
 	}

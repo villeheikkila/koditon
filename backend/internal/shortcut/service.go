@@ -48,18 +48,18 @@ func NewService(
 			return nil, err
 		}
 		tokens := &client.Tokens{
-			CUID:   dbToken.ShortcutTokensCuid,
-			Token:  dbToken.ShortcutTokensToken,
-			Loaded: dbToken.ShortcutTokensLoaded,
+			CUID:   dbToken.ShortcutTokenCuid,
+			Token:  dbToken.ShortcutTokenToken,
+			Loaded: dbToken.ShortcutTokenLoaded,
 		}
 		return tokens, nil
 	}
 	tokenStore := func(ctx context.Context, tokens *client.Tokens, expiresAt time.Time) error {
 		_, err := queries.InsertShortcutToken(ctx, &db.InsertShortcutTokenParams{
-			ShortcutTokensCuid:      tokens.CUID,
-			ShortcutTokensToken:     tokens.Token,
-			ShortcutTokensLoaded:    tokens.Loaded,
-			ShortcutTokensExpiresAt: expiresAt,
+			ShortcutTokenCuid:      tokens.CUID,
+			ShortcutTokenToken:     tokens.Token,
+			ShortcutTokenLoaded:    tokens.Loaded,
+			ShortcutTokenExpiresAt: expiresAt,
 		})
 		return err
 	}
@@ -97,14 +97,24 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 		}
 	}
 	if len(buildingEntries) > 0 {
-		params := mapBatchUpsertBuildingsFromSitemapParams(buildingEntries)
+		seenBuildingIDs := make(map[int]struct{})
+		validBuildingEntries := make([]client.ShortcutSitemapEntry, 0, len(buildingEntries))
+		for _, entry := range buildingEntries {
+			if _, seen := seenBuildingIDs[entry.ID]; seen {
+				s.logger.Debug("duplicate building ID in sitemap, skipping", "building_id", entry.ID)
+				continue
+			}
+			seenBuildingIDs[entry.ID] = struct{}{}
+			validBuildingEntries = append(validBuildingEntries, entry)
+		}
+		params := mapBatchUpsertBuildingsFromSitemapParams(validBuildingEntries)
 		buildings, upsertErr := s.queries.BatchUpsertShortcutBuildingsFromSitemap(ctx, params)
 		if upsertErr != nil {
 			return nil, nil, fmt.Errorf("batch upsert buildings: %w", upsertErr)
 		}
 		buildingIDs = make([]string, len(buildings))
 		for i, building := range buildings {
-			buildingIDs[i] = fmt.Sprintf("building:%s", building.ShortcutBuildingsID.String())
+			buildingIDs[i] = fmt.Sprintf("building:%s", building.ShortcutBuildingID.String())
 		}
 	}
 	adEntries := append(listingEntries, rentalEntries...)
@@ -139,7 +149,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 			}
 			adIDs = make([]string, len(ads))
 			for i, ad := range ads {
-				adIDs[i] = fmt.Sprintf("ad:%d", ad.ShortcutAdsID)
+				adIDs[i] = fmt.Sprintf("ad:%d", ad.ShortcutAdID)
 			}
 		}
 	}
@@ -176,7 +186,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 			buildingIDInt := int64(buildingIDFloat)
 			building, err := s.queries.GetShortcutBuildingByExternalID(ctx, buildingIDInt)
 			if err == nil {
-				shortcutBuildingID = building.ShortcutBuildingsID
+				shortcutBuildingID = building.ShortcutBuildingID
 			}
 		}
 	}
@@ -184,7 +194,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err != nil {
 		return fmt.Errorf("get existing ad (ad_id=%d): %w", adID, err)
 	}
-	params := mapUpsertAdParams(adID, existingAd.ShortcutAdsUrl, string(adType), adData, shortcutBuildingID)
+	params := mapUpsertAdParams(adID, existingAd.ShortcutAdUrl, string(adType), adData, shortcutBuildingID)
 	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}
@@ -196,10 +206,10 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 	if err != nil {
 		return fmt.Errorf("get building (building_id=%s): %w", buildingID, err)
 	}
-	if building.ShortcutBuildingsPageNotFound != nil && *building.ShortcutBuildingsPageNotFound {
+	if building.ShortcutBuildingPageNotFound != nil && *building.ShortcutBuildingPageNotFound {
 		return nil
 	}
-	scrapedBuilding, listings, rentals, err := s.client.ScrapeBuildingPage(ctx, int(building.ShortcutBuildingsExternalID), building.ShortcutBuildingsUrl)
+	scrapedBuilding, listings, rentals, err := s.client.ScrapeBuildingPage(ctx, int(building.ShortcutBuildingExternalID), building.ShortcutBuildingUrl)
 	if err != nil {
 		if errors.Is(err, client.ErrScraperErrorPage) {
 			if markErr := s.queries.MarkShortcutBuildingPageNotFound(ctx, pgtype.UUID{Bytes: buildingID, Valid: true}); markErr != nil {
@@ -208,11 +218,11 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 			return nil
 		}
 		if errors.Is(err, client.ErrScraperForbidden) {
-			return fmt.Errorf("scraping forbidden (building_id=%s, url=%s): %w", buildingID, building.ShortcutBuildingsUrl, err)
+			return fmt.Errorf("scraping forbidden (building_id=%s, url=%s): %w", buildingID, building.ShortcutBuildingUrl, err)
 		}
-		return fmt.Errorf("scrape building page (building_id=%s, url=%s): %w", buildingID, building.ShortcutBuildingsUrl, err)
+		return fmt.Errorf("scrape building page (building_id=%s, url=%s): %w", buildingID, building.ShortcutBuildingUrl, err)
 	}
-	params := mapScrapedBuildingParams(int64(scrapedBuilding.ShortcutBuildingID), building.ShortcutBuildingsUrl, scrapedBuilding)
+	params := mapScrapedBuildingParams(int64(scrapedBuilding.ShortcutBuildingID), building.ShortcutBuildingUrl, scrapedBuilding)
 	if _, err = s.queries.UpsertShortcutBuilding(ctx, params); err != nil {
 		return fmt.Errorf("update building (building_id=%s): %w", buildingID, err)
 	}

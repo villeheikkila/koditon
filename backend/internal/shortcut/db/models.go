@@ -9,79 +9,79 @@ import (
 )
 
 type ShortcutAd struct {
-	ShortcutAdsID          int64              `db:"shortcut_ads_id" json:"shortcut_ads_id"`
-	ShortcutAdsUrl         string             `db:"shortcut_ads_url" json:"shortcut_ads_url"`
-	ShortcutAdsType        string             `db:"shortcut_ads_type" json:"shortcut_ads_type"`
-	ShortcutAdsFirstSeenAt pgtype.Timestamptz `db:"shortcut_ads_first_seen_at" json:"shortcut_ads_first_seen_at"`
-	ShortcutAdsLastSeenAt  pgtype.Timestamptz `db:"shortcut_ads_last_seen_at" json:"shortcut_ads_last_seen_at"`
-	ShortcutAdsData        []byte             `db:"shortcut_ads_data" json:"shortcut_ads_data"`
-	ShortcutAdsUpdatedAt   pgtype.Timestamptz `db:"shortcut_ads_updated_at" json:"shortcut_ads_updated_at"`
-	ShortcutAdsBuildingID  pgtype.UUID        `db:"shortcut_ads_building_id" json:"shortcut_ads_building_id"`
+	ShortcutAdID          int64              `db:"shortcut_ad_id" json:"shortcut_ad_id"`
+	ShortcutAdUrl         string             `db:"shortcut_ad_url" json:"shortcut_ad_url"`
+	ShortcutAdType        string             `db:"shortcut_ad_type" json:"shortcut_ad_type"`
+	ShortcutAdFirstSeenAt pgtype.Timestamptz `db:"shortcut_ad_first_seen_at" json:"shortcut_ad_first_seen_at"`
+	ShortcutAdLastSeenAt  pgtype.Timestamptz `db:"shortcut_ad_last_seen_at" json:"shortcut_ad_last_seen_at"`
+	ShortcutAdData        []byte             `db:"shortcut_ad_data" json:"shortcut_ad_data"`
+	ShortcutAdUpdatedAt   pgtype.Timestamptz `db:"shortcut_ad_updated_at" json:"shortcut_ad_updated_at"`
+	ShortcutBuildingID    pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
 }
 
 type ShortcutBuilding struct {
-	ShortcutBuildingsID                      pgtype.UUID        `db:"shortcut_buildings_id" json:"shortcut_buildings_id"`
-	ShortcutBuildingsExternalID              int64              `db:"shortcut_buildings_external_id" json:"shortcut_buildings_external_id"`
-	ShortcutBuildingsBuildingID              *string            `db:"shortcut_buildings_building_id" json:"shortcut_buildings_building_id"`
-	ShortcutBuildingsBuildingType            *string            `db:"shortcut_buildings_building_type" json:"shortcut_buildings_building_type"`
-	ShortcutBuildingsBuildingSubtype         *string            `db:"shortcut_buildings_building_subtype" json:"shortcut_buildings_building_subtype"`
-	ShortcutBuildingsConstructionYear        *int32             `db:"shortcut_buildings_construction_year" json:"shortcut_buildings_construction_year"`
-	ShortcutBuildingsFloorCount              *int32             `db:"shortcut_buildings_floor_count" json:"shortcut_buildings_floor_count"`
-	ShortcutBuildingsApartmentCount          *int32             `db:"shortcut_buildings_apartment_count" json:"shortcut_buildings_apartment_count"`
-	ShortcutBuildingsHeatingSystem           *string            `db:"shortcut_buildings_heating_system" json:"shortcut_buildings_heating_system"`
-	ShortcutBuildingsBuildingMaterial        *string            `db:"shortcut_buildings_building_material" json:"shortcut_buildings_building_material"`
-	ShortcutBuildingsPlotType                *string            `db:"shortcut_buildings_plot_type" json:"shortcut_buildings_plot_type"`
-	ShortcutBuildingsWallStructure           *string            `db:"shortcut_buildings_wall_structure" json:"shortcut_buildings_wall_structure"`
-	ShortcutBuildingsHeatSource              *string            `db:"shortcut_buildings_heat_source" json:"shortcut_buildings_heat_source"`
-	ShortcutBuildingsHasElevator             *string            `db:"shortcut_buildings_has_elevator" json:"shortcut_buildings_has_elevator"`
-	ShortcutBuildingsHasSauna                *string            `db:"shortcut_buildings_has_sauna" json:"shortcut_buildings_has_sauna"`
-	ShortcutBuildingsLatitude                *float64           `db:"shortcut_buildings_latitude" json:"shortcut_buildings_latitude"`
-	ShortcutBuildingsLongitude               *float64           `db:"shortcut_buildings_longitude" json:"shortcut_buildings_longitude"`
-	ShortcutBuildingsAdditionalAddresses     *string            `db:"shortcut_buildings_additional_addresses" json:"shortcut_buildings_additional_addresses"`
-	ShortcutBuildingsUrl                     string             `db:"shortcut_buildings_url" json:"shortcut_buildings_url"`
-	ShortcutBuildingsCreatedAt               pgtype.Timestamptz `db:"shortcut_buildings_created_at" json:"shortcut_buildings_created_at"`
-	ShortcutBuildingsUpdatedAt               pgtype.Timestamptz `db:"shortcut_buildings_updated_at" json:"shortcut_buildings_updated_at"`
-	ShortcutBuildingsAddress                 *string            `db:"shortcut_buildings_address" json:"shortcut_buildings_address"`
-	ShortcutBuildingsProcessedAt             pgtype.Timestamptz `db:"shortcut_buildings_processed_at" json:"shortcut_buildings_processed_at"`
-	ShortcutBuildingsPageNotFound            *bool              `db:"shortcut_buildings_page_not_found" json:"shortcut_buildings_page_not_found"`
-	ShortcutBuildingsFrameConstructionMethod *string            `db:"shortcut_buildings_frame_construction_method" json:"shortcut_buildings_frame_construction_method"`
-	ShortcutBuildingsHousingCompany          *string            `db:"shortcut_buildings_housing_company" json:"shortcut_buildings_housing_company"`
-	ShortcutBuildingsGeom                    interface{}        `db:"shortcut_buildings_geom" json:"shortcut_buildings_geom"`
+	ShortcutBuildingID                      pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64              `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string            `db:"shortcut_building_building_id" json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string            `db:"shortcut_building_building_type" json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string            `db:"shortcut_building_building_subtype" json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32             `db:"shortcut_building_construction_year" json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32             `db:"shortcut_building_floor_count" json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32             `db:"shortcut_building_apartment_count" json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string            `db:"shortcut_building_heating_system" json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string            `db:"shortcut_building_building_material" json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string            `db:"shortcut_building_plot_type" json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string            `db:"shortcut_building_wall_structure" json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string            `db:"shortcut_building_heat_source" json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string            `db:"shortcut_building_has_elevator" json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string            `db:"shortcut_building_has_sauna" json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64           `db:"shortcut_building_latitude" json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64           `db:"shortcut_building_longitude" json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string            `db:"shortcut_building_additional_addresses" json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string             `db:"shortcut_building_url" json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               pgtype.Timestamptz `db:"shortcut_building_created_at" json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               pgtype.Timestamptz `db:"shortcut_building_updated_at" json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string            `db:"shortcut_building_address" json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             pgtype.Timestamptz `db:"shortcut_building_processed_at" json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool              `db:"shortcut_building_page_not_found" json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string            `db:"shortcut_building_frame_construction_method" json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string            `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{}        `db:"shortcut_building_geom" json:"shortcut_building_geom"`
 }
 
 type ShortcutBuildingListing struct {
-	ShortcutBuildingListingsID            pgtype.UUID        `db:"shortcut_building_listings_id" json:"shortcut_building_listings_id"`
-	ShortcutBuildingListingsBuildingID    pgtype.UUID        `db:"shortcut_building_listings_building_id" json:"shortcut_building_listings_building_id"`
-	ShortcutBuildingListingsLayout        *string            `db:"shortcut_building_listings_layout" json:"shortcut_building_listings_layout"`
-	ShortcutBuildingListingsSize          *float64           `db:"shortcut_building_listings_size" json:"shortcut_building_listings_size"`
-	ShortcutBuildingListingsPrice         *float64           `db:"shortcut_building_listings_price" json:"shortcut_building_listings_price"`
-	ShortcutBuildingListingsPricePerSqm   *float64           `db:"shortcut_building_listings_price_per_sqm" json:"shortcut_building_listings_price_per_sqm"`
-	ShortcutBuildingListingsDeletedAt     pgtype.Timestamptz `db:"shortcut_building_listings_deleted_at" json:"shortcut_building_listings_deleted_at"`
-	ShortcutBuildingListingsCreatedAt     pgtype.Timestamptz `db:"shortcut_building_listings_created_at" json:"shortcut_building_listings_created_at"`
-	ShortcutBuildingListingsUpdatedAt     pgtype.Timestamptz `db:"shortcut_building_listings_updated_at" json:"shortcut_building_listings_updated_at"`
-	ShortcutBuildingListingsMarketingTime *string            `db:"shortcut_building_listings_marketing_time" json:"shortcut_building_listings_marketing_time"`
-	ShortcutBuildingListingsIdx           *int32             `db:"shortcut_building_listings_idx" json:"shortcut_building_listings_idx"`
+	ShortcutBuildingListingID            pgtype.UUID        `db:"shortcut_building_listing_id" json:"shortcut_building_listing_id"`
+	ShortcutBuildingID                   pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string            `db:"shortcut_building_listing_layout" json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64           `db:"shortcut_building_listing_size" json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64           `db:"shortcut_building_listing_price" json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64           `db:"shortcut_building_listing_price_per_sqm" json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingDeletedAt     pgtype.Timestamptz `db:"shortcut_building_listing_deleted_at" json:"shortcut_building_listing_deleted_at"`
+	ShortcutBuildingListingCreatedAt     pgtype.Timestamptz `db:"shortcut_building_listing_created_at" json:"shortcut_building_listing_created_at"`
+	ShortcutBuildingListingUpdatedAt     pgtype.Timestamptz `db:"shortcut_building_listing_updated_at" json:"shortcut_building_listing_updated_at"`
+	ShortcutBuildingListingMarketingTime *string            `db:"shortcut_building_listing_marketing_time" json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32             `db:"shortcut_building_listing_idx" json:"shortcut_building_listing_idx"`
 }
 
 type ShortcutBuildingRental struct {
-	ShortcutBuildingRentalsID            pgtype.UUID        `db:"shortcut_building_rentals_id" json:"shortcut_building_rentals_id"`
-	ShortcutBuildingRentalsBuildingID    pgtype.UUID        `db:"shortcut_building_rentals_building_id" json:"shortcut_building_rentals_building_id"`
-	ShortcutBuildingRentalsLayout        *string            `db:"shortcut_building_rentals_layout" json:"shortcut_building_rentals_layout"`
-	ShortcutBuildingRentalsSize          *float64           `db:"shortcut_building_rentals_size" json:"shortcut_building_rentals_size"`
-	ShortcutBuildingRentalsPrice         *float64           `db:"shortcut_building_rentals_price" json:"shortcut_building_rentals_price"`
-	ShortcutBuildingRentalsDeletedAt     pgtype.Timestamptz `db:"shortcut_building_rentals_deleted_at" json:"shortcut_building_rentals_deleted_at"`
-	ShortcutBuildingRentalsCreatedAt     pgtype.Timestamptz `db:"shortcut_building_rentals_created_at" json:"shortcut_building_rentals_created_at"`
-	ShortcutBuildingRentalsUpdatedAt     pgtype.Timestamptz `db:"shortcut_building_rentals_updated_at" json:"shortcut_building_rentals_updated_at"`
-	ShortcutBuildingRentalsMarketingTime *string            `db:"shortcut_building_rentals_marketing_time" json:"shortcut_building_rentals_marketing_time"`
-	ShortcutBuildingRentalsIdx           *int32             `db:"shortcut_building_rentals_idx" json:"shortcut_building_rentals_idx"`
+	ShortcutBuildingRentalID            pgtype.UUID        `db:"shortcut_building_rental_id" json:"shortcut_building_rental_id"`
+	ShortcutBuildingID                  pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string            `db:"shortcut_building_rental_layout" json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64           `db:"shortcut_building_rental_size" json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64           `db:"shortcut_building_rental_price" json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalDeletedAt     pgtype.Timestamptz `db:"shortcut_building_rental_deleted_at" json:"shortcut_building_rental_deleted_at"`
+	ShortcutBuildingRentalCreatedAt     pgtype.Timestamptz `db:"shortcut_building_rental_created_at" json:"shortcut_building_rental_created_at"`
+	ShortcutBuildingRentalUpdatedAt     pgtype.Timestamptz `db:"shortcut_building_rental_updated_at" json:"shortcut_building_rental_updated_at"`
+	ShortcutBuildingRentalMarketingTime *string            `db:"shortcut_building_rental_marketing_time" json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32             `db:"shortcut_building_rental_idx" json:"shortcut_building_rental_idx"`
 }
 
 type ShortcutToken struct {
-	ShortcutTokensID        pgtype.UUID        `db:"shortcut_tokens_id" json:"shortcut_tokens_id"`
-	ShortcutTokensCuid      string             `db:"shortcut_tokens_cuid" json:"shortcut_tokens_cuid"`
-	ShortcutTokensToken     string             `db:"shortcut_tokens_token" json:"shortcut_tokens_token"`
-	ShortcutTokensLoaded    string             `db:"shortcut_tokens_loaded" json:"shortcut_tokens_loaded"`
-	ShortcutTokensCreatedAt pgtype.Timestamptz `db:"shortcut_tokens_created_at" json:"shortcut_tokens_created_at"`
-	ShortcutTokensUpdatedAt pgtype.Timestamptz `db:"shortcut_tokens_updated_at" json:"shortcut_tokens_updated_at"`
-	ShortcutTokensExpiresAt pgtype.Timestamptz `db:"shortcut_tokens_expires_at" json:"shortcut_tokens_expires_at"`
+	ShortcutTokenID        pgtype.UUID        `db:"shortcut_token_id" json:"shortcut_token_id"`
+	ShortcutTokenCuid      string             `db:"shortcut_token_cuid" json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string             `db:"shortcut_token_token" json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string             `db:"shortcut_token_loaded" json:"shortcut_token_loaded"`
+	ShortcutTokenCreatedAt pgtype.Timestamptz `db:"shortcut_token_created_at" json:"shortcut_token_created_at"`
+	ShortcutTokenUpdatedAt pgtype.Timestamptz `db:"shortcut_token_updated_at" json:"shortcut_token_updated_at"`
+	ShortcutTokenExpiresAt pgtype.Timestamptz `db:"shortcut_token_expires_at" json:"shortcut_token_expires_at"`
 }

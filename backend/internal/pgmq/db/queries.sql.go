@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -310,12 +309,12 @@ FROM pgmq.pop($1)
 `
 
 type PopRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64     `db:"msg_id" json:"msg_id"`
+	ReadCt     int32     `db:"read_ct" json:"read_ct"`
+	EnqueuedAt time.Time `db:"enqueued_at" json:"enqueued_at"`
+	Vt         time.Time `db:"vt" json:"vt"`
+	Message    []byte    `db:"message" json:"message"`
+	Headers    []byte    `db:"headers" json:"headers"`
 }
 
 func (q *Queries) Pop(ctx context.Context, queueName string) ([]PopRow, error) {
@@ -372,12 +371,12 @@ FROM pgmq.read(
 `
 
 type ReadRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64     `db:"msg_id" json:"msg_id"`
+	ReadCt     int32     `db:"read_ct" json:"read_ct"`
+	EnqueuedAt time.Time `db:"enqueued_at" json:"enqueued_at"`
+	Vt         time.Time `db:"vt" json:"vt"`
+	Message    []byte    `db:"message" json:"message"`
+	Headers    []byte    `db:"headers" json:"headers"`
 }
 
 func (q *Queries) Read(ctx context.Context, queueName string, vtSeconds int32, numMessages int32) ([]ReadRow, error) {
@@ -419,7 +418,7 @@ SELECT pgmq.send(
 // ============================================
 // PGMQ MESSAGE OPERATIONS
 // ============================================
-func (q *Queries) Send(ctx context.Context, queueName string, message json.RawMessage, delaySeconds int32) (int64, error) {
+func (q *Queries) Send(ctx context.Context, queueName string, message []byte, delaySeconds int32) (int64, error) {
 	row := q.db.QueryRow(ctx, send, queueName, message, delaySeconds)
 	var msg_id int64
 	err := row.Scan(&msg_id)
@@ -435,7 +434,7 @@ FROM pgmq.send_batch(
 ) AS msg_id
 `
 
-func (q *Queries) SendBatch(ctx context.Context, queueName string, messages []json.RawMessage, delaySeconds int32) ([]int64, error) {
+func (q *Queries) SendBatch(ctx context.Context, queueName string, messages [][]byte, delaySeconds int32) ([]int64, error) {
 	rows, err := q.db.Query(ctx, sendBatch, queueName, messages, delaySeconds)
 	if err != nil {
 		return nil, err
@@ -471,12 +470,12 @@ FROM pgmq.set_vt(
 `
 
 type SetVTRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64     `db:"msg_id" json:"msg_id"`
+	ReadCt     int32     `db:"read_ct" json:"read_ct"`
+	EnqueuedAt time.Time `db:"enqueued_at" json:"enqueued_at"`
+	Vt         time.Time `db:"vt" json:"vt"`
+	Message    []byte    `db:"message" json:"message"`
+	Headers    []byte    `db:"headers" json:"headers"`
 }
 
 func (q *Queries) SetVT(ctx context.Context, queueName string, msgID int64, vtSeconds int32) ([]SetVTRow, error) {

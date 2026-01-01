@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.cache
+.gocache
+
+# Coverage and profiling
+/coverage/
+*.coverprofile
+*.out.cover
+coverage.out
+*.prof
+*.pprof
+
+# Dependencies
+/vendor/
+
+# Environment and runtime
+.env
+.env.local
+*.log
+
+# Editor and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Task runner
+.task
+Taskfile.yml
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+*.md
+AGENTS.md
+
+# Database files
+db_backup_*.sql
+*.sql
+
+# Testing
+*_test.go

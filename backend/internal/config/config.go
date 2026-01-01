@@ -31,6 +31,7 @@ type Config struct {
 	Prices          PricesConfig
 	Shortcut        ShortcutConfig
 	Frontdoor       FrontdoorConfig
+	OpenRouter      OpenRouterConfig
 }
 
 func (c Config) SlogLevel() slog.Level {
@@ -74,6 +75,10 @@ type FrontdoorConfig struct {
 	UserAgent   string `env:"FRONTDOOR_USER_AGENT,required"`
 	Cookie      string `env:"FRONTDOOR_COOKIE,required"`
 	SitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL,required"`
+}
+
+type OpenRouterConfig struct {
+	APIKey string `env:"OPENROUTER_API_KEY,required"`
 }
 
 func Load() (Config, error) {

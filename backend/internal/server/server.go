@@ -45,18 +45,18 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 			return nil, err
 		}
 		tokens := &shortcutclient.Tokens{
-			CUID:   dbToken.ShortcutTokensCuid,
-			Token:  dbToken.ShortcutTokensToken,
-			Loaded: dbToken.ShortcutTokensLoaded,
+			CUID:   dbToken.ShortcutTokenCuid,
+			Token:  dbToken.ShortcutTokenToken,
+			Loaded: dbToken.ShortcutTokenLoaded,
 		}
 		return tokens, nil
 	}
 	tokenStore := func(ctx context.Context, tokens *shortcutclient.Tokens, expiresAt time.Time) error {
 		_, err := shortcutQueries.InsertShortcutToken(ctx, &shortcutdb.InsertShortcutTokenParams{
-			ShortcutTokensCuid:      tokens.CUID,
-			ShortcutTokensToken:     tokens.Token,
-			ShortcutTokensLoaded:    tokens.Loaded,
-			ShortcutTokensExpiresAt: expiresAt,
+			ShortcutTokenCuid:      tokens.CUID,
+			ShortcutTokenToken:     tokens.Token,
+			ShortcutTokenLoaded:    tokens.Loaded,
+			ShortcutTokenExpiresAt: expiresAt,
 		})
 		return err
 	}

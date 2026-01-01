@@ -28,16 +28,16 @@ const (
 	TaskTypePricesCitiesInit                 = "prices_cities_init"
 	TaskTypePricesSync                       = "prices_sync"
 	TaskTypePricesNeighborhoodPostalCodeSync = "prices_neighborhood_postal_code_sync"
+	TaskTypePricesSyncAll                    = "prices_sync_all"
+	TaskTypePostalSync                       = "postal_sync"
 )
 
-// Entity prefixes
 const (
 	EntityPrefixAd       = "ad:"
 	EntityPrefixBuilding = "building:"
 	EntityPrefixCity     = "city:"
 )
 
-// Task priority levels
 const (
 	PriorityLow      = -10
 	PriorityNormal   = 0

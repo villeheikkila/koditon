@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/taskqueue"
@@ -20,6 +22,7 @@ type Consumer struct {
 	pricesService    *prices.Service
 	shortcutService  *shortcut.Service
 	frontdoorService *frontdoor.Service
+	postalService    *postal.Service
 	workerPool       *taskqueue.WorkerPool
 }
 
@@ -39,6 +42,7 @@ func New(
 	pricesService *prices.Service,
 	shortcutService *shortcut.Service,
 	frontdoorService *frontdoor.Service,
+	postalService *postal.Service,
 ) *Consumer {
 	return &Consumer{
 		logger:           logger,
@@ -46,6 +50,7 @@ func New(
 		pricesService:    pricesService,
 		shortcutService:  shortcutService,
 		frontdoorService: frontdoorService,
+		postalService:    postalService,
 	}
 }
 
@@ -55,6 +60,8 @@ func (c *Consumer) Start(ctx context.Context, cfg Config, pool *pgxpool.Pool) er
 	}
 	workerConfig := taskqueue.DefaultWorkerConfig()
 	workerConfig.Logger = c.logger
+	workerConfig.TaskTimeout = 30 * time.Minute
+	workerConfig.VisibilityTimeout = 35 * time.Minute
 	c.workerPool = taskqueue.NewWorkerPool(
 		cfg.WorkerCount,
 		pool,
@@ -101,6 +108,10 @@ func (c *Consumer) handleTask(taskCtx context.Context, task taskqueuedb.TaskQueu
 		err = c.handlePricesSync(taskCtx, taskLogger, task)
 	case taskqueue.TaskTypePricesNeighborhoodPostalCodeSync:
 		err = c.handlePricesNeighborhoodPostalCodeSync(taskCtx, taskLogger)
+	case taskqueue.TaskTypePricesSyncAll:
+		err = c.handlePricesSyncAll(taskCtx, taskLogger)
+	case taskqueue.TaskTypePostalSync:
+		err = c.handlePostalSync(taskCtx, taskLogger)
 	default:
 		return taskqueue.NewPermanentError(
 			fmt.Errorf("unknown task type: %s", task.TaskType),

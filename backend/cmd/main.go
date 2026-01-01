@@ -8,6 +8,7 @@ import (
 	"koditon-go/internal/config"
 	"koditon-go/internal/consumers"
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
@@ -24,6 +25,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
+	openrouter "github.com/revrost/go-openrouter"
 )
 
 func main() {
@@ -63,9 +65,11 @@ func run(
 	}
 	appLogger.Debug("database connection established")
 	taskQueueClient := taskqueue.NewClient(pool)
+	openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
 	pricesService, err := prices.NewService(
 		pool,
 		cfg.Prices.BaseURL,
+		openRouterClient,
 	)
 	if err != nil {
 		return fmt.Errorf("create prices service: %w", err)
@@ -87,12 +91,14 @@ func run(
 		cfg.Frontdoor.Cookie,
 		cfg.Frontdoor.SitemapBase,
 	)
+	postalService := postal.NewService(pool)
 	consumer := consumers.New(
 		logger,
 		taskQueueClient,
 		pricesService,
 		shortcutService,
 		frontdoorService,
+		postalService,
 	)
 	consumerConfig := consumers.DefaultConfig()
 	if err := consumer.Start(ctx, consumerConfig, pool); err != nil {

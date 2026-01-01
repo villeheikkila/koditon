@@ -14,17 +14,17 @@ import (
 
 const batchUpsertShortcutAdsFromSitemap = `-- name: BatchUpsertShortcutAdsFromSitemap :many
 INSERT INTO public.shortcut_ads (
-    shortcut_ads_id,
-    shortcut_ads_url,
-    shortcut_ads_type,
-    shortcut_ads_last_seen_at
+    shortcut_ad_id,
+    shortcut_ad_url,
+    shortcut_ad_type,
+    shortcut_ad_last_seen_at
 )
 SELECT UNNEST($1::bigint[]), UNNEST($2::text[]), UNNEST($3::text[]), now()
-ON CONFLICT (shortcut_ads_id) DO UPDATE SET
-    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
-    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
-    shortcut_ads_last_seen_at = now()
-RETURNING shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id
+ON CONFLICT (shortcut_ad_id) DO UPDATE SET
+    shortcut_ad_url = EXCLUDED.shortcut_ad_url,
+    shortcut_ad_type = EXCLUDED.shortcut_ad_type,
+    shortcut_ad_last_seen_at = now()
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id
 `
 
 type BatchUpsertShortcutAdsFromSitemapParams struct {
@@ -43,14 +43,14 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg *Ba
 	for rows.Next() {
 		var i ShortcutAd
 		if err := rows.Scan(
-			&i.ShortcutAdsID,
-			&i.ShortcutAdsUrl,
-			&i.ShortcutAdsType,
-			&i.ShortcutAdsFirstSeenAt,
-			&i.ShortcutAdsLastSeenAt,
-			&i.ShortcutAdsData,
-			&i.ShortcutAdsUpdatedAt,
-			&i.ShortcutAdsBuildingID,
+			&i.ShortcutAdID,
+			&i.ShortcutAdUrl,
+			&i.ShortcutAdType,
+			&i.ShortcutAdFirstSeenAt,
+			&i.ShortcutAdLastSeenAt,
+			&i.ShortcutAdData,
+			&i.ShortcutAdUpdatedAt,
+			&i.ShortcutBuildingID,
 		); err != nil {
 			return nil, err
 		}
@@ -64,14 +64,14 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg *Ba
 
 const batchUpsertShortcutBuildingsFromSitemap = `-- name: BatchUpsertShortcutBuildingsFromSitemap :many
 INSERT INTO public.shortcut_buildings (
-    shortcut_buildings_external_id,
-    shortcut_buildings_url
+    shortcut_building_external_id,
+    shortcut_building_url
 )
 SELECT UNNEST($1::bigint[]), UNNEST($2::text[])
-ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
-    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
-WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
-RETURNING shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom
+ON CONFLICT (shortcut_building_external_id) DO UPDATE SET
+    shortcut_building_url = EXCLUDED.shortcut_building_url
+WHERE public.shortcut_buildings.shortcut_building_url IS DISTINCT FROM EXCLUDED.shortcut_building_url
+RETURNING shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom
 `
 
 type BatchUpsertShortcutBuildingsFromSitemapParams struct {
@@ -89,33 +89,33 @@ func (q *Queries) BatchUpsertShortcutBuildingsFromSitemap(ctx context.Context, a
 	for rows.Next() {
 		var i ShortcutBuilding
 		if err := rows.Scan(
-			&i.ShortcutBuildingsID,
-			&i.ShortcutBuildingsExternalID,
-			&i.ShortcutBuildingsBuildingID,
-			&i.ShortcutBuildingsBuildingType,
-			&i.ShortcutBuildingsBuildingSubtype,
-			&i.ShortcutBuildingsConstructionYear,
-			&i.ShortcutBuildingsFloorCount,
-			&i.ShortcutBuildingsApartmentCount,
-			&i.ShortcutBuildingsHeatingSystem,
-			&i.ShortcutBuildingsBuildingMaterial,
-			&i.ShortcutBuildingsPlotType,
-			&i.ShortcutBuildingsWallStructure,
-			&i.ShortcutBuildingsHeatSource,
-			&i.ShortcutBuildingsHasElevator,
-			&i.ShortcutBuildingsHasSauna,
-			&i.ShortcutBuildingsLatitude,
-			&i.ShortcutBuildingsLongitude,
-			&i.ShortcutBuildingsAdditionalAddresses,
-			&i.ShortcutBuildingsUrl,
-			&i.ShortcutBuildingsCreatedAt,
-			&i.ShortcutBuildingsUpdatedAt,
-			&i.ShortcutBuildingsAddress,
-			&i.ShortcutBuildingsProcessedAt,
-			&i.ShortcutBuildingsPageNotFound,
-			&i.ShortcutBuildingsFrameConstructionMethod,
-			&i.ShortcutBuildingsHousingCompany,
-			&i.ShortcutBuildingsGeom,
+			&i.ShortcutBuildingID,
+			&i.ShortcutBuildingExternalID,
+			&i.ShortcutBuildingBuildingID,
+			&i.ShortcutBuildingBuildingType,
+			&i.ShortcutBuildingBuildingSubtype,
+			&i.ShortcutBuildingConstructionYear,
+			&i.ShortcutBuildingFloorCount,
+			&i.ShortcutBuildingApartmentCount,
+			&i.ShortcutBuildingHeatingSystem,
+			&i.ShortcutBuildingBuildingMaterial,
+			&i.ShortcutBuildingPlotType,
+			&i.ShortcutBuildingWallStructure,
+			&i.ShortcutBuildingHeatSource,
+			&i.ShortcutBuildingHasElevator,
+			&i.ShortcutBuildingHasSauna,
+			&i.ShortcutBuildingLatitude,
+			&i.ShortcutBuildingLongitude,
+			&i.ShortcutBuildingAdditionalAddresses,
+			&i.ShortcutBuildingUrl,
+			&i.ShortcutBuildingCreatedAt,
+			&i.ShortcutBuildingUpdatedAt,
+			&i.ShortcutBuildingAddress,
+			&i.ShortcutBuildingProcessedAt,
+			&i.ShortcutBuildingPageNotFound,
+			&i.ShortcutBuildingFrameConstructionMethod,
+			&i.ShortcutBuildingHousingCompany,
+			&i.ShortcutBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -129,17 +129,17 @@ func (q *Queries) BatchUpsertShortcutBuildingsFromSitemap(ctx context.Context, a
 
 const deleteShortcutToken = `-- name: DeleteShortcutToken :exec
 DELETE FROM public.shortcut_tokens
-WHERE shortcut_tokens_cuid = $1
+WHERE shortcut_token_cuid = $1
 `
 
-func (q *Queries) DeleteShortcutToken(ctx context.Context, shortcutTokensCuid string) error {
-	_, err := q.db.Exec(ctx, deleteShortcutToken, shortcutTokensCuid)
+func (q *Queries) DeleteShortcutToken(ctx context.Context, shortcutTokenCuid string) error {
+	_, err := q.db.Exec(ctx, deleteShortcutToken, shortcutTokenCuid)
 	return err
 }
 
 const getAllValidShortcutTokens = `-- name: GetAllValidShortcutTokens :many
-SELECT shortcut_tokens_id, shortcut_tokens_cuid, shortcut_tokens_token, shortcut_tokens_loaded, shortcut_tokens_created_at, shortcut_tokens_updated_at, shortcut_tokens_expires_at FROM public.shortcut_tokens
-ORDER BY shortcut_tokens_created_at DESC
+SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM public.shortcut_tokens
+ORDER BY shortcut_token_created_at DESC
 `
 
 func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]ShortcutToken, error) {
@@ -152,13 +152,13 @@ func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]ShortcutToke
 	for rows.Next() {
 		var i ShortcutToken
 		if err := rows.Scan(
-			&i.ShortcutTokensID,
-			&i.ShortcutTokensCuid,
-			&i.ShortcutTokensToken,
-			&i.ShortcutTokensLoaded,
-			&i.ShortcutTokensCreatedAt,
-			&i.ShortcutTokensUpdatedAt,
-			&i.ShortcutTokensExpiresAt,
+			&i.ShortcutTokenID,
+			&i.ShortcutTokenCuid,
+			&i.ShortcutTokenToken,
+			&i.ShortcutTokenLoaded,
+			&i.ShortcutTokenCreatedAt,
+			&i.ShortcutTokenUpdatedAt,
+			&i.ShortcutTokenExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -171,114 +171,114 @@ func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]ShortcutToke
 }
 
 const getShortcutAdByID = `-- name: GetShortcutAdByID :one
-SELECT shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id FROM public.shortcut_ads
-WHERE shortcut_ads_id = $1
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id FROM public.shortcut_ads
+WHERE shortcut_ad_id = $1
 `
 
-func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdsID int64) (ShortcutAd, error) {
-	row := q.db.QueryRow(ctx, getShortcutAdByID, shortcutAdsID)
+func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdID int64) (ShortcutAd, error) {
+	row := q.db.QueryRow(ctx, getShortcutAdByID, shortcutAdID)
 	var i ShortcutAd
 	err := row.Scan(
-		&i.ShortcutAdsID,
-		&i.ShortcutAdsUrl,
-		&i.ShortcutAdsType,
-		&i.ShortcutAdsFirstSeenAt,
-		&i.ShortcutAdsLastSeenAt,
-		&i.ShortcutAdsData,
-		&i.ShortcutAdsUpdatedAt,
-		&i.ShortcutAdsBuildingID,
+		&i.ShortcutAdID,
+		&i.ShortcutAdUrl,
+		&i.ShortcutAdType,
+		&i.ShortcutAdFirstSeenAt,
+		&i.ShortcutAdLastSeenAt,
+		&i.ShortcutAdData,
+		&i.ShortcutAdUpdatedAt,
+		&i.ShortcutBuildingID,
 	)
 	return i, err
 }
 
 const getShortcutBuildingByExternalID = `-- name: GetShortcutBuildingByExternalID :one
-SELECT shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom FROM public.shortcut_buildings
-WHERE shortcut_buildings_external_id = $1
+SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom FROM public.shortcut_buildings
+WHERE shortcut_building_external_id = $1
 `
 
-func (q *Queries) GetShortcutBuildingByExternalID(ctx context.Context, shortcutBuildingsExternalID int64) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, getShortcutBuildingByExternalID, shortcutBuildingsExternalID)
+func (q *Queries) GetShortcutBuildingByExternalID(ctx context.Context, shortcutBuildingExternalID int64) (ShortcutBuilding, error) {
+	row := q.db.QueryRow(ctx, getShortcutBuildingByExternalID, shortcutBuildingExternalID)
 	var i ShortcutBuilding
 	err := row.Scan(
-		&i.ShortcutBuildingsID,
-		&i.ShortcutBuildingsExternalID,
-		&i.ShortcutBuildingsBuildingID,
-		&i.ShortcutBuildingsBuildingType,
-		&i.ShortcutBuildingsBuildingSubtype,
-		&i.ShortcutBuildingsConstructionYear,
-		&i.ShortcutBuildingsFloorCount,
-		&i.ShortcutBuildingsApartmentCount,
-		&i.ShortcutBuildingsHeatingSystem,
-		&i.ShortcutBuildingsBuildingMaterial,
-		&i.ShortcutBuildingsPlotType,
-		&i.ShortcutBuildingsWallStructure,
-		&i.ShortcutBuildingsHeatSource,
-		&i.ShortcutBuildingsHasElevator,
-		&i.ShortcutBuildingsHasSauna,
-		&i.ShortcutBuildingsLatitude,
-		&i.ShortcutBuildingsLongitude,
-		&i.ShortcutBuildingsAdditionalAddresses,
-		&i.ShortcutBuildingsUrl,
-		&i.ShortcutBuildingsCreatedAt,
-		&i.ShortcutBuildingsUpdatedAt,
-		&i.ShortcutBuildingsAddress,
-		&i.ShortcutBuildingsProcessedAt,
-		&i.ShortcutBuildingsPageNotFound,
-		&i.ShortcutBuildingsFrameConstructionMethod,
-		&i.ShortcutBuildingsHousingCompany,
-		&i.ShortcutBuildingsGeom,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingExternalID,
+		&i.ShortcutBuildingBuildingID,
+		&i.ShortcutBuildingBuildingType,
+		&i.ShortcutBuildingBuildingSubtype,
+		&i.ShortcutBuildingConstructionYear,
+		&i.ShortcutBuildingFloorCount,
+		&i.ShortcutBuildingApartmentCount,
+		&i.ShortcutBuildingHeatingSystem,
+		&i.ShortcutBuildingBuildingMaterial,
+		&i.ShortcutBuildingPlotType,
+		&i.ShortcutBuildingWallStructure,
+		&i.ShortcutBuildingHeatSource,
+		&i.ShortcutBuildingHasElevator,
+		&i.ShortcutBuildingHasSauna,
+		&i.ShortcutBuildingLatitude,
+		&i.ShortcutBuildingLongitude,
+		&i.ShortcutBuildingAdditionalAddresses,
+		&i.ShortcutBuildingUrl,
+		&i.ShortcutBuildingCreatedAt,
+		&i.ShortcutBuildingUpdatedAt,
+		&i.ShortcutBuildingAddress,
+		&i.ShortcutBuildingProcessedAt,
+		&i.ShortcutBuildingPageNotFound,
+		&i.ShortcutBuildingFrameConstructionMethod,
+		&i.ShortcutBuildingHousingCompany,
+		&i.ShortcutBuildingGeom,
 	)
 	return i, err
 }
 
 const getShortcutBuildingByID = `-- name: GetShortcutBuildingByID :one
-SELECT shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom FROM public.shortcut_buildings
-WHERE shortcut_buildings_id = $1
+SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom FROM public.shortcut_buildings
+WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) GetShortcutBuildingByID(ctx context.Context, shortcutBuildingsID pgtype.UUID) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, getShortcutBuildingByID, shortcutBuildingsID)
+func (q *Queries) GetShortcutBuildingByID(ctx context.Context, shortcutBuildingID pgtype.UUID) (ShortcutBuilding, error) {
+	row := q.db.QueryRow(ctx, getShortcutBuildingByID, shortcutBuildingID)
 	var i ShortcutBuilding
 	err := row.Scan(
-		&i.ShortcutBuildingsID,
-		&i.ShortcutBuildingsExternalID,
-		&i.ShortcutBuildingsBuildingID,
-		&i.ShortcutBuildingsBuildingType,
-		&i.ShortcutBuildingsBuildingSubtype,
-		&i.ShortcutBuildingsConstructionYear,
-		&i.ShortcutBuildingsFloorCount,
-		&i.ShortcutBuildingsApartmentCount,
-		&i.ShortcutBuildingsHeatingSystem,
-		&i.ShortcutBuildingsBuildingMaterial,
-		&i.ShortcutBuildingsPlotType,
-		&i.ShortcutBuildingsWallStructure,
-		&i.ShortcutBuildingsHeatSource,
-		&i.ShortcutBuildingsHasElevator,
-		&i.ShortcutBuildingsHasSauna,
-		&i.ShortcutBuildingsLatitude,
-		&i.ShortcutBuildingsLongitude,
-		&i.ShortcutBuildingsAdditionalAddresses,
-		&i.ShortcutBuildingsUrl,
-		&i.ShortcutBuildingsCreatedAt,
-		&i.ShortcutBuildingsUpdatedAt,
-		&i.ShortcutBuildingsAddress,
-		&i.ShortcutBuildingsProcessedAt,
-		&i.ShortcutBuildingsPageNotFound,
-		&i.ShortcutBuildingsFrameConstructionMethod,
-		&i.ShortcutBuildingsHousingCompany,
-		&i.ShortcutBuildingsGeom,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingExternalID,
+		&i.ShortcutBuildingBuildingID,
+		&i.ShortcutBuildingBuildingType,
+		&i.ShortcutBuildingBuildingSubtype,
+		&i.ShortcutBuildingConstructionYear,
+		&i.ShortcutBuildingFloorCount,
+		&i.ShortcutBuildingApartmentCount,
+		&i.ShortcutBuildingHeatingSystem,
+		&i.ShortcutBuildingBuildingMaterial,
+		&i.ShortcutBuildingPlotType,
+		&i.ShortcutBuildingWallStructure,
+		&i.ShortcutBuildingHeatSource,
+		&i.ShortcutBuildingHasElevator,
+		&i.ShortcutBuildingHasSauna,
+		&i.ShortcutBuildingLatitude,
+		&i.ShortcutBuildingLongitude,
+		&i.ShortcutBuildingAdditionalAddresses,
+		&i.ShortcutBuildingUrl,
+		&i.ShortcutBuildingCreatedAt,
+		&i.ShortcutBuildingUpdatedAt,
+		&i.ShortcutBuildingAddress,
+		&i.ShortcutBuildingProcessedAt,
+		&i.ShortcutBuildingPageNotFound,
+		&i.ShortcutBuildingFrameConstructionMethod,
+		&i.ShortcutBuildingHousingCompany,
+		&i.ShortcutBuildingGeom,
 	)
 	return i, err
 }
 
 const getShortcutBuildingListingsByBuildingID = `-- name: GetShortcutBuildingListingsByBuildingID :many
-SELECT shortcut_building_listings_id, shortcut_building_listings_building_id, shortcut_building_listings_layout, shortcut_building_listings_size, shortcut_building_listings_price, shortcut_building_listings_price_per_sqm, shortcut_building_listings_deleted_at, shortcut_building_listings_created_at, shortcut_building_listings_updated_at, shortcut_building_listings_marketing_time, shortcut_building_listings_idx FROM public.shortcut_building_listings
-WHERE shortcut_building_listings_building_id = $1
-ORDER BY shortcut_building_listings_created_at DESC
+SELECT shortcut_building_listing_id, shortcut_building_id, shortcut_building_listing_layout, shortcut_building_listing_size, shortcut_building_listing_price, shortcut_building_listing_price_per_sqm, shortcut_building_listing_deleted_at, shortcut_building_listing_created_at, shortcut_building_listing_updated_at, shortcut_building_listing_marketing_time, shortcut_building_listing_idx FROM public.shortcut_building_listings
+WHERE shortcut_building_id = $1
+ORDER BY shortcut_building_listing_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, shortcutBuildingListingsBuildingID pgtype.UUID) ([]ShortcutBuildingListing, error) {
-	rows, err := q.db.Query(ctx, getShortcutBuildingListingsByBuildingID, shortcutBuildingListingsBuildingID)
+func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, shortcutBuildingID pgtype.UUID) ([]ShortcutBuildingListing, error) {
+	rows, err := q.db.Query(ctx, getShortcutBuildingListingsByBuildingID, shortcutBuildingID)
 	if err != nil {
 		return nil, err
 	}
@@ -287,17 +287,17 @@ func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, s
 	for rows.Next() {
 		var i ShortcutBuildingListing
 		if err := rows.Scan(
-			&i.ShortcutBuildingListingsID,
-			&i.ShortcutBuildingListingsBuildingID,
-			&i.ShortcutBuildingListingsLayout,
-			&i.ShortcutBuildingListingsSize,
-			&i.ShortcutBuildingListingsPrice,
-			&i.ShortcutBuildingListingsPricePerSqm,
-			&i.ShortcutBuildingListingsDeletedAt,
-			&i.ShortcutBuildingListingsCreatedAt,
-			&i.ShortcutBuildingListingsUpdatedAt,
-			&i.ShortcutBuildingListingsMarketingTime,
-			&i.ShortcutBuildingListingsIdx,
+			&i.ShortcutBuildingListingID,
+			&i.ShortcutBuildingID,
+			&i.ShortcutBuildingListingLayout,
+			&i.ShortcutBuildingListingSize,
+			&i.ShortcutBuildingListingPrice,
+			&i.ShortcutBuildingListingPricePerSqm,
+			&i.ShortcutBuildingListingDeletedAt,
+			&i.ShortcutBuildingListingCreatedAt,
+			&i.ShortcutBuildingListingUpdatedAt,
+			&i.ShortcutBuildingListingMarketingTime,
+			&i.ShortcutBuildingListingIdx,
 		); err != nil {
 			return nil, err
 		}
@@ -310,13 +310,13 @@ func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, s
 }
 
 const getShortcutBuildingRentalsByBuildingID = `-- name: GetShortcutBuildingRentalsByBuildingID :many
-SELECT shortcut_building_rentals_id, shortcut_building_rentals_building_id, shortcut_building_rentals_layout, shortcut_building_rentals_size, shortcut_building_rentals_price, shortcut_building_rentals_deleted_at, shortcut_building_rentals_created_at, shortcut_building_rentals_updated_at, shortcut_building_rentals_marketing_time, shortcut_building_rentals_idx FROM public.shortcut_building_rentals
-WHERE shortcut_building_rentals_building_id = $1
-ORDER BY shortcut_building_rentals_created_at DESC
+SELECT shortcut_building_rental_id, shortcut_building_id, shortcut_building_rental_layout, shortcut_building_rental_size, shortcut_building_rental_price, shortcut_building_rental_deleted_at, shortcut_building_rental_created_at, shortcut_building_rental_updated_at, shortcut_building_rental_marketing_time, shortcut_building_rental_idx FROM public.shortcut_building_rentals
+WHERE shortcut_building_id = $1
+ORDER BY shortcut_building_rental_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, shortcutBuildingRentalsBuildingID pgtype.UUID) ([]ShortcutBuildingRental, error) {
-	rows, err := q.db.Query(ctx, getShortcutBuildingRentalsByBuildingID, shortcutBuildingRentalsBuildingID)
+func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, shortcutBuildingID pgtype.UUID) ([]ShortcutBuildingRental, error) {
+	rows, err := q.db.Query(ctx, getShortcutBuildingRentalsByBuildingID, shortcutBuildingID)
 	if err != nil {
 		return nil, err
 	}
@@ -325,16 +325,16 @@ func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, sh
 	for rows.Next() {
 		var i ShortcutBuildingRental
 		if err := rows.Scan(
-			&i.ShortcutBuildingRentalsID,
-			&i.ShortcutBuildingRentalsBuildingID,
-			&i.ShortcutBuildingRentalsLayout,
-			&i.ShortcutBuildingRentalsSize,
-			&i.ShortcutBuildingRentalsPrice,
-			&i.ShortcutBuildingRentalsDeletedAt,
-			&i.ShortcutBuildingRentalsCreatedAt,
-			&i.ShortcutBuildingRentalsUpdatedAt,
-			&i.ShortcutBuildingRentalsMarketingTime,
-			&i.ShortcutBuildingRentalsIdx,
+			&i.ShortcutBuildingRentalID,
+			&i.ShortcutBuildingID,
+			&i.ShortcutBuildingRentalLayout,
+			&i.ShortcutBuildingRentalSize,
+			&i.ShortcutBuildingRentalPrice,
+			&i.ShortcutBuildingRentalDeletedAt,
+			&i.ShortcutBuildingRentalCreatedAt,
+			&i.ShortcutBuildingRentalUpdatedAt,
+			&i.ShortcutBuildingRentalMarketingTime,
+			&i.ShortcutBuildingRentalIdx,
 		); err != nil {
 			return nil, err
 		}
@@ -347,8 +347,8 @@ func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, sh
 }
 
 const getValidShortcutToken = `-- name: GetValidShortcutToken :one
-SELECT shortcut_tokens_id, shortcut_tokens_cuid, shortcut_tokens_token, shortcut_tokens_loaded, shortcut_tokens_created_at, shortcut_tokens_updated_at, shortcut_tokens_expires_at FROM public.shortcut_tokens
-ORDER BY shortcut_tokens_created_at DESC
+SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM public.shortcut_tokens
+ORDER BY shortcut_token_created_at DESC
 LIMIT 1
 `
 
@@ -356,64 +356,64 @@ func (q *Queries) GetValidShortcutToken(ctx context.Context) (ShortcutToken, err
 	row := q.db.QueryRow(ctx, getValidShortcutToken)
 	var i ShortcutToken
 	err := row.Scan(
-		&i.ShortcutTokensID,
-		&i.ShortcutTokensCuid,
-		&i.ShortcutTokensToken,
-		&i.ShortcutTokensLoaded,
-		&i.ShortcutTokensCreatedAt,
-		&i.ShortcutTokensUpdatedAt,
-		&i.ShortcutTokensExpiresAt,
+		&i.ShortcutTokenID,
+		&i.ShortcutTokenCuid,
+		&i.ShortcutTokenToken,
+		&i.ShortcutTokenLoaded,
+		&i.ShortcutTokenCreatedAt,
+		&i.ShortcutTokenUpdatedAt,
+		&i.ShortcutTokenExpiresAt,
 	)
 	return i, err
 }
 
 const insertShortcutToken = `-- name: InsertShortcutToken :one
 INSERT INTO public.shortcut_tokens (
-    shortcut_tokens_cuid,
-    shortcut_tokens_token,
-    shortcut_tokens_loaded,
-    shortcut_tokens_expires_at
+    shortcut_token_cuid,
+    shortcut_token_token,
+    shortcut_token_loaded,
+    shortcut_token_expires_at
 ) VALUES (
     $1, $2, $3, $4
 )
-ON CONFLICT (shortcut_tokens_cuid) DO UPDATE SET
-    shortcut_tokens_token = EXCLUDED.shortcut_tokens_token,
-    shortcut_tokens_loaded = EXCLUDED.shortcut_tokens_loaded,
-    shortcut_tokens_expires_at = EXCLUDED.shortcut_tokens_expires_at,
-    shortcut_tokens_updated_at = NOW()
-RETURNING shortcut_tokens_id, shortcut_tokens_cuid, shortcut_tokens_token, shortcut_tokens_loaded, shortcut_tokens_created_at, shortcut_tokens_updated_at, shortcut_tokens_expires_at
+ON CONFLICT (shortcut_token_cuid) DO UPDATE SET
+    shortcut_token_token = EXCLUDED.shortcut_token_token,
+    shortcut_token_loaded = EXCLUDED.shortcut_token_loaded,
+    shortcut_token_expires_at = EXCLUDED.shortcut_token_expires_at,
+    shortcut_token_updated_at = NOW()
+RETURNING shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at
 `
 
 type InsertShortcutTokenParams struct {
-	ShortcutTokensCuid      string    `db:"shortcut_tokens_cuid" json:"shortcut_tokens_cuid"`
-	ShortcutTokensToken     string    `db:"shortcut_tokens_token" json:"shortcut_tokens_token"`
-	ShortcutTokensLoaded    string    `db:"shortcut_tokens_loaded" json:"shortcut_tokens_loaded"`
-	ShortcutTokensExpiresAt time.Time `db:"shortcut_tokens_expires_at" json:"shortcut_tokens_expires_at"`
+	ShortcutTokenCuid      string    `db:"shortcut_token_cuid" json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string    `db:"shortcut_token_token" json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string    `db:"shortcut_token_loaded" json:"shortcut_token_loaded"`
+	ShortcutTokenExpiresAt time.Time `db:"shortcut_token_expires_at" json:"shortcut_token_expires_at"`
 }
 
 func (q *Queries) InsertShortcutToken(ctx context.Context, arg *InsertShortcutTokenParams) (ShortcutToken, error) {
 	row := q.db.QueryRow(ctx, insertShortcutToken,
-		arg.ShortcutTokensCuid,
-		arg.ShortcutTokensToken,
-		arg.ShortcutTokensLoaded,
-		arg.ShortcutTokensExpiresAt,
+		arg.ShortcutTokenCuid,
+		arg.ShortcutTokenToken,
+		arg.ShortcutTokenLoaded,
+		arg.ShortcutTokenExpiresAt,
 	)
 	var i ShortcutToken
 	err := row.Scan(
-		&i.ShortcutTokensID,
-		&i.ShortcutTokensCuid,
-		&i.ShortcutTokensToken,
-		&i.ShortcutTokensLoaded,
-		&i.ShortcutTokensCreatedAt,
-		&i.ShortcutTokensUpdatedAt,
-		&i.ShortcutTokensExpiresAt,
+		&i.ShortcutTokenID,
+		&i.ShortcutTokenCuid,
+		&i.ShortcutTokenToken,
+		&i.ShortcutTokenLoaded,
+		&i.ShortcutTokenCreatedAt,
+		&i.ShortcutTokenUpdatedAt,
+		&i.ShortcutTokenExpiresAt,
 	)
 	return i, err
 }
 
 const listShortcutAds = `-- name: ListShortcutAds :many
-SELECT shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id FROM public.shortcut_ads
-ORDER BY shortcut_ads_last_seen_at DESC
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id FROM public.shortcut_ads
+ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -432,14 +432,14 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg *ListShortcutAdsParam
 	for rows.Next() {
 		var i ShortcutAd
 		if err := rows.Scan(
-			&i.ShortcutAdsID,
-			&i.ShortcutAdsUrl,
-			&i.ShortcutAdsType,
-			&i.ShortcutAdsFirstSeenAt,
-			&i.ShortcutAdsLastSeenAt,
-			&i.ShortcutAdsData,
-			&i.ShortcutAdsUpdatedAt,
-			&i.ShortcutAdsBuildingID,
+			&i.ShortcutAdID,
+			&i.ShortcutAdUrl,
+			&i.ShortcutAdType,
+			&i.ShortcutAdFirstSeenAt,
+			&i.ShortcutAdLastSeenAt,
+			&i.ShortcutAdData,
+			&i.ShortcutAdUpdatedAt,
+			&i.ShortcutBuildingID,
 		); err != nil {
 			return nil, err
 		}
@@ -452,8 +452,8 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg *ListShortcutAdsParam
 }
 
 const listShortcutBuildings = `-- name: ListShortcutBuildings :many
-SELECT shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom FROM public.shortcut_buildings
-ORDER BY shortcut_buildings_created_at DESC
+SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom FROM public.shortcut_buildings
+ORDER BY shortcut_building_created_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -472,33 +472,33 @@ func (q *Queries) ListShortcutBuildings(ctx context.Context, arg *ListShortcutBu
 	for rows.Next() {
 		var i ShortcutBuilding
 		if err := rows.Scan(
-			&i.ShortcutBuildingsID,
-			&i.ShortcutBuildingsExternalID,
-			&i.ShortcutBuildingsBuildingID,
-			&i.ShortcutBuildingsBuildingType,
-			&i.ShortcutBuildingsBuildingSubtype,
-			&i.ShortcutBuildingsConstructionYear,
-			&i.ShortcutBuildingsFloorCount,
-			&i.ShortcutBuildingsApartmentCount,
-			&i.ShortcutBuildingsHeatingSystem,
-			&i.ShortcutBuildingsBuildingMaterial,
-			&i.ShortcutBuildingsPlotType,
-			&i.ShortcutBuildingsWallStructure,
-			&i.ShortcutBuildingsHeatSource,
-			&i.ShortcutBuildingsHasElevator,
-			&i.ShortcutBuildingsHasSauna,
-			&i.ShortcutBuildingsLatitude,
-			&i.ShortcutBuildingsLongitude,
-			&i.ShortcutBuildingsAdditionalAddresses,
-			&i.ShortcutBuildingsUrl,
-			&i.ShortcutBuildingsCreatedAt,
-			&i.ShortcutBuildingsUpdatedAt,
-			&i.ShortcutBuildingsAddress,
-			&i.ShortcutBuildingsProcessedAt,
-			&i.ShortcutBuildingsPageNotFound,
-			&i.ShortcutBuildingsFrameConstructionMethod,
-			&i.ShortcutBuildingsHousingCompany,
-			&i.ShortcutBuildingsGeom,
+			&i.ShortcutBuildingID,
+			&i.ShortcutBuildingExternalID,
+			&i.ShortcutBuildingBuildingID,
+			&i.ShortcutBuildingBuildingType,
+			&i.ShortcutBuildingBuildingSubtype,
+			&i.ShortcutBuildingConstructionYear,
+			&i.ShortcutBuildingFloorCount,
+			&i.ShortcutBuildingApartmentCount,
+			&i.ShortcutBuildingHeatingSystem,
+			&i.ShortcutBuildingBuildingMaterial,
+			&i.ShortcutBuildingPlotType,
+			&i.ShortcutBuildingWallStructure,
+			&i.ShortcutBuildingHeatSource,
+			&i.ShortcutBuildingHasElevator,
+			&i.ShortcutBuildingHasSauna,
+			&i.ShortcutBuildingLatitude,
+			&i.ShortcutBuildingLongitude,
+			&i.ShortcutBuildingAdditionalAddresses,
+			&i.ShortcutBuildingUrl,
+			&i.ShortcutBuildingCreatedAt,
+			&i.ShortcutBuildingUpdatedAt,
+			&i.ShortcutBuildingAddress,
+			&i.ShortcutBuildingProcessedAt,
+			&i.ShortcutBuildingPageNotFound,
+			&i.ShortcutBuildingFrameConstructionMethod,
+			&i.ShortcutBuildingHousingCompany,
+			&i.ShortcutBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -511,9 +511,9 @@ func (q *Queries) ListShortcutBuildings(ctx context.Context, arg *ListShortcutBu
 }
 
 const listUnprocessedShortcutBuildings = `-- name: ListUnprocessedShortcutBuildings :many
-SELECT shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom FROM public.shortcut_buildings
-WHERE shortcut_buildings_processed_at IS NULL AND shortcut_buildings_page_not_found = false
-ORDER BY shortcut_buildings_created_at DESC
+SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom FROM public.shortcut_buildings
+WHERE shortcut_building_processed_at IS NULL AND shortcut_building_page_not_found = false
+ORDER BY shortcut_building_created_at DESC
 LIMIT $1
 `
 
@@ -527,33 +527,33 @@ func (q *Queries) ListUnprocessedShortcutBuildings(ctx context.Context, limit in
 	for rows.Next() {
 		var i ShortcutBuilding
 		if err := rows.Scan(
-			&i.ShortcutBuildingsID,
-			&i.ShortcutBuildingsExternalID,
-			&i.ShortcutBuildingsBuildingID,
-			&i.ShortcutBuildingsBuildingType,
-			&i.ShortcutBuildingsBuildingSubtype,
-			&i.ShortcutBuildingsConstructionYear,
-			&i.ShortcutBuildingsFloorCount,
-			&i.ShortcutBuildingsApartmentCount,
-			&i.ShortcutBuildingsHeatingSystem,
-			&i.ShortcutBuildingsBuildingMaterial,
-			&i.ShortcutBuildingsPlotType,
-			&i.ShortcutBuildingsWallStructure,
-			&i.ShortcutBuildingsHeatSource,
-			&i.ShortcutBuildingsHasElevator,
-			&i.ShortcutBuildingsHasSauna,
-			&i.ShortcutBuildingsLatitude,
-			&i.ShortcutBuildingsLongitude,
-			&i.ShortcutBuildingsAdditionalAddresses,
-			&i.ShortcutBuildingsUrl,
-			&i.ShortcutBuildingsCreatedAt,
-			&i.ShortcutBuildingsUpdatedAt,
-			&i.ShortcutBuildingsAddress,
-			&i.ShortcutBuildingsProcessedAt,
-			&i.ShortcutBuildingsPageNotFound,
-			&i.ShortcutBuildingsFrameConstructionMethod,
-			&i.ShortcutBuildingsHousingCompany,
-			&i.ShortcutBuildingsGeom,
+			&i.ShortcutBuildingID,
+			&i.ShortcutBuildingExternalID,
+			&i.ShortcutBuildingBuildingID,
+			&i.ShortcutBuildingBuildingType,
+			&i.ShortcutBuildingBuildingSubtype,
+			&i.ShortcutBuildingConstructionYear,
+			&i.ShortcutBuildingFloorCount,
+			&i.ShortcutBuildingApartmentCount,
+			&i.ShortcutBuildingHeatingSystem,
+			&i.ShortcutBuildingBuildingMaterial,
+			&i.ShortcutBuildingPlotType,
+			&i.ShortcutBuildingWallStructure,
+			&i.ShortcutBuildingHeatSource,
+			&i.ShortcutBuildingHasElevator,
+			&i.ShortcutBuildingHasSauna,
+			&i.ShortcutBuildingLatitude,
+			&i.ShortcutBuildingLongitude,
+			&i.ShortcutBuildingAdditionalAddresses,
+			&i.ShortcutBuildingUrl,
+			&i.ShortcutBuildingCreatedAt,
+			&i.ShortcutBuildingUpdatedAt,
+			&i.ShortcutBuildingAddress,
+			&i.ShortcutBuildingProcessedAt,
+			&i.ShortcutBuildingPageNotFound,
+			&i.ShortcutBuildingFrameConstructionMethod,
+			&i.ShortcutBuildingHousingCompany,
+			&i.ShortcutBuildingGeom,
 		); err != nil {
 			return nil, err
 		}
@@ -567,400 +567,400 @@ func (q *Queries) ListUnprocessedShortcutBuildings(ctx context.Context, limit in
 
 const markShortcutBuildingPageNotFound = `-- name: MarkShortcutBuildingPageNotFound :exec
 UPDATE public.shortcut_buildings
-SET shortcut_buildings_page_not_found = true, shortcut_buildings_updated_at = CURRENT_TIMESTAMP
-WHERE shortcut_buildings_id = $1
+SET shortcut_building_page_not_found = true, shortcut_building_updated_at = CURRENT_TIMESTAMP
+WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) MarkShortcutBuildingPageNotFound(ctx context.Context, shortcutBuildingsID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markShortcutBuildingPageNotFound, shortcutBuildingsID)
+func (q *Queries) MarkShortcutBuildingPageNotFound(ctx context.Context, shortcutBuildingID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markShortcutBuildingPageNotFound, shortcutBuildingID)
 	return err
 }
 
 const markShortcutBuildingProcessed = `-- name: MarkShortcutBuildingProcessed :exec
 UPDATE public.shortcut_buildings
-SET shortcut_buildings_processed_at = CURRENT_TIMESTAMP, shortcut_buildings_updated_at = CURRENT_TIMESTAMP
-WHERE shortcut_buildings_id = $1
+SET shortcut_building_processed_at = CURRENT_TIMESTAMP, shortcut_building_updated_at = CURRENT_TIMESTAMP
+WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) MarkShortcutBuildingProcessed(ctx context.Context, shortcutBuildingsID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markShortcutBuildingProcessed, shortcutBuildingsID)
+func (q *Queries) MarkShortcutBuildingProcessed(ctx context.Context, shortcutBuildingID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markShortcutBuildingProcessed, shortcutBuildingID)
 	return err
 }
 
 const upsertShortcutAd = `-- name: UpsertShortcutAd :one
 INSERT INTO public.shortcut_ads (
-    shortcut_ads_id,
-    shortcut_ads_url,
-    shortcut_ads_type,
-    shortcut_ads_data,
-    shortcut_ads_building_id,
-    shortcut_ads_last_seen_at
+    shortcut_ad_id,
+    shortcut_ad_url,
+    shortcut_ad_type,
+    shortcut_ad_data,
+    shortcut_building_id,
+    shortcut_ad_last_seen_at
 ) VALUES (
     $1, $2, $3, $4, $5, now()
 )
-ON CONFLICT (shortcut_ads_id) DO UPDATE SET
-    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
-    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
-    shortcut_ads_data = EXCLUDED.shortcut_ads_data,
-    shortcut_ads_building_id = EXCLUDED.shortcut_ads_building_id,
-    shortcut_ads_last_seen_at = now(),
-    shortcut_ads_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id
+ON CONFLICT (shortcut_ad_id) DO UPDATE SET
+    shortcut_ad_url = EXCLUDED.shortcut_ad_url,
+    shortcut_ad_type = EXCLUDED.shortcut_ad_type,
+    shortcut_ad_data = EXCLUDED.shortcut_ad_data,
+    shortcut_building_id = EXCLUDED.shortcut_building_id,
+    shortcut_ad_last_seen_at = now(),
+    shortcut_ad_updated_at = CURRENT_TIMESTAMP
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id
 `
 
 type UpsertShortcutAdParams struct {
-	ShortcutAdsID         int64       `db:"shortcut_ads_id" json:"shortcut_ads_id"`
-	ShortcutAdsUrl        string      `db:"shortcut_ads_url" json:"shortcut_ads_url"`
-	ShortcutAdsType       string      `db:"shortcut_ads_type" json:"shortcut_ads_type"`
-	ShortcutAdsData       []byte      `db:"shortcut_ads_data" json:"shortcut_ads_data"`
-	ShortcutAdsBuildingID pgtype.UUID `db:"shortcut_ads_building_id" json:"shortcut_ads_building_id"`
+	ShortcutAdID       int64       `db:"shortcut_ad_id" json:"shortcut_ad_id"`
+	ShortcutAdUrl      string      `db:"shortcut_ad_url" json:"shortcut_ad_url"`
+	ShortcutAdType     string      `db:"shortcut_ad_type" json:"shortcut_ad_type"`
+	ShortcutAdData     []byte      `db:"shortcut_ad_data" json:"shortcut_ad_data"`
+	ShortcutBuildingID pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
 }
 
 func (q *Queries) UpsertShortcutAd(ctx context.Context, arg *UpsertShortcutAdParams) (ShortcutAd, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutAd,
-		arg.ShortcutAdsID,
-		arg.ShortcutAdsUrl,
-		arg.ShortcutAdsType,
-		arg.ShortcutAdsData,
-		arg.ShortcutAdsBuildingID,
+		arg.ShortcutAdID,
+		arg.ShortcutAdUrl,
+		arg.ShortcutAdType,
+		arg.ShortcutAdData,
+		arg.ShortcutBuildingID,
 	)
 	var i ShortcutAd
 	err := row.Scan(
-		&i.ShortcutAdsID,
-		&i.ShortcutAdsUrl,
-		&i.ShortcutAdsType,
-		&i.ShortcutAdsFirstSeenAt,
-		&i.ShortcutAdsLastSeenAt,
-		&i.ShortcutAdsData,
-		&i.ShortcutAdsUpdatedAt,
-		&i.ShortcutAdsBuildingID,
+		&i.ShortcutAdID,
+		&i.ShortcutAdUrl,
+		&i.ShortcutAdType,
+		&i.ShortcutAdFirstSeenAt,
+		&i.ShortcutAdLastSeenAt,
+		&i.ShortcutAdData,
+		&i.ShortcutAdUpdatedAt,
+		&i.ShortcutBuildingID,
 	)
 	return i, err
 }
 
 const upsertShortcutAdFromSitemap = `-- name: UpsertShortcutAdFromSitemap :one
 INSERT INTO public.shortcut_ads (
-    shortcut_ads_id,
-    shortcut_ads_url,
-    shortcut_ads_type,
-    shortcut_ads_last_seen_at
+    shortcut_ad_id,
+    shortcut_ad_url,
+    shortcut_ad_type,
+    shortcut_ad_last_seen_at
 ) VALUES (
     $1, $2, $3, now()
 )
-ON CONFLICT (shortcut_ads_id) DO UPDATE SET
-    shortcut_ads_url = EXCLUDED.shortcut_ads_url,
-    shortcut_ads_type = EXCLUDED.shortcut_ads_type,
-    shortcut_ads_last_seen_at = now()
-RETURNING shortcut_ads_id, shortcut_ads_url, shortcut_ads_type, shortcut_ads_first_seen_at, shortcut_ads_last_seen_at, shortcut_ads_data, shortcut_ads_updated_at, shortcut_ads_building_id
+ON CONFLICT (shortcut_ad_id) DO UPDATE SET
+    shortcut_ad_url = EXCLUDED.shortcut_ad_url,
+    shortcut_ad_type = EXCLUDED.shortcut_ad_type,
+    shortcut_ad_last_seen_at = now()
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id
 `
 
 type UpsertShortcutAdFromSitemapParams struct {
-	ShortcutAdsID   int64  `db:"shortcut_ads_id" json:"shortcut_ads_id"`
-	ShortcutAdsUrl  string `db:"shortcut_ads_url" json:"shortcut_ads_url"`
-	ShortcutAdsType string `db:"shortcut_ads_type" json:"shortcut_ads_type"`
+	ShortcutAdID   int64  `db:"shortcut_ad_id" json:"shortcut_ad_id"`
+	ShortcutAdUrl  string `db:"shortcut_ad_url" json:"shortcut_ad_url"`
+	ShortcutAdType string `db:"shortcut_ad_type" json:"shortcut_ad_type"`
 }
 
 func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg *UpsertShortcutAdFromSitemapParams) (ShortcutAd, error) {
-	row := q.db.QueryRow(ctx, upsertShortcutAdFromSitemap, arg.ShortcutAdsID, arg.ShortcutAdsUrl, arg.ShortcutAdsType)
+	row := q.db.QueryRow(ctx, upsertShortcutAdFromSitemap, arg.ShortcutAdID, arg.ShortcutAdUrl, arg.ShortcutAdType)
 	var i ShortcutAd
 	err := row.Scan(
-		&i.ShortcutAdsID,
-		&i.ShortcutAdsUrl,
-		&i.ShortcutAdsType,
-		&i.ShortcutAdsFirstSeenAt,
-		&i.ShortcutAdsLastSeenAt,
-		&i.ShortcutAdsData,
-		&i.ShortcutAdsUpdatedAt,
-		&i.ShortcutAdsBuildingID,
+		&i.ShortcutAdID,
+		&i.ShortcutAdUrl,
+		&i.ShortcutAdType,
+		&i.ShortcutAdFirstSeenAt,
+		&i.ShortcutAdLastSeenAt,
+		&i.ShortcutAdData,
+		&i.ShortcutAdUpdatedAt,
+		&i.ShortcutBuildingID,
 	)
 	return i, err
 }
 
 const upsertShortcutBuilding = `-- name: UpsertShortcutBuilding :one
 INSERT INTO public.shortcut_buildings (
-    shortcut_buildings_external_id,
-    shortcut_buildings_building_id,
-    shortcut_buildings_building_type,
-    shortcut_buildings_building_subtype,
-    shortcut_buildings_construction_year,
-    shortcut_buildings_floor_count,
-    shortcut_buildings_apartment_count,
-    shortcut_buildings_heating_system,
-    shortcut_buildings_building_material,
-    shortcut_buildings_plot_type,
-    shortcut_buildings_wall_structure,
-    shortcut_buildings_heat_source,
-    shortcut_buildings_has_elevator,
-    shortcut_buildings_has_sauna,
-    shortcut_buildings_latitude,
-    shortcut_buildings_longitude,
-    shortcut_buildings_additional_addresses,
-    shortcut_buildings_url,
-    shortcut_buildings_address,
-    shortcut_buildings_frame_construction_method,
-    shortcut_buildings_housing_company
+    shortcut_building_external_id,
+    shortcut_building_building_id,
+    shortcut_building_building_type,
+    shortcut_building_building_subtype,
+    shortcut_building_construction_year,
+    shortcut_building_floor_count,
+    shortcut_building_apartment_count,
+    shortcut_building_heating_system,
+    shortcut_building_building_material,
+    shortcut_building_plot_type,
+    shortcut_building_wall_structure,
+    shortcut_building_heat_source,
+    shortcut_building_has_elevator,
+    shortcut_building_has_sauna,
+    shortcut_building_latitude,
+    shortcut_building_longitude,
+    shortcut_building_additional_addresses,
+    shortcut_building_url,
+    shortcut_building_address,
+    shortcut_building_frame_construction_method,
+    shortcut_building_housing_company
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 )
-ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
-    shortcut_buildings_building_id = EXCLUDED.shortcut_buildings_building_id,
-    shortcut_buildings_building_type = EXCLUDED.shortcut_buildings_building_type,
-    shortcut_buildings_building_subtype = EXCLUDED.shortcut_buildings_building_subtype,
-    shortcut_buildings_construction_year = EXCLUDED.shortcut_buildings_construction_year,
-    shortcut_buildings_floor_count = EXCLUDED.shortcut_buildings_floor_count,
-    shortcut_buildings_apartment_count = EXCLUDED.shortcut_buildings_apartment_count,
-    shortcut_buildings_heating_system = EXCLUDED.shortcut_buildings_heating_system,
-    shortcut_buildings_building_material = EXCLUDED.shortcut_buildings_building_material,
-    shortcut_buildings_plot_type = EXCLUDED.shortcut_buildings_plot_type,
-    shortcut_buildings_wall_structure = EXCLUDED.shortcut_buildings_wall_structure,
-    shortcut_buildings_heat_source = EXCLUDED.shortcut_buildings_heat_source,
-    shortcut_buildings_has_elevator = EXCLUDED.shortcut_buildings_has_elevator,
-    shortcut_buildings_has_sauna = EXCLUDED.shortcut_buildings_has_sauna,
-    shortcut_buildings_latitude = EXCLUDED.shortcut_buildings_latitude,
-    shortcut_buildings_longitude = EXCLUDED.shortcut_buildings_longitude,
-    shortcut_buildings_additional_addresses = EXCLUDED.shortcut_buildings_additional_addresses,
-    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url,
-    shortcut_buildings_address = EXCLUDED.shortcut_buildings_address,
-    shortcut_buildings_frame_construction_method = EXCLUDED.shortcut_buildings_frame_construction_method,
-    shortcut_buildings_housing_company = EXCLUDED.shortcut_buildings_housing_company,
-    shortcut_buildings_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom
+ON CONFLICT (shortcut_building_external_id) DO UPDATE SET
+    shortcut_building_building_id = EXCLUDED.shortcut_building_building_id,
+    shortcut_building_building_type = EXCLUDED.shortcut_building_building_type,
+    shortcut_building_building_subtype = EXCLUDED.shortcut_building_building_subtype,
+    shortcut_building_construction_year = EXCLUDED.shortcut_building_construction_year,
+    shortcut_building_floor_count = EXCLUDED.shortcut_building_floor_count,
+    shortcut_building_apartment_count = EXCLUDED.shortcut_building_apartment_count,
+    shortcut_building_heating_system = EXCLUDED.shortcut_building_heating_system,
+    shortcut_building_building_material = EXCLUDED.shortcut_building_building_material,
+    shortcut_building_plot_type = EXCLUDED.shortcut_building_plot_type,
+    shortcut_building_wall_structure = EXCLUDED.shortcut_building_wall_structure,
+    shortcut_building_heat_source = EXCLUDED.shortcut_building_heat_source,
+    shortcut_building_has_elevator = EXCLUDED.shortcut_building_has_elevator,
+    shortcut_building_has_sauna = EXCLUDED.shortcut_building_has_sauna,
+    shortcut_building_latitude = EXCLUDED.shortcut_building_latitude,
+    shortcut_building_longitude = EXCLUDED.shortcut_building_longitude,
+    shortcut_building_additional_addresses = EXCLUDED.shortcut_building_additional_addresses,
+    shortcut_building_url = EXCLUDED.shortcut_building_url,
+    shortcut_building_address = EXCLUDED.shortcut_building_address,
+    shortcut_building_frame_construction_method = EXCLUDED.shortcut_building_frame_construction_method,
+    shortcut_building_housing_company = EXCLUDED.shortcut_building_housing_company,
+    shortcut_building_updated_at = CURRENT_TIMESTAMP
+RETURNING shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom
 `
 
 type UpsertShortcutBuildingParams struct {
-	ShortcutBuildingsExternalID              int64         `db:"shortcut_buildings_external_id" json:"shortcut_buildings_external_id"`
-	ShortcutBuildingsBuildingID              *string       `db:"shortcut_buildings_building_id" json:"shortcut_buildings_building_id"`
-	ShortcutBuildingsBuildingType            *string       `db:"shortcut_buildings_building_type" json:"shortcut_buildings_building_type"`
-	ShortcutBuildingsBuildingSubtype         *string       `db:"shortcut_buildings_building_subtype" json:"shortcut_buildings_building_subtype"`
-	ShortcutBuildingsConstructionYear        pgtype.Int4   `db:"shortcut_buildings_construction_year" json:"shortcut_buildings_construction_year"`
-	ShortcutBuildingsFloorCount              pgtype.Int4   `db:"shortcut_buildings_floor_count" json:"shortcut_buildings_floor_count"`
-	ShortcutBuildingsApartmentCount          pgtype.Int4   `db:"shortcut_buildings_apartment_count" json:"shortcut_buildings_apartment_count"`
-	ShortcutBuildingsHeatingSystem           *string       `db:"shortcut_buildings_heating_system" json:"shortcut_buildings_heating_system"`
-	ShortcutBuildingsBuildingMaterial        *string       `db:"shortcut_buildings_building_material" json:"shortcut_buildings_building_material"`
-	ShortcutBuildingsPlotType                *string       `db:"shortcut_buildings_plot_type" json:"shortcut_buildings_plot_type"`
-	ShortcutBuildingsWallStructure           *string       `db:"shortcut_buildings_wall_structure" json:"shortcut_buildings_wall_structure"`
-	ShortcutBuildingsHeatSource              *string       `db:"shortcut_buildings_heat_source" json:"shortcut_buildings_heat_source"`
-	ShortcutBuildingsHasElevator             *string       `db:"shortcut_buildings_has_elevator" json:"shortcut_buildings_has_elevator"`
-	ShortcutBuildingsHasSauna                *string       `db:"shortcut_buildings_has_sauna" json:"shortcut_buildings_has_sauna"`
-	ShortcutBuildingsLatitude                pgtype.Float8 `db:"shortcut_buildings_latitude" json:"shortcut_buildings_latitude"`
-	ShortcutBuildingsLongitude               pgtype.Float8 `db:"shortcut_buildings_longitude" json:"shortcut_buildings_longitude"`
-	ShortcutBuildingsAdditionalAddresses     *string       `db:"shortcut_buildings_additional_addresses" json:"shortcut_buildings_additional_addresses"`
-	ShortcutBuildingsUrl                     string        `db:"shortcut_buildings_url" json:"shortcut_buildings_url"`
-	ShortcutBuildingsAddress                 *string       `db:"shortcut_buildings_address" json:"shortcut_buildings_address"`
-	ShortcutBuildingsFrameConstructionMethod *string       `db:"shortcut_buildings_frame_construction_method" json:"shortcut_buildings_frame_construction_method"`
-	ShortcutBuildingsHousingCompany          *string       `db:"shortcut_buildings_housing_company" json:"shortcut_buildings_housing_company"`
+	ShortcutBuildingExternalID              int64         `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string       `db:"shortcut_building_building_id" json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string       `db:"shortcut_building_building_type" json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string       `db:"shortcut_building_building_subtype" json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        pgtype.Int4   `db:"shortcut_building_construction_year" json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              pgtype.Int4   `db:"shortcut_building_floor_count" json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          pgtype.Int4   `db:"shortcut_building_apartment_count" json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string       `db:"shortcut_building_heating_system" json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string       `db:"shortcut_building_building_material" json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string       `db:"shortcut_building_plot_type" json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string       `db:"shortcut_building_wall_structure" json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string       `db:"shortcut_building_heat_source" json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string       `db:"shortcut_building_has_elevator" json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string       `db:"shortcut_building_has_sauna" json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                pgtype.Float8 `db:"shortcut_building_latitude" json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               pgtype.Float8 `db:"shortcut_building_longitude" json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string       `db:"shortcut_building_additional_addresses" json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string        `db:"shortcut_building_url" json:"shortcut_building_url"`
+	ShortcutBuildingAddress                 *string       `db:"shortcut_building_address" json:"shortcut_building_address"`
+	ShortcutBuildingFrameConstructionMethod *string       `db:"shortcut_building_frame_construction_method" json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string       `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
 }
 
 func (q *Queries) UpsertShortcutBuilding(ctx context.Context, arg *UpsertShortcutBuildingParams) (ShortcutBuilding, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuilding,
-		arg.ShortcutBuildingsExternalID,
-		arg.ShortcutBuildingsBuildingID,
-		arg.ShortcutBuildingsBuildingType,
-		arg.ShortcutBuildingsBuildingSubtype,
-		arg.ShortcutBuildingsConstructionYear,
-		arg.ShortcutBuildingsFloorCount,
-		arg.ShortcutBuildingsApartmentCount,
-		arg.ShortcutBuildingsHeatingSystem,
-		arg.ShortcutBuildingsBuildingMaterial,
-		arg.ShortcutBuildingsPlotType,
-		arg.ShortcutBuildingsWallStructure,
-		arg.ShortcutBuildingsHeatSource,
-		arg.ShortcutBuildingsHasElevator,
-		arg.ShortcutBuildingsHasSauna,
-		arg.ShortcutBuildingsLatitude,
-		arg.ShortcutBuildingsLongitude,
-		arg.ShortcutBuildingsAdditionalAddresses,
-		arg.ShortcutBuildingsUrl,
-		arg.ShortcutBuildingsAddress,
-		arg.ShortcutBuildingsFrameConstructionMethod,
-		arg.ShortcutBuildingsHousingCompany,
+		arg.ShortcutBuildingExternalID,
+		arg.ShortcutBuildingBuildingID,
+		arg.ShortcutBuildingBuildingType,
+		arg.ShortcutBuildingBuildingSubtype,
+		arg.ShortcutBuildingConstructionYear,
+		arg.ShortcutBuildingFloorCount,
+		arg.ShortcutBuildingApartmentCount,
+		arg.ShortcutBuildingHeatingSystem,
+		arg.ShortcutBuildingBuildingMaterial,
+		arg.ShortcutBuildingPlotType,
+		arg.ShortcutBuildingWallStructure,
+		arg.ShortcutBuildingHeatSource,
+		arg.ShortcutBuildingHasElevator,
+		arg.ShortcutBuildingHasSauna,
+		arg.ShortcutBuildingLatitude,
+		arg.ShortcutBuildingLongitude,
+		arg.ShortcutBuildingAdditionalAddresses,
+		arg.ShortcutBuildingUrl,
+		arg.ShortcutBuildingAddress,
+		arg.ShortcutBuildingFrameConstructionMethod,
+		arg.ShortcutBuildingHousingCompany,
 	)
 	var i ShortcutBuilding
 	err := row.Scan(
-		&i.ShortcutBuildingsID,
-		&i.ShortcutBuildingsExternalID,
-		&i.ShortcutBuildingsBuildingID,
-		&i.ShortcutBuildingsBuildingType,
-		&i.ShortcutBuildingsBuildingSubtype,
-		&i.ShortcutBuildingsConstructionYear,
-		&i.ShortcutBuildingsFloorCount,
-		&i.ShortcutBuildingsApartmentCount,
-		&i.ShortcutBuildingsHeatingSystem,
-		&i.ShortcutBuildingsBuildingMaterial,
-		&i.ShortcutBuildingsPlotType,
-		&i.ShortcutBuildingsWallStructure,
-		&i.ShortcutBuildingsHeatSource,
-		&i.ShortcutBuildingsHasElevator,
-		&i.ShortcutBuildingsHasSauna,
-		&i.ShortcutBuildingsLatitude,
-		&i.ShortcutBuildingsLongitude,
-		&i.ShortcutBuildingsAdditionalAddresses,
-		&i.ShortcutBuildingsUrl,
-		&i.ShortcutBuildingsCreatedAt,
-		&i.ShortcutBuildingsUpdatedAt,
-		&i.ShortcutBuildingsAddress,
-		&i.ShortcutBuildingsProcessedAt,
-		&i.ShortcutBuildingsPageNotFound,
-		&i.ShortcutBuildingsFrameConstructionMethod,
-		&i.ShortcutBuildingsHousingCompany,
-		&i.ShortcutBuildingsGeom,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingExternalID,
+		&i.ShortcutBuildingBuildingID,
+		&i.ShortcutBuildingBuildingType,
+		&i.ShortcutBuildingBuildingSubtype,
+		&i.ShortcutBuildingConstructionYear,
+		&i.ShortcutBuildingFloorCount,
+		&i.ShortcutBuildingApartmentCount,
+		&i.ShortcutBuildingHeatingSystem,
+		&i.ShortcutBuildingBuildingMaterial,
+		&i.ShortcutBuildingPlotType,
+		&i.ShortcutBuildingWallStructure,
+		&i.ShortcutBuildingHeatSource,
+		&i.ShortcutBuildingHasElevator,
+		&i.ShortcutBuildingHasSauna,
+		&i.ShortcutBuildingLatitude,
+		&i.ShortcutBuildingLongitude,
+		&i.ShortcutBuildingAdditionalAddresses,
+		&i.ShortcutBuildingUrl,
+		&i.ShortcutBuildingCreatedAt,
+		&i.ShortcutBuildingUpdatedAt,
+		&i.ShortcutBuildingAddress,
+		&i.ShortcutBuildingProcessedAt,
+		&i.ShortcutBuildingPageNotFound,
+		&i.ShortcutBuildingFrameConstructionMethod,
+		&i.ShortcutBuildingHousingCompany,
+		&i.ShortcutBuildingGeom,
 	)
 	return i, err
 }
 
 const upsertShortcutBuildingFromSitemap = `-- name: UpsertShortcutBuildingFromSitemap :one
 INSERT INTO public.shortcut_buildings (
-    shortcut_buildings_external_id,
-    shortcut_buildings_url
+    shortcut_building_external_id,
+    shortcut_building_url
 ) VALUES (
     $1, $2
 )
-ON CONFLICT (shortcut_buildings_external_id) DO UPDATE SET
-    shortcut_buildings_url = EXCLUDED.shortcut_buildings_url
-WHERE public.shortcut_buildings.shortcut_buildings_url IS DISTINCT FROM EXCLUDED.shortcut_buildings_url
-RETURNING shortcut_buildings_id, shortcut_buildings_external_id, shortcut_buildings_building_id, shortcut_buildings_building_type, shortcut_buildings_building_subtype, shortcut_buildings_construction_year, shortcut_buildings_floor_count, shortcut_buildings_apartment_count, shortcut_buildings_heating_system, shortcut_buildings_building_material, shortcut_buildings_plot_type, shortcut_buildings_wall_structure, shortcut_buildings_heat_source, shortcut_buildings_has_elevator, shortcut_buildings_has_sauna, shortcut_buildings_latitude, shortcut_buildings_longitude, shortcut_buildings_additional_addresses, shortcut_buildings_url, shortcut_buildings_created_at, shortcut_buildings_updated_at, shortcut_buildings_address, shortcut_buildings_processed_at, shortcut_buildings_page_not_found, shortcut_buildings_frame_construction_method, shortcut_buildings_housing_company, shortcut_buildings_geom
+ON CONFLICT (shortcut_building_external_id) DO UPDATE SET
+    shortcut_building_url = EXCLUDED.shortcut_building_url
+WHERE public.shortcut_buildings.shortcut_building_url IS DISTINCT FROM EXCLUDED.shortcut_building_url
+RETURNING shortcut_building_id, shortcut_building_external_id, shortcut_building_building_id, shortcut_building_building_type, shortcut_building_building_subtype, shortcut_building_construction_year, shortcut_building_floor_count, shortcut_building_apartment_count, shortcut_building_heating_system, shortcut_building_building_material, shortcut_building_plot_type, shortcut_building_wall_structure, shortcut_building_heat_source, shortcut_building_has_elevator, shortcut_building_has_sauna, shortcut_building_latitude, shortcut_building_longitude, shortcut_building_additional_addresses, shortcut_building_url, shortcut_building_created_at, shortcut_building_updated_at, shortcut_building_address, shortcut_building_processed_at, shortcut_building_page_not_found, shortcut_building_frame_construction_method, shortcut_building_housing_company, shortcut_building_geom
 `
 
 type UpsertShortcutBuildingFromSitemapParams struct {
-	ShortcutBuildingsExternalID int64  `db:"shortcut_buildings_external_id" json:"shortcut_buildings_external_id"`
-	ShortcutBuildingsUrl        string `db:"shortcut_buildings_url" json:"shortcut_buildings_url"`
+	ShortcutBuildingExternalID int64  `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
+	ShortcutBuildingUrl        string `db:"shortcut_building_url" json:"shortcut_building_url"`
 }
 
 func (q *Queries) UpsertShortcutBuildingFromSitemap(ctx context.Context, arg *UpsertShortcutBuildingFromSitemapParams) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, upsertShortcutBuildingFromSitemap, arg.ShortcutBuildingsExternalID, arg.ShortcutBuildingsUrl)
+	row := q.db.QueryRow(ctx, upsertShortcutBuildingFromSitemap, arg.ShortcutBuildingExternalID, arg.ShortcutBuildingUrl)
 	var i ShortcutBuilding
 	err := row.Scan(
-		&i.ShortcutBuildingsID,
-		&i.ShortcutBuildingsExternalID,
-		&i.ShortcutBuildingsBuildingID,
-		&i.ShortcutBuildingsBuildingType,
-		&i.ShortcutBuildingsBuildingSubtype,
-		&i.ShortcutBuildingsConstructionYear,
-		&i.ShortcutBuildingsFloorCount,
-		&i.ShortcutBuildingsApartmentCount,
-		&i.ShortcutBuildingsHeatingSystem,
-		&i.ShortcutBuildingsBuildingMaterial,
-		&i.ShortcutBuildingsPlotType,
-		&i.ShortcutBuildingsWallStructure,
-		&i.ShortcutBuildingsHeatSource,
-		&i.ShortcutBuildingsHasElevator,
-		&i.ShortcutBuildingsHasSauna,
-		&i.ShortcutBuildingsLatitude,
-		&i.ShortcutBuildingsLongitude,
-		&i.ShortcutBuildingsAdditionalAddresses,
-		&i.ShortcutBuildingsUrl,
-		&i.ShortcutBuildingsCreatedAt,
-		&i.ShortcutBuildingsUpdatedAt,
-		&i.ShortcutBuildingsAddress,
-		&i.ShortcutBuildingsProcessedAt,
-		&i.ShortcutBuildingsPageNotFound,
-		&i.ShortcutBuildingsFrameConstructionMethod,
-		&i.ShortcutBuildingsHousingCompany,
-		&i.ShortcutBuildingsGeom,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingExternalID,
+		&i.ShortcutBuildingBuildingID,
+		&i.ShortcutBuildingBuildingType,
+		&i.ShortcutBuildingBuildingSubtype,
+		&i.ShortcutBuildingConstructionYear,
+		&i.ShortcutBuildingFloorCount,
+		&i.ShortcutBuildingApartmentCount,
+		&i.ShortcutBuildingHeatingSystem,
+		&i.ShortcutBuildingBuildingMaterial,
+		&i.ShortcutBuildingPlotType,
+		&i.ShortcutBuildingWallStructure,
+		&i.ShortcutBuildingHeatSource,
+		&i.ShortcutBuildingHasElevator,
+		&i.ShortcutBuildingHasSauna,
+		&i.ShortcutBuildingLatitude,
+		&i.ShortcutBuildingLongitude,
+		&i.ShortcutBuildingAdditionalAddresses,
+		&i.ShortcutBuildingUrl,
+		&i.ShortcutBuildingCreatedAt,
+		&i.ShortcutBuildingUpdatedAt,
+		&i.ShortcutBuildingAddress,
+		&i.ShortcutBuildingProcessedAt,
+		&i.ShortcutBuildingPageNotFound,
+		&i.ShortcutBuildingFrameConstructionMethod,
+		&i.ShortcutBuildingHousingCompany,
+		&i.ShortcutBuildingGeom,
 	)
 	return i, err
 }
 
 const upsertShortcutBuildingListing = `-- name: UpsertShortcutBuildingListing :one
 INSERT INTO public.shortcut_building_listings (
-    shortcut_building_listings_building_id,
-    shortcut_building_listings_layout,
-    shortcut_building_listings_size,
-    shortcut_building_listings_price,
-    shortcut_building_listings_price_per_sqm,
-    shortcut_building_listings_marketing_time,
-    shortcut_building_listings_idx
+    shortcut_building_id,
+    shortcut_building_listing_layout,
+    shortcut_building_listing_size,
+    shortcut_building_listing_price,
+    shortcut_building_listing_price_per_sqm,
+    shortcut_building_listing_marketing_time,
+    shortcut_building_listing_idx
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
 )
-ON CONFLICT (shortcut_building_listings_building_id, shortcut_building_listings_layout, shortcut_building_listings_size, shortcut_building_listings_price, shortcut_building_listings_price_per_sqm, shortcut_building_listings_deleted_at, shortcut_building_listings_marketing_time, shortcut_building_listings_idx) DO UPDATE SET
-    shortcut_building_listings_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_building_listings_id, shortcut_building_listings_building_id, shortcut_building_listings_layout, shortcut_building_listings_size, shortcut_building_listings_price, shortcut_building_listings_price_per_sqm, shortcut_building_listings_deleted_at, shortcut_building_listings_created_at, shortcut_building_listings_updated_at, shortcut_building_listings_marketing_time, shortcut_building_listings_idx
+ON CONFLICT (shortcut_building_id, shortcut_building_listing_layout, shortcut_building_listing_size, shortcut_building_listing_price, shortcut_building_listing_price_per_sqm, shortcut_building_listing_deleted_at, shortcut_building_listing_marketing_time, shortcut_building_listing_idx) DO UPDATE SET
+    shortcut_building_listing_updated_at = CURRENT_TIMESTAMP
+RETURNING shortcut_building_listing_id, shortcut_building_id, shortcut_building_listing_layout, shortcut_building_listing_size, shortcut_building_listing_price, shortcut_building_listing_price_per_sqm, shortcut_building_listing_deleted_at, shortcut_building_listing_created_at, shortcut_building_listing_updated_at, shortcut_building_listing_marketing_time, shortcut_building_listing_idx
 `
 
 type UpsertShortcutBuildingListingParams struct {
-	ShortcutBuildingListingsBuildingID    pgtype.UUID   `db:"shortcut_building_listings_building_id" json:"shortcut_building_listings_building_id"`
-	ShortcutBuildingListingsLayout        *string       `db:"shortcut_building_listings_layout" json:"shortcut_building_listings_layout"`
-	ShortcutBuildingListingsSize          pgtype.Float8 `db:"shortcut_building_listings_size" json:"shortcut_building_listings_size"`
-	ShortcutBuildingListingsPrice         pgtype.Float8 `db:"shortcut_building_listings_price" json:"shortcut_building_listings_price"`
-	ShortcutBuildingListingsPricePerSqm   pgtype.Float8 `db:"shortcut_building_listings_price_per_sqm" json:"shortcut_building_listings_price_per_sqm"`
-	ShortcutBuildingListingsMarketingTime *string       `db:"shortcut_building_listings_marketing_time" json:"shortcut_building_listings_marketing_time"`
-	ShortcutBuildingListingsIdx           pgtype.Int4   `db:"shortcut_building_listings_idx" json:"shortcut_building_listings_idx"`
+	ShortcutBuildingID                   pgtype.UUID   `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string       `db:"shortcut_building_listing_layout" json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          pgtype.Float8 `db:"shortcut_building_listing_size" json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         pgtype.Float8 `db:"shortcut_building_listing_price" json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   pgtype.Float8 `db:"shortcut_building_listing_price_per_sqm" json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingMarketingTime *string       `db:"shortcut_building_listing_marketing_time" json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           pgtype.Int4   `db:"shortcut_building_listing_idx" json:"shortcut_building_listing_idx"`
 }
 
 func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg *UpsertShortcutBuildingListingParams) (ShortcutBuildingListing, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingListing,
-		arg.ShortcutBuildingListingsBuildingID,
-		arg.ShortcutBuildingListingsLayout,
-		arg.ShortcutBuildingListingsSize,
-		arg.ShortcutBuildingListingsPrice,
-		arg.ShortcutBuildingListingsPricePerSqm,
-		arg.ShortcutBuildingListingsMarketingTime,
-		arg.ShortcutBuildingListingsIdx,
+		arg.ShortcutBuildingID,
+		arg.ShortcutBuildingListingLayout,
+		arg.ShortcutBuildingListingSize,
+		arg.ShortcutBuildingListingPrice,
+		arg.ShortcutBuildingListingPricePerSqm,
+		arg.ShortcutBuildingListingMarketingTime,
+		arg.ShortcutBuildingListingIdx,
 	)
 	var i ShortcutBuildingListing
 	err := row.Scan(
-		&i.ShortcutBuildingListingsID,
-		&i.ShortcutBuildingListingsBuildingID,
-		&i.ShortcutBuildingListingsLayout,
-		&i.ShortcutBuildingListingsSize,
-		&i.ShortcutBuildingListingsPrice,
-		&i.ShortcutBuildingListingsPricePerSqm,
-		&i.ShortcutBuildingListingsDeletedAt,
-		&i.ShortcutBuildingListingsCreatedAt,
-		&i.ShortcutBuildingListingsUpdatedAt,
-		&i.ShortcutBuildingListingsMarketingTime,
-		&i.ShortcutBuildingListingsIdx,
+		&i.ShortcutBuildingListingID,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingListingLayout,
+		&i.ShortcutBuildingListingSize,
+		&i.ShortcutBuildingListingPrice,
+		&i.ShortcutBuildingListingPricePerSqm,
+		&i.ShortcutBuildingListingDeletedAt,
+		&i.ShortcutBuildingListingCreatedAt,
+		&i.ShortcutBuildingListingUpdatedAt,
+		&i.ShortcutBuildingListingMarketingTime,
+		&i.ShortcutBuildingListingIdx,
 	)
 	return i, err
 }
 
 const upsertShortcutBuildingRental = `-- name: UpsertShortcutBuildingRental :one
 INSERT INTO public.shortcut_building_rentals (
-    shortcut_building_rentals_building_id,
-    shortcut_building_rentals_layout,
-    shortcut_building_rentals_size,
-    shortcut_building_rentals_price,
-    shortcut_building_rentals_marketing_time,
-    shortcut_building_rentals_idx
+    shortcut_building_id,
+    shortcut_building_rental_layout,
+    shortcut_building_rental_size,
+    shortcut_building_rental_price,
+    shortcut_building_rental_marketing_time,
+    shortcut_building_rental_idx
 ) VALUES (
     $1, $2, $3, $4, $5, $6
 )
-ON CONFLICT (shortcut_building_rentals_building_id, shortcut_building_rentals_layout, shortcut_building_rentals_size, shortcut_building_rentals_price, shortcut_building_rentals_deleted_at, shortcut_building_rentals_marketing_time, shortcut_building_rentals_idx) DO UPDATE SET
-    shortcut_building_rentals_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_building_rentals_id, shortcut_building_rentals_building_id, shortcut_building_rentals_layout, shortcut_building_rentals_size, shortcut_building_rentals_price, shortcut_building_rentals_deleted_at, shortcut_building_rentals_created_at, shortcut_building_rentals_updated_at, shortcut_building_rentals_marketing_time, shortcut_building_rentals_idx
+ON CONFLICT (shortcut_building_id, shortcut_building_rental_layout, shortcut_building_rental_size, shortcut_building_rental_price, shortcut_building_rental_deleted_at, shortcut_building_rental_marketing_time, shortcut_building_rental_idx) DO UPDATE SET
+    shortcut_building_rental_updated_at = CURRENT_TIMESTAMP
+RETURNING shortcut_building_rental_id, shortcut_building_id, shortcut_building_rental_layout, shortcut_building_rental_size, shortcut_building_rental_price, shortcut_building_rental_deleted_at, shortcut_building_rental_created_at, shortcut_building_rental_updated_at, shortcut_building_rental_marketing_time, shortcut_building_rental_idx
 `
 
 type UpsertShortcutBuildingRentalParams struct {
-	ShortcutBuildingRentalsBuildingID    pgtype.UUID   `db:"shortcut_building_rentals_building_id" json:"shortcut_building_rentals_building_id"`
-	ShortcutBuildingRentalsLayout        *string       `db:"shortcut_building_rentals_layout" json:"shortcut_building_rentals_layout"`
-	ShortcutBuildingRentalsSize          pgtype.Float8 `db:"shortcut_building_rentals_size" json:"shortcut_building_rentals_size"`
-	ShortcutBuildingRentalsPrice         pgtype.Float8 `db:"shortcut_building_rentals_price" json:"shortcut_building_rentals_price"`
-	ShortcutBuildingRentalsMarketingTime *string       `db:"shortcut_building_rentals_marketing_time" json:"shortcut_building_rentals_marketing_time"`
-	ShortcutBuildingRentalsIdx           pgtype.Int4   `db:"shortcut_building_rentals_idx" json:"shortcut_building_rentals_idx"`
+	ShortcutBuildingID                  pgtype.UUID   `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string       `db:"shortcut_building_rental_layout" json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          pgtype.Float8 `db:"shortcut_building_rental_size" json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         pgtype.Float8 `db:"shortcut_building_rental_price" json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalMarketingTime *string       `db:"shortcut_building_rental_marketing_time" json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           pgtype.Int4   `db:"shortcut_building_rental_idx" json:"shortcut_building_rental_idx"`
 }
 
 func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg *UpsertShortcutBuildingRentalParams) (ShortcutBuildingRental, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingRental,
-		arg.ShortcutBuildingRentalsBuildingID,
-		arg.ShortcutBuildingRentalsLayout,
-		arg.ShortcutBuildingRentalsSize,
-		arg.ShortcutBuildingRentalsPrice,
-		arg.ShortcutBuildingRentalsMarketingTime,
-		arg.ShortcutBuildingRentalsIdx,
+		arg.ShortcutBuildingID,
+		arg.ShortcutBuildingRentalLayout,
+		arg.ShortcutBuildingRentalSize,
+		arg.ShortcutBuildingRentalPrice,
+		arg.ShortcutBuildingRentalMarketingTime,
+		arg.ShortcutBuildingRentalIdx,
 	)
 	var i ShortcutBuildingRental
 	err := row.Scan(
-		&i.ShortcutBuildingRentalsID,
-		&i.ShortcutBuildingRentalsBuildingID,
-		&i.ShortcutBuildingRentalsLayout,
-		&i.ShortcutBuildingRentalsSize,
-		&i.ShortcutBuildingRentalsPrice,
-		&i.ShortcutBuildingRentalsDeletedAt,
-		&i.ShortcutBuildingRentalsCreatedAt,
-		&i.ShortcutBuildingRentalsUpdatedAt,
-		&i.ShortcutBuildingRentalsMarketingTime,
-		&i.ShortcutBuildingRentalsIdx,
+		&i.ShortcutBuildingRentalID,
+		&i.ShortcutBuildingID,
+		&i.ShortcutBuildingRentalLayout,
+		&i.ShortcutBuildingRentalSize,
+		&i.ShortcutBuildingRentalPrice,
+		&i.ShortcutBuildingRentalDeletedAt,
+		&i.ShortcutBuildingRentalCreatedAt,
+		&i.ShortcutBuildingRentalUpdatedAt,
+		&i.ShortcutBuildingRentalMarketingTime,
+		&i.ShortcutBuildingRentalIdx,
 	)
 	return i, err
 }

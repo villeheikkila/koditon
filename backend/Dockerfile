@@ -1,43 +1,24 @@
-FROM postgres:18
+FROM golang:1.25.3-alpine AS builder
 
-ENV PG_CRON_VERSION=v1.6.7
+WORKDIR /app
 
-# Install build dependencies and PostGIS
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    postgresql-server-dev-18 \
-    libcurl4-openssl-dev \
-    postgresql-18-postgis-3 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Build and install pg_cron
-RUN cd /tmp \
-    && git clone https://github.com/citusdata/pg_cron.git \
-    && cd pg_cron \
-    && make \
-    && make install \
-    && cd / \
-    && rm -rf /tmp/pg_cron
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Build and install pgmq
-RUN cd /tmp \
-    && git clone https://github.com/pgmq/pgmq.git \
-    && cd pgmq/pgmq-extension \
-    && make \
-    && make install \
-    && cd / \
-    && rm -rf /tmp/pgmq
+COPY . .
 
-# Create initialization script to enable extensions
-RUN mkdir -p /docker-entrypoint-initdb.d
-COPY <<EOF /docker-entrypoint-initdb.d/init-extensions.sql
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pgmq;
-CREATE SCHEMA IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS postgis SCHEMA postgis;
-ALTER DATABASE postgres SET search_path TO public, postgis, "\$user";
-SET search_path TO public, postgis;
-EOF
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/koditon ./cmd/main.go
 
-EXPOSE 5432
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /app/koditon .
+
+EXPOSE 8080
+
+CMD ["./koditon"]
