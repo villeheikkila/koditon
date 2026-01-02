@@ -174,9 +174,9 @@ tasks:
     cmds:
       - npm run preview
 
-  client:generate:
-    desc: Generate the client API SDK from OpenAPI
-    dir: client
+  koditon:generate:
+    desc: Generate the Koditon Expo API client from OpenAPI
+    dir: koditon
     cmds:
       - npm run generate
 

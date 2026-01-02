@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,6 +28,7 @@ type Config struct {
 	ShutdownTimeout time.Duration `env:"APP_SHUTDOWN_TIMEOUT,required"`
 	Environment     Environment   `env:"APP_ENV" envDefault:"development"`
 	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
+	Mode            AppMode       `env:"APP_MODE" envDefault:"consumer,api"`
 	DB              DBConfig      `envPrefix:"DB_"`
 	Prices          PricesConfig
 	Shortcut        ShortcutConfig
@@ -48,6 +50,52 @@ func (c Config) SlogLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+type AppMode struct {
+	Consumer bool
+	API      bool
+}
+
+func (m AppMode) String() string {
+	parts := make([]string, 0, 2)
+	if m.Consumer {
+		parts = append(parts, "consumer")
+	}
+	if m.API {
+		parts = append(parts, "api")
+	}
+	return strings.Join(parts, ",")
+}
+
+func (m *AppMode) UnmarshalText(text []byte) error {
+	raw := strings.TrimSpace(strings.ToLower(string(text)))
+	if raw == "" {
+		return errors.New("app mode must include consumer or api")
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t'
+	})
+	if len(parts) == 0 {
+		return errors.New("app mode must include consumer or api")
+	}
+	var consumerSet, apiSet bool
+	for _, part := range parts {
+		switch part {
+		case "consumer":
+			consumerSet = true
+		case "api":
+			apiSet = true
+		default:
+			return fmt.Errorf("invalid app mode: %s", part)
+		}
+	}
+	if !consumerSet && !apiSet {
+		return errors.New("app mode must include consumer or api")
+	}
+	m.Consumer = consumerSet
+	m.API = apiSet
+	return nil
 }
 
 type DBConfig struct {

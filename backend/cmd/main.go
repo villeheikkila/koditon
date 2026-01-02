@@ -56,6 +56,7 @@ func run(
 	appLogger.Info("starting application",
 		"env", cfg.Environment,
 		"log_level", cfg.LogLevel,
+		"mode", cfg.Mode.String(),
 	)
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL())
 	if err != nil {
@@ -66,78 +67,89 @@ func run(
 	}
 	appLogger.Debug("database connection established")
 	taskQueueClient := taskqueue.NewClient(pool)
-	openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
-	pricesService, err := prices.NewService(
-		pool,
-		cfg.Prices.BaseURL,
-		openRouterClient,
-	)
-	if err != nil {
-		return fmt.Errorf("create prices service: %w", err)
-	}
-	shortcutService := shortcut.NewService(
-		pool,
-		logger,
-		cfg.Shortcut.BaseURL,
-		cfg.Shortcut.DocsBaseURL,
-		cfg.Shortcut.AdBaseURL,
-		cfg.Shortcut.UserAgent,
-		cfg.Shortcut.SitemapBase,
-	)
-	frontdoorService := frontdoor.NewService(
-		pool,
-		logger,
-		cfg.Frontdoor.BaseURL,
-		cfg.Frontdoor.UserAgent,
-		cfg.Frontdoor.Cookie,
-		cfg.Frontdoor.SitemapBase,
-	)
-	postalService := postal.NewService(pool)
-	consumer := consumers.New(
-		logger,
-		taskQueueClient,
-		pricesService,
-		shortcutService,
-		frontdoorService,
-		postalService,
-	)
-	consumerConfig := consumers.DefaultConfig()
-	if err := consumer.Start(ctx, consumerConfig, pool); err != nil {
-		return fmt.Errorf("start consumer: %w", err)
-	}
-	srv := server.New(logger, cfg, pool, taskQueueClient)
-	mux := http.NewServeMux()
-	api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
-	httpServer := &http.Server{
-		Addr:              net.JoinHostPort(cfg.Host, cfg.Port),
-		Handler:           srv.Handler(mux, api),
-		ReadTimeout:       15 * time.Second,
-		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
-		BaseContext: func(net.Listener) context.Context {
-			return ctx
-		},
-	}
-	errCh := make(chan error, 1)
-	go func() {
-		appLogger.Info("server listening", "addr", httpServer.Addr)
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
-			return
+	var consumer *consumers.Consumer
+	if cfg.Mode.Consumer {
+		openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
+		pricesService, err := prices.NewService(
+			pool,
+			cfg.Prices.BaseURL,
+			openRouterClient,
+		)
+		if err != nil {
+			return fmt.Errorf("create prices service: %w", err)
 		}
-		errCh <- nil
-	}()
+		shortcutService := shortcut.NewService(
+			pool,
+			logger,
+			cfg.Shortcut.BaseURL,
+			cfg.Shortcut.DocsBaseURL,
+			cfg.Shortcut.AdBaseURL,
+			cfg.Shortcut.UserAgent,
+			cfg.Shortcut.SitemapBase,
+		)
+		frontdoorService := frontdoor.NewService(
+			pool,
+			logger,
+			cfg.Frontdoor.BaseURL,
+			cfg.Frontdoor.UserAgent,
+			cfg.Frontdoor.Cookie,
+			cfg.Frontdoor.SitemapBase,
+		)
+		postalService := postal.NewService(pool)
+		consumer = consumers.New(
+			logger,
+			taskQueueClient,
+			pricesService,
+			shortcutService,
+			frontdoorService,
+			postalService,
+		)
+		consumerConfig := consumers.DefaultConfig()
+		if err := consumer.Start(ctx, consumerConfig, pool); err != nil {
+			return fmt.Errorf("start consumer: %w", err)
+		}
+	}
+	var httpServer *http.Server
+	var errCh chan error
+	if cfg.Mode.API {
+		srv := server.New(logger, cfg, pool, taskQueueClient)
+		mux := http.NewServeMux()
+		api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
+		httpServer = &http.Server{
+			Addr:              net.JoinHostPort(cfg.Host, cfg.Port),
+			Handler:           srv.Handler(mux, api),
+			ReadTimeout:       15 * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    1 << 20,
+			BaseContext: func(net.Listener) context.Context {
+				return ctx
+			},
+		}
+		errCh = make(chan error, 1)
+		go func() {
+			appLogger.Info("server listening", "addr", httpServer.Addr)
+			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				errCh <- err
+				return
+			}
+			errCh <- nil
+		}()
+	}
 	select {
 	case <-ctx.Done():
 		appLogger.Info("shutdown signal received")
 	case err := <-errCh:
 		if err != nil {
-			consumer.Stop()
+			if consumer != nil {
+				consumer.Stop()
+			}
 			return fmt.Errorf("http server: %w", err)
 		}
-		consumer.Stop()
+		if consumer != nil {
+			consumer.Stop()
+		}
 		return nil
 	}
 	// graceful shutdown
@@ -145,17 +157,21 @@ func run(
 	defer shutdownCancel()
 	var shutdownErrs []error
 	appLogger.Debug("stopping consumer")
-	consumer.Stop()
-	appLogger.Debug("consumer stopped")
-	appLogger.Debug("shutting down http server")
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		appLogger.Error("http server shutdown failed", tint.Err(err))
-		shutdownErrs = append(shutdownErrs, fmt.Errorf("http server shutdown: %w", err))
-	} else {
-		appLogger.Debug("http server stopped")
+	if consumer != nil {
+		consumer.Stop()
+		appLogger.Debug("consumer stopped")
 	}
-	if err := <-errCh; err != nil {
-		shutdownErrs = append(shutdownErrs, fmt.Errorf("http server: %w", err))
+	if httpServer != nil {
+		appLogger.Debug("shutting down http server")
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			appLogger.Error("http server shutdown failed", tint.Err(err))
+			shutdownErrs = append(shutdownErrs, fmt.Errorf("http server shutdown: %w", err))
+		} else {
+			appLogger.Debug("http server stopped")
+		}
+		if err := <-errCh; err != nil {
+			shutdownErrs = append(shutdownErrs, fmt.Errorf("http server: %w", err))
+		}
 	}
 	appLogger.Debug("closing database pool")
 	pool.Close()
