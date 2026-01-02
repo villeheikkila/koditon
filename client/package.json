@@ -1,6 +1,5 @@
 {
-  "name": "expo-template-default",
-  "license": "0BSD",
+  "name": "koditon",
   "main": "expo-router/entry",
   "version": "54.0.35",
   "scripts": {
