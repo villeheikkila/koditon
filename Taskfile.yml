@@ -174,65 +174,23 @@ tasks:
     cmds:
       - npm run preview
 
-  koditon:generate:
-    desc: Generate the Koditon Expo API client from OpenAPI
-    dir: koditon
+  expo:start:
+    desc: Start the Expo app with required env vars
+    dir: client
+    cmds:
+      - EXPO_OWNER=${EXPO_OWNER} BUNDLE_IDENTIFIER=${BUNDLE_IDENTIFIER} npm run start
+
+  expo:build:ios:
+    desc: Build the iOS app locally with required env vars
+    dir: client
+    cmds:
+      - EXPO_OWNER=${EXPO_OWNER} BUNDLE_IDENTIFIER=${BUNDLE_IDENTIFIER} npx expo run:ios --configuration Release
+
+  client:generate:
+    desc: Generate the client Expo API client from OpenAPI
+    dir: client
     cmds:
       - npm run generate
-
-  match:neighborhoods:
-    desc: Match unmatched neighborhoods to postal codes using LLM
-    dir: backend
-    cmds:
-      - go run ./cmd/match-neighborhoods {{.CLI_ARGS}}
-    env:
-      APP_HOST: "{{.APP_HOST}}"
-      APP_PORT: "{{.APP_PORT}}"
-      APP_SHUTDOWN_TIMEOUT: "{{.APP_SHUTDOWN_TIMEOUT}}"
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
-      DB_SSLMODE: "{{.DB_SSLMODE}}"
-      PRICES_BASE_URL: "{{.PRICES_BASE_URL}}"
-      SHORTCUT_BASE_URL: "{{.SHORTCUT_BASE_URL}}"
-      SHORTCUT_DOCS_BASE_URL: "{{.SHORTCUT_DOCS_BASE_URL}}"
-      SHORTCUT_AD_BASE_URL: "{{.SHORTCUT_AD_BASE_URL}}"
-      SHORTCUT_USER_AGENT: "{{.SHORTCUT_USER_AGENT}}"
-      SHORTCUT_SITEMAP_BASE_URL: "{{.SHORTCUT_SITEMAP_BASE_URL}}"
-      FRONTDOOR_BASE_URL: "{{.FRONTDOOR_BASE_URL}}"
-      FRONTDOOR_USER_AGENT: "{{.FRONTDOOR_USER_AGENT}}"
-      FRONTDOOR_COOKIE: "{{.FRONTDOOR_COOKIE}}"
-      FRONTDOOR_SITEMAP_BASE_URL: "{{.FRONTDOOR_SITEMAP_BASE_URL}}"
-      OPENROUTER_API_KEY: "{{.OPENROUTER_API_KEY}}"
-
-  match:neighborhoods:test:
-    desc: Test OpenRouter API connection
-    dir: backend
-    cmds:
-      - go run ./cmd/match-neighborhoods test
-    env:
-      APP_HOST: "{{.APP_HOST}}"
-      APP_PORT: "{{.APP_PORT}}"
-      APP_SHUTDOWN_TIMEOUT: "{{.APP_SHUTDOWN_TIMEOUT}}"
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
-      DB_SSLMODE: "{{.DB_SSLMODE}}"
-      PRICES_BASE_URL: "{{.PRICES_BASE_URL}}"
-      SHORTCUT_BASE_URL: "{{.SHORTCUT_BASE_URL}}"
-      SHORTCUT_DOCS_BASE_URL: "{{.SHORTCUT_DOCS_BASE_URL}}"
-      SHORTCUT_AD_BASE_URL: "{{.SHORTCUT_AD_BASE_URL}}"
-      SHORTCUT_USER_AGENT: "{{.SHORTCUT_USER_AGENT}}"
-      SHORTCUT_SITEMAP_BASE_URL: "{{.SHORTCUT_SITEMAP_BASE_URL}}"
-      FRONTDOOR_BASE_URL: "{{.FRONTDOOR_BASE_URL}}"
-      FRONTDOOR_USER_AGENT: "{{.FRONTDOOR_USER_AGENT}}"
-      FRONTDOOR_COOKIE: "{{.FRONTDOOR_COOKIE}}"
-      FRONTDOOR_SITEMAP_BASE_URL: "{{.FRONTDOOR_SITEMAP_BASE_URL}}"
-      OPENROUTER_API_KEY: "{{.OPENROUTER_API_KEY}}"
 
   docker:build:
     desc: Build Docker image for backend (uses DOCKER_IMAGE from .env)
