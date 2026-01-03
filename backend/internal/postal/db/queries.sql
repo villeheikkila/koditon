@@ -143,3 +143,32 @@ JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
 WHERE ppc.postal_postal_code_type_code = '1'
 ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code;
+
+-- name: ListMunicipalitiesWithPriceData :many
+SELECT DISTINCT
+    pm.postal_municipality_id,
+    pm.postal_municipality_code,
+    pm.postal_municipality_name_fi,
+    pm.postal_municipality_name_sv
+FROM public.postal_municipalities AS pm
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_municipality_id = pm.postal_municipality_id
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
+JOIN public.prices_transactions AS pt
+    ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
+ORDER BY pm.postal_municipality_name_fi;
+
+-- name: ListPostalCodesWithPriceDataForMunicipality :many
+SELECT DISTINCT
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    ppc.postal_postal_code_name_sv
+FROM public.postal_postal_codes AS ppc
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
+JOIN public.prices_transactions AS pt
+    ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
+WHERE ppc.postal_municipality_id = sqlc.arg(municipality_id)
+ORDER BY ppc.postal_postal_code_code;

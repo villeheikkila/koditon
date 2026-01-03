@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	pricesdb "koditon-go/internal/prices/db"
@@ -116,4 +117,103 @@ func parseUUIDParam(value string) (pgtype.UUID, error) {
 		return pgtype.UUID{}, err
 	}
 	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+}
+
+type pricesTransactionsFilteredInput struct {
+	MunicipalityIDs string  `query:"municipality_ids" doc:"Comma-separated list of municipality UUIDs"`
+	PostalCodeIDs   string  `query:"postal_code_ids" doc:"Comma-separated list of postal code UUIDs"`
+	Categories      string  `query:"categories" doc:"Comma-separated list of categories (e.g., Kerrostalo,Rivitalo)"`
+	Types           string  `query:"types" doc:"Comma-separated list of types (e.g., Yksiö,Kaksio)"`
+	MinArea         float64 `query:"min_area" doc:"Minimum area in square meters (0 = no minimum)"`
+	MaxArea         float64 `query:"max_area" doc:"Maximum area in square meters (0 = no maximum)"`
+	Limit           int32   `query:"limit" doc:"Maximum number of results (default 100)"`
+}
+
+func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *pricesTransactionsFilteredInput) (*pricesTransactionsOutput, error) {
+	params := &pricesdb.ListTransactionsFilteredParams{}
+	if input.MunicipalityIDs != "" {
+		ids := strings.Split(input.MunicipalityIDs, ",")
+		uuids := make([]pgtype.UUID, 0, len(ids))
+		for _, id := range ids {
+			parsed, err := parseUUIDParam(strings.TrimSpace(id))
+			if err != nil {
+				return nil, huma.Error400BadRequest("invalid municipality_id: " + id)
+			}
+			uuids = append(uuids, parsed)
+		}
+		params.MunicipalityIds = uuids
+	}
+	if input.PostalCodeIDs != "" {
+		ids := strings.Split(input.PostalCodeIDs, ",")
+		uuids := make([]pgtype.UUID, 0, len(ids))
+		for _, id := range ids {
+			parsed, err := parseUUIDParam(strings.TrimSpace(id))
+			if err != nil {
+				return nil, huma.Error400BadRequest("invalid postal_code_id: " + id)
+			}
+			uuids = append(uuids, parsed)
+		}
+		params.PostalCodeIds = uuids
+	}
+	if input.Categories != "" {
+		cats := strings.Split(input.Categories, ",")
+		trimmed := make([]string, 0, len(cats))
+		for _, c := range cats {
+			trimmed = append(trimmed, strings.TrimSpace(c))
+		}
+		params.Categories = trimmed
+	}
+	if input.Types != "" {
+		types := strings.Split(input.Types, ",")
+		trimmed := make([]string, 0, len(types))
+		for _, t := range types {
+			trimmed = append(trimmed, strings.TrimSpace(t))
+		}
+		params.Types = trimmed
+	}
+	if input.MinArea > 0 {
+		params.MinArea = pgtype.Float8{Float64: input.MinArea, Valid: true}
+	}
+	if input.MaxArea > 0 {
+		params.MaxArea = pgtype.Float8{Float64: input.MaxArea, Valid: true}
+	}
+	if input.Limit > 0 {
+		params.LimitCount = pgtype.Int4{Int32: input.Limit, Valid: true}
+	}
+	rows, err := s.pricesQueries.ListTransactionsFiltered(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	transactions := make([]pricesTransaction, 0, len(rows))
+	for _, row := range rows {
+		neighborhoodName := row.PricesNeighborhoodName
+		transactions = append(transactions, pricesTransaction{
+			ID:                  formatUUID(row.PricesTransactionID),
+			Description:         row.PricesTransactionDescription,
+			Type:                row.PricesTransactionType,
+			Area:                row.PricesTransactionArea,
+			Price:               row.PricesTransactionPrice,
+			PricePerSquareMeter: row.PricesTransactionPricePerSquareMeter,
+			BuildYear:           row.PricesTransactionBuildYear,
+			Floor:               row.PricesTransactionFloor,
+			Elevator:            row.PricesTransactionElevator,
+			Condition:           row.PricesTransactionCondition,
+			Plot:                row.PricesTransactionPlot,
+			EnergyClass:         row.PricesTransactionEnergyClass,
+			PeriodIdentifier:    row.PricesTransactionPeriodIdentifier,
+			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
+			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
+			Category:            row.PricesTransactionCategory,
+			NeighborhoodID:      formatUUID(row.PricesNeighborhoodID),
+			NeighborhoodName:    &neighborhoodName,
+			PostalCodeID:        formatUUID(row.PostalPostalCodeID),
+			PostalCodeCode:      row.PostalPostalCodeCode,
+			PostalCodeNameFi:    row.PostalPostalCodeNameFi,
+			MunicipalityID:      formatUUID(row.PostalMunicipalityID),
+			MunicipalityNameFi:  row.PostalMunicipalityNameFi,
+		})
+	}
+	output := &pricesTransactionsOutput{}
+	output.Body.Transactions = transactions
+	return output, nil
 }

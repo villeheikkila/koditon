@@ -70,6 +70,110 @@ func (q *Queries) GetAvailablePostalCodesForMunicipality(ctx context.Context, mu
 	return items, nil
 }
 
+const listAvailableMunicipalities = `-- name: ListAvailableMunicipalities :many
+SELECT DISTINCT
+    pm.postal_municipality_id,
+    pm.postal_municipality_code,
+    pm.postal_municipality_name_fi,
+    pm.postal_municipality_name_sv
+FROM public.prices_transactions AS pt
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+ORDER BY pm.postal_municipality_name_fi
+`
+
+type ListAvailableMunicipalitiesRow struct {
+	PostalMunicipalityID     pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityCode   string      `db:"postal_municipality_code" json:"postal_municipality_code"`
+	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv *string     `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
+}
+
+func (q *Queries) ListAvailableMunicipalities(ctx context.Context) ([]ListAvailableMunicipalitiesRow, error) {
+	rows, err := q.db.Query(ctx, listAvailableMunicipalities)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAvailableMunicipalitiesRow{}
+	for rows.Next() {
+		var i ListAvailableMunicipalitiesRow
+		if err := rows.Scan(
+			&i.PostalMunicipalityID,
+			&i.PostalMunicipalityCode,
+			&i.PostalMunicipalityNameFi,
+			&i.PostalMunicipalityNameSv,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAvailablePostalCodes = `-- name: ListAvailablePostalCodes :many
+SELECT DISTINCT
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    ppc.postal_postal_code_name_sv,
+    pm.postal_municipality_id,
+    pm.postal_municipality_name_fi
+FROM public.prices_transactions AS pt
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+ORDER BY ppc.postal_postal_code_code
+`
+
+type ListAvailablePostalCodesRow struct {
+	PostalPostalCodeID       pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeCode     string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi   string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv   *string     `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
+	PostalMunicipalityID     pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+}
+
+func (q *Queries) ListAvailablePostalCodes(ctx context.Context) ([]ListAvailablePostalCodesRow, error) {
+	rows, err := q.db.Query(ctx, listAvailablePostalCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAvailablePostalCodesRow{}
+	for rows.Next() {
+		var i ListAvailablePostalCodesRow
+		if err := rows.Scan(
+			&i.PostalPostalCodeID,
+			&i.PostalPostalCodeCode,
+			&i.PostalPostalCodeNameFi,
+			&i.PostalPostalCodeNameSv,
+			&i.PostalMunicipalityID,
+			&i.PostalMunicipalityNameFi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCitiesWithNeighborhoods = `-- name: ListCitiesWithNeighborhoods :many
 SELECT
     hc.prices_city_id,
@@ -127,6 +231,85 @@ func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCities
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDistinctCategories = `-- name: ListDistinctCategories :many
+SELECT DISTINCT prices_transaction_category AS category
+FROM public.prices_transactions
+ORDER BY prices_transaction_category
+`
+
+func (q *Queries) ListDistinctCategories(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var category string
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		items = append(items, category)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDistinctPlots = `-- name: ListDistinctPlots :many
+SELECT DISTINCT prices_transaction_plot AS plot
+FROM public.prices_transactions
+WHERE prices_transaction_plot IS NOT NULL AND prices_transaction_plot != ''
+ORDER BY prices_transaction_plot
+`
+
+func (q *Queries) ListDistinctPlots(ctx context.Context) ([]*string, error) {
+	rows, err := q.db.Query(ctx, listDistinctPlots)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*string{}
+	for rows.Next() {
+		var plot *string
+		if err := rows.Scan(&plot); err != nil {
+			return nil, err
+		}
+		items = append(items, plot)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDistinctTypes = `-- name: ListDistinctTypes :many
+SELECT DISTINCT prices_transaction_type AS type
+FROM public.prices_transactions
+ORDER BY prices_transaction_type
+`
+
+func (q *Queries) ListDistinctTypes(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var type_ string
+		if err := rows.Scan(&type_); err != nil {
+			return nil, err
+		}
+		items = append(items, type_)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -386,6 +569,137 @@ func (q *Queries) ListTransactionsByPostalSelection(ctx context.Context, arg *Li
 	items := []ListTransactionsByPostalSelectionRow{}
 	for rows.Next() {
 		var i ListTransactionsByPostalSelectionRow
+		if err := rows.Scan(
+			&i.PricesTransactionID,
+			&i.PricesTransactionDescription,
+			&i.PricesTransactionType,
+			&i.PricesTransactionArea,
+			&i.PricesTransactionPrice,
+			&i.PricesTransactionPricePerSquareMeter,
+			&i.PricesTransactionBuildYear,
+			&i.PricesTransactionFloor,
+			&i.PricesTransactionElevator,
+			&i.PricesTransactionCondition,
+			&i.PricesTransactionPlot,
+			&i.PricesTransactionEnergyClass,
+			&i.PricesTransactionPeriodIdentifier,
+			&i.PricesTransactionCreatedAt,
+			&i.PricesTransactionUpdatedAt,
+			&i.PricesTransactionCategory,
+			&i.PricesNeighborhoodID,
+			&i.PricesNeighborhoodName,
+			&i.PostalPostalCodeID,
+			&i.PostalPostalCodeCode,
+			&i.PostalPostalCodeNameFi,
+			&i.PostalMunicipalityID,
+			&i.PostalMunicipalityNameFi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTransactionsFiltered = `-- name: ListTransactionsFiltered :many
+SELECT
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    pn.prices_neighborhood_id,
+    pn.prices_neighborhood_name,
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    pm.postal_municipality_id,
+    pm.postal_municipality_name_fi
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+  AND ($1::uuid[] IS NULL OR pm.postal_municipality_id = ANY($1::uuid[]))
+  AND ($2::uuid[] IS NULL OR ppc.postal_postal_code_id = ANY($2::uuid[]))
+  AND ($3::text[] IS NULL OR ht.prices_transaction_category = ANY($3::text[]))
+  AND ($4::text[] IS NULL OR ht.prices_transaction_type = ANY($4::text[]))
+  AND ($5::double precision IS NULL OR ht.prices_transaction_area >= $5::double precision)
+  AND ($6::double precision IS NULL OR ht.prices_transaction_area <= $6::double precision)
+ORDER BY ht.prices_transaction_created_at DESC
+LIMIT COALESCE($7::int, 100)
+`
+
+type ListTransactionsFilteredParams struct {
+	MunicipalityIds []pgtype.UUID `db:"municipality_ids" json:"municipality_ids"`
+	PostalCodeIds   []pgtype.UUID `db:"postal_code_ids" json:"postal_code_ids"`
+	Categories      []string      `db:"categories" json:"categories"`
+	Types           []string      `db:"types" json:"types"`
+	MinArea         pgtype.Float8 `db:"min_area" json:"min_area"`
+	MaxArea         pgtype.Float8 `db:"max_area" json:"max_area"`
+	LimitCount      pgtype.Int4   `db:"limit_count" json:"limit_count"`
+}
+
+type ListTransactionsFilteredRow struct {
+	PricesTransactionID                  pgtype.UUID `db:"prices_transaction_id" json:"prices_transaction_id"`
+	PricesTransactionDescription         string      `db:"prices_transaction_description" json:"prices_transaction_description"`
+	PricesTransactionType                string      `db:"prices_transaction_type" json:"prices_transaction_type"`
+	PricesTransactionArea                float64     `db:"prices_transaction_area" json:"prices_transaction_area"`
+	PricesTransactionPrice               int32       `db:"prices_transaction_price" json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32       `db:"prices_transaction_price_per_square_meter" json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32       `db:"prices_transaction_build_year" json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string     `db:"prices_transaction_floor" json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool        `db:"prices_transaction_elevator" json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string     `db:"prices_transaction_condition" json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string     `db:"prices_transaction_plot" json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string     `db:"prices_transaction_energy_class" json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string      `db:"prices_transaction_period_identifier" json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time   `db:"prices_transaction_created_at" json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time   `db:"prices_transaction_updated_at" json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string      `db:"prices_transaction_category" json:"prices_transaction_category"`
+	PricesNeighborhoodID                 pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string      `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
+	PostalPostalCodeID                   pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeCode                 string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi               string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalMunicipalityID                 pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityNameFi             string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+}
+
+func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg *ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsFiltered,
+		arg.MunicipalityIds,
+		arg.PostalCodeIds,
+		arg.Categories,
+		arg.Types,
+		arg.MinArea,
+		arg.MaxArea,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTransactionsFilteredRow{}
+	for rows.Next() {
+		var i ListTransactionsFilteredRow
 		if err := rows.Scan(
 			&i.PricesTransactionID,
 			&i.PricesTransactionDescription,

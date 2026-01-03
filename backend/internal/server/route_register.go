@@ -47,4 +47,59 @@ func (s *Server) addRoutes(api huma.API) {
 			op.Middlewares = huma.Middlewares{authMiddleware}
 		}
 	})
+	huma.Get(api, "/api/v1/prices/transactions/filtered", s.pricesTransactionsFilteredHandler, func(op *huma.Operation) {
+		op.OperationID = "prices-transactions-filtered"
+		op.Summary = "List price transactions with advanced filters"
+		op.Description = "Query transactions with multiple postal codes, categories, types, and area ranges"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
+	huma.Get(api, "/api/v1/availability/locations", s.availableLocationsHandler, func(op *huma.Operation) {
+		op.OperationID = "availability-locations"
+		op.Summary = "List municipalities and postal codes with price data"
+		op.Description = "Returns only locations that have price transaction data available"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
+	huma.Get(api, "/api/v1/availability/categories", s.availableCategoriesHandler, func(op *huma.Operation) {
+		op.OperationID = "availability-categories"
+		op.Summary = "List available building categories"
+		op.Description = "Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
+	huma.Get(api, "/api/v1/availability/types", s.availableTypesHandler, func(op *huma.Operation) {
+		op.OperationID = "availability-types"
+		op.Summary = "List available apartment types"
+		op.Description = "Returns distinct apartment types (e.g., Yksiö, Kaksio, Kolmio)"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
+	huma.Get(api, "/api/v1/availability/plots", s.availablePlotsHandler, func(op *huma.Operation) {
+		op.OperationID = "availability-plots"
+		op.Summary = "List available plot ownership types"
+		op.Description = "Returns distinct plot ownership types (e.g., Oma, Vuokra)"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
 }

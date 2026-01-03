@@ -20,60 +20,31 @@ tasks:
     dir: backend/db/migrations
     cmds:
       - tern new {{.NAME}}
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
 
   db:migrate:
     desc: Apply all pending migrations to the latest version
     dir: backend/db/migrations
     cmds:
       - tern migrate
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
 
   db:status:
     desc: Show current migration state
     dir: backend/db/migrations
     cmds:
       - tern status
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
 
   db:drop:
     desc: Drop the database (WARNING - destructive operation)
     dir: backend
     cmds:
-      - psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d postgres -c "DROP DATABASE IF EXISTS {{.DB_NAME}};"
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      PGPASSWORD: "{{.DB_PASSWORD}}"
+      - psql "{{.DATABASE_URL}}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();" || true
+      - psql "{{.DATABASE_URL}}/../postgres" -c "DROP DATABASE IF EXISTS $(echo '{{.DATABASE_URL}}' | sed 's/.*\///' | sed 's/?.*//');"
 
   db:create:
     desc: Create the database
     dir: backend
     cmds:
-      - psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d postgres -c "CREATE DATABASE {{.DB_NAME}};"
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      PGPASSWORD: "{{.DB_PASSWORD}}"
+      - psql "{{.DATABASE_URL}}/../postgres" -c "CREATE DATABASE $(echo '{{.DATABASE_URL}}' | sed 's/.*\///' | sed 's/?.*//');"
 
   db:reset:
     desc: Drop, create, and migrate the database (WARNING - destructive operation)
@@ -88,13 +59,7 @@ tasks:
     desc: Import a data file into the database (FILE required)
     dir: backend
     cmds:
-      - psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}} -f {{.FILE}}
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      PGPASSWORD: "{{.DB_PASSWORD}}"
+      - psql "{{.DATABASE_URL}}" -f {{.FILE}}
 
   db:query:
     desc: Run SQL query from stdin or file (use QUERY="..." or FILE=path/to/file.sql)
@@ -102,31 +67,19 @@ tasks:
     cmds:
       - |
         {{if .FILE}}
-        psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}} -f {{.FILE}}
+        psql "{{.DATABASE_URL}}" -f {{.FILE}}
         {{else if .QUERY}}
-        psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}} -c "{{.QUERY}}"
+        psql "{{.DATABASE_URL}}" -c "{{.QUERY}}"
         {{else}}
         echo "Error: Either QUERY or FILE must be provided"
         exit 1
         {{end}}
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      PGPASSWORD: "{{.DB_PASSWORD}}"
 
   db:generate:
     desc: Generate type-safe Go code from SQL queries
     dir: backend
     cmds:
       - sqlc generate -f sqlc.yaml
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASSWORD: "{{.DB_PASSWORD}}"
     sources:
       - backend/db/schema/**/*.sql
       - backend/internal/*/queries.sql
@@ -139,20 +92,14 @@ tasks:
     cmds:
       - |
         {{if .FILE}}
-        pg_dump -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}} -F p -f {{.FILE}}
+        pg_dump "{{.DATABASE_URL}}" -F p -f {{.FILE}}
         echo "Database dumped to {{.FILE}}"
         {{else}}
         TIMESTAMP=$(date +%Y%m%d_%H%M%S)
         FILENAME="db_backup_${TIMESTAMP}.sql"
-        pg_dump -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}} -F p -f ${FILENAME}
+        pg_dump "{{.DATABASE_URL}}" -F p -f ${FILENAME}
         echo "Database dumped to ${FILENAME}"
         {{end}}
-    env:
-      DB_HOST: "{{.DB_HOST}}"
-      DB_PORT: "{{.DB_PORT}}"
-      DB_NAME: "{{.DB_NAME}}"
-      DB_USER: "{{.DB_USER}}"
-      PGPASSWORD: "{{.DB_PASSWORD}}"
 
   docker:build:
     desc: Build Docker image for backend (uses DOCKER_IMAGE from .env)

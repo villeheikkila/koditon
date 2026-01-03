@@ -379,3 +379,95 @@ WHERE prices_neighborhood_id = sqlc.arg(neighborhood_id);
 SELECT COUNT(*) as count
 FROM public.prices_neighborhoods
 WHERE prices_neighborhood_postal_postal_code_id IS NULL;
+
+-- name: ListAvailableMunicipalities :many
+SELECT DISTINCT
+    pm.postal_municipality_id,
+    pm.postal_municipality_code,
+    pm.postal_municipality_name_fi,
+    pm.postal_municipality_name_sv
+FROM public.prices_transactions AS pt
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+ORDER BY pm.postal_municipality_name_fi;
+
+-- name: ListAvailablePostalCodes :many
+SELECT DISTINCT
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    ppc.postal_postal_code_name_sv,
+    pm.postal_municipality_id,
+    pm.postal_municipality_name_fi
+FROM public.prices_transactions AS pt
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+ORDER BY ppc.postal_postal_code_code;
+
+-- name: ListDistinctCategories :many
+SELECT DISTINCT prices_transaction_category AS category
+FROM public.prices_transactions
+ORDER BY prices_transaction_category;
+
+-- name: ListDistinctTypes :many
+SELECT DISTINCT prices_transaction_type AS type
+FROM public.prices_transactions
+ORDER BY prices_transaction_type;
+
+-- name: ListDistinctPlots :many
+SELECT DISTINCT prices_transaction_plot AS plot
+FROM public.prices_transactions
+WHERE prices_transaction_plot IS NOT NULL AND prices_transaction_plot != ''
+ORDER BY prices_transaction_plot;
+
+-- name: ListTransactionsFiltered :many
+SELECT
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    pn.prices_neighborhood_id,
+    pn.prices_neighborhood_name,
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    pm.postal_municipality_id,
+    pm.postal_municipality_name_fi
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+  AND (sqlc.narg('municipality_ids')::uuid[] IS NULL OR pm.postal_municipality_id = ANY(sqlc.narg('municipality_ids')::uuid[]))
+  AND (sqlc.narg('postal_code_ids')::uuid[] IS NULL OR ppc.postal_postal_code_id = ANY(sqlc.narg('postal_code_ids')::uuid[]))
+  AND (sqlc.narg('categories')::text[] IS NULL OR ht.prices_transaction_category = ANY(sqlc.narg('categories')::text[]))
+  AND (sqlc.narg('types')::text[] IS NULL OR ht.prices_transaction_type = ANY(sqlc.narg('types')::text[]))
+  AND (sqlc.narg('min_area')::double precision IS NULL OR ht.prices_transaction_area >= sqlc.narg('min_area')::double precision)
+  AND (sqlc.narg('max_area')::double precision IS NULL OR ht.prices_transaction_area <= sqlc.narg('max_area')::double precision)
+ORDER BY ht.prices_transaction_created_at DESC
+LIMIT COALESCE(sqlc.narg('limit_count')::int, 100);

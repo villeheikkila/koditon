@@ -39,6 +39,124 @@ components:
         - user_id
         - is_new_user
       type: object
+    AvailableCategoriesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AvailableCategoriesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        categories:
+          items:
+            $ref: "#/components/schemas/TranslatedValue"
+          type:
+            - array
+            - "null"
+      required:
+        - categories
+      type: object
+    AvailableLocationsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AvailableLocationsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        municipalities:
+          items:
+            $ref: "#/components/schemas/AvailableMunicipality"
+          type:
+            - array
+            - "null"
+        postal_codes:
+          items:
+            $ref: "#/components/schemas/AvailablePostalCode"
+          type:
+            - array
+            - "null"
+      required:
+        - municipalities
+        - postal_codes
+      type: object
+    AvailableMunicipality:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        name_fi:
+          type: string
+        name_sv:
+          type: string
+      required:
+        - id
+        - code
+        - name_fi
+      type: object
+    AvailablePlotsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AvailablePlotsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        plots:
+          items:
+            $ref: "#/components/schemas/TranslatedValue"
+          type:
+            - array
+            - "null"
+      required:
+        - plots
+      type: object
+    AvailablePostalCode:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        municipality_id:
+          type: string
+        name_fi:
+          type: string
+        name_sv:
+          type: string
+      required:
+        - id
+        - code
+        - name_fi
+        - municipality_id
+      type: object
+    AvailableTypesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AvailableTypesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        types:
+          items:
+            $ref: "#/components/schemas/TranslatedValue"
+          type:
+            - array
+            - "null"
+      required:
+        - types
+      type: object
     CurrentUserOutputBody:
       additionalProperties: false
       properties:
@@ -411,6 +529,17 @@ components:
       required:
         - success
       type: object
+    TranslatedValue:
+      additionalProperties: false
+      properties:
+        translation:
+          type: string
+        value:
+          type: string
+      required:
+        - value
+        - translation
+      type: object
   securitySchemes:
     bearer:
       bearerFormat: JWT
@@ -422,6 +551,86 @@ info:
   version: 0.1.0
 openapi: 3.1.0
 paths:
+  /api/v1/availability/categories:
+    get:
+      description: Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)
+      operationId: availability-categories
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableCategoriesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List available building categories
+  /api/v1/availability/locations:
+    get:
+      description: Returns only locations that have price transaction data available
+      operationId: availability-locations
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableLocationsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List municipalities and postal codes with price data
+  /api/v1/availability/plots:
+    get:
+      description: Returns distinct plot ownership types (e.g., Oma, Vuokra)
+      operationId: availability-plots
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailablePlotsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List available plot ownership types
+  /api/v1/availability/types:
+    get:
+      description: Returns distinct apartment types (e.g., Yksiö, Kaksio, Kolmio)
+      operationId: availability-types
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableTypesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List available apartment types
   /api/v1/ping:
     post:
       operationId: ping
@@ -498,6 +707,79 @@ paths:
       security:
         - bearer: []
       summary: List price transactions by municipality and postal code
+  /api/v1/prices/transactions/filtered:
+    get:
+      description: Query transactions with multiple postal codes, categories, types, and area ranges
+      operationId: prices-transactions-filtered
+      parameters:
+        - description: Comma-separated list of municipality UUIDs
+          explode: false
+          in: query
+          name: municipality_ids
+          schema:
+            description: Comma-separated list of municipality UUIDs
+            type: string
+        - description: Comma-separated list of postal code UUIDs
+          explode: false
+          in: query
+          name: postal_code_ids
+          schema:
+            description: Comma-separated list of postal code UUIDs
+            type: string
+        - description: Comma-separated list of categories (e.g., Kerrostalo,Rivitalo)
+          explode: false
+          in: query
+          name: categories
+          schema:
+            description: Comma-separated list of categories (e.g., Kerrostalo,Rivitalo)
+            type: string
+        - description: Comma-separated list of types (e.g., Yksiö,Kaksio)
+          explode: false
+          in: query
+          name: types
+          schema:
+            description: Comma-separated list of types (e.g., Yksiö,Kaksio)
+            type: string
+        - description: Minimum area in square meters (0 = no minimum)
+          explode: false
+          in: query
+          name: min_area
+          schema:
+            description: Minimum area in square meters (0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum area in square meters (0 = no maximum)
+          explode: false
+          in: query
+          name: max_area
+          schema:
+            description: Maximum area in square meters (0 = no maximum)
+            format: double
+            type: number
+        - description: Maximum number of results (default 100)
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Maximum number of results (default 100)
+            format: int32
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricesTransactionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List price transactions with advanced filters
   /auth/anonymous:
     post:
       description: Create an anonymous user and obtain access and refresh tokens
