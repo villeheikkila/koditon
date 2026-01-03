@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -118,5 +118,5 @@ func (s *JWTService) Issuer() string {
 }
 
 func isExpiredTokenError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "exp not satisfied")
+	return errors.Is(err, jwt.ErrTokenExpired())
 }

@@ -26,9 +26,9 @@ type Config struct {
 	Host            string        `env:"APP_HOST,required"`
 	Port            string        `env:"APP_PORT,required"`
 	ShutdownTimeout time.Duration `env:"APP_SHUTDOWN_TIMEOUT,required"`
-	Environment     Environment   `env:"APP_ENV" envDefault:"development"`
-	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
-	Mode            AppMode       `env:"APP_MODE" envDefault:"consumer,api"`
+	Environment     Environment   `env:"APP_ENV,required"`
+	LogLevel        string        `env:"LOG_LEVEL,required"`
+	Mode            AppMode       `env:"APP_MODE,required"`
 	DatabaseURL     string        `env:"DATABASE_URL,required"`
 	Auth            AuthConfig
 	Prices          PricesConfig
@@ -123,21 +123,21 @@ type OpenRouterConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken string `env:"TELEGRAM_BOT_TOKEN"`
-	ChatID   string `env:"TELEGRAM_CHAT_ID"`
+	BotToken string `env:"TELEGRAM_BOT_TOKEN,required"`
+	ChatID   string `env:"TELEGRAM_CHAT_ID,required"`
 }
 
 type AuthConfig struct {
-	JWTSigningKey string `env:"AUTH_JWT_SIGNING_KEY"`
-	JWTIssuer     string `env:"AUTH_JWT_ISSUER" envDefault:"koditon"`
+	JWTSigningKey string `env:"AUTH_JWT_SIGNING_KEY,required"`
+	JWTIssuer     string `env:"AUTH_JWT_ISSUER,required"`
 	Apple         AppleAuthConfig
 }
 
 type AppleAuthConfig struct {
-	BundleID     string `env:"AUTH_APPLE_BUNDLE_ID"`
-	TeamID       string `env:"AUTH_APPLE_TEAM_ID"`
-	PrivateKeyID string `env:"AUTH_APPLE_PRIVATE_KEY_ID"`
-	PrivateKey   string `env:"AUTH_APPLE_PRIVATE_KEY"`
+	BundleID     string `env:"AUTH_APPLE_BUNDLE_ID,required"`
+	TeamID       string `env:"AUTH_APPLE_TEAM_ID,required"`
+	PrivateKeyID string `env:"AUTH_APPLE_PRIVATE_KEY_ID,required"`
+	PrivateKey   string `env:"AUTH_APPLE_PRIVATE_KEY,required"`
 }
 
 func (c AppleAuthConfig) IsConfigured() bool {
