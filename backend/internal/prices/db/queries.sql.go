@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -296,6 +297,119 @@ func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborh
 			&i.PricesNeighborhoodName,
 			&i.PricesPostalCodeCode,
 			&i.PricesCityName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTransactionsByPostalSelection = `-- name: ListTransactionsByPostalSelection :many
+SELECT
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    pn.prices_neighborhood_id,
+    pn.prices_neighborhood_name,
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    pm.postal_municipality_id,
+    pm.postal_municipality_name_fi
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
+  AND pm.postal_municipality_id = $1
+  AND ppc.postal_postal_code_id = $2
+ORDER BY ht.prices_transaction_created_at DESC
+`
+
+type ListTransactionsByPostalSelectionParams struct {
+	MunicipalityID pgtype.UUID `db:"municipality_id" json:"municipality_id"`
+	PostalCodeID   pgtype.UUID `db:"postal_code_id" json:"postal_code_id"`
+}
+
+type ListTransactionsByPostalSelectionRow struct {
+	PricesTransactionID                  pgtype.UUID `db:"prices_transaction_id" json:"prices_transaction_id"`
+	PricesTransactionDescription         string      `db:"prices_transaction_description" json:"prices_transaction_description"`
+	PricesTransactionType                string      `db:"prices_transaction_type" json:"prices_transaction_type"`
+	PricesTransactionArea                float64     `db:"prices_transaction_area" json:"prices_transaction_area"`
+	PricesTransactionPrice               int32       `db:"prices_transaction_price" json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32       `db:"prices_transaction_price_per_square_meter" json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32       `db:"prices_transaction_build_year" json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string     `db:"prices_transaction_floor" json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool        `db:"prices_transaction_elevator" json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string     `db:"prices_transaction_condition" json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string     `db:"prices_transaction_plot" json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string     `db:"prices_transaction_energy_class" json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string      `db:"prices_transaction_period_identifier" json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time   `db:"prices_transaction_created_at" json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time   `db:"prices_transaction_updated_at" json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string      `db:"prices_transaction_category" json:"prices_transaction_category"`
+	PricesNeighborhoodID                 pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string      `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
+	PostalPostalCodeID                   pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeCode                 string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi               string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalMunicipalityID                 pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityNameFi             string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+}
+
+func (q *Queries) ListTransactionsByPostalSelection(ctx context.Context, arg *ListTransactionsByPostalSelectionParams) ([]ListTransactionsByPostalSelectionRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByPostalSelection, arg.MunicipalityID, arg.PostalCodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTransactionsByPostalSelectionRow{}
+	for rows.Next() {
+		var i ListTransactionsByPostalSelectionRow
+		if err := rows.Scan(
+			&i.PricesTransactionID,
+			&i.PricesTransactionDescription,
+			&i.PricesTransactionType,
+			&i.PricesTransactionArea,
+			&i.PricesTransactionPrice,
+			&i.PricesTransactionPricePerSquareMeter,
+			&i.PricesTransactionBuildYear,
+			&i.PricesTransactionFloor,
+			&i.PricesTransactionElevator,
+			&i.PricesTransactionCondition,
+			&i.PricesTransactionPlot,
+			&i.PricesTransactionEnergyClass,
+			&i.PricesTransactionPeriodIdentifier,
+			&i.PricesTransactionCreatedAt,
+			&i.PricesTransactionUpdatedAt,
+			&i.PricesTransactionCategory,
+			&i.PricesNeighborhoodID,
+			&i.PricesNeighborhoodName,
+			&i.PostalPostalCodeID,
+			&i.PostalPostalCodeCode,
+			&i.PostalPostalCodeNameFi,
+			&i.PostalMunicipalityID,
+			&i.PostalMunicipalityNameFi,
 		); err != nil {
 			return nil, err
 		}

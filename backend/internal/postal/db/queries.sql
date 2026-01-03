@@ -117,3 +117,22 @@ SET postal_postal_code_date = EXCLUDED.postal_postal_code_date,
     postal_ad_area_id = EXCLUDED.postal_ad_area_id,
     postal_municipality_id = EXCLUDED.postal_municipality_id,
     postal_postal_code_updated_at = now();
+
+-- name: ListMunicipalitiesWithPostalCodes :many
+SELECT
+    pm.postal_municipality_id,
+    pm.postal_municipality_code,
+    pm.postal_municipality_name_fi,
+    pm.postal_municipality_name_sv,
+    pm.postal_municipality_created_at,
+    pm.postal_municipality_updated_at,
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    ppc.postal_postal_code_name_sv,
+    ppc.postal_postal_code_created_at,
+    ppc.postal_postal_code_updated_at
+FROM public.postal_municipalities AS pm
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_municipality_id = pm.postal_municipality_id
+ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code;

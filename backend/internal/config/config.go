@@ -30,6 +30,7 @@ type Config struct {
 	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
 	Mode            AppMode       `env:"APP_MODE" envDefault:"consumer,api"`
 	DB              DBConfig      `envPrefix:"DB_"`
+	Auth            AuthConfig
 	Prices          PricesConfig
 	Shortcut        ShortcutConfig
 	Frontdoor       FrontdoorConfig
@@ -133,6 +134,23 @@ type OpenRouterConfig struct {
 type TelegramConfig struct {
 	BotToken string `env:"TELEGRAM_BOT_TOKEN"`
 	ChatID   string `env:"TELEGRAM_CHAT_ID"`
+}
+
+type AuthConfig struct {
+	JWTSigningKey string `env:"AUTH_JWT_SIGNING_KEY"`
+	JWTIssuer     string `env:"AUTH_JWT_ISSUER" envDefault:"koditon"`
+	Apple         AppleAuthConfig
+}
+
+type AppleAuthConfig struct {
+	BundleID     string `env:"AUTH_APPLE_BUNDLE_ID"`
+	TeamID       string `env:"AUTH_APPLE_TEAM_ID"`
+	PrivateKeyID string `env:"AUTH_APPLE_PRIVATE_KEY_ID"`
+	PrivateKey   string `env:"AUTH_APPLE_PRIVATE_KEY"`
+}
+
+func (c AppleAuthConfig) IsConfigured() bool {
+	return c.BundleID != "" && c.TeamID != "" && c.PrivateKeyID != "" && c.PrivateKey != ""
 }
 
 func Load() (Config, error) {

@@ -28,7 +28,6 @@ The repository root contains a `Taskfile.yml` with shortcuts for common operatio
 
 ### Development
 - `task backend:dev`: runs the backend server with file watching and auto-reload
-- `task client:dev`: runs the frontend development server
 
 ### Database
 - `task db:new NAME=...`: creates a new timestamped migration file
@@ -38,11 +37,15 @@ The repository root contains a `Taskfile.yml` with shortcuts for common operatio
 - `task db:query QUERY="SELECT ..."`: runs a SQL query directly
 - `task db:query FILE=path/to/file.sql`: runs a SQL file
 
-### Client Build & Quality
-- `task client:generate`: rebuilds the client SDK when API contracts or return types change
-- `task client:build`: builds the client app for production
-- `task client:lint`: lints the client app
-- `task client:preview`: previews the built client
+### iOS (Native Swift App in `koditon/`)
+
+> **Note:** The `client/` folder contains a deprecated Expo app. All client development should now be done in the `koditon/` folder which contains the native Swift iOS app.
+
+- `task ios:build`: builds the iOS app using xcede
+- `task ios:run`: runs the iOS app on the simulator (does not exit on its own - must be terminated manually)
+- `task ios:build-run`: builds and runs the iOS app in one command (does not exit on its own - must be terminated manually)
+
+The device ID is read from `IOS_DEVICE_ID` in `.env`. You can override the platform with `IOS_PLATFORM=device` for physical devices.
 
 ## General Repository Notes
 

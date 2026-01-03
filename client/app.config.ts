@@ -9,6 +9,11 @@ if (!bundleIdentifier) {
   throw new Error("Missing required environment variable: BUNDLE_IDENTIFIER");
 }
 
+const projectId = process.env.EAS_PROJECT_ID;
+if (!bundleIdentifier) {
+  throw new Error("Missing required environment variable: EAS_PROJECT_ID");
+}
+
 const config: ExpoConfig = {
   name: "Koditon",
   slug: "koditon",
@@ -22,12 +27,14 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier,
+    usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
   },
   plugins: [
     "expo-router",
+    "expo-apple-authentication",
     [
       "expo-splash-screen",
       {
@@ -48,12 +55,12 @@ const config: ExpoConfig = {
   extra: {
     router: {},
     eas: {
-      projectId: "2d5b52c3-77aa-4a3e-ba65-8e2837178227",
+      projectId: projectId,
     },
   },
   owner,
   updates: {
-    url: "https://u.expo.dev/2d5b52c3-77aa-4a3e-ba65-8e2837178227",
+    url: `https://u.expo.dev/${projectId}`,
   },
   runtimeVersion: {
     policy: "appVersion",

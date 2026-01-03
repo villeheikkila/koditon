@@ -1,18 +1,27 @@
 import { defineConfig } from "orval";
 
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080";
+// Default to localhost, use ORVAL_PROD=1 to generate from production API
+const API_BASE = process.env.ORVAL_PROD
+  ? "https://api.bytesized.solutions"
+  : "http://localhost:8080";
 
 export default defineConfig({
   koditon: {
-    input: "http://localhost:8080/openapi.yaml",
+    input: `${API_BASE}/openapi.yaml`,
     output: {
       mode: "tags-split",
-      target: "api/client.ts",
-      schemas: "api/models",
+      target: "generated/client.ts",
+      schemas: "generated/models",
       client: "fetch",
       httpClient: "fetch",
-      baseUrl: apiBaseUrl,
+      baseUrl: "http://localhost:8080",
       clean: true,
+      override: {
+        mutator: {
+          path: "api/orval-mutator.ts",
+          name: "authFetch",
+        },
+      },
     },
   },
 });

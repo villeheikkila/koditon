@@ -1,10 +1,3 @@
--- Consolidated migration combining all schema changes from migrations 003-013
--- This includes: task systems, postal tables, column renames to singular form
-
--- ============================================
--- Task System: prices_neighborhood_postal_code_sync
--- ============================================
-
 INSERT INTO task_queue.entity_registry (entity_id, entity_type, status, scheduling_strategy)
 VALUES ('prices:neighborhood_postal_codes', 'prices_neighborhood_postal_codes', 'active', 'cron')
 ON CONFLICT (entity_id) DO NOTHING;
@@ -78,10 +71,6 @@ SELECT cron.schedule(
 WHERE NOT EXISTS (
     SELECT 1 FROM cron.job WHERE jobname = 'trigger-prices-neighborhood-postal-code-sync'
 );
-
--- ============================================
--- Task System: prices_sync_all
--- ============================================
 
 INSERT INTO task_queue.entity_registry (entity_id, entity_type, status, scheduling_strategy)
 VALUES ('prices:sync_all', 'prices_sync_all', 'active', 'cron')
@@ -157,10 +146,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM cron.job WHERE jobname = 'trigger-prices-sync-all'
 );
 
--- ============================================
--- Create postal tables (normalized)
--- ============================================
-
 CREATE TABLE public.postal_ad_areas (
     postal_ad_area_id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     postal_ad_area_code       text NOT NULL UNIQUE,
@@ -200,10 +185,6 @@ CREATE INDEX idx_postal_postal_code_name_fi ON public.postal_postal_codes(postal
 CREATE INDEX idx_postal_postal_code_ad_area_id ON public.postal_postal_codes(postal_ad_area_id);
 CREATE INDEX idx_postal_postal_code_municipality_id ON public.postal_postal_codes(postal_municipality_id);
 CREATE INDEX idx_postal_municipality_name_fi ON public.postal_municipalities(postal_municipality_name_fi);
-
--- ============================================
--- Task System: postal_sync
--- ============================================
 
 INSERT INTO task_queue.entity_registry (entity_id, entity_type, status, scheduling_strategy)
 VALUES ('postal:sync', 'postal_sync', 'active', 'manual')
@@ -270,19 +251,11 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION task_queue.fnc__schedule_postal_sync() IS
 'Creates a postal_sync task to sync Finnish postal codes, municipalities, and administrative areas from Posti.';
 
--- ============================================
--- Link prices_neighborhoods to postal codes
--- ============================================
-
 ALTER TABLE public.prices_neighborhoods
 ADD COLUMN prices_neighborhood_postal_postal_code_id uuid REFERENCES public.postal_postal_codes(postal_postal_code_id);
 
 CREATE INDEX idx_prices_neighborhood_postal_postal_code_id
 ON public.prices_neighborhoods(prices_neighborhood_postal_postal_code_id);
-
--- ============================================
--- Link frontdoor_ads to postal codes
--- ============================================
 
 ALTER TABLE public.frontdoor_ads
 ADD COLUMN postal_postal_code_id uuid
@@ -314,11 +287,7 @@ ON public.frontdoor_ads
 FOR EACH ROW
 EXECUTE FUNCTION fnc__link_frontdoor_ads_postal_code();
 
--- ============================================
--- Rename all columns to singular form
--- ============================================
 
--- prices_cities
 ALTER TABLE public.prices_cities
     RENAME COLUMN prices_cities_id TO prices_city_id;
 ALTER TABLE public.prices_cities
@@ -328,7 +297,6 @@ ALTER TABLE public.prices_cities
 ALTER TABLE public.prices_cities
     RENAME COLUMN prices_cities_updated_at TO prices_city_updated_at;
 
--- prices_postal_codes
 ALTER TABLE public.prices_postal_codes
     RENAME COLUMN prices_postal_codes_id TO prices_postal_code_id;
 ALTER TABLE public.prices_postal_codes
@@ -340,7 +308,6 @@ ALTER TABLE public.prices_postal_codes
 ALTER TABLE public.prices_postal_codes
     RENAME COLUMN prices_postal_codes_updated_at TO prices_postal_code_updated_at;
 
--- prices_neighborhoods
 ALTER TABLE public.prices_neighborhoods
     RENAME COLUMN prices_neighborhoods_id TO prices_neighborhood_id;
 ALTER TABLE public.prices_neighborhoods
@@ -354,7 +321,6 @@ ALTER TABLE public.prices_neighborhoods
 ALTER TABLE public.prices_neighborhoods
     RENAME COLUMN prices_neighborhoods_updated_at TO prices_neighborhood_updated_at;
 
--- prices_transactions
 ALTER TABLE public.prices_transactions
     RENAME COLUMN prices_transactions_id TO prices_transaction_id;
 ALTER TABLE public.prices_transactions
@@ -471,7 +437,6 @@ ALTER TABLE public.shortcut_buildings
 DROP INDEX IF EXISTS shortcut_buildings_geom_idx;
 CREATE INDEX shortcut_building_geom_idx ON public.shortcut_buildings USING GIST (shortcut_building_geom);
 
--- shortcut_building_listings
 ALTER TABLE public.shortcut_building_listings
     RENAME COLUMN shortcut_building_listings_id TO shortcut_building_listing_id;
 ALTER TABLE public.shortcut_building_listings
@@ -495,7 +460,6 @@ ALTER TABLE public.shortcut_building_listings
 ALTER TABLE public.shortcut_building_listings
     RENAME COLUMN shortcut_building_listings_idx TO shortcut_building_listing_idx;
 
--- shortcut_building_rentals
 ALTER TABLE public.shortcut_building_rentals
     RENAME COLUMN shortcut_building_rentals_id TO shortcut_building_rental_id;
 ALTER TABLE public.shortcut_building_rentals
@@ -517,7 +481,6 @@ ALTER TABLE public.shortcut_building_rentals
 ALTER TABLE public.shortcut_building_rentals
     RENAME COLUMN shortcut_building_rentals_idx TO shortcut_building_rental_idx;
 
--- shortcut_ads
 ALTER TABLE public.shortcut_ads
     RENAME COLUMN shortcut_ads_id TO shortcut_ad_id;
 ALTER TABLE public.shortcut_ads
@@ -538,7 +501,6 @@ ALTER TABLE public.shortcut_ads
 DROP INDEX IF EXISTS idx_shortcut_ads_zipcode_name;
 CREATE INDEX idx_shortcut_ad_zipcode_name ON public.shortcut_ads(((((shortcut_ad_data -> 'address'::text) -> 'zipCode'::text) ->> 'name'::text)));
 
--- shortcut_tokens
 ALTER TABLE public.shortcut_tokens
     RENAME COLUMN shortcut_tokens_id TO shortcut_token_id;
 ALTER TABLE public.shortcut_tokens
@@ -562,7 +524,6 @@ CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens(shortcut_token_cu
 ALTER TABLE public.shortcut_tokens DROP CONSTRAINT IF EXISTS shortcut_tokens_shortcut_tokens_cuid_key;
 ALTER TABLE public.shortcut_tokens ADD CONSTRAINT shortcut_token_cuid_key UNIQUE(shortcut_token_cuid);
 
--- frontdoor_ads
 ALTER TABLE public.frontdoor_ads
     RENAME COLUMN frontdoor_ads_id TO frontdoor_ad_id;
 ALTER TABLE public.frontdoor_ads
@@ -589,7 +550,6 @@ DROP INDEX IF EXISTS idx_frontdoor_ads_page_not_found;
 CREATE INDEX idx_frontdoor_ad_processed_at ON public.frontdoor_ads(frontdoor_ad_processed_at);
 CREATE INDEX idx_frontdoor_ad_page_not_found ON public.frontdoor_ads(frontdoor_ad_page_not_found);
 
--- frontdoor_buildings
 ALTER TABLE public.frontdoor_buildings
     RENAME COLUMN frontdoor_buildings_id TO frontdoor_building_id;
 ALTER TABLE public.frontdoor_buildings
@@ -704,7 +664,6 @@ DROP INDEX IF EXISTS idx_frontdoor_buildings_business_id;
 CREATE INDEX idx_frontdoor_building_processed_at ON public.frontdoor_buildings(frontdoor_building_processed_at);
 CREATE INDEX idx_frontdoor_building_business_id ON public.frontdoor_buildings(frontdoor_building_business_id);
 
--- frontdoor_building_announcements
 ALTER TABLE public.frontdoor_building_announcements
     RENAME COLUMN frontdoor_building_announcements_id TO frontdoor_building_announcement_id;
 ALTER TABLE public.frontdoor_building_announcements
@@ -770,10 +729,6 @@ DROP INDEX IF EXISTS idx_frontdoor_building_announcements_building_id;
 CREATE INDEX idx_frontdoor_building_announcement_building_id
     ON public.frontdoor_building_announcements(frontdoor_building_id);
 
--- ============================================
--- Update trigger function with new column names
--- ============================================
-
 DROP TRIGGER IF EXISTS tg__frontdoor_ads_link_postal_code ON public.frontdoor_ads;
 DROP FUNCTION IF EXISTS fnc__link_frontdoor_ads_postal_code();
 
@@ -794,10 +749,6 @@ BEFORE INSERT OR UPDATE OF frontdoor_ad_data
 ON public.frontdoor_ads
 FOR EACH ROW
 EXECUTE FUNCTION fnc__link_frontdoor_ads_postal_code();
-
--- ============================================
--- Recreate view with updated column names
--- ============================================
 
 DROP VIEW IF EXISTS view__prices_transactions;
 

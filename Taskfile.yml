@@ -2,6 +2,10 @@ version: "3"
 
 dotenv: [".env", "./backend/.env"]
 
+vars:
+  IOS_SCHEME: koditon
+  IOS_PLATFORM: sim
+
 tasks:
   backend:dev:
     desc: Run the server with automatic reload on source/.env changes
@@ -151,16 +155,92 @@ tasks:
       PGPASSWORD: "{{.DB_PASSWORD}}"
 
   client:dev:
-    desc: Run the client dev server
+    desc: Start the Expo app with required env vars
     dir: client
     cmds:
-      - npm run dev
+      - npm run start
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_API_URL: "{{.EXPO_PUBLIC_API_URL}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
 
-  client:build:
-    desc: Build the client app
+  client:credentials:
+    desc: Build the iOS simulator app locally via EAS with required env vars
     dir: client
     cmds:
-      - npm run build
+      - npx eas-cli credentials
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
+
+  client:build:simulator:
+    desc: Build the iOS simulator app locally via EAS with required env vars
+    dir: client
+    cmds:
+      - npx eas-cli build --platform ios --profile development-simulator --local --non-interactive
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
+
+  client:build:production:
+    desc: Build the iOS simulator app locally via EAS with required env vars
+    dir: client
+    dotenv: [".env.prod"]
+    cmds:
+      - npx eas-cli build --platform ios --local --profile production --non-interactive --auto-submit
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
+
+  client:eas-init:
+    dir: client
+    cmds:
+      - eas init --id ${EAS_PROJECT_ID}
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+
+  client:submit:
+    dir: client
+    cmds:
+      - npx eas-cli submit --platform ios
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+
+  client:project:info:
+    dir: client
+    cmds:
+      - npx eas-cli project:info
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+
+  client:build-and-submit:production:
+    desc: Build locally and submit to App Store in one command
+    dir: client
+    dotenv: [".env.prod"]
+    cmds:
+      - |
+        npx eas-cli build --platform ios --profile production --auto-submit
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      EXPO_PUBLIC_API_URL: "{{.EXPO_PUBLIC_API_URL}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+      EAS_PROJECT_ID: "{{.EAS_PROJECT_ID}}"
 
   client:lint:
     desc: Lint the client app
@@ -168,29 +248,36 @@ tasks:
     cmds:
       - npm run lint
 
-  client:preview:
-    desc: Preview the built client
-    dir: client
-    cmds:
-      - npm run preview
-
-  expo:start:
-    desc: Start the Expo app with required env vars
-    dir: client
-    cmds:
-      - EXPO_OWNER=${EXPO_OWNER} BUNDLE_IDENTIFIER=${BUNDLE_IDENTIFIER} npm run start
-
-  expo:build:ios:
-    desc: Build the iOS app locally with required env vars
-    dir: client
-    cmds:
-      - EXPO_OWNER=${EXPO_OWNER} BUNDLE_IDENTIFIER=${BUNDLE_IDENTIFIER} npx expo run:ios --configuration Release
-
   client:generate:
     desc: Generate the client Expo API client from OpenAPI
     dir: client
     cmds:
       - npm run generate
+    env:
+      EXPO_PUBLIC_API_URL: "{{.EXPO_PUBLIC_API_URL}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+
+  client:build:prod:
+    desc: Build the iOS production app via EAS with required env vars
+    dir: client
+    dotenv: [".env.prod"]
+    cmds:
+      - npx eas-cli build --platform ios --profile production --non-interactive
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
+
+  client:submit:prod:
+    desc: Submit the latest iOS production build via EAS with required env vars
+    dir: client
+    dotenv: [".env.prod"]
+    cmds:
+      - npx eas-cli submit --platform ios --profile production --latest --non-interactive
+    env:
+      EXPO_OWNER: "{{.EXPO_OWNER}}"
+      EXPO_PUBLIC_KODITON_API_KEY: "{{.EXPO_PUBLIC_KODITON_API_KEY}}"
+      BUNDLE_IDENTIFIER: "{{.BUNDLE_IDENTIFIER}}"
 
   docker:build:
     desc: Build Docker image for backend (uses DOCKER_IMAGE from .env)
@@ -222,3 +309,21 @@ tasks:
         echo "Triggering Dokploy deployment..."
         curl -X POST "{{.DOKPLOY_WEBHOOK_URL}}"
         echo "\nDeployment triggered successfully!"
+
+  ios:build:
+    desc: Build the iOS app using xcede
+    dir: koditon
+    cmds:
+      - xcede build --scheme {{.IOS_SCHEME}} --platform {{.IOS_PLATFORM}} --device "{{.IOS_DEVICE_ID}}"
+
+  ios:run:
+    desc: Run the iOS app using xcede
+    dir: koditon
+    cmds:
+      - xcede run --scheme {{.IOS_SCHEME}} --platform {{.IOS_PLATFORM}} --device "{{.IOS_DEVICE_ID}}"
+
+  ios:build-run:
+    desc: Build and run the iOS app using xcede
+    dir: koditon
+    cmds:
+      - xcede buildrun -s {{.IOS_SCHEME}} -p {{.IOS_PLATFORM}} -d "{{.IOS_DEVICE_ID}}"

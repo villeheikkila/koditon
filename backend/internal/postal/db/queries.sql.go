@@ -12,6 +12,74 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const listMunicipalitiesWithPostalCodes = `-- name: ListMunicipalitiesWithPostalCodes :many
+SELECT
+    pm.postal_municipality_id,
+    pm.postal_municipality_code,
+    pm.postal_municipality_name_fi,
+    pm.postal_municipality_name_sv,
+    pm.postal_municipality_created_at,
+    pm.postal_municipality_updated_at,
+    ppc.postal_postal_code_id,
+    ppc.postal_postal_code_code,
+    ppc.postal_postal_code_name_fi,
+    ppc.postal_postal_code_name_sv,
+    ppc.postal_postal_code_created_at,
+    ppc.postal_postal_code_updated_at
+FROM public.postal_municipalities AS pm
+JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_municipality_id = pm.postal_municipality_id
+ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code
+`
+
+type ListMunicipalitiesWithPostalCodesRow struct {
+	PostalMunicipalityID        pgtype.UUID        `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityCode      string             `db:"postal_municipality_code" json:"postal_municipality_code"`
+	PostalMunicipalityNameFi    string             `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv    *string            `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
+	PostalMunicipalityCreatedAt pgtype.Timestamptz `db:"postal_municipality_created_at" json:"postal_municipality_created_at"`
+	PostalMunicipalityUpdatedAt pgtype.Timestamptz `db:"postal_municipality_updated_at" json:"postal_municipality_updated_at"`
+	PostalPostalCodeID          pgtype.UUID        `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeCode        string             `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi      string             `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv      *string            `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
+	PostalPostalCodeCreatedAt   pgtype.Timestamptz `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
+	PostalPostalCodeUpdatedAt   pgtype.Timestamptz `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
+}
+
+func (q *Queries) ListMunicipalitiesWithPostalCodes(ctx context.Context) ([]ListMunicipalitiesWithPostalCodesRow, error) {
+	rows, err := q.db.Query(ctx, listMunicipalitiesWithPostalCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMunicipalitiesWithPostalCodesRow{}
+	for rows.Next() {
+		var i ListMunicipalitiesWithPostalCodesRow
+		if err := rows.Scan(
+			&i.PostalMunicipalityID,
+			&i.PostalMunicipalityCode,
+			&i.PostalMunicipalityNameFi,
+			&i.PostalMunicipalityNameSv,
+			&i.PostalMunicipalityCreatedAt,
+			&i.PostalMunicipalityUpdatedAt,
+			&i.PostalPostalCodeID,
+			&i.PostalPostalCodeCode,
+			&i.PostalPostalCodeNameFi,
+			&i.PostalPostalCodeNameSv,
+			&i.PostalPostalCodeCreatedAt,
+			&i.PostalPostalCodeUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertPostalAdAreasBulk = `-- name: UpsertPostalAdAreasBulk :many
 INSERT INTO public.postal_ad_areas (
     postal_ad_area_code,

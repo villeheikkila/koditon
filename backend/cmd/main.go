@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"koditon-go/internal/auth"
+	"koditon-go/internal/auth/apple"
 	"koditon-go/internal/config"
 	"koditon-go/internal/consumers"
 	"koditon-go/internal/frontdoor"
@@ -112,9 +114,32 @@ func run(
 	var httpServer *http.Server
 	var errCh chan error
 	if cfg.Mode.API {
-		srv := server.New(logger, cfg, pool, taskQueueClient)
+		var appleConfig *apple.Config
+		if cfg.Auth.Apple.IsConfigured() {
+			appleConfig = &apple.Config{
+				BundleID:     cfg.Auth.Apple.BundleID,
+				TeamID:       cfg.Auth.Apple.TeamID,
+				PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
+				PrivateKey:   cfg.Auth.Apple.PrivateKey,
+			}
+		}
+		authService, err := auth.NewService(ctx, auth.ServiceConfig{
+			Pool: pool,
+			JWT: auth.JWTConfig{
+				SigningKey: cfg.Auth.JWTSigningKey,
+				Issuer:     cfg.Auth.JWTIssuer,
+			},
+			Apple:  appleConfig,
+			Logger: logger,
+		})
+		if err != nil {
+			return fmt.Errorf("create auth service: %w", err)
+		}
+		srv := server.New(logger, cfg, pool, taskQueueClient, authService)
 		mux := http.NewServeMux()
-		api := humago.New(mux, huma.DefaultConfig("Koditon API", "0.1.0"))
+		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
+		auth.RegisterSecurityScheme(&apiConfig)
+		api := humago.New(mux, apiConfig)
 		httpServer = &http.Server{
 			Addr:              net.JoinHostPort(cfg.Host, cfg.Port),
 			Handler:           srv.Handler(mux, api),

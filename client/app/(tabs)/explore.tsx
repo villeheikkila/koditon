@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
-import { healthz } from "@/api/default/default";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts } from "@/constants/theme";
+import { getHealthzUrl, healthz, ping } from "@/generated/default/default";
+import { useAuth } from "@/state/auth-context";
 
 export default function TabTwoScreen() {
+  const { signOut } = useAuth();
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pingEcho, setPingEcho] = useState<string | null>(null);
+  const [pingError, setPingError] = useState<string | null>(null);
   useEffect(() => {
     let mounted = true;
     const fetchHealth = async () => {
@@ -26,7 +30,23 @@ export default function TabTwoScreen() {
         setError(err instanceof Error ? err.message : "Health check failed");
       }
     };
+    const fetchPing = async () => {
+      try {
+        const res = await ping({ message: "ping" });
+        if (!mounted) return;
+        if (res.status === 200) {
+          setPingEcho(res.data.echo);
+          setPingError(null);
+          return;
+        }
+        setPingError(res.data?.status?.toString() ?? "Ping failed");
+      } catch (err) {
+        if (!mounted) return;
+        setPingError(err instanceof Error ? err.message : "Ping failed");
+      }
+    };
     fetchHealth();
+    fetchPing();
     return () => {
       mounted = false;
     };
@@ -48,10 +68,20 @@ export default function TabTwoScreen() {
       </ThemedText>
       <ThemedView style={styles.healthRow}>
         <ThemedText type="defaultSemiBold">Health</ThemedText>
+        <ThemedText type="defaultSemiBold">{getHealthzUrl()}</ThemedText>
         {status && <ThemedText>{status}</ThemedText>}
         {!status && !error && <ActivityIndicator />}
         {error && <ThemedText>{error}</ThemedText>}
       </ThemedView>
+      <ThemedView style={styles.healthRow}>
+        <ThemedText type="defaultSemiBold">Ping</ThemedText>
+        {pingEcho && <ThemedText>{pingEcho}</ThemedText>}
+        {!pingEcho && !pingError && <ActivityIndicator />}
+        {pingError && <ThemedText>{pingError}</ThemedText>}
+      </ThemedView>
+      <Pressable style={styles.signOutButton} onPress={signOut}>
+        <ThemedText style={styles.signOutText}>Sign Out</ThemedText>
+      </Pressable>
     </View>
   );
 }
@@ -72,5 +102,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
+  },
+  signOutButton: {
+    marginTop: 32,
+    backgroundColor: "#333",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  signOutText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });

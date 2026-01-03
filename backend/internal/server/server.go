@@ -11,8 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"koditon-go/internal/auth"
 	"koditon-go/internal/config"
 	frontdoorclient "koditon-go/internal/frontdoor/client"
+	postaldb "koditon-go/internal/postal/db"
 	pricesclient "koditon-go/internal/prices/client"
 	pricesdb "koditon-go/internal/prices/db"
 	shortcutclient "koditon-go/internal/shortcut/client"
@@ -25,17 +27,18 @@ type Server struct {
 	cfg           config.Config
 	pricesQueries *pricesdb.Queries
 	pricesAPI     *pricesclient.Client
+	postalQueries *postaldb.Queries
 	taskQueue     *taskqueue.Client
 	shortcutAPI   *shortcutclient.Client
 	frontdoorAPI  *frontdoorclient.Client
+	authService   *auth.Service
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueClient *taskqueue.Client) *Server {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueClient *taskqueue.Client, authService *auth.Service) *Server {
 	pricesQueries := pricesdb.New(pool)
+	postalQueries := postaldb.New(pool)
 	shortcutQueries := shortcutdb.New(pool)
-
 	pricesClient, _ := pricesclient.NewClient(cfg.Prices.BaseURL)
-
 	tokenLoad := func(ctx context.Context) (*shortcutclient.Tokens, error) {
 		dbToken, err := shortcutQueries.GetValidShortcutToken(ctx)
 		if err != nil {
@@ -81,9 +84,11 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		cfg:           cfg,
 		pricesQueries: pricesQueries,
 		pricesAPI:     pricesClient,
+		postalQueries: postalQueries,
 		taskQueue:     taskQueueClient,
 		shortcutAPI:   shortcutClient,
 		frontdoorAPI:  frontdoorClient,
+		authService:   authService,
 	}
 }
 

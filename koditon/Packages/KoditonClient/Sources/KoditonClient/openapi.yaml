@@ -1,0 +1,672 @@
+components:
+  schemas:
+    AuthTokensResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AuthTokensResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        access_token:
+          description: JWT access token for API authentication
+          type: string
+        access_token_expires_at:
+          description: Unix timestamp when access token expires
+          format: int64
+          type: integer
+        is_new_user:
+          description: Whether this is a newly created user
+          type: boolean
+        refresh_token:
+          description: JWT refresh token for obtaining new access tokens
+          type: string
+        refresh_token_expires_at:
+          description: Unix timestamp when refresh token expires
+          format: int64
+          type: integer
+        user_id:
+          description: User ID
+          format: uuid
+          type: string
+      required:
+        - access_token
+        - access_token_expires_at
+        - refresh_token
+        - refresh_token_expires_at
+        - user_id
+        - is_new_user
+      type: object
+    CurrentUserOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CurrentUserOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        feature_flags:
+          description: List of enabled feature flags for the user
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - feature_flags
+      type: object
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value:
+          description: The value at the given location
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ErrorModel.json
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of the problem.
+          examples:
+            - Property foo is required but is missing.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          type:
+            - array
+            - "null"
+        instance:
+          description: A URI reference that identifies the specific occurrence of the problem.
+          examples:
+            - https://example.com/error-log/abc123
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          examples:
+            - 400
+          format: int64
+          type: integer
+        title:
+          description: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+          examples:
+            - Bad Request
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          examples:
+            - https://example.com/errors/example
+          format: uri
+          type: string
+      type: object
+    HealthResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/HealthResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        status:
+          type: string
+      required:
+        - status
+      type: object
+    PingRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PingRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        message:
+          type: string
+      required:
+        - message
+      type: object
+    PingResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PingResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        echo:
+          type: string
+      required:
+        - echo
+      type: object
+    PostalCitiesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PostalCitiesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        cities:
+          items:
+            $ref: "#/components/schemas/PostalCity"
+          type:
+            - array
+            - "null"
+      required:
+        - cities
+      type: object
+    PostalCity:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        name_fi:
+          type: string
+        name_sv:
+          type: string
+        postal_codes:
+          items:
+            $ref: "#/components/schemas/PostalCode"
+          type:
+            - array
+            - "null"
+      required:
+        - id
+        - code
+        - name_fi
+        - postal_codes
+      type: object
+    PostalCode:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        name_fi:
+          type: string
+        name_sv:
+          type: string
+      required:
+        - id
+        - code
+        - name_fi
+      type: object
+    PricesTransaction:
+      additionalProperties: false
+      properties:
+        area:
+          format: double
+          type: number
+        build_year:
+          format: int32
+          type: integer
+        category:
+          type: string
+        condition:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        description:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor:
+          type: string
+        id:
+          type: string
+        municipality_id:
+          type: string
+        municipality_name_fi:
+          type: string
+        neighborhood_id:
+          type: string
+        neighborhood_name:
+          type: string
+        period_identifier:
+          type: string
+        plot:
+          type: string
+        postal_code_code:
+          type: string
+        postal_code_id:
+          type: string
+        postal_code_name_fi:
+          type: string
+        price:
+          format: int32
+          type: integer
+        price_per_square_meter:
+          format: int32
+          type: integer
+        type:
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+      required:
+        - id
+        - description
+        - type
+        - area
+        - price
+        - price_per_square_meter
+        - build_year
+        - elevator
+        - period_identifier
+        - created_at
+        - updated_at
+        - category
+        - neighborhood_id
+        - postal_code_id
+        - postal_code_code
+        - postal_code_name_fi
+        - municipality_id
+        - municipality_name_fi
+      type: object
+    PricesTransactionsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PricesTransactionsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        transactions:
+          items:
+            $ref: "#/components/schemas/PricesTransaction"
+          type:
+            - array
+            - "null"
+      required:
+        - transactions
+      type: object
+    RefreshTokensInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RefreshTokensInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        refresh_token:
+          description: Refresh token obtained from sign-in
+          type: string
+      required:
+        - refresh_token
+      type: object
+    RefreshTokensOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RefreshTokensOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        access_token:
+          description: New JWT access token
+          type: string
+        access_token_expires_at:
+          description: Unix timestamp when access token expires
+          format: int64
+          type: integer
+        refresh_token:
+          description: New JWT refresh token
+          type: string
+        refresh_token_expires_at:
+          description: Unix timestamp when refresh token expires
+          format: int64
+          type: integer
+        user_id:
+          description: User ID
+          format: uuid
+          type: string
+      required:
+        - access_token
+        - access_token_expires_at
+        - refresh_token
+        - refresh_token_expires_at
+        - user_id
+      type: object
+    SignInAnonymousInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SignInAnonymousInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+      type: object
+    SignInWithAppleInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SignInWithAppleInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        authorization_code:
+          description: Authorization code from Apple Sign In
+          type: string
+        nonce:
+          description: Nonce used in the Apple Sign In request
+          type: string
+      required:
+        - authorization_code
+      type: object
+    SignOutOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SignOutOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        success:
+          type: boolean
+      required:
+        - success
+      type: object
+  securitySchemes:
+    bearer:
+      bearerFormat: JWT
+      description: JWT access token obtained from sign-in
+      scheme: bearer
+      type: http
+info:
+  title: Koditon API
+  version: 0.1.0
+openapi: 3.1.0
+paths:
+  /api/v1/ping:
+    post:
+      operationId: ping
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Echo a message
+  /api/v1/postal/cities:
+    get:
+      operationId: postal-cities
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostalCitiesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List postal municipalities with postal codes
+  /api/v1/prices/transactions:
+    get:
+      operationId: prices-transactions
+      parameters:
+        - explode: false
+          in: query
+          name: municipality_id
+          required: true
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: postal_code_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricesTransactionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List price transactions by municipality and postal code
+  /auth/anonymous:
+    post:
+      description: Create an anonymous user and obtain access and refresh tokens
+      operationId: auth-sign-in-anonymous
+      parameters:
+        - description: Device identifier for session tracking
+          in: header
+          name: X-Device-ID
+          required: true
+          schema:
+            description: Device identifier for session tracking
+            format: uuid
+            type: string
+        - in: header
+          name: User-Agent
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInAnonymousInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokensResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Sign in anonymously
+      tags:
+        - Authentication
+  /auth/apple:
+    post:
+      description: Exchange an Apple authorization code for access and refresh tokens
+      operationId: auth-sign-in-with-apple
+      parameters:
+        - description: Device identifier for session tracking
+          in: header
+          name: X-Device-ID
+          required: true
+          schema:
+            description: Device identifier for session tracking
+            format: uuid
+            type: string
+        - in: header
+          name: User-Agent
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInWithAppleInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokensResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Sign in with Apple
+      tags:
+        - Authentication
+  /auth/me:
+    get:
+      description: Returns information about the authenticated user including feature flags
+      operationId: auth-get-current-user
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get current user info
+      tags:
+        - Authentication
+  /auth/refresh:
+    post:
+      description: Exchange a refresh token for new access and refresh tokens
+      operationId: auth-refresh-tokens
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokensInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshTokensOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Refresh tokens
+      tags:
+        - Authentication
+  /auth/sign-out:
+    post:
+      description: Revoke the current session
+      operationId: auth-sign-out
+      parameters:
+        - description: Session ID to revoke (uses current session if not provided)
+          in: header
+          name: X-Session-ID
+          schema:
+            description: Session ID to revoke (uses current session if not provided)
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignOutOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Sign out
+      tags:
+        - Authentication
+  /healthz:
+    get:
+      operationId: healthz
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Health check

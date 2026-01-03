@@ -8,9 +8,13 @@ import type {
   ErrorModel,
   HealthResponse,
   PingRequest,
-  PingResponse
+  PingResponse,
+  PostalCitiesOutputBody,
+  PricesTransactionsOutputBody,
+  PricesTransactionsParams
 } from '.././models';
 
+import { authFetch } from '../../api/orval-mutator';
 
 // https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
 type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
@@ -79,7 +83,7 @@ export const getPingUrl = () => {
 
 export const ping = async (pingRequest: NonReadonly<PingRequest>, options?: RequestInit): Promise<pingResponse> => {
   
-  const res = await fetch(getPingUrl(),
+  return authFetch<pingResponse>(getPingUrl(),
   {      
     ...options,
     method: 'POST',
@@ -87,13 +91,98 @@ export const ping = async (pingRequest: NonReadonly<PingRequest>, options?: Requ
     body: JSON.stringify(
       pingRequest,)
   }
-)
+);}
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: pingResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as pingResponse
+
+/**
+ * @summary List postal municipalities with postal codes
+ */
+export type postalCitiesResponse200 = {
+  data: PostalCitiesOutputBody
+  status: 200
 }
+
+export type postalCitiesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type postalCitiesResponseSuccess = (postalCitiesResponse200) & {
+  headers: Headers;
+};
+export type postalCitiesResponseError = (postalCitiesResponseDefault) & {
+  headers: Headers;
+};
+
+export type postalCitiesResponse = (postalCitiesResponseSuccess | postalCitiesResponseError)
+
+export const getPostalCitiesUrl = () => {
+
+
+  
+
+  return `http://localhost:8080/api/v1/postal/cities`
+}
+
+export const postalCities = async ( options?: RequestInit): Promise<postalCitiesResponse> => {
+  
+  return authFetch<postalCitiesResponse>(getPostalCitiesUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+/**
+ * @summary List price transactions by municipality and postal code
+ */
+export type pricesTransactionsResponse200 = {
+  data: PricesTransactionsOutputBody
+  status: 200
+}
+
+export type pricesTransactionsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+    
+export type pricesTransactionsResponseSuccess = (pricesTransactionsResponse200) & {
+  headers: Headers;
+};
+export type pricesTransactionsResponseError = (pricesTransactionsResponseDefault) & {
+  headers: Headers;
+};
+
+export type pricesTransactionsResponse = (pricesTransactionsResponseSuccess | pricesTransactionsResponseError)
+
+export const getPricesTransactionsUrl = (params: PricesTransactionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `http://localhost:8080/api/v1/prices/transactions?${stringifiedParams}` : `http://localhost:8080/api/v1/prices/transactions`
+}
+
+export const pricesTransactions = async (params: PricesTransactionsParams, options?: RequestInit): Promise<pricesTransactionsResponse> => {
+  
+  return authFetch<pricesTransactionsResponse>(getPricesTransactionsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
 
 
 /**
@@ -128,19 +217,13 @@ export const getHealthzUrl = () => {
 
 export const healthz = async ( options?: RequestInit): Promise<healthzResponse> => {
   
-  const res = await fetch(getHealthzUrl(),
+  return authFetch<healthzResponse>(getHealthzUrl(),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: healthzResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as healthzResponse
-}
+);}
 
 
