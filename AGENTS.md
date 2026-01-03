@@ -39,8 +39,6 @@ The repository root contains a `Taskfile.yml` with shortcuts for common operatio
 
 ### iOS (Native Swift App in `koditon/`)
 
-> **Note:** The `client/` folder contains a deprecated Expo app. All client development should now be done in the `koditon/` folder which contains the native Swift iOS app.
-
 - `task ios:build`: builds the iOS app using xcede
 - `task ios:run`: runs the iOS app on the simulator (does not exit on its own - must be terminated manually)
 - `task ios:build-run`: builds and runs the iOS app in one command (does not exit on its own - must be terminated manually)
