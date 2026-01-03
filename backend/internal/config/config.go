@@ -29,7 +29,7 @@ type Config struct {
 	Environment     Environment   `env:"APP_ENV" envDefault:"development"`
 	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
 	Mode            AppMode       `env:"APP_MODE" envDefault:"consumer,api"`
-	DB              DBConfig      `envPrefix:"DB_"`
+	DatabaseURL     string        `env:"DATABASE_URL,required"`
 	Auth            AuthConfig
 	Prices          PricesConfig
 	Shortcut        ShortcutConfig
@@ -99,15 +99,6 @@ func (m *AppMode) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type DBConfig struct {
-	Host     string `env:"HOST,required"`
-	Port     string `env:"PORT,required"`
-	User     string `env:"USER,required"`
-	Password string `env:"PASSWORD,required"`
-	Name     string `env:"NAME,required"`
-	SSLMode  string `env:"SSLMODE,required"`
-}
-
 type PricesConfig struct {
 	BaseURL string `env:"PRICES_BASE_URL,required"`
 }
@@ -160,9 +151,4 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
 	return cfg, nil
-}
-
-func (c Config) DatabaseURL() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.Name, c.DB.SSLMode)
 }

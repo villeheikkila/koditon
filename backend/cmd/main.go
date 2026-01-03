@@ -60,7 +60,7 @@ func run(
 		"log_level", cfg.LogLevel,
 		"mode", cfg.Mode.String(),
 	)
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL())
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("create database pool: %w", err)
 	}
