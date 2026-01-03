@@ -202,3 +202,10 @@ tasks:
     dir: koditon
     cmds:
       - xcede buildrun -s {{.IOS_SCHEME}} -p {{.IOS_PLATFORM}} -d "{{.IOS_DEVICE_ID}}"
+
+  ios:openapi:
+    desc: Fetch OpenAPI spec from local server and regenerate KoditonClient
+    dir: koditon/Packages/KoditonClient
+    cmds:
+      - curl -s http://localhost:8080/openapi.yaml -o Sources/KoditonClient/openapi.yaml
+      - swift build

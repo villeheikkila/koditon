@@ -24,27 +24,30 @@ SELECT
     ppc.postal_postal_code_code,
     ppc.postal_postal_code_name_fi,
     ppc.postal_postal_code_name_sv,
+    ppc.postal_postal_code_neighborhood_fi,
     ppc.postal_postal_code_created_at,
     ppc.postal_postal_code_updated_at
 FROM public.postal_municipalities AS pm
 JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
+WHERE ppc.postal_postal_code_type_code = '1'
 ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code
 `
 
 type ListMunicipalitiesWithPostalCodesRow struct {
-	PostalMunicipalityID        pgtype.UUID        `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityCode      string             `db:"postal_municipality_code" json:"postal_municipality_code"`
-	PostalMunicipalityNameFi    string             `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
-	PostalMunicipalityNameSv    *string            `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
-	PostalMunicipalityCreatedAt pgtype.Timestamptz `db:"postal_municipality_created_at" json:"postal_municipality_created_at"`
-	PostalMunicipalityUpdatedAt pgtype.Timestamptz `db:"postal_municipality_updated_at" json:"postal_municipality_updated_at"`
-	PostalPostalCodeID          pgtype.UUID        `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeCode        string             `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi      string             `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv      *string            `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
-	PostalPostalCodeCreatedAt   pgtype.Timestamptz `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
-	PostalPostalCodeUpdatedAt   pgtype.Timestamptz `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
+	PostalMunicipalityID           pgtype.UUID        `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalMunicipalityCode         string             `db:"postal_municipality_code" json:"postal_municipality_code"`
+	PostalMunicipalityNameFi       string             `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv       *string            `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
+	PostalMunicipalityCreatedAt    pgtype.Timestamptz `db:"postal_municipality_created_at" json:"postal_municipality_created_at"`
+	PostalMunicipalityUpdatedAt    pgtype.Timestamptz `db:"postal_municipality_updated_at" json:"postal_municipality_updated_at"`
+	PostalPostalCodeID             pgtype.UUID        `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeCode           string             `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi         string             `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv         *string            `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
+	PostalPostalCodeNeighborhoodFi *string            `db:"postal_postal_code_neighborhood_fi" json:"postal_postal_code_neighborhood_fi"`
+	PostalPostalCodeCreatedAt      pgtype.Timestamptz `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
+	PostalPostalCodeUpdatedAt      pgtype.Timestamptz `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
 }
 
 func (q *Queries) ListMunicipalitiesWithPostalCodes(ctx context.Context) ([]ListMunicipalitiesWithPostalCodesRow, error) {
@@ -67,6 +70,7 @@ func (q *Queries) ListMunicipalitiesWithPostalCodes(ctx context.Context) ([]List
 			&i.PostalPostalCodeCode,
 			&i.PostalPostalCodeNameFi,
 			&i.PostalPostalCodeNameSv,
+			&i.PostalPostalCodeNeighborhoodFi,
 			&i.PostalPostalCodeCreatedAt,
 			&i.PostalPostalCodeUpdatedAt,
 		); err != nil {
@@ -219,6 +223,7 @@ INSERT INTO public.postal_postal_codes (
     postal_postal_code_name_sv,
     postal_postal_code_abbr_fi,
     postal_postal_code_abbr_sv,
+    postal_postal_code_neighborhood_fi,
     postal_postal_code_valid_from,
     postal_postal_code_type_code,
     postal_ad_area_id,
@@ -233,6 +238,7 @@ SELECT
     NULLIF(names_sv, ''),
     NULLIF(abbrs_fi, ''),
     NULLIF(abbrs_sv, ''),
+    NULLIF(neighborhoods_fi, ''),
     valids_from,
     NULLIF(type_codes, ''),
     ad_area_ids,
@@ -246,10 +252,11 @@ FROM unnest(
     $4::text[],
     $5::text[],
     $6::text[],
-    $7::date[],
-    $8::text[],
-    $9::uuid[],
-    $10::uuid[]
+    $7::text[],
+    $8::date[],
+    $9::text[],
+    $10::uuid[],
+    $11::uuid[]
 ) AS t(
     dates,
     codes,
@@ -257,6 +264,7 @@ FROM unnest(
     names_sv,
     abbrs_fi,
     abbrs_sv,
+    neighborhoods_fi,
     valids_from,
     type_codes,
     ad_area_ids,
@@ -268,6 +276,7 @@ SET postal_postal_code_date = EXCLUDED.postal_postal_code_date,
     postal_postal_code_name_sv = EXCLUDED.postal_postal_code_name_sv,
     postal_postal_code_abbr_fi = EXCLUDED.postal_postal_code_abbr_fi,
     postal_postal_code_abbr_sv = EXCLUDED.postal_postal_code_abbr_sv,
+    postal_postal_code_neighborhood_fi = EXCLUDED.postal_postal_code_neighborhood_fi,
     postal_postal_code_valid_from = EXCLUDED.postal_postal_code_valid_from,
     postal_postal_code_type_code = EXCLUDED.postal_postal_code_type_code,
     postal_ad_area_id = EXCLUDED.postal_ad_area_id,
@@ -282,6 +291,7 @@ type UpsertPostalPostalCodesBulkParams struct {
 	NamesSv         []string      `db:"names_sv" json:"names_sv"`
 	AbbrsFi         []string      `db:"abbrs_fi" json:"abbrs_fi"`
 	AbbrsSv         []string      `db:"abbrs_sv" json:"abbrs_sv"`
+	NeighborhoodsFi []string      `db:"neighborhoods_fi" json:"neighborhoods_fi"`
 	ValidsFrom      []time.Time   `db:"valids_from" json:"valids_from"`
 	TypeCodes       []string      `db:"type_codes" json:"type_codes"`
 	AdAreaIds       []pgtype.UUID `db:"ad_area_ids" json:"ad_area_ids"`
@@ -297,6 +307,7 @@ func (q *Queries) UpsertPostalPostalCodesBulk(ctx context.Context, arg *UpsertPo
 		arg.NamesSv,
 		arg.AbbrsFi,
 		arg.AbbrsSv,
+		arg.NeighborhoodsFi,
 		arg.ValidsFrom,
 		arg.TypeCodes,
 		arg.AdAreaIds,

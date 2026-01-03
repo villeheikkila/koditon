@@ -30,17 +30,18 @@ type PostalMunicipality struct {
 }
 
 type PostalPostalCode struct {
-	PostalPostalCodeID        pgtype.UUID        `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeDate      time.Time          `db:"postal_postal_code_date" json:"postal_postal_code_date"`
-	PostalPostalCodeCode      string             `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi    string             `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv    *string            `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
-	PostalPostalCodeAbbrFi    *string            `db:"postal_postal_code_abbr_fi" json:"postal_postal_code_abbr_fi"`
-	PostalPostalCodeAbbrSv    *string            `db:"postal_postal_code_abbr_sv" json:"postal_postal_code_abbr_sv"`
-	PostalPostalCodeValidFrom *time.Time         `db:"postal_postal_code_valid_from" json:"postal_postal_code_valid_from"`
-	PostalPostalCodeTypeCode  *string            `db:"postal_postal_code_type_code" json:"postal_postal_code_type_code"`
-	PostalAdAreaID            pgtype.UUID        `db:"postal_ad_area_id" json:"postal_ad_area_id"`
-	PostalMunicipalityID      pgtype.UUID        `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalPostalCodeCreatedAt pgtype.Timestamptz `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
-	PostalPostalCodeUpdatedAt pgtype.Timestamptz `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
+	PostalPostalCodeID             pgtype.UUID        `db:"postal_postal_code_id" json:"postal_postal_code_id"`
+	PostalPostalCodeDate           time.Time          `db:"postal_postal_code_date" json:"postal_postal_code_date"`
+	PostalPostalCodeCode           string             `db:"postal_postal_code_code" json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi         string             `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv         *string            `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
+	PostalPostalCodeAbbrFi         *string            `db:"postal_postal_code_abbr_fi" json:"postal_postal_code_abbr_fi"`
+	PostalPostalCodeAbbrSv         *string            `db:"postal_postal_code_abbr_sv" json:"postal_postal_code_abbr_sv"`
+	PostalPostalCodeNeighborhoodFi *string            `db:"postal_postal_code_neighborhood_fi" json:"postal_postal_code_neighborhood_fi"`
+	PostalPostalCodeValidFrom      *time.Time         `db:"postal_postal_code_valid_from" json:"postal_postal_code_valid_from"`
+	PostalPostalCodeTypeCode       *string            `db:"postal_postal_code_type_code" json:"postal_postal_code_type_code"`
+	PostalAdAreaID                 pgtype.UUID        `db:"postal_ad_area_id" json:"postal_ad_area_id"`
+	PostalMunicipalityID           pgtype.UUID        `db:"postal_municipality_id" json:"postal_municipality_id"`
+	PostalPostalCodeCreatedAt      pgtype.Timestamptz `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
+	PostalPostalCodeUpdatedAt      pgtype.Timestamptz `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
 }

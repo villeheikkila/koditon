@@ -25,6 +25,7 @@ CREATE TABLE public.postal_postal_codes (
     postal_postal_code_name_sv         text,
     postal_postal_code_abbr_fi         text,
     postal_postal_code_abbr_sv         text,
+    postal_postal_code_neighborhood_fi text,
     postal_postal_code_valid_from      date,
     postal_postal_code_type_code       text,
     postal_ad_area_id                  uuid REFERENCES public.postal_ad_areas(postal_ad_area_id),

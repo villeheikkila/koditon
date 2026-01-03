@@ -16,10 +16,11 @@ type postalCity struct {
 }
 
 type postalCode struct {
-	ID     string  `json:"id"`
-	Code   string  `json:"code"`
-	NameFi string  `json:"name_fi"`
-	NameSv *string `json:"name_sv,omitempty"`
+	ID             string  `json:"id"`
+	Code           string  `json:"code"`
+	NameFi         string  `json:"name_fi"`
+	NameSv         *string `json:"name_sv,omitempty"`
+	NeighborhoodFi *string `json:"neighborhood_fi,omitempty"`
 }
 
 type postalCitiesOutput struct {
@@ -50,10 +51,11 @@ func (s *Server) postalCitiesHandler(ctx context.Context, _ *struct{}) (*postalC
 			index = cityIndex[cityID]
 		}
 		cities[index].PostalCodes = append(cities[index].PostalCodes, postalCode{
-			ID:     formatUUID(row.PostalPostalCodeID),
-			Code:   row.PostalPostalCodeCode,
-			NameFi: row.PostalPostalCodeNameFi,
-			NameSv: row.PostalPostalCodeNameSv,
+			ID:             formatUUID(row.PostalPostalCodeID),
+			Code:           row.PostalPostalCodeCode,
+			NameFi:         row.PostalPostalCodeNameFi,
+			NameSv:         row.PostalPostalCodeNameSv,
+			NeighborhoodFi: row.PostalPostalCodeNeighborhoodFi,
 		})
 	}
 	output := &postalCitiesOutput{}

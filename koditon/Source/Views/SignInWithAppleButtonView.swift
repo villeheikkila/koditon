@@ -54,7 +54,7 @@ struct SignInWithAppleButtonView: View {
 
     private func randomString(length: Int = 32) -> String {
         let charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
-        return String((0..<length).compactMap { _ in charset.randomElement() })
+        return String((0 ..< length).compactMap { _ in charset.randomElement() })
     }
 
     private func sha256(_ input: String) -> String {

@@ -63,6 +63,7 @@ INSERT INTO public.postal_postal_codes (
     postal_postal_code_name_sv,
     postal_postal_code_abbr_fi,
     postal_postal_code_abbr_sv,
+    postal_postal_code_neighborhood_fi,
     postal_postal_code_valid_from,
     postal_postal_code_type_code,
     postal_ad_area_id,
@@ -77,6 +78,7 @@ SELECT
     NULLIF(names_sv, ''),
     NULLIF(abbrs_fi, ''),
     NULLIF(abbrs_sv, ''),
+    NULLIF(neighborhoods_fi, ''),
     valids_from,
     NULLIF(type_codes, ''),
     ad_area_ids,
@@ -90,6 +92,7 @@ FROM unnest(
     sqlc.arg(names_sv)::text[],
     sqlc.arg(abbrs_fi)::text[],
     sqlc.arg(abbrs_sv)::text[],
+    sqlc.arg(neighborhoods_fi)::text[],
     sqlc.arg(valids_from)::date[],
     sqlc.arg(type_codes)::text[],
     sqlc.arg(ad_area_ids)::uuid[],
@@ -101,6 +104,7 @@ FROM unnest(
     names_sv,
     abbrs_fi,
     abbrs_sv,
+    neighborhoods_fi,
     valids_from,
     type_codes,
     ad_area_ids,
@@ -112,6 +116,7 @@ SET postal_postal_code_date = EXCLUDED.postal_postal_code_date,
     postal_postal_code_name_sv = EXCLUDED.postal_postal_code_name_sv,
     postal_postal_code_abbr_fi = EXCLUDED.postal_postal_code_abbr_fi,
     postal_postal_code_abbr_sv = EXCLUDED.postal_postal_code_abbr_sv,
+    postal_postal_code_neighborhood_fi = EXCLUDED.postal_postal_code_neighborhood_fi,
     postal_postal_code_valid_from = EXCLUDED.postal_postal_code_valid_from,
     postal_postal_code_type_code = EXCLUDED.postal_postal_code_type_code,
     postal_ad_area_id = EXCLUDED.postal_ad_area_id,
@@ -130,9 +135,11 @@ SELECT
     ppc.postal_postal_code_code,
     ppc.postal_postal_code_name_fi,
     ppc.postal_postal_code_name_sv,
+    ppc.postal_postal_code_neighborhood_fi,
     ppc.postal_postal_code_created_at,
     ppc.postal_postal_code_updated_at
 FROM public.postal_municipalities AS pm
 JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
+WHERE ppc.postal_postal_code_type_code = '1'
 ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code;

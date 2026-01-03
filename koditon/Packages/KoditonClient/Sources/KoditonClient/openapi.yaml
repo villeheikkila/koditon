@@ -216,6 +216,8 @@ components:
           type: string
         name_sv:
           type: string
+        neighborhood_fi:
+          type: string
       required:
         - id
         - code
@@ -235,7 +237,6 @@ components:
         condition:
           type: string
         created_at:
-          format: date-time
           type: string
         description:
           type: string
@@ -274,7 +275,6 @@ components:
         type:
           type: string
         updated_at:
-          format: date-time
           type: string
       required:
         - id

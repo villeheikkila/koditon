@@ -5,6 +5,7 @@ import OpenAPIURLSession
 
 public struct KoditonClient: Sendable {
     private let client: Client
+
     public init(baseURL: URL, middlewares: [any ClientMiddleware] = []) {
         self.client = Client(
             serverURL: baseURL,

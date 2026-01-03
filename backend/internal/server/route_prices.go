@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	pricesdb "koditon-go/internal/prices/db"
@@ -11,35 +12,46 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// RFC3339Time wraps time.Time to marshal without fractional seconds for iOS compatibility
+type RFC3339Time struct {
+	time.Time
+}
+
+func (t RFC3339Time) MarshalJSON() ([]byte, error) {
+	// Format as RFC3339 without fractional seconds
+	formatted := t.UTC().Format("2006-01-02T15:04:05Z")
+	return json.Marshal(formatted)
+}
+
 type pricesTransactionsInput struct {
 	MunicipalityID string `query:"municipality_id" required:"true"`
 	PostalCodeID   string `query:"postal_code_id" required:"true"`
 }
 
 type pricesTransaction struct {
-	ID                  string    `json:"id"`
-	Description         string    `json:"description"`
-	Type                string    `json:"type"`
-	Area                float64   `json:"area"`
-	Price               int32     `json:"price"`
-	PricePerSquareMeter int32     `json:"price_per_square_meter"`
-	BuildYear           int32     `json:"build_year"`
-	Floor               *string   `json:"floor,omitempty"`
-	Elevator            bool      `json:"elevator"`
-	Condition           *string   `json:"condition,omitempty"`
-	Plot                *string   `json:"plot,omitempty"`
-	EnergyClass         *string   `json:"energy_class,omitempty"`
-	PeriodIdentifier    string    `json:"period_identifier"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	Category            string    `json:"category"`
-	NeighborhoodID      string    `json:"neighborhood_id"`
-	NeighborhoodName    *string   `json:"neighborhood_name,omitempty"`
-	PostalCodeID        string    `json:"postal_code_id"`
-	PostalCodeCode      string    `json:"postal_code_code"`
-	PostalCodeNameFi    string    `json:"postal_code_name_fi"`
-	MunicipalityID      string    `json:"municipality_id"`
-	MunicipalityNameFi  string    `json:"municipality_name_fi"`
+	ID                  string      `json:"id"`
+	Description         string      `json:"description"`
+	Type                string      `json:"type"`
+	Area                float64     `json:"area"`
+	Price               int32       `json:"price"`
+	PricePerSquareMeter int32       `json:"price_per_square_meter"`
+	BuildYear           int32       `json:"build_year"`
+	Floor               *string     `json:"floor,omitempty"`
+	Elevator            bool        `json:"elevator"`
+	Condition           *string     `json:"condition,omitempty"`
+	Plot                *string     `json:"plot,omitempty"`
+	EnergyClass         *string     `json:"energy_class,omitempty"`
+	PeriodIdentifier    string      `json:"period_identifier"`
+	CreatedAt           RFC3339Time `json:"created_at"`
+	UpdatedAt           RFC3339Time `json:"updated_at"`
+	Category            string      `json:"category"`
+	NeighborhoodID      string      `json:"neighborhood_id"`
+	NeighborhoodName    *string     `json:"neighborhood_name,omitempty"`
+	PostalCodeID        string      `json:"postal_code_id"`
+	PostalCodeCode      string      `json:"postal_code_code"`
+	PostalCodeNameFi    string      `json:"postal_code_name_fi"`
+	MunicipalityID      string      `json:"municipality_id"`
+	MunicipalityNameFi  string      `json:"municipality_name_fi"`
 }
 
 type pricesTransactionsOutput struct {
@@ -81,8 +93,8 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 			Plot:                row.PricesTransactionPlot,
 			EnergyClass:         row.PricesTransactionEnergyClass,
 			PeriodIdentifier:    row.PricesTransactionPeriodIdentifier,
-			CreatedAt:           row.PricesTransactionCreatedAt,
-			UpdatedAt:           row.PricesTransactionUpdatedAt,
+			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
+			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
 			Category:            row.PricesTransactionCategory,
 			NeighborhoodID:      formatUUID(row.PricesNeighborhoodID),
 			NeighborhoodName:    &neighborhoodName,

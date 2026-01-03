@@ -5,6 +5,8 @@ import OSLog
 @Observable
 @MainActor
 final class AuthManager {
+    private static let autoRefreshInterval: Duration = .seconds(10)
+    private static let refreshThreshold: Duration = .seconds(30)
     private let logger = Logger(subsystem: "com.koditon", category: "AuthManager")
     private let client: KoditonClient
     private let deviceManager: DeviceManager
@@ -13,8 +15,8 @@ final class AuthManager {
     private var accessTokenExpiresAt: Int64?
     private var refreshToken: String?
     private var refreshTokenExpiresAt: Int64?
-    private var isRefreshing = false
-    private var refreshContinuations: [CheckedContinuation<String, Error>] = []
+    private var inFlightRefresh: Task<String, Error>?
+    private var autoRefreshTask: Task<Void, Never>?
 
     init(client: KoditonClient, deviceManager: DeviceManager) {
         self.client = client
@@ -45,9 +47,11 @@ final class AuthManager {
             let isAnonymous = KeychainService.load(.isAnonymous) == "true"
             state = isAnonymous ? .anonymous(userId: userId) : .authenticated(userId: userId)
             logger.info("Session restored for user: \(userId, privacy: .private)")
+            startAutoRefresh()
         } else {
             do {
                 _ = try await getValidAccessToken()
+                startAutoRefresh()
             } catch {
                 logger.error("Failed to refresh during restore: \(error.localizedDescription)")
                 clearTokens()
@@ -68,6 +72,7 @@ final class AuthManager {
             switch ok.body {
             case .json(let body):
                 handleAuthResponse(body, isAnonymous: true)
+                startAutoRefresh()
             }
         case .default(let statusCode, _):
             throw AuthError.signInFailed("Sign in failed with status: \(statusCode)")
@@ -94,6 +99,7 @@ final class AuthManager {
             switch ok.body {
             case .json(let body):
                 handleAuthResponse(body, isAnonymous: false)
+                startAutoRefresh()
             }
         case .default(let statusCode, _):
             throw AuthError.signInFailed("Sign in failed with status: \(statusCode)")
@@ -102,6 +108,7 @@ final class AuthManager {
 
     func signOut() async {
         logger.debug("Signing out")
+        stopAutoRefresh()
         if accessToken != nil {
             do {
                 let response = try await client.api.authSignOut(.init())
@@ -129,56 +136,81 @@ final class AuthManager {
         return try await refreshTokens()
     }
 
+    func refreshTokensForRetry() async throws -> String {
+        try await refreshTokens()
+    }
+
     private func refreshTokens() async throws -> String {
-        if isRefreshing {
-            return try await withCheckedThrowingContinuation { continuation in
-                refreshContinuations.append(continuation)
+        if let inFlight = inFlightRefresh {
+            return try await inFlight.value
+        }
+        let task = Task { @MainActor in
+            defer { inFlightRefresh = nil }
+            guard let currentRefreshToken = refreshToken ?? KeychainService.load(.refreshToken)
+            else {
+                throw AuthError.notAuthenticated
             }
-        }
-        isRefreshing = true
-        defer {
-            isRefreshing = false
-            refreshContinuations.removeAll()
-        }
-        guard let refreshToken = refreshToken ?? KeychainService.load(.refreshToken) else {
-            throw AuthError.notAuthenticated
-        }
-        logger.debug("Refreshing tokens")
-        do {
+            logger.debug("Refreshing tokens")
             let response = try await client.api.authRefreshTokens(
-                .init(body: .json(.init(refreshToken: refreshToken)))
+                .init(body: .json(.init(refreshToken: currentRefreshToken)))
             )
             switch response {
             case .ok(let ok):
                 switch ok.body {
                 case .json(let body):
-                    let token = body.accessToken
-                    accessToken = token
+                    accessToken = body.accessToken
                     accessTokenExpiresAt = body.accessTokenExpiresAt
-                    self.refreshToken = body.refreshToken
+                    refreshToken = body.refreshToken
                     refreshTokenExpiresAt = body.refreshTokenExpiresAt
                     persistTokens(userId: body.userId)
-                    for continuation in refreshContinuations {
-                        continuation.resume(returning: token)
-                    }
-                    return token
+                    return body.accessToken
                 }
             case .default(let statusCode, _):
-                let error = AuthError.refreshFailed("Refresh failed with status: \(statusCode)")
-                for continuation in refreshContinuations {
-                    continuation.resume(throwing: error)
-                }
                 if statusCode == 401 {
+                    stopAutoRefresh()
                     clearTokens()
                     state = .signedOut
                 }
-                throw error
+                throw AuthError.refreshFailed("Refresh failed with status: \(statusCode)")
             }
+        }
+        inFlightRefresh = task
+        return try await task.value
+    }
+
+    private func startAutoRefresh() {
+        guard autoRefreshTask == nil else { return }
+        logger.debug("Starting auto-refresh")
+        autoRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.autoRefreshInterval)
+                guard !Task.isCancelled else { break }
+                await autoRefreshTickIfNeeded()
+            }
+        }
+    }
+
+    private func stopAutoRefresh() {
+        logger.debug("Stopping auto-refresh")
+        autoRefreshTask?.cancel()
+        autoRefreshTask = nil
+    }
+
+    private func autoRefreshTickIfNeeded() async {
+        guard let expiresAt = accessTokenExpiresAt else { return }
+        let now = Int64(Date().timeIntervalSince1970)
+        let secondsUntilExpiry = expiresAt - now
+        let threshold = Int64(Self.refreshThreshold.components.seconds)
+        guard secondsUntilExpiry <= threshold else {
+            logger.debug("Token expires in \(secondsUntilExpiry)s, no refresh needed")
+            return
+        }
+        logger.debug("Token expires in \(secondsUntilExpiry)s, refreshing proactively")
+        do {
+            _ = try await refreshTokens()
+            logger.debug("Auto-refresh succeeded")
         } catch {
-            for continuation in refreshContinuations {
-                continuation.resume(throwing: error)
-            }
-            throw error
+            logger.warning("Auto-refresh failed: \(error.localizedDescription)")
         }
     }
 

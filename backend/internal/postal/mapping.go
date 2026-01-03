@@ -102,6 +102,7 @@ func mapUpsertPostalCodesBulkParams(
 		NamesSv:         make([]string, 0, len(records)),
 		AbbrsFi:         make([]string, 0, len(records)),
 		AbbrsSv:         make([]string, 0, len(records)),
+		NeighborhoodsFi: make([]string, 0, len(records)),
 		ValidsFrom:      make([]time.Time, 0, len(records)),
 		TypeCodes:       make([]string, 0, len(records)),
 		AdAreaIds:       make([]pgtype.UUID, 0, len(records)),
@@ -124,12 +125,14 @@ func mapUpsertPostalCodesBulkParams(
 		if id, ok := municipalityIDs[r.MunicipalCode]; ok {
 			municipalityID = id
 		}
+		neighborhood := GetNeighborhood(r.Postcode)
 		params.Dates = append(params.Dates, *date)
 		params.Codes = append(params.Codes, r.Postcode)
 		params.NamesFi = append(params.NamesFi, r.PostcodeNameFi)
 		params.NamesSv = append(params.NamesSv, r.PostcodeNameSv)
 		params.AbbrsFi = append(params.AbbrsFi, r.PostcodeAbbrFi)
 		params.AbbrsSv = append(params.AbbrsSv, r.PostcodeAbbrSv)
+		params.NeighborhoodsFi = append(params.NeighborhoodsFi, neighborhood)
 		params.ValidsFrom = append(params.ValidsFrom, *validFrom)
 		params.TypeCodes = append(params.TypeCodes, r.TypeCode)
 		params.AdAreaIds = append(params.AdAreaIds, adAreaID)
