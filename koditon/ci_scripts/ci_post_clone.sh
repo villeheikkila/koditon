@@ -3,6 +3,9 @@ set -e
 
 echo "Running post-clone script..."
 
+echo "Trusting swift-openapi-generator plugin..."
+defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES
+
 if [ -z "$API_BASE_URL" ]; then
     echo "API_BASE_URL not set, using default localhost configuration"
     exit 0
