@@ -33,9 +33,9 @@
 			path = Packages;
 			sourceTree = "<group>";
 		};
-		5CB112672F092A5400CCAC21 /* koditon */ = {
+		5CB112672F092A5400CCAC21 /* Source */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = koditon;
+			path = Source;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -56,7 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				5C3BC37F2F0933A400047C75 /* Packages */,
-				5CB112672F092A5400CCAC21 /* koditon */,
+				5CB112672F092A5400CCAC21 /* Source */,
 				5CB112662F092A5400CCAC21 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -86,7 +86,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5C3BC37F2F0933A400047C75 /* Packages */,
-				5CB112672F092A5400CCAC21 /* koditon */,
+				5CB112672F092A5400CCAC21 /* Source */,
 			);
 			name = koditon;
 			packageProductDependencies = (
@@ -275,7 +275,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = koditon/koditon.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Source/koditon.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J9S7QG9SVR;
@@ -284,6 +284,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Koditon;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -320,7 +321,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = koditon/koditon.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Source/koditon.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J9S7QG9SVR;
@@ -329,6 +330,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Koditon;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
