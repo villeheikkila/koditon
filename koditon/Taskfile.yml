@@ -1,0 +1,29 @@
+version: "3"
+
+vars:
+  SCHEME: '{{.IOS_SCHEME | default "koditon"}}'
+  PLATFORM: '{{.IOS_PLATFORM | default "sim"}}'
+  DEVICE_ID: '{{.IOS_DEVICE_ID | default ""}}'
+
+tasks:
+  build:
+    desc: Build the iOS app using xcede
+    cmds:
+      - xcede build --scheme {{.SCHEME}} --platform {{.PLATFORM}} --device "{{.DEVICE_ID}}"
+
+  run:
+    desc: Run the iOS app using xcede
+    cmds:
+      - xcede run --scheme {{.SCHEME}} --platform {{.PLATFORM}} --device "{{.DEVICE_ID}}"
+
+  build-run:
+    desc: Build and run the iOS app using xcede
+    cmds:
+      - xcede buildrun -s {{.SCHEME}} -p {{.PLATFORM}} -d "{{.DEVICE_ID}}"
+
+  openapi:
+    desc: Fetch OpenAPI spec from local server and regenerate KoditonClient
+    dir: Packages/KoditonClient
+    cmds:
+      - curl -s http://localhost:8080/openapi.yaml -o Sources/KoditonClient/openapi.yaml
+      - swift build

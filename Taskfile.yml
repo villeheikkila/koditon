@@ -2,157 +2,16 @@ version: "3"
 
 dotenv: [".env", "./backend/.env"]
 
-vars:
-  IOS_SCHEME: koditon
-  IOS_PLATFORM: sim
+includes:
+  backend:
+    taskfile: ./backend/Taskfile.yml
+    dir: ./backend
+  client:
+    taskfile: ./koditon/Taskfile.yml
+    dir: ./koditon
 
 tasks:
-  backend:dev:
-    desc: Run the server with automatic reload on source/.env changes
-    dir: backend
+  default:
+    desc: List all available tasks
     cmds:
-      - reflex --regex='\.go$' --decoration=none --start-service -- sh -c 'go run ./cmd'
-    env:
-      CGO_ENABLED: "0"
-
-  db:new:
-    desc: Create a new timestamped migration (NAME required)
-    dir: backend/db/migrations
-    cmds:
-      - tern new {{.NAME}}
-
-  db:migrate:
-    desc: Apply all pending migrations to the latest version
-    dir: backend/db/migrations
-    cmds:
-      - tern migrate
-
-  db:status:
-    desc: Show current migration state
-    dir: backend/db/migrations
-    cmds:
-      - tern status
-
-  db:drop:
-    desc: Drop the database (WARNING - destructive operation)
-    dir: backend
-    cmds:
-      - psql "{{.DATABASE_URL}}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();" || true
-      - psql "{{.DATABASE_URL}}/../postgres" -c "DROP DATABASE IF EXISTS $(echo '{{.DATABASE_URL}}' | sed 's/.*\///' | sed 's/?.*//');"
-
-  db:create:
-    desc: Create the database
-    dir: backend
-    cmds:
-      - psql "{{.DATABASE_URL}}/../postgres" -c "CREATE DATABASE $(echo '{{.DATABASE_URL}}' | sed 's/.*\///' | sed 's/?.*//');"
-
-  db:reset:
-    desc: Drop, create, and migrate the database (WARNING - destructive operation)
-    dir: backend
-    cmds:
-      - task: db:drop
-      - task: db:create
-      - task: db:migrate
-      - echo "Database reset complete. Run 'task db:generate' to regenerate code."
-
-  db:import:
-    desc: Import a data file into the database (FILE required)
-    dir: backend
-    cmds:
-      - psql "{{.DATABASE_URL}}" -f {{.FILE}}
-
-  db:query:
-    desc: Run SQL query from stdin or file (use QUERY="..." or FILE=path/to/file.sql)
-    dir: backend
-    cmds:
-      - |
-        {{if .FILE}}
-        psql "{{.DATABASE_URL}}" -f {{.FILE}}
-        {{else if .QUERY}}
-        psql "{{.DATABASE_URL}}" -c "{{.QUERY}}"
-        {{else}}
-        echo "Error: Either QUERY or FILE must be provided"
-        exit 1
-        {{end}}
-
-  db:generate:
-    desc: Generate type-safe Go code from SQL queries
-    dir: backend
-    cmds:
-      - sqlc generate -f sqlc.yaml
-    sources:
-      - backend/db/schema/**/*.sql
-      - backend/internal/*/queries.sql
-    generates:
-      - backend/internal/*/db/**/*
-
-  db:dump:
-    desc: Create a database backup (optional FILE=path/to/backup.sql, defaults to timestamped file)
-    dir: backend
-    cmds:
-      - |
-        {{if .FILE}}
-        pg_dump "{{.DATABASE_URL}}" -F p -f {{.FILE}}
-        echo "Database dumped to {{.FILE}}"
-        {{else}}
-        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-        FILENAME="db_backup_${TIMESTAMP}.sql"
-        pg_dump "{{.DATABASE_URL}}" -F p -f ${FILENAME}
-        echo "Database dumped to ${FILENAME}"
-        {{end}}
-
-  docker:build:
-    desc: Build Docker image for backend (uses DOCKER_IMAGE from .env)
-    dir: backend
-    cmds:
-      - |
-        docker build -t "{{.DOCKER_IMAGE}}" .
-        echo "Image built: {{.DOCKER_IMAGE}}"
-
-  docker:push:
-    desc: Push Docker image to registry (uses DOCKER_IMAGE from .env)
-    dir: backend
-    cmds:
-      - |
-        docker push "{{.DOCKER_IMAGE}}"
-        echo "Image pushed: {{.DOCKER_IMAGE}}"
-
-  docker:deploy:
-    desc: Build, push Docker image, and trigger Dokploy deployment (uses DOCKER_IMAGE and DOKPLOY_WEBHOOK_URL from .env)
-    cmds:
-      - task: docker:build
-      - task: docker:push
-      - task: docker:webhook
-
-  docker:webhook:
-    desc: Trigger Dokploy deployment webhook
-    cmds:
-      - |
-        echo "Triggering Dokploy deployment..."
-        curl -X POST "{{.DOKPLOY_WEBHOOK_URL}}"
-        echo "\nDeployment triggered successfully!"
-
-  ios:build:
-    desc: Build the iOS app using xcede
-    dir: koditon
-    cmds:
-      - xcede build --scheme {{.IOS_SCHEME}} --platform {{.IOS_PLATFORM}} --device "{{.IOS_DEVICE_ID}}"
-
-  ios:run:
-    desc: Run the iOS app using xcede
-    dir: koditon
-    cmds:
-      - xcede run --scheme {{.IOS_SCHEME}} --platform {{.IOS_PLATFORM}} --device "{{.IOS_DEVICE_ID}}"
-
-  ios:build-run:
-    desc: Build and run the iOS app using xcede
-    dir: koditon
-    cmds:
-      - xcede buildrun -s {{.IOS_SCHEME}} -p {{.IOS_PLATFORM}} -d "{{.IOS_DEVICE_ID}}"
-
-  ios:openapi:
-    desc: Fetch OpenAPI spec from local server and regenerate KoditonClient
-    dir: koditon/Packages/KoditonClient
-    cmds:
-      - curl -s http://localhost:8080/openapi.yaml -o Sources/KoditonClient/openapi.yaml
-      - swift build
+      - task --list
