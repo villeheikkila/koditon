@@ -142,11 +142,25 @@ func parseInt(s string) int {
 }
 
 func (c *Client) GetAllTransactions(ctx context.Context, city string) ([]*TransactionEntity, error) {
+	return c.GetAllTransactionsWithProgress(ctx, city, nil)
+}
+
+type TransactionsProgress struct {
+	City            string
+	Page            int
+	Apartments      int
+	TotalApartments int
+}
+
+func (c *Client) GetAllTransactionsWithProgress(ctx context.Context, city string, progressFn func(TransactionsProgress)) ([]*TransactionEntity, error) {
 	var allApartments []*TransactionEntity
 	nextPage := new(int)
 	*nextPage = 0
 	for nextPage != nil {
 		page := *nextPage
+		if progressFn != nil {
+			progressFn(TransactionsProgress{City: city, Page: page, TotalApartments: len(allApartments)})
+		}
 		if page > 0 {
 			time.Sleep(1 * time.Second)
 		}
@@ -155,6 +169,9 @@ func (c *Client) GetAllTransactions(ctx context.Context, city string) ([]*Transa
 			return nil, fmt.Errorf("fetch page %d: %w", page, err)
 		}
 		allApartments = append(allApartments, response.Apartments...)
+		if progressFn != nil {
+			progressFn(TransactionsProgress{City: city, Page: page, Apartments: len(response.Apartments), TotalApartments: len(allApartments)})
+		}
 		nextPage = response.NextPage
 	}
 	return allApartments, nil

@@ -90,6 +90,52 @@ WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
   AND ppc.postal_postal_code_id = sqlc.arg(postal_code_id)
 ORDER BY ht.prices_transaction_created_at DESC;
 
+-- name: SearchTransactionsByCityAndAddress :many
+SELECT
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    pn.prices_neighborhood_name,
+    COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
+    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
+    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
+    pc.prices_city_name
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.prices_cities AS pc
+    ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pc.prices_city_name ILIKE sqlc.arg(city_name)
+  AND (
+      sqlc.arg(search_term) = ''
+      OR ht.prices_transaction_description ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR pn.prices_neighborhood_name ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
+  )
+ORDER BY ht.prices_transaction_created_at DESC
+LIMIT COALESCE(sqlc.narg('limit_count')::int, 200);
+
 -- name: UpsertPricesCity :one
 INSERT INTO public.prices_cities (
     prices_city_name,

@@ -104,6 +104,10 @@ func (r *Runner) ShortcutSyncEntity(ctx context.Context, entityID string) error 
 }
 
 func (r *Runner) PricesSyncCityEntity(ctx context.Context, entityID string) error {
+	return r.PricesSyncCityEntityWithProgress(ctx, entityID, nil)
+}
+
+func (r *Runner) PricesSyncCityEntityWithProgress(ctx context.Context, entityID string, progressFn func(prices.SyncCityProgress)) error {
 	entityType, cityName, err := parseEntityID(entityID)
 	if err != nil {
 		return err
@@ -111,7 +115,7 @@ func (r *Runner) PricesSyncCityEntity(ctx context.Context, entityID string) erro
 	if entityType != "city" {
 		return &EntityParseError{EntityID: entityID, Reason: fmt.Sprintf("expected city entity type for prices sync, got: %s", entityType)}
 	}
-	if err := r.pricesService.SyncCity(ctx, cityName); err != nil {
+	if err := r.pricesService.SyncCityWithProgress(ctx, cityName, progressFn); err != nil {
 		return fmt.Errorf("sync prices city %s: %w", cityName, err)
 	}
 	return nil
@@ -130,6 +134,14 @@ func (r *Runner) PricesSyncNeighborhoodPostalCodes(ctx context.Context, progress
 		return fmt.Errorf("sync neighborhood postal codes: %w", err)
 	}
 	return nil
+}
+
+func (r *Runner) PricesSearchTransactionsByCityAndAddress(ctx context.Context, cityName, searchTerm string, limit int32) ([]prices.SearchTransactionsRow, error) {
+	rows, err := r.pricesService.SearchTransactionsByCityAndAddress(ctx, cityName, searchTerm, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search prices transactions: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *Runner) PostalSync(ctx context.Context, logger *slog.Logger) (*postal.SyncResult, error) {

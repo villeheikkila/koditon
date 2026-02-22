@@ -784,6 +784,125 @@ func (q *Queries) ListUnmatchedNeighborhoodsBatch(ctx context.Context, batchOffs
 	return items, nil
 }
 
+const searchTransactionsByCityAndAddress = `-- name: SearchTransactionsByCityAndAddress :many
+SELECT
+    ht.prices_transaction_id,
+    ht.prices_transaction_description,
+    ht.prices_transaction_type,
+    ht.prices_transaction_area,
+    ht.prices_transaction_price,
+    ht.prices_transaction_price_per_square_meter,
+    ht.prices_transaction_build_year,
+    ht.prices_transaction_floor,
+    ht.prices_transaction_elevator,
+    ht.prices_transaction_condition,
+    ht.prices_transaction_plot,
+    ht.prices_transaction_energy_class,
+    ht.prices_transaction_period_identifier,
+    ht.prices_transaction_created_at,
+    ht.prices_transaction_updated_at,
+    ht.prices_transaction_category,
+    pn.prices_neighborhood_name,
+    COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
+    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
+    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
+    pc.prices_city_name
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.prices_cities AS pc
+    ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE pc.prices_city_name ILIKE $1
+  AND (
+      $2 = ''
+      OR ht.prices_transaction_description ILIKE ('%' || $2 || '%')
+      OR pn.prices_neighborhood_name ILIKE ('%' || $2 || '%')
+      OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%' || $2 || '%')
+      OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%' || $2 || '%')
+      OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%' || $2 || '%')
+  )
+ORDER BY ht.prices_transaction_created_at DESC
+LIMIT COALESCE($3::int, 200)
+`
+
+type SearchTransactionsByCityAndAddressParams struct {
+	CityName   *string     `db:"city_name" json:"city_name"`
+	SearchTerm *string     `db:"search_term" json:"search_term"`
+	LimitCount pgtype.Int4 `db:"limit_count" json:"limit_count"`
+}
+
+type SearchTransactionsByCityAndAddressRow struct {
+	PricesTransactionID                  pgtype.UUID `db:"prices_transaction_id" json:"prices_transaction_id"`
+	PricesTransactionDescription         string      `db:"prices_transaction_description" json:"prices_transaction_description"`
+	PricesTransactionType                string      `db:"prices_transaction_type" json:"prices_transaction_type"`
+	PricesTransactionArea                float64     `db:"prices_transaction_area" json:"prices_transaction_area"`
+	PricesTransactionPrice               int32       `db:"prices_transaction_price" json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32       `db:"prices_transaction_price_per_square_meter" json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32       `db:"prices_transaction_build_year" json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string     `db:"prices_transaction_floor" json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool        `db:"prices_transaction_elevator" json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string     `db:"prices_transaction_condition" json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string     `db:"prices_transaction_plot" json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string     `db:"prices_transaction_energy_class" json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string      `db:"prices_transaction_period_identifier" json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time   `db:"prices_transaction_created_at" json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time   `db:"prices_transaction_updated_at" json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string      `db:"prices_transaction_category" json:"prices_transaction_category"`
+	PricesNeighborhoodName               string      `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
+	PostalCode                           *string     `db:"postal_code" json:"postal_code"`
+	PostalAreaNameFi                     *string     `db:"postal_area_name_fi" json:"postal_area_name_fi"`
+	MunicipalityNameFi                   *string     `db:"municipality_name_fi" json:"municipality_name_fi"`
+	PricesCityName                       string      `db:"prices_city_name" json:"prices_city_name"`
+}
+
+func (q *Queries) SearchTransactionsByCityAndAddress(ctx context.Context, arg *SearchTransactionsByCityAndAddressParams) ([]SearchTransactionsByCityAndAddressRow, error) {
+	rows, err := q.db.Query(ctx, searchTransactionsByCityAndAddress, arg.CityName, arg.SearchTerm, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchTransactionsByCityAndAddressRow{}
+	for rows.Next() {
+		var i SearchTransactionsByCityAndAddressRow
+		if err := rows.Scan(
+			&i.PricesTransactionID,
+			&i.PricesTransactionDescription,
+			&i.PricesTransactionType,
+			&i.PricesTransactionArea,
+			&i.PricesTransactionPrice,
+			&i.PricesTransactionPricePerSquareMeter,
+			&i.PricesTransactionBuildYear,
+			&i.PricesTransactionFloor,
+			&i.PricesTransactionElevator,
+			&i.PricesTransactionCondition,
+			&i.PricesTransactionPlot,
+			&i.PricesTransactionEnergyClass,
+			&i.PricesTransactionPeriodIdentifier,
+			&i.PricesTransactionCreatedAt,
+			&i.PricesTransactionUpdatedAt,
+			&i.PricesTransactionCategory,
+			&i.PricesNeighborhoodName,
+			&i.PostalCode,
+			&i.PostalAreaNameFi,
+			&i.MunicipalityNameFi,
+			&i.PricesCityName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateNeighborhoodPostalCode = `-- name: UpdateNeighborhoodPostalCode :exec
 UPDATE public.prices_neighborhoods
 SET prices_postal_code_id = $1,

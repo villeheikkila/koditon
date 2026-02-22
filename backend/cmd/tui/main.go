@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"os"
 
@@ -33,6 +34,9 @@ func run(ctx context.Context, stderr io.Writer) error {
 		return err
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: cfg.SlogLevel()}))
+	slog.SetDefault(logger)
+	log.SetOutput(io.Discard)
+	log.SetFlags(0)
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("create database pool: %w", err)

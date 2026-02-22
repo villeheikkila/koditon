@@ -71,6 +71,79 @@ type SyncAllResult struct {
 	Errors                []error
 }
 
+type SearchTransactionsRow struct {
+	City             string
+	Municipality     string
+	PostalCode       string
+	PostalArea       string
+	Neighborhood     string
+	Description      string
+	Type             string
+	Category         string
+	Area             float64
+	Price            int32
+	PricePerSqm      int32
+	BuildYear        int32
+	Floor            string
+	Elevator         bool
+	Condition        string
+	Plot             string
+	EnergyClass      string
+	PeriodIdentifier string
+	CreatedAt        time.Time
+}
+
+func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityName, searchTerm string, limit int32) ([]SearchTransactionsRow, error) {
+	cityName = strings.TrimSpace(cityName)
+	searchTerm = strings.TrimSpace(searchTerm)
+	if cityName == "" {
+		return nil, fmt.Errorf("city name is required")
+	}
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.queries.SearchTransactionsByCityAndAddress(ctx, &db.SearchTransactionsByCityAndAddressParams{
+		CityName:   &cityName,
+		SearchTerm: &searchTerm,
+		LimitCount: pgtype.Int4{Int32: limit, Valid: true},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search transactions by city and address: %w", err)
+	}
+	result := make([]SearchTransactionsRow, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, SearchTransactionsRow{
+			City:             row.PricesCityName,
+			Municipality:     ptrString(row.MunicipalityNameFi),
+			PostalCode:       ptrString(row.PostalCode),
+			PostalArea:       ptrString(row.PostalAreaNameFi),
+			Neighborhood:     row.PricesNeighborhoodName,
+			Description:      row.PricesTransactionDescription,
+			Type:             row.PricesTransactionType,
+			Category:         row.PricesTransactionCategory,
+			Area:             row.PricesTransactionArea,
+			Price:            row.PricesTransactionPrice,
+			PricePerSqm:      row.PricesTransactionPricePerSquareMeter,
+			BuildYear:        row.PricesTransactionBuildYear,
+			Floor:            ptrString(row.PricesTransactionFloor),
+			Elevator:         row.PricesTransactionElevator,
+			Condition:        ptrString(row.PricesTransactionCondition),
+			Plot:             ptrString(row.PricesTransactionPlot),
+			EnergyClass:      ptrString(row.PricesTransactionEnergyClass),
+			PeriodIdentifier: row.PricesTransactionPeriodIdentifier,
+			CreatedAt:        row.PricesTransactionCreatedAt,
+		})
+	}
+	return result, nil
+}
+
+func ptrString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 func (s *Service) SyncAll(ctx context.Context, cfg SyncAllConfig) (*SyncAllResult, error) {
 	logger := cfg.Logger
 	if logger == nil {
@@ -216,6 +289,14 @@ type SyncNeighborhoodPostalCodesProgress struct {
 	Updated    int
 }
 
+type SyncCityProgress struct {
+	City    string
+	Step    string
+	Page    int
+	Count   int
+	Details string
+}
+
 func (s *Service) SyncNeighborhoodPostalCodes(ctx context.Context, progressFn func(SyncNeighborhoodPostalCodesProgress)) error {
 	cities, err := s.queries.ListPricesCities(ctx)
 	if err != nil {
@@ -294,18 +375,32 @@ func (s *Service) syncNeighborhoodsForPostalCode(
 }
 
 func (s *Service) SyncCity(ctx context.Context, cityName string) error {
+	return s.SyncCityWithProgress(ctx, cityName, nil)
+}
+
+func (s *Service) SyncCityWithProgress(ctx context.Context, cityName string, progressFn func(SyncCityProgress)) error {
+	report := func(p SyncCityProgress) {
+		if progressFn != nil {
+			progressFn(p)
+		}
+	}
+	report(SyncCityProgress{City: cityName, Step: "city_upsert_start"})
 	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
 	if err != nil {
 		return fmt.Errorf("upsert city %q: %w", cityName, err)
 	}
+	report(SyncCityProgress{City: cityName, Step: "city_upsert_done"})
 	cityID := cityRow.PricesCityID
+	report(SyncCityProgress{City: cityName, Step: "postal_codes_fetch_start"})
 	postalCodes, err := s.client.FetchPostalCodes(ctx, cityName)
 	if err != nil {
 		return fmt.Errorf("fetch postal codes for %q: %w", cityName, err)
 	}
 	postalCodes = util.UniqueStrings(postalCodes)
+	report(SyncCityProgress{City: cityName, Step: "postal_codes_fetch_done", Count: len(postalCodes)})
 	postalCodeIDs := make(map[string]pgtype.UUID, len(postalCodes))
 	if len(postalCodes) > 0 {
+		report(SyncCityProgress{City: cityName, Step: "postal_codes_upsert_start", Count: len(postalCodes)})
 		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams(postalCodes, cityID))
 		if err != nil {
 			return fmt.Errorf("bulk upsert postal codes for %q: %w", cityName, err)
@@ -313,16 +408,29 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 		for _, row := range rows {
 			postalCodeIDs[row.PricesPostalCodeCode] = row.PricesPostalCodeID
 		}
+		report(SyncCityProgress{City: cityName, Step: "postal_codes_upsert_done", Count: len(rows)})
 	}
+	report(SyncCityProgress{City: cityName, Step: "neighborhoods_fetch_start"})
 	neighborhoods, err := s.client.FetchNeighborhoods(ctx, cityName)
 	if err != nil {
 		return fmt.Errorf("fetch neighborhoods for %q: %w", cityName, err)
 	}
 	neighborhoods = util.UniqueStrings(neighborhoods)
-	transactions, err := s.client.GetAllTransactions(ctx, cityName)
+	report(SyncCityProgress{City: cityName, Step: "neighborhoods_fetch_done", Count: len(neighborhoods)})
+	report(SyncCityProgress{City: cityName, Step: "transactions_fetch_start"})
+	transactions, err := s.client.GetAllTransactionsWithProgress(ctx, cityName, func(p client.TransactionsProgress) {
+		report(SyncCityProgress{
+			City:    cityName,
+			Step:    "transactions_page",
+			Page:    p.Page,
+			Count:   p.Apartments,
+			Details: fmt.Sprintf("total=%d", p.TotalApartments),
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("fetch transactions for %q: %w", cityName, err)
 	}
+	report(SyncCityProgress{City: cityName, Step: "transactions_fetch_done", Count: len(transactions)})
 	transactionNeighborhoods := make(map[string]bool)
 	for _, tx := range transactions {
 		normalized := util.TrimUnicodeSpace(tx.Neighborhood)
@@ -334,8 +442,10 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 		neighborhoods = append(neighborhoods, name)
 	}
 	neighborhoods = util.UniqueStrings(neighborhoods)
+	report(SyncCityProgress{City: cityName, Step: "neighborhoods_merge_done", Count: len(neighborhoods)})
 	neighborhoodIDs := make(map[string]pgtype.UUID, len(neighborhoods))
 	if len(neighborhoods) > 0 {
+		report(SyncCityProgress{City: cityName, Step: "neighborhoods_upsert_start", Count: len(neighborhoods)})
 		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, mapUpsertNeighborhoodsBulkParams(neighborhoods, cityID))
 		if err != nil {
 			return fmt.Errorf("bulk upsert neighborhoods for %q: %w", cityName, err)
@@ -344,9 +454,11 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 			key := util.NormalizeString(row.PricesNeighborhoodName)
 			neighborhoodIDs[key] = row.PricesNeighborhoodID
 		}
+		report(SyncCityProgress{City: cityName, Step: "neighborhoods_upsert_done", Count: len(rows)})
 	}
 	if len(transactions) > 0 {
 		periodIdentifier := s.nowFunc().Format("2006-01")
+		report(SyncCityProgress{City: cityName, Step: "transactions_upsert_start", Count: len(transactions), Details: periodIdentifier})
 		params, err := mapUpsertTransactionsBulkParams(transactions, neighborhoodIDs, periodIdentifier)
 		if err != nil {
 			return fmt.Errorf("build transaction params for %q: %w", cityName, err)
@@ -354,7 +466,9 @@ func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 		if _, err := s.queries.UpsertPricesTransactionsBulk(ctx, params); err != nil {
 			return fmt.Errorf("bulk upsert transactions for %q: %w", cityName, err)
 		}
+		report(SyncCityProgress{City: cityName, Step: "transactions_upsert_done", Count: len(transactions), Details: periodIdentifier})
 	}
+	report(SyncCityProgress{City: cityName, Step: "sync_city_done"})
 	return nil
 }
 
