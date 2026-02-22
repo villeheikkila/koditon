@@ -1,0 +1,45 @@
+                                                                                                  
+  Koditon Manual Sync                                                                             
+  Subsystems > Ads > Actions                                                                      
+  Enter search • Tab/j/k fields • h/l choices • Esc back • q quit                                 
+                                                                                                  
+  ╭────────────────────────────────────────────────────────────────────────────────────────────╮  
+  │ Search Reports                                                                             │  
+  │ Unified Shortcut + Frontdoor ads report search                                             │  
+  │                                                                                            │  
+  │ > Query (id/url/address/postal/city)                                                       │  
+  │   > helsinki 00100                                                                         │  
+  │                                                                                            │  
+  │   Source                                                                                   │  
+  │   [h/l]   All                                                                              │  
+  │                                                                                            │  
+  │   Kind                                                                                     │  
+  │   [h/l]   All                                                                              │  
+  │                                                                                            │  
+  │   Min price                                                                                │  
+  │   > 100000                                                                                 │  
+  │                                                                                            │  
+  │   Max price                                                                                │  
+  │   > 400000                                                                                 │  
+  │                                                                                            │  
+  │   Min area (m2)                                                                            │  
+  │   > 30                                                                                     │  
+  │                                                                                            │  
+  │   Max area (m2)                                                                            │  
+  │   > 120                                                                                    │  
+  │                                                                                            │  
+  │   City contains                                                                            │  
+  │   > Helsinki                                                                               │  
+  │                                                                                            │  
+  │   Postal contains                                                                          │  
+  │   > 00100                                                                                  │  
+  │                                                                                            │  
+  │   Sort                                                                                     │  
+  │   [h/l]   Newest first                                                                     │  
+  │                                                                                            │  
+  │   Page size                                                                                │  
+  │   [h/l]   50                                                                               │  
+  │                                                                                            │  
+  │ Enter search • Tab/j/k navigate • h/l change choices • Esc back                            │  
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                  

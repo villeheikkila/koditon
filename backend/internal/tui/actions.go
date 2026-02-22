@@ -63,6 +63,20 @@ type subsystem struct {
 func buildSubsystems() []subsystem {
 	return []subsystem{
 		{
+			Title:       "Ads",
+			Description: "Unified ads and announcement report search",
+			Actions: []action{
+				{
+					Title:       "Search Reports",
+					Description: "Browse shortcut/frontdoor ads and frontdoor announcements with filters",
+					BuildInput:  newAdsReportFormScreen,
+					Run: func(_ context.Context, _ *syncflows.Runner, _ []string, _ reportFn) (actionResult, error) {
+						return actionResult{Output: "ads report browser opened"}, nil
+					},
+				},
+			},
+		},
+		{
 			Title:       "Frontdoor",
 			Description: "Frontdoor sitemap and entity sync",
 			Actions: []action{

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	openrouter "github.com/revrost/go-openrouter"
 
+	"koditon-go/internal/ads"
 	"koditon-go/internal/config"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/postal"
@@ -50,10 +51,11 @@ func run(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("create prices service: %w", err)
 	}
+	adsService := ads.NewService(pool)
 	shortcutService := shortcut.NewService(pool, logger, cfg.Shortcut.BaseURL, cfg.Shortcut.DocsBaseURL, cfg.Shortcut.AdBaseURL, cfg.Shortcut.UserAgent, cfg.Shortcut.SitemapBase)
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
-	runner := syncflows.NewRunner(logger, pricesService, shortcutService, frontdoorService, postalService)
+	runner := syncflows.NewRunner(logger, adsService, pricesService, shortcutService, frontdoorService, postalService)
 	p := tea.NewProgram(tui.NewApp(runner).Model(), tea.WithAltScreen(), tea.WithOutput(stderr))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)

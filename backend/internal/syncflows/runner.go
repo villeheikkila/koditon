@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"koditon-go/internal/ads"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
@@ -16,17 +17,18 @@ import (
 
 type Runner struct {
 	logger           *slog.Logger
+	adsService       *ads.Service
 	pricesService    *prices.Service
 	shortcutService  *shortcut.Service
 	frontdoorService *frontdoor.Service
 	postalService    *postal.Service
 }
 
-func NewRunner(logger *slog.Logger, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Runner {
+func NewRunner(logger *slog.Logger, adsService *ads.Service, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Runner {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Runner{logger: logger, pricesService: pricesService, shortcutService: shortcutService, frontdoorService: frontdoorService, postalService: postalService}
+	return &Runner{logger: logger, adsService: adsService, pricesService: pricesService, shortcutService: shortcutService, frontdoorService: frontdoorService, postalService: postalService}
 }
 
 func (r *Runner) FrontdoorSitemap(ctx context.Context) ([]string, []string, error) {
@@ -184,4 +186,26 @@ func (r *Runner) PostalSync(ctx context.Context, logger *slog.Logger) (*postal.S
 		return nil, fmt.Errorf("sync postal codes: %w", err)
 	}
 	return result, nil
+}
+
+func (r *Runner) AdsSearchReports(ctx context.Context, params ads.SearchParams) (ads.ReportPage, error) {
+	if r.adsService == nil {
+		return ads.ReportPage{}, fmt.Errorf("ads service unavailable")
+	}
+	page, err := r.adsService.Search(ctx, params)
+	if err != nil {
+		return ads.ReportPage{}, fmt.Errorf("search ads reports: %w", err)
+	}
+	return page, nil
+}
+
+func (r *Runner) AdsReportDetail(ctx context.Context, source, kind, entityID string) (ads.Detail, error) {
+	if r.adsService == nil {
+		return ads.Detail{}, fmt.Errorf("ads service unavailable")
+	}
+	detail, err := r.adsService.Detail(ctx, source, kind, entityID)
+	if err != nil {
+		return ads.Detail{}, fmt.Errorf("load ads report detail: %w", err)
+	}
+	return detail, nil
 }

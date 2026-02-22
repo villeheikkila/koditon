@@ -36,7 +36,7 @@ func New(logger *slog.Logger, taskQueueClient *taskqueue.Client, pricesService *
 	return &Consumer{
 		logger:          logger,
 		taskQueueClient: taskQueueClient,
-		syncRunner:      syncflows.NewRunner(logger, pricesService, shortcutService, frontdoorService, postalService),
+		syncRunner:      syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
 	}
 }
 
