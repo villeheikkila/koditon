@@ -18,16 +18,28 @@ type FrontdoorAd struct {
 }
 
 type FrontdoorBuilding struct {
-	FrontdoorBuildingID                       pgtype.UUID `db:"frontdoor_building_id" json:"frontdoor_building_id"`
-	FrontdoorBuildingUrl                      *string     `db:"frontdoor_building_url" json:"frontdoor_building_url"`
-	FrontdoorBuildingHousingCompanyID         pgtype.Int8 `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
-	FrontdoorBuildingHousingCompanyFriendlyID *string     `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
-	FrontdoorBuildingCompanyName              *string     `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
-	FrontdoorBuildingStreetAddress            *string     `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
-	FrontdoorBuildingHouseNumber              *string     `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
-	FrontdoorBuildingPostcode                 *string     `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
-	FrontdoorBuildingPostArea                 *string     `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
-	FrontdoorBuildingMunicipality             *string     `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
+	FrontdoorBuildingID                       pgtype.UUID        `db:"frontdoor_building_id" json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string            `db:"frontdoor_building_url" json:"frontdoor_building_url"`
+	FrontdoorBuildingLastSeenAt               pgtype.Timestamptz `db:"frontdoor_building_last_seen_at" json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingCompanyName              *string            `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string            `db:"frontdoor_building_business_id" json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32             `db:"frontdoor_building_apartment_count" json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32             `db:"frontdoor_building_floor_count" json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingBuildYear                *int32             `db:"frontdoor_building_build_year" json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool              `db:"frontdoor_building_has_elevator" json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool              `db:"frontdoor_building_has_sauna" json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string            `db:"frontdoor_building_energy_certificate_code" json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingHeating                  *string            `db:"frontdoor_building_heating" json:"frontdoor_building_heating"`
+	FrontdoorBuildingStreetAddress            *string            `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string            `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string            `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string            `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string            `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
+	FrontdoorBuildingLatitude                 *float64           `db:"frontdoor_building_latitude" json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64           `db:"frontdoor_building_longitude" json:"frontdoor_building_longitude"`
+	FrontdoorBuildingData                     []byte             `db:"frontdoor_building_data" json:"frontdoor_building_data"`
+	FrontdoorBuildingHousingCompanyID         pgtype.Int8        `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string            `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
 }
 
 type FrontdoorBuildingAnnouncement struct {
@@ -57,9 +69,36 @@ type ShortcutAd struct {
 }
 
 type ShortcutBuilding struct {
-	ShortcutBuildingID             pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingExternalID     int64       `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
-	ShortcutBuildingUrl            string      `db:"shortcut_building_url" json:"shortcut_building_url"`
-	ShortcutBuildingAddress        *string     `db:"shortcut_building_address" json:"shortcut_building_address"`
-	ShortcutBuildingHousingCompany *string     `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
+	ShortcutBuildingID               pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutBuildingExternalID       int64              `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingType     *string            `db:"shortcut_building_building_type" json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype  *string            `db:"shortcut_building_building_subtype" json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear *int32             `db:"shortcut_building_construction_year" json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount       *int32             `db:"shortcut_building_floor_count" json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount   *int32             `db:"shortcut_building_apartment_count" json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem    *string            `db:"shortcut_building_heating_system" json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial *string            `db:"shortcut_building_building_material" json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType         *string            `db:"shortcut_building_plot_type" json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure    *string            `db:"shortcut_building_wall_structure" json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource       *string            `db:"shortcut_building_heat_source" json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator      *string            `db:"shortcut_building_has_elevator" json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna         *string            `db:"shortcut_building_has_sauna" json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude         *float64           `db:"shortcut_building_latitude" json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude        *float64           `db:"shortcut_building_longitude" json:"shortcut_building_longitude"`
+	ShortcutBuildingUrl              string             `db:"shortcut_building_url" json:"shortcut_building_url"`
+	ShortcutBuildingAddress          *string            `db:"shortcut_building_address" json:"shortcut_building_address"`
+	ShortcutBuildingHousingCompany   *string            `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
+	ShortcutBuildingUpdatedAt        pgtype.Timestamptz `db:"shortcut_building_updated_at" json:"shortcut_building_updated_at"`
+	ShortcutBuildingProcessedAt      pgtype.Timestamptz `db:"shortcut_building_processed_at" json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound     *bool              `db:"shortcut_building_page_not_found" json:"shortcut_building_page_not_found"`
+}
+
+type ShortcutBuildingListing struct {
+	ShortcutBuildingListingID pgtype.UUID `db:"shortcut_building_listing_id" json:"shortcut_building_listing_id"`
+	ShortcutBuildingID        pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
+}
+
+type ShortcutBuildingRental struct {
+	ShortcutBuildingRentalID pgtype.UUID `db:"shortcut_building_rental_id" json:"shortcut_building_rental_id"`
+	ShortcutBuildingID       pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
 }

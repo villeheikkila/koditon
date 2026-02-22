@@ -199,13 +199,13 @@ func (r *Runner) AdsSearchReports(ctx context.Context, params ads.SearchParams) 
 	return page, nil
 }
 
-func (r *Runner) AdsReportDetail(ctx context.Context, source, kind, entityID string) (ads.Detail, error) {
+func (r *Runner) AdsReportDetail(ctx context.Context, canonicalID string) (ads.UnifiedEntityDetail, error) {
 	if r.adsService == nil {
-		return ads.Detail{}, fmt.Errorf("ads service unavailable")
+		return ads.UnifiedEntityDetail{}, fmt.Errorf("ads service unavailable")
 	}
-	detail, err := r.adsService.Detail(ctx, source, kind, entityID)
+	detail, err := r.adsService.DetailByCanonicalID(ctx, canonicalID)
 	if err != nil {
-		return ads.Detail{}, fmt.Errorf("load ads report detail: %w", err)
+		return ads.UnifiedEntityDetail{}, fmt.Errorf("load ads report detail: %w", err)
 	}
 	return detail, nil
 }

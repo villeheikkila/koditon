@@ -1,7 +1,9 @@
 package ads
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -30,23 +32,24 @@ type SearchParams struct {
 	Sort     string
 }
 
-type ReportRow struct {
-	Source     string
-	Kind       string
-	EntityID   string
-	Headline   string
-	Address    string
-	City       string
-	Postal     string
-	Price      *int64
-	Area       *float64
-	RoomLayout string
-	URL        string
-	LastSeenAt time.Time
+type UnifiedEntityRow struct {
+	CanonicalID string
+	Source      string
+	Kind        string
+	NativeID    string
+	Headline    string
+	Address     string
+	City        string
+	Postal      string
+	Price       *int64
+	Area        *float64
+	RoomLayout  string
+	URL         string
+	LastSeenAt  time.Time
 }
 
 type ReportPage struct {
-	Rows     []ReportRow
+	Rows     []UnifiedEntityRow
 	Total    int64
 	Page     int32
 	PageSize int32
@@ -57,9 +60,32 @@ type DetailField struct {
 	Value string
 }
 
-type Detail struct {
-	Summary []DetailField
-	Related []DetailField
+type RawPayload struct {
+	Pretty        string
+	OriginalBytes int
+}
+
+type UnifiedCanonicalFields struct {
+	CanonicalID string
+	Source      string
+	Kind        string
+	NativeID    string
+	Headline    string
+	Address     string
+	City        string
+	Postal      string
+	Price       *int64
+	Area        *float64
+	RoomLayout  string
+	URL         string
+	LastSeenAt  time.Time
+}
+
+type UnifiedEntityDetail struct {
+	Canonical      UnifiedCanonicalFields
+	SourceSpecific []DetailField
+	Related        []DetailField
+	Raw            RawPayload
 }
 
 type Service struct {
@@ -76,7 +102,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	source := stringPtr(normalized.Source)
 	kind := stringPtr(normalized.Kind)
 	sort := stringPtr(normalized.Sort)
-	count, err := s.queries.CountAdsReports(ctx, &db.CountAdsReportsParams{
+	count, err := s.queries.CountUnifiedEntities(ctx, &db.CountUnifiedEntitiesParams{
 		SourceFilter: source,
 		KindFilter:   kind,
 		QueryText:    emptyToNil(normalized.Query),
@@ -88,9 +114,9 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MaxArea:      normalized.MaxArea,
 	})
 	if err != nil {
-		return ReportPage{}, fmt.Errorf("count ads reports: %w", err)
+		return ReportPage{}, fmt.Errorf("count unified entities: %w", err)
 	}
-	rows, err := s.queries.SearchAdsReports(ctx, &db.SearchAdsReportsParams{
+	rows, err := s.queries.SearchUnifiedEntities(ctx, &db.SearchUnifiedEntitiesParams{
 		SortMode:     sort,
 		OffsetCount:  offset,
 		LimitCount:   normalized.PageSize,
@@ -105,153 +131,150 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MaxArea:      normalized.MaxArea,
 	})
 	if err != nil {
-		return ReportPage{}, fmt.Errorf("search ads reports: %w", err)
+		return ReportPage{}, fmt.Errorf("search unified entities: %w", err)
 	}
-	mapped := make([]ReportRow, 0, len(rows))
+	mapped := make([]UnifiedEntityRow, 0, len(rows))
 	for _, row := range rows {
-		mapped = append(mapped, ReportRow{
-			Source:     row.Source,
-			Kind:       row.Kind,
-			EntityID:   row.EntityID,
-			Headline:   valueOrEmpty(row.Headline),
-			Address:    valueOrEmpty(row.Address),
-			City:       valueOrEmpty(row.City),
-			Postal:     valueOrEmpty(row.Postal),
-			Price:      pgInt8ToPointer(row.Price),
-			Area:       pgFloat8ToPointer(row.Area),
-			RoomLayout: valueOrEmpty(row.RoomLayout),
-			URL:        strings.TrimSpace(row.Url),
-			LastSeenAt: row.LastSeenAt.Time,
+		mapped = append(mapped, UnifiedEntityRow{
+			CanonicalID: valueOrEmpty(row.CanonicalID),
+			Source:      row.Source,
+			Kind:        row.Kind,
+			NativeID:    row.NativeID,
+			Headline:    valueOrEmpty(row.Headline),
+			Address:     valueOrEmpty(row.Address),
+			City:        valueOrEmpty(row.City),
+			Postal:      valueOrEmpty(row.Postal),
+			Price:       pgInt8ToPointer(row.Price),
+			Area:        pgFloat8ToPointer(row.Area),
+			RoomLayout:  valueOrEmpty(row.RoomLayout),
+			URL:         strings.TrimSpace(row.Url),
+			LastSeenAt:  row.LastSeenAt.Time,
 		})
 	}
 	return ReportPage{Rows: mapped, Total: count, Page: normalized.Page, PageSize: normalized.PageSize}, nil
 }
 
-func (s *Service) Detail(ctx context.Context, source, kind, entityID string) (Detail, error) {
-	switch normalizeSource(source) {
+func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (UnifiedEntityDetail, error) {
+	source, kind, nativeID, err := ParseCanonicalID(canonicalID)
+	if err != nil {
+		return UnifiedEntityDetail{}, err
+	}
+	switch source {
 	case "shortcut":
-		if normalizeKind(kind) != "ad" {
-			return Detail{}, fmt.Errorf("unsupported shortcut kind: %s", kind)
-		}
-		adID, err := strconv.ParseInt(strings.TrimSpace(entityID), 10, 64)
-		if err != nil {
-			return Detail{}, fmt.Errorf("parse shortcut ad id: %w", err)
-		}
-		row, err := s.queries.GetShortcutAdReportDetail(ctx, pgtype.Int8{Int64: adID, Valid: true})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return Detail{}, fmt.Errorf("shortcut ad not found")
-			}
-			return Detail{}, fmt.Errorf("get shortcut ad detail: %w", err)
-		}
-		summary := []DetailField{}
-		appendField(&summary, "Source", "shortcut/ad")
-		appendField(&summary, "Ad ID", strconv.FormatInt(row.ShortcutAdID, 10))
-		appendField(&summary, "Type", row.ShortcutAdType)
-		appendField(&summary, "Address", valueOrEmpty(row.AdAddress))
-		appendField(&summary, "Price", formatPgInt8(row.AdPrice))
-		appendField(&summary, "Area", formatPgFloat8(row.AdArea))
-		appendField(&summary, "Room Layout", valueOrEmpty(row.AdRoomLayout))
-		appendField(&summary, "Last Seen", row.ShortcutAdLastSeenAt.Time.Format("2006-01-02 15:04:05Z07:00"))
-		appendField(&summary, "URL", row.ShortcutAdUrl)
-		related := []DetailField{}
-		if row.ShortcutBuildingID.Valid {
-			appendField(&related, "Building ID", uuid.UUID(row.ShortcutBuildingID.Bytes).String())
-		}
-		appendField(&related, "Building External ID", formatPgInt8(row.ShortcutBuildingExternalID))
-		appendField(&related, "Building Address", valueOrEmpty(row.ShortcutBuildingAddress))
-		appendField(&related, "Housing Company", valueOrEmpty(row.ShortcutBuildingHousingCompany))
-		appendField(&related, "Building URL", valueOrEmpty(row.ShortcutBuildingUrl))
-		appendField(&related, "Listing Rows", strconv.FormatInt(row.BuildingListingCount, 10))
-		appendField(&related, "Rental Rows", strconv.FormatInt(row.BuildingRentalCount, 10))
-		return Detail{Summary: summary, Related: related}, nil
-	case "frontdoor":
-		switch normalizeKind(kind) {
+		switch kind {
 		case "ad":
-			row, err := s.queries.GetFrontdoorAdReportDetail(ctx, strings.TrimSpace(entityID))
+			adID, err := strconv.ParseInt(nativeID, 10, 64)
+			if err != nil {
+				return UnifiedEntityDetail{}, fmt.Errorf("parse shortcut ad id: %w", err)
+			}
+			row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, adID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return Detail{}, fmt.Errorf("frontdoor ad not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("shortcut ad not found")
 				}
-				return Detail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
+				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
-			summary := []DetailField{}
-			appendField(&summary, "Source", "frontdoor/ad")
-			appendField(&summary, "External ID", row.FrontdoorAdExternalID)
-			appendField(&summary, "Address", valueOrEmpty(row.AdAddress))
-			appendField(&summary, "City", valueOrEmpty(row.AdCity))
-			appendField(&summary, "Postal", valueOrEmpty(row.AdPostal))
-			appendField(&summary, "Price", formatPgInt8(row.AdPrice))
-			appendField(&summary, "Area", formatPgFloat8(row.AdArea))
-			appendField(&summary, "Room Layout", valueOrEmpty(row.AdRoomLayout))
-			appendField(&summary, "Property Type", valueOrEmpty(row.AdPropertyType))
-			appendField(&summary, "Condition", valueOrEmpty(row.AdCondition))
-			appendField(&summary, "Page Not Found", formatBool(row.FrontdoorAdPageNotFound))
-			appendField(&summary, "Last Seen", row.FrontdoorAdLastSeenAt.Time.Format("2006-01-02 15:04:05Z07:00"))
-			appendField(&summary, "URL", row.FrontdoorAdUrl)
-			return Detail{Summary: summary, Related: nil}, nil
-		case "announcement":
-			parsedID, err := uuid.Parse(strings.TrimSpace(entityID))
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: pgInt8ToPointer(row.AdPrice), Area: pgFloat8ToPointer(row.AdArea), RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt.Time}}
+			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: pgUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatPgInt8(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
+			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
+			detail.Raw = buildRawPayload(row.ShortcutAdData)
+			return cleanDetail(detail), nil
+		case "building":
+			buildingID, err := uuid.Parse(nativeID)
 			if err != nil {
-				return Detail{}, fmt.Errorf("parse announcement id: %w", err)
+				return UnifiedEntityDetail{}, fmt.Errorf("parse shortcut building id: %w", err)
 			}
-			row, err := s.queries.GetFrontdoorAnnouncementReportDetail(ctx, pgtype.UUID{Bytes: parsedID, Valid: true})
+			row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return Detail{}, fmt.Errorf("frontdoor announcement not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("shortcut building not found")
 				}
-				return Detail{}, fmt.Errorf("get frontdoor announcement detail: %w", err)
+				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut building detail: %w", err)
 			}
-			summary := []DetailField{}
-			appendField(&summary, "Source", "frontdoor/announcement")
-			appendField(&summary, "Announcement ID", uuid.UUID(row.FrontdoorBuildingAnnouncementID.Bytes).String())
-			appendField(&summary, "External ID", formatInt32(row.FrontdoorBuildingAnnouncementExternalID))
-			appendField(&summary, "Friendly ID", valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID))
-			appendField(&summary, "Address 1", valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1))
-			appendField(&summary, "Address 2", valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine2))
-			appendField(&summary, "Location", valueOrEmpty(row.FrontdoorBuildingAnnouncementLocation))
-			appendField(&summary, "Price", formatFloatToInt(row.FrontdoorBuildingAnnouncementSearchPrice))
-			appendField(&summary, "Area", formatFloat(row.FrontdoorBuildingAnnouncementArea))
-			appendField(&summary, "Room Layout", valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure))
-			appendField(&summary, "Property Type", valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType))
-			appendField(&summary, "Property Subtype", valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype))
-			appendField(&summary, "Published", formatBoolPtr(row.FrontdoorBuildingAnnouncementPublished))
-			appendField(&summary, "Last Seen", row.FrontdoorBuildingAnnouncementLastSeenAt.Time.Format("2006-01-02 15:04:05Z07:00"))
-			related := []DetailField{}
-			appendField(&related, "Building ID", uuid.UUID(row.FrontdoorBuildingID.Bytes).String())
-			appendField(&related, "Building URL", valueOrEmpty(row.FrontdoorBuildingUrl))
-			appendField(&related, "Housing Company ID", formatPgInt8(row.FrontdoorBuildingHousingCompanyID))
-			appendField(&related, "Housing Friendly ID", valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID))
-			appendField(&related, "Company", valueOrEmpty(row.FrontdoorBuildingCompanyName))
-			appendField(&related, "Street", valueOrEmpty(row.FrontdoorBuildingStreetAddress))
-			appendField(&related, "House #", valueOrEmpty(row.FrontdoorBuildingHouseNumber))
-			appendField(&related, "Postal", valueOrEmpty(row.FrontdoorBuildingPostcode))
-			appendField(&related, "Post Area", valueOrEmpty(row.FrontdoorBuildingPostArea))
-			appendField(&related, "Municipality", valueOrEmpty(row.FrontdoorBuildingMunicipality))
-			return Detail{Summary: summary, Related: related}, nil
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.ShortcutBuildingAddress), valueOrEmpty(row.ShortcutBuildingHousingCompany), formatInt64Value(row.ShortcutBuildingExternalID)), Address: valueOrEmpty(row.ShortcutBuildingAddress), URL: strings.TrimSpace(row.ShortcutBuildingUrl), LastSeenAt: firstTime(row.ShortcutBuildingUpdatedAt, row.ShortcutBuildingProcessedAt)}}
+			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt64Value(row.ShortcutBuildingExternalID)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building Type", Value: valueOrEmpty(row.ShortcutBuildingBuildingType)}, {Label: "Building Subtype", Value: valueOrEmpty(row.ShortcutBuildingBuildingSubtype)}, {Label: "Construction Year", Value: formatInt32(row.ShortcutBuildingConstructionYear)}, {Label: "Floor Count", Value: formatInt32(row.ShortcutBuildingFloorCount)}, {Label: "Apartment Count", Value: formatInt32(row.ShortcutBuildingApartmentCount)}, {Label: "Heating System", Value: valueOrEmpty(row.ShortcutBuildingHeatingSystem)}, {Label: "Building Material", Value: valueOrEmpty(row.ShortcutBuildingBuildingMaterial)}, {Label: "Plot Type", Value: valueOrEmpty(row.ShortcutBuildingPlotType)}, {Label: "Wall Structure", Value: valueOrEmpty(row.ShortcutBuildingWallStructure)}, {Label: "Heat Source", Value: valueOrEmpty(row.ShortcutBuildingHeatSource)}, {Label: "Has Elevator", Value: valueOrEmpty(row.ShortcutBuildingHasElevator)}, {Label: "Has Sauna", Value: valueOrEmpty(row.ShortcutBuildingHasSauna)}, {Label: "Latitude", Value: formatFloat64Ptr(row.ShortcutBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.ShortcutBuildingLongitude)}, {Label: "Page Not Found", Value: formatBoolPtr(row.ShortcutBuildingPageNotFound)}}
+			detail.Related = []DetailField{{Label: "Linked Ads", Value: strconv.FormatInt(row.AdCount, 10)}, {Label: "Listings", Value: strconv.FormatInt(row.ListingCount, 10)}, {Label: "Rentals", Value: strconv.FormatInt(row.RentalCount, 10)}}
+			detail.Raw = buildRawPayload(row.RawJson)
+			return cleanDetail(detail), nil
 		default:
-			return Detail{}, fmt.Errorf("unsupported frontdoor kind: %s", kind)
+			return UnifiedEntityDetail{}, fmt.Errorf("unsupported shortcut kind: %s", kind)
+		}
+	case "frontdoor":
+		switch kind {
+		case "ad":
+			row, err := s.queries.GetFrontdoorAdUnifiedDetail(ctx, nativeID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor ad not found")
+				}
+				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
+			}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: pgInt8ToPointer(row.AdPrice), Area: pgFloat8ToPointer(row.AdArea), RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), LastSeenAt: row.FrontdoorAdLastSeenAt.Time}}
+			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: valueOrEmpty(row.AdPropertyType)}, {Label: "Condition", Value: valueOrEmpty(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
+			detail.Raw = buildRawPayload(row.FrontdoorAdData)
+			return cleanDetail(detail), nil
+		case "announcement":
+			announcementID, err := uuid.Parse(nativeID)
+			if err != nil {
+				return UnifiedEntityDetail{}, fmt.Errorf("parse frontdoor announcement id: %w", err)
+			}
+			row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, pgtype.UUID{Bytes: announcementID, Valid: true})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor announcement not found")
+				}
+				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor announcement detail: %w", err)
+			}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), formatInt32(row.FrontdoorBuildingAnnouncementExternalID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine2)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingAnnouncementLocation), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), Price: float64ToInt64Ptr(row.FrontdoorBuildingAnnouncementSearchPrice), Area: floatToPointer(row.FrontdoorBuildingAnnouncementArea), RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), URL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: row.FrontdoorBuildingAnnouncementLastSeenAt.Time}}
+			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt32(row.FrontdoorBuildingAnnouncementExternalID)}, {Label: "Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID)}, {Label: "Property Type", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType)}, {Label: "Property Subtype", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype)}, {Label: "Published", Value: formatBoolPtr(row.FrontdoorBuildingAnnouncementPublished)}}
+			detail.Related = []DetailField{{Label: "Building ID", Value: pgUUIDToString(row.FrontdoorBuildingID)}, {Label: "Housing Company ID", Value: formatPgInt8(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Building Street", Value: valueOrEmpty(row.FrontdoorBuildingStreetAddress)}, {Label: "Building House #", Value: valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, {Label: "Building Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Building Municipality", Value: valueOrEmpty(row.FrontdoorBuildingMunicipality)}}
+			detail.Raw = buildRawPayload(row.RawJson)
+			return cleanDetail(detail), nil
+		case "building":
+			buildingID, err := uuid.Parse(nativeID)
+			if err != nil {
+				return UnifiedEntityDetail{}, fmt.Errorf("parse frontdoor building id: %w", err)
+			}
+			row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor building not found")
+				}
+				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor building detail: %w", err)
+			}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingCompanyName), strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), formatPgInt8(row.FrontdoorBuildingHousingCompanyID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingMunicipality), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), URL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: row.FrontdoorBuildingLastSeenAt.Time}}
+			detail.SourceSpecific = []DetailField{{Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Business ID", Value: valueOrEmpty(row.FrontdoorBuildingBusinessID)}, {Label: "Housing Company ID", Value: formatPgInt8(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Apartment Count", Value: formatInt32(row.FrontdoorBuildingApartmentCount)}, {Label: "Floor Count", Value: formatInt32(row.FrontdoorBuildingFloorCount)}, {Label: "Build Year", Value: formatInt32(row.FrontdoorBuildingBuildYear)}, {Label: "Has Elevator", Value: formatBoolPtr(row.FrontdoorBuildingHasElevator)}, {Label: "Has Sauna", Value: formatBoolPtr(row.FrontdoorBuildingHasSauna)}, {Label: "Energy Certificate", Value: valueOrEmpty(row.FrontdoorBuildingEnergyCertificateCode)}, {Label: "Heating", Value: valueOrEmpty(row.FrontdoorBuildingHeating)}, {Label: "Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Latitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLongitude)}}
+			detail.Related = []DetailField{{Label: "Announcement Count", Value: strconv.FormatInt(row.AnnouncementCount, 10)}}
+			detail.Raw = buildRawPayload(row.FrontdoorBuildingData)
+			return cleanDetail(detail), nil
+		default:
+			return UnifiedEntityDetail{}, fmt.Errorf("unsupported frontdoor kind: %s", kind)
 		}
 	default:
-		return Detail{}, fmt.Errorf("unsupported source: %s", source)
+		return UnifiedEntityDetail{}, fmt.Errorf("unsupported source: %s", source)
 	}
 }
 
-func normalizeSearchParams(params SearchParams) SearchParams {
-	normalized := SearchParams{
-		Query:    strings.TrimSpace(params.Query),
-		Source:   normalizeSource(params.Source),
-		Kind:     normalizeKind(params.Kind),
-		MinPrice: params.MinPrice,
-		MaxPrice: params.MaxPrice,
-		MinArea:  params.MinArea,
-		MaxArea:  params.MaxArea,
-		City:     strings.TrimSpace(params.City),
-		Postal:   strings.TrimSpace(params.Postal),
-		Page:     params.Page,
-		PageSize: normalizePageSize(params.PageSize),
-		Sort:     normalizeSort(params.Sort),
+func CanonicalID(source, kind, nativeID string) string {
+	return strings.TrimSpace(source) + ":" + strings.TrimSpace(kind) + ":" + strings.TrimSpace(nativeID)
+}
+
+func ParseCanonicalID(value string) (string, string, string, error) {
+	parts := strings.SplitN(strings.TrimSpace(value), ":", 3)
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("invalid canonical id: %s", value)
 	}
+	source := normalizeSource(parts[0])
+	kind := normalizeKind(parts[1])
+	nativeID := strings.TrimSpace(parts[2])
+	if source == "all" || kind == "all" || nativeID == "" {
+		return "", "", "", fmt.Errorf("invalid canonical id: %s", value)
+	}
+	return source, kind, nativeID, nil
+}
+
+func normalizeSearchParams(params SearchParams) SearchParams {
+	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort)}
 	if normalized.Page < 1 {
 		normalized.Page = 1
 	}
@@ -269,7 +292,7 @@ func normalizeSource(source string) string {
 
 func normalizeKind(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
-	case "ad", "announcement":
+	case "ad", "announcement", "building":
 		return strings.ToLower(strings.TrimSpace(kind))
 	default:
 		return "all"
@@ -310,12 +333,33 @@ func emptyToNil(value string) *string {
 	return &trimmed
 }
 
-func appendField(fields *[]DetailField, label string, value string) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return
+func cleanDetail(detail UnifiedEntityDetail) UnifiedEntityDetail {
+	detail.SourceSpecific = compactFields(detail.SourceSpecific)
+	detail.Related = compactFields(detail.Related)
+	return detail
+}
+
+func compactFields(fields []DetailField) []DetailField {
+	out := make([]DetailField, 0, len(fields))
+	for _, field := range fields {
+		if strings.TrimSpace(field.Label) == "" || strings.TrimSpace(field.Value) == "" {
+			continue
+		}
+		out = append(out, field)
 	}
-	*fields = append(*fields, DetailField{Label: label, Value: trimmed})
+	return out
+}
+
+func buildRawPayload(payload []byte) RawPayload {
+	if len(payload) == 0 {
+		return RawPayload{}
+	}
+	pretty := payload
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, payload, "", "  "); err == nil {
+		pretty = buf.Bytes()
+	}
+	return RawPayload{Pretty: string(pretty), OriginalBytes: len(pretty)}
 }
 
 func valueOrEmpty(value *string) string {
@@ -323,6 +367,55 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*value)
+}
+
+func formatBool(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
+func formatBoolPtr(value *bool) string {
+	if value == nil {
+		return ""
+	}
+	if *value {
+		return "true"
+	}
+	return "false"
+}
+
+func formatInt32(value *int32) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatInt(int64(*value), 10)
+}
+
+func formatPgInt8(value pgtype.Int8) string {
+	if !value.Valid {
+		return ""
+	}
+	return strconv.FormatInt(value.Int64, 10)
+}
+
+func formatInt64Value(value int64) string {
+	return strconv.FormatInt(value, 10)
+}
+
+func formatPgFloat8(value pgtype.Float8) string {
+	if !value.Valid {
+		return ""
+	}
+	return fmt.Sprintf("%.6f", value.Float64)
+}
+
+func formatFloat64Ptr(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%.6f", *value)
 }
 
 func pgInt8ToPointer(value pgtype.Int8) *int64 {
@@ -341,54 +434,44 @@ func pgFloat8ToPointer(value pgtype.Float8) *float64 {
 	return &v
 }
 
-func formatPgInt8(value pgtype.Int8) string {
+func floatToPointer(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	v := *value
+	return &v
+}
+
+func float64ToInt64Ptr(value *float64) *int64 {
+	if value == nil {
+		return nil
+	}
+	v := int64(*value)
+	return &v
+}
+
+func pgUUIDToString(value pgtype.UUID) string {
 	if !value.Valid {
 		return ""
 	}
-	return strconv.FormatInt(value.Int64, 10)
+	return uuid.UUID(value.Bytes).String()
 }
 
-func formatInt32(value *int32) string {
-	if value == nil {
-		return ""
+func firstTime(values ...pgtype.Timestamptz) time.Time {
+	for _, v := range values {
+		if v.Valid {
+			return v.Time
+		}
 	}
-	return strconv.FormatInt(int64(*value), 10)
+	return time.Time{}
 }
 
-func formatFloat(value *float64) string {
-	if value == nil {
-		return ""
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
 	}
-	return fmt.Sprintf("%.1f", *value)
-}
-
-func formatPgFloat8(value pgtype.Float8) string {
-	if !value.Valid {
-		return ""
-	}
-	return fmt.Sprintf("%.1f", value.Float64)
-}
-
-func formatFloatToInt(value *float64) string {
-	if value == nil {
-		return ""
-	}
-	return strconv.FormatInt(int64(*value), 10)
-}
-
-func formatBool(value bool) string {
-	if value {
-		return "true"
-	}
-	return "false"
-}
-
-func formatBoolPtr(value *bool) string {
-	if value == nil {
-		return ""
-	}
-	if *value {
-		return "true"
-	}
-	return "false"
+	return ""
 }

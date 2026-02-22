@@ -26,7 +26,7 @@ func newAdsReportFormScreen(ctx *appContext, action action, values []string, bre
 	fields := []formField{
 		newTextFormField("query", "Query (id/url/address/postal/city)", "helsinki 00100"),
 		newChoiceFormField("source", "Source", []formChoice{{Label: "All", Value: "all"}, {Label: "Shortcut", Value: "shortcut"}, {Label: "Frontdoor", Value: "frontdoor"}}, choiceIndexByValue("all", "shortcut", "frontdoor", formValues[1])),
-		newChoiceFormField("kind", "Kind", []formChoice{{Label: "All", Value: "all"}, {Label: "Ad", Value: "ad"}, {Label: "Announcement", Value: "announcement"}}, choiceIndexByValue("all", "ad", "announcement", formValues[2])),
+		newChoiceFormField("kind", "Kind", []formChoice{{Label: "All", Value: "all"}, {Label: "Ad", Value: "ad"}, {Label: "Announcement", Value: "announcement"}, {Label: "Building", Value: "building"}}, choiceIndexByValue("all", "ad", "announcement", "building", formValues[2])),
 		newTextFormField("min_price", "Min price", "100000"),
 		newTextFormField("max_price", "Max price", "400000"),
 		newTextFormField("min_area", "Min area (m2)", "30"),

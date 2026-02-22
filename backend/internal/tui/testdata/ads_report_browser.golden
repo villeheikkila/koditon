@@ -1,35 +1,34 @@
-                                                                                                    
-  Koditon Manual Sync                                                                               
-  Subsystems > Ads > Actions                                                                        
-  j/k move • n/p page • r reload • f filters • Esc back • q quit                                    
-                                                                                                    
-  ╭────────────────────────────────────────────────────────────╮  ╭──────────────────────────────╮  
-  │ Results (2 rows total)                                     │  │ Detail                       │  
-  │ page 1/1 • page_size=50 • source=all • kind=all •          │  │ shortcut/ad • id=12345       │  
-  │ sort=seen_desc                                             │  │                              │  
-  │                                                            │  │ Source: shortcut/ad          │  
-  │  Src        Kind           ID            City              │  │ Ad ID: 12345                 │  
-  │ Postal    Price       Area      Seen        Headline       │  │ URL:                         │  
-  │  shortcut   ad             12345         Helsinki      0   │  │ https://example.test/ad/1234 │  
-  │  frontdoor  announcement   9c58cc2a-...  Helsinki      0   │  │ 5                            │  
-  │                                                            │  │                              │  
-  │                                                            │  │ Related                      │  
-  │                                                            │  │ Building ID: 3f0268f4-2c8f-  │  
-  │                                                            │  │ 4a5a-af96-07025833928f       │  
-  │                                                            │  ╰──────────────────────────────╯  
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  │                                                            │                                    
-  ╰────────────────────────────────────────────────────────────╯                                    
-                                                                                                    
-  j/k move • n/p page • r reload • f filters • Esc back                                             
-                                                                                                    
+                                                                                                  
+  Koditon Manual Sync                                                                             
+  Subsystems > Ads > Actions                                                                      
+  Enter detail • j/k move • n/p page • r reload • f filters • Esc back • q quit                   
+                                                                                                  
+  ╭────────────────────────────────────────────────────────────────────────────────────────────╮  
+  │ Results (3 rows total)                                                                     │  
+  │ page 1/1 • page_size=50 • source=all • kind=all • sort=seen_desc                           │  
+  │                                                                                            │  
+  │  Src        Kind           ID                  City          Postal    Price       Area    │  
+  │ Seen        Headline                                                                       │  
+  │  shortcut   ad             12345               Helsinki      00100     230000      48.5    │  
+  │  frontdoor  announcement   9c58cc2a-73eb-4...  Helsinki      00100     310000      71.0    │  
+  │  frontdoor  building       3f0268f4-2c8f-4...  Espoo         02100                         │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │                                                                                            │  
+  │ Enter detail • j/k move • n/p page • r reload • f filters • Esc back                       │  
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                  
