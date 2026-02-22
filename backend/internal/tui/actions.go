@@ -19,6 +19,19 @@ type progressUpdate struct {
 	Total   int
 }
 
+type batchRunOptions struct {
+	Limit int
+	Delay time.Duration
+}
+
+type batchRunReport struct {
+	Result *syncflows.BatchRunResult
+	Loaded []string
+	Failed []string
+}
+
+type entityDetailFn func(context.Context, string) string
+
 type reportFn func(progressUpdate)
 
 type actionTable struct {
@@ -56,7 +69,12 @@ func buildSubsystems() []subsystem {
 				{
 					Title:       "Full Sitemap Sync",
 					Description: "Fetch sitemap and sync all frontdoor ad/building entities now",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					BuildInput:  newBatchSyncSettingsScreen,
+					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+						opts, err := parseBatchRunOptions(inputs)
+						if err != nil {
+							return actionResult{}, err
+						}
 						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
 						adIDs, buildingIDs, err := runner.FrontdoorSitemap(ctx)
 						if err != nil {
@@ -66,8 +84,8 @@ func buildSubsystems() []subsystem {
 						entityIDs = append(entityIDs, adIDs...)
 						entityIDs = append(entityIDs, buildingIDs...)
 						report(progressUpdate{Message: fmt.Sprintf("Discovered %d ads and %d buildings", len(adIDs), len(buildingIDs))})
-						result := runEntityBatch(ctx, entityIDs, runner.FrontdoorSyncEntity, report)
-						return actionResult{Output: fmt.Sprintf("discovered ads=%d buildings=%d total=%d success=%d failed=%d duration=%s", len(adIDs), len(buildingIDs), result.Total, result.Success, result.Failed, result.Duration.Round(time.Millisecond))}, joinResultErrors(result)
+						batch := runEntityBatch(ctx, entityIDs, runner.FrontdoorSyncEntity, nil, report, opts)
+						return actionResult{Output: fmt.Sprintf("discovered ads=%d buildings=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(adIDs), len(buildingIDs), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
 					},
 				},
 				{
@@ -105,7 +123,12 @@ func buildSubsystems() []subsystem {
 				{
 					Title:       "Full Sitemap Sync",
 					Description: "Fetch sitemap and sync all shortcut ad/building entities now",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					BuildInput:  newBatchSyncSettingsScreen,
+					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+						opts, err := parseBatchRunOptions(inputs)
+						if err != nil {
+							return actionResult{}, err
+						}
 						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
 						buildingIDs, adIDs, err := runner.ShortcutSitemap(ctx)
 						if err != nil {
@@ -115,8 +138,8 @@ func buildSubsystems() []subsystem {
 						entityIDs = append(entityIDs, buildingIDs...)
 						entityIDs = append(entityIDs, adIDs...)
 						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings and %d ads", len(buildingIDs), len(adIDs))})
-						result := runEntityBatch(ctx, entityIDs, runner.ShortcutSyncEntity, report)
-						return actionResult{Output: fmt.Sprintf("discovered buildings=%d ads=%d total=%d success=%d failed=%d duration=%s", len(buildingIDs), len(adIDs), result.Total, result.Success, result.Failed, result.Duration.Round(time.Millisecond))}, joinResultErrors(result)
+						batch := runEntityBatch(ctx, entityIDs, runner.ShortcutSyncEntity, shortcutDetailFn(runner), report, opts)
+						return actionResult{Output: fmt.Sprintf("discovered buildings=%d ads=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), len(adIDs), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
 					},
 				},
 				{
@@ -154,7 +177,12 @@ func buildSubsystems() []subsystem {
 				{
 					Title:       "Cities Init (Full Sync Now)",
 					Description: "Fetch prices cities and sync each city in-process",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					BuildInput:  newBatchSyncSettingsScreen,
+					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+						opts, err := parseBatchRunOptions(inputs)
+						if err != nil {
+							return actionResult{}, err
+						}
 						report(progressUpdate{Message: "Fetching prices cities..."})
 						cities, err := runner.PricesFetchCities(ctx)
 						if err != nil {
@@ -165,8 +193,8 @@ func buildSubsystems() []subsystem {
 							entityIDs = append(entityIDs, "city:"+city)
 						}
 						report(progressUpdate{Message: fmt.Sprintf("Discovered %d cities", len(cities))})
-						result := runEntityBatch(ctx, entityIDs, runner.PricesSyncCityEntity, report)
-						return actionResult{Output: fmt.Sprintf("cities=%d total=%d success=%d failed=%d duration=%s", len(cities), result.Total, result.Success, result.Failed, result.Duration.Round(time.Millisecond))}, joinResultErrors(result)
+						batch := runEntityBatch(ctx, entityIDs, runner.PricesSyncCityEntity, nil, report, opts)
+						return actionResult{Output: fmt.Sprintf("cities=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(cities), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
 					},
 				},
 				{
@@ -447,6 +475,33 @@ func sortRows(rows []prices.SearchTransactionsRow, sortMode string) {
 	})
 }
 
+func parseBatchRunOptions(inputs []string) (batchRunOptions, error) {
+	opts := batchRunOptions{}
+	limitRaw := safeInput(inputs, 0)
+	delayRaw := safeInput(inputs, 1)
+	if limitRaw != "" {
+		limit, err := strconv.Atoi(limitRaw)
+		if err != nil {
+			return batchRunOptions{}, fmt.Errorf("max entries must be numeric")
+		}
+		if limit < 1 {
+			return batchRunOptions{}, fmt.Errorf("max entries must be at least 1")
+		}
+		opts.Limit = limit
+	}
+	if delayRaw != "" {
+		delay, err := time.ParseDuration(delayRaw)
+		if err != nil {
+			return batchRunOptions{}, fmt.Errorf("delay must be a valid duration (example: 1s)")
+		}
+		if delay < 0 {
+			return batchRunOptions{}, fmt.Errorf("delay cannot be negative")
+		}
+		opts.Delay = delay
+	}
+	return opts, nil
+}
+
 func boolToYN(v bool) string {
 	if v {
 		return "Y"
@@ -454,11 +509,74 @@ func boolToYN(v bool) string {
 	return "N"
 }
 
-func runEntityBatch(ctx context.Context, entityIDs []string, syncFn func(context.Context, string) error, report reportFn) *syncflows.BatchRunResult {
+func summarizeEntityIDs(ids []string, maxCount int) string {
+	if len(ids) == 0 {
+		return "-"
+	}
+	limit := maxCount
+	if limit <= 0 || limit > len(ids) {
+		limit = len(ids)
+	}
+	short := strings.Join(ids[:limit], ",")
+	if limit == len(ids) {
+		return short
+	}
+	return fmt.Sprintf("%s,+%d", short, len(ids)-limit)
+}
+
+func shortcutDetailFn(runner *syncflows.Runner) entityDetailFn {
+	return func(ctx context.Context, entityID string) string {
+		detail, err := runner.ShortcutDescribeEntity(ctx, entityID)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(detail)
+	}
+}
+
+func trimForProgress(value string, maxLen int) string {
+	v := strings.TrimSpace(value)
+	if v == "" || maxLen <= 0 {
+		return ""
+	}
+	if len(v) <= maxLen {
+		return v
+	}
+	return v[:maxLen-3] + "..."
+}
+
+func shortErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return trimForProgress(err.Error(), 120)
+}
+
+func runEntityBatch(ctx context.Context, entityIDs []string, syncFn func(context.Context, string) error, detailFn entityDetailFn, report reportFn, opts batchRunOptions) *batchRunReport {
+	if opts.Limit > 0 && len(entityIDs) > opts.Limit {
+		entityIDs = entityIDs[:opts.Limit]
+	}
 	start := time.Now()
 	result := &syncflows.BatchRunResult{Total: len(entityIDs), Errors: make([]error, 0)}
+	batch := &batchRunReport{Result: result, Loaded: make([]string, 0), Failed: make([]string, 0)}
 	for i, entityID := range entityIDs {
-		report(progressUpdate{Message: "Syncing " + entityID, Current: i + 1, Total: len(entityIDs)})
+		if i > 0 && opts.Delay > 0 {
+			report(progressUpdate{Message: fmt.Sprintf("Waiting %s before next sync", opts.Delay)})
+			timer := time.NewTimer(opts.Delay)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+				result.Errors = append(result.Errors, ctx.Err())
+				result.Failed++
+				batch.Failed = append(batch.Failed, entityID)
+				result.Duration = time.Since(start)
+				return batch
+			case <-timer.C:
+			}
+		}
+		report(progressUpdate{Message: fmt.Sprintf("Syncing %s (%d/%d, ok=%d, fail=%d)", entityID, i+1, len(entityIDs), result.Success, result.Failed), Current: i + 1, Total: len(entityIDs)})
 		if ctx.Err() != nil {
 			result.Errors = append(result.Errors, ctx.Err())
 			result.Failed++
@@ -467,14 +585,32 @@ func runEntityBatch(ctx context.Context, entityIDs []string, syncFn func(context
 		if err := syncFn(ctx, entityID); err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("%s: %w", entityID, err))
 			result.Failed++
-			report(progressUpdate{Message: "Failed " + entityID, Current: i + 1, Total: len(entityIDs)})
+			batch.Failed = append(batch.Failed, entityID)
+			report(progressUpdate{Message: fmt.Sprintf("Failed %s (%d/%d): %s", entityID, i+1, len(entityIDs), shortErr(err)), Current: i + 1, Total: len(entityIDs)})
 			continue
 		}
 		result.Success++
-		report(progressUpdate{Message: "Done " + entityID, Current: i + 1, Total: len(entityIDs)})
+		batch.Loaded = append(batch.Loaded, entityID)
+		detail := ""
+		if detailFn != nil {
+			detail = detailFn(ctx, entityID)
+		}
+		if detail != "" {
+			report(progressUpdate{Message: fmt.Sprintf("Done %s (%d/%d)\n%s", entityID, i+1, len(entityIDs), indentLines(detail, "  ")), Current: i + 1, Total: len(entityIDs)})
+			continue
+		}
+		report(progressUpdate{Message: fmt.Sprintf("Done %s (%d/%d)", entityID, i+1, len(entityIDs)), Current: i + 1, Total: len(entityIDs)})
 	}
 	result.Duration = time.Since(start)
-	return result
+	return batch
+}
+
+func indentLines(value string, prefix string) string {
+	lines := strings.Split(strings.TrimSpace(value), "\n")
+	for i := range lines {
+		lines[i] = prefix + strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func joinResultErrors(result *syncflows.BatchRunResult) error {

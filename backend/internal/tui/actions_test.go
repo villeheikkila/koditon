@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -48,5 +49,46 @@ func TestSortRows(t *testing.T) {
 	sortRows(rows, "date_desc")
 	if !rows[0].CreatedAt.Equal(day2) {
 		t.Fatalf("expected newest first for date_desc")
+	}
+}
+
+func TestParseBatchRunOptions(t *testing.T) {
+	opts, err := parseBatchRunOptions([]string{"10", "1s"})
+	if err != nil {
+		t.Fatalf("parse options: %v", err)
+	}
+	if opts.Limit != 10 {
+		t.Fatalf("expected limit 10, got %d", opts.Limit)
+	}
+	if opts.Delay != time.Second {
+		t.Fatalf("expected delay 1s, got %s", opts.Delay)
+	}
+}
+
+func TestRunEntityBatchAppliesLimit(t *testing.T) {
+	called := 0
+	ids := []string{"a", "b", "c", "d"}
+	batch := runEntityBatch(context.Background(), ids, func(_ context.Context, _ string) error {
+		called++
+		return nil
+	}, nil, func(progressUpdate) {}, batchRunOptions{Limit: 2})
+	if called != 2 {
+		t.Fatalf("expected 2 sync calls, got %d", called)
+	}
+	if batch.Result.Total != 2 {
+		t.Fatalf("expected total 2, got %d", batch.Result.Total)
+	}
+	if len(batch.Loaded) != 2 {
+		t.Fatalf("expected 2 loaded ids, got %d", len(batch.Loaded))
+	}
+}
+
+func TestSummarizeEntityIDs(t *testing.T) {
+	if got := summarizeEntityIDs(nil, 5); got != "-" {
+		t.Fatalf("expected -, got %q", got)
+	}
+	ids := []string{"a", "b", "c", "d"}
+	if got := summarizeEntityIDs(ids, 2); got != "a,b,+2" {
+		t.Fatalf("unexpected summary: %q", got)
 	}
 }

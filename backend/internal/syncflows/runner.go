@@ -144,6 +144,37 @@ func (r *Runner) PricesSearchTransactionsByCityAndAddress(ctx context.Context, c
 	return rows, nil
 }
 
+func (r *Runner) ShortcutDescribeEntity(ctx context.Context, entityID string) (string, error) {
+	entityType, externalID, err := parseEntityID(entityID)
+	if err != nil {
+		return "", err
+	}
+	switch entityType {
+	case "ad":
+		adID, err := strconv.ParseInt(externalID, 10, 64)
+		if err != nil {
+			return "", &EntityParseError{EntityID: entityID, Reason: "invalid ad ID", Err: err}
+		}
+		desc, err := r.shortcutService.DescribeAd(ctx, adID)
+		if err != nil {
+			return "", fmt.Errorf("describe shortcut ad %d: %w", adID, err)
+		}
+		return desc, nil
+	case "building":
+		buildingID, err := uuid.Parse(externalID)
+		if err != nil {
+			return "", &EntityParseError{EntityID: entityID, Reason: "invalid building UUID", Err: err}
+		}
+		desc, err := r.shortcutService.DescribeBuilding(ctx, buildingID)
+		if err != nil {
+			return "", fmt.Errorf("describe shortcut building %s: %w", buildingID, err)
+		}
+		return desc, nil
+	default:
+		return "", &EntityParseError{EntityID: entityID, Reason: fmt.Sprintf("unknown shortcut entity type: %s", entityType)}
+	}
+}
+
 func (r *Runner) PostalSync(ctx context.Context, logger *slog.Logger) (*postal.SyncResult, error) {
 	if logger == nil {
 		logger = r.logger

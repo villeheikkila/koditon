@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -193,8 +194,31 @@ func (j *jobView) pushProgressLine(line string) {
 		return
 	}
 	timestamp := time.Now().Format("15:04:05")
-	colored := j.colorizeProgressLine(line)
-	j.progressLines = append(j.progressLines, j.styles.muted.Render("["+timestamp+"]")+" "+colored)
+	lines := strings.Split(line, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	wrapped := make([]string, 0, len(lines))
+	contentWidth := max(24, j.activity.Width-14)
+	for _, raw := range lines {
+		if strings.TrimSpace(raw) == "" {
+			wrapped = append(wrapped, "")
+			continue
+		}
+		if strings.Contains(raw, "http://") || strings.Contains(raw, "https://") {
+			wrapped = append(wrapped, raw)
+			continue
+		}
+		wrapped = append(wrapped, wrapActivityLine(raw, contentWidth)...)
+	}
+	for i, l := range wrapped {
+		prefix := "          "
+		if i == 0 {
+			prefix = j.styles.muted.Render("[" + timestamp + "]")
+		}
+		colored := j.colorizeProgressLine(l)
+		j.progressLines = append(j.progressLines, prefix+" "+colored)
+	}
 }
 
 func (j *jobView) refreshActivity() {
@@ -247,4 +271,54 @@ func (j *jobView) colorizeProgressLine(line string) string {
 	default:
 		return j.styles.normal.Render(line)
 	}
+}
+
+func wrapActivityLine(line string, width int) []string {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || width <= 0 || utf8.RuneCountInString(trimmed) <= width {
+		return []string{trimmed}
+	}
+	words := strings.Fields(trimmed)
+	if len(words) == 0 {
+		return []string{trimmed}
+	}
+	lines := make([]string, 0, 4)
+	current := words[0]
+	for _, word := range words[1:] {
+		candidate := current + " " + word
+		if utf8.RuneCountInString(candidate) <= width {
+			current = candidate
+			continue
+		}
+		lines = append(lines, current)
+		if utf8.RuneCountInString(word) > width {
+			lines = append(lines, splitLongWord(word, width)...)
+			current = ""
+			continue
+		}
+		current = word
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
+func splitLongWord(word string, width int) []string {
+	if width <= 0 {
+		return []string{word}
+	}
+	runes := []rune(word)
+	if len(runes) <= width {
+		return []string{word}
+	}
+	lines := make([]string, 0, (len(runes)/width)+1)
+	for len(runes) > width {
+		lines = append(lines, string(runes[:width]))
+		runes = runes[width:]
+	}
+	if len(runes) > 0 {
+		lines = append(lines, string(runes))
+	}
+	return lines
 }

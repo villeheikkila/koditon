@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"koditon-go/internal/shortcut/client"
@@ -246,4 +247,126 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 		return fmt.Errorf("all listing/rental upserts failed (building_id=%s): %w", buildingID, errors.Join(upsertErrors...))
 	}
 	return nil
+}
+
+func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
+	ad, err := s.queries.GetShortcutAdByID(ctx, adID)
+	if err != nil {
+		return "", err
+	}
+	lines := make([]string, 0, 4)
+	if title := extractAdTitle(ad.ShortcutAdData); title != "" {
+		lines = append(lines, "title: "+title)
+	}
+	if ad.ShortcutBuildingID.Valid {
+		building, err := s.queries.GetShortcutBuildingByID(ctx, ad.ShortcutBuildingID)
+		if err == nil {
+			if addr := firstNonEmptyString(building.ShortcutBuildingAddress, building.ShortcutBuildingHousingCompany); addr != "" {
+				lines = append(lines, "address: "+addr)
+			}
+		}
+	}
+	if ad.ShortcutAdUrl != "" {
+		lines = append(lines, "url: "+ad.ShortcutAdUrl)
+	}
+	return strings.Join(uniqueStrings(lines), "\n"), nil
+}
+
+func (s *Service) DescribeBuilding(ctx context.Context, buildingID uuid.UUID) (string, error) {
+	building, err := s.queries.GetShortcutBuildingByID(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+	if err != nil {
+		return "", err
+	}
+	lines := make([]string, 0, 4)
+	if addr := firstNonEmptyString(building.ShortcutBuildingAddress, building.ShortcutBuildingHousingCompany); addr != "" {
+		lines = append(lines, "address: "+addr)
+	}
+	if building.ShortcutBuildingUrl != "" {
+		lines = append(lines, "url: "+building.ShortcutBuildingUrl)
+	}
+	if building.ShortcutBuildingExternalID > 0 {
+		lines = append(lines, fmt.Sprintf("building_external_id: %d", building.ShortcutBuildingExternalID))
+	}
+	return strings.Join(uniqueStrings(lines), "\n"), nil
+}
+
+func extractAdTitle(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return ""
+	}
+	candidates := []string{
+		"address",
+		"formattedAddress",
+		"name",
+		"title",
+		"description",
+	}
+	for _, key := range candidates {
+		if value := nestedString(payload, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func nestedString(root map[string]any, key string) string {
+	if root == nil {
+		return ""
+	}
+	if v, ok := root[key].(string); ok && strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v)
+	}
+	for _, raw := range root {
+		switch typed := raw.(type) {
+		case map[string]any:
+			if v := nestedString(typed, key); v != "" {
+				return v
+			}
+		case []any:
+			for _, item := range typed {
+				obj, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				if v := nestedString(obj, key); v != "" {
+					return v
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyString(values ...*string) string {
+	for _, v := range values {
+		if v == nil {
+			continue
+		}
+		trimmed := strings.TrimSpace(*v)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, v := range values {
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
 }
