@@ -9,6 +9,7 @@ import (
 	frontdoorclient "koditon-go/internal/frontdoor/client"
 	pricesclient "koditon-go/internal/prices/client"
 	shortcutclient "koditon-go/internal/shortcut/client"
+	"koditon-go/internal/syncflows"
 	"koditon-go/internal/taskqueue"
 )
 
@@ -61,6 +62,10 @@ func classifyError(err error, _ any) error {
 	}
 	var parseErr *EntityParseError
 	if errors.As(err, &parseErr) {
+		return taskqueue.NewPermanentError(err, "invalid entity format")
+	}
+	var flowParseErr *syncflows.EntityParseError
+	if errors.As(err, &flowParseErr) {
 		return taskqueue.NewPermanentError(err, "invalid entity format")
 	}
 	return err

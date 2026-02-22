@@ -228,6 +228,13 @@ tasks:
     env:
       CGO_ENABLED: "0"
 
+  tui:
+    desc: Run interactive sync TUI
+    cmds:
+      - go run ./cmd/tui
+    env:
+      CGO_ENABLED: "0"
+
   clean:
     desc: Remove built artifacts
     cmds:

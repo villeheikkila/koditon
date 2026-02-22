@@ -2,7 +2,6 @@ package consumers
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"koditon-go/internal/prices"
@@ -12,9 +11,9 @@ import (
 
 func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger) error {
 	logger.InfoContext(ctx, "processing prices cities initialization task")
-	cities, err := c.pricesService.FetchCities(ctx)
+	cities, err := c.syncRunner.PricesFetchCities(ctx)
 	if err != nil {
-		return fmt.Errorf("fetch cities: %w", err)
+		return err
 	}
 	if len(cities) > 0 {
 		cityEntityIDs := make([]string, 0, len(cities))
@@ -32,39 +31,21 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 }
 
 func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
-	entityType, cityName, err := parseEntityID(task.EntityID)
-	if err != nil {
-		return err
-	}
-	if entityType != "city" {
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   fmt.Sprintf("expected city entity type for prices sync, got: %s", entityType),
-		}
-	}
-	logger.InfoContext(ctx, "syncing prices for city", "city", cityName)
-	return c.pricesService.SyncCity(ctx, cityName)
+	logger.InfoContext(ctx, "syncing prices city", "entity_id", task.EntityID)
+	return c.syncRunner.PricesSyncCityEntity(ctx, task.EntityID)
 }
 
 func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, logger *slog.Logger) error {
 	logger.InfoContext(ctx, "processing prices neighborhood postal code sync task")
-	err := c.pricesService.SyncNeighborhoodPostalCodes(ctx, func(p prices.SyncNeighborhoodPostalCodesProgress) {
+	err := c.syncRunner.PricesSyncNeighborhoodPostalCodes(ctx, func(p prices.SyncNeighborhoodPostalCodesProgress) {
 		if p.Page > 0 {
-			logger.DebugContext(ctx, "fetching postal code transactions",
-				"city", p.City,
-				"postal_code", p.PostalCode,
-				"page", p.Page,
-			)
+			logger.DebugContext(ctx, "fetching postal code transactions", "city", p.City, "postal_code", p.PostalCode, "page", p.Page)
 		} else if p.Updated > 0 {
-			logger.InfoContext(ctx, "updated neighborhood postal code mappings",
-				"city", p.City,
-				"postal_code", p.PostalCode,
-				"updated", p.Updated,
-			)
+			logger.InfoContext(ctx, "updated neighborhood postal code mappings", "city", p.City, "postal_code", p.PostalCode, "updated", p.Updated)
 		}
 	})
 	if err != nil {
-		return fmt.Errorf("sync neighborhood postal codes: %w", err)
+		return err
 	}
 	logger.InfoContext(ctx, "completed prices neighborhood postal code sync")
 	return nil
@@ -75,16 +56,10 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger)
 	cfg := prices.DefaultSyncAllConfig()
 	cfg.Logger = logger
 	cfg.Concurrency = 5
-	result, err := c.pricesService.SyncAll(ctx, cfg)
+	result, err := c.syncRunner.PricesSyncAll(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("sync all prices: %w", err)
+		return err
 	}
-	logger.InfoContext(ctx, "completed prices sync all",
-		"cities", result.CitiesProcessed,
-		"postal_codes", result.PostalCodesProcessed,
-		"neighborhoods", result.NeighborhoodsUpdated,
-		"transactions", result.TransactionsProcessed,
-		"errors", len(result.Errors),
-	)
+	logger.InfoContext(ctx, "completed prices sync all", "cities", result.CitiesProcessed, "postal_codes", result.PostalCodesProcessed, "neighborhoods", result.NeighborhoodsUpdated, "transactions", result.TransactionsProcessed, "errors", len(result.Errors))
 	return nil
 }

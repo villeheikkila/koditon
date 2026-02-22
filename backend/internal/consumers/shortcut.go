@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
-
-	"github.com/google/uuid"
 
 	taskqueuedb "koditon-go/internal/taskqueue/db"
 )
 
 func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger) error {
-	buildingIDs, adIDs, err := c.shortcutService.SyncSitemap(ctx)
+	buildingIDs, adIDs, err := c.syncRunner.ShortcutSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "shortcut sitemap sync failed", "error", err)
-		return fmt.Errorf("shortcut sitemap sync: %w", err)
+		return err
 	}
 	var regErrors []error
 	if len(buildingIDs) > 0 {
@@ -38,57 +35,19 @@ func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.L
 }
 
 func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
-	entityType, externalID, err := parseEntityID(task.EntityID)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to parse entity ID", "entity_id", task.EntityID, "error", err)
+	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
+		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", task.EntityID, "error", err)
 		return err
 	}
-	if entityType != "building" {
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   fmt.Sprintf("expected building entity type for scraper, got: %s", entityType),
-		}
-	}
-	buildingID, err := uuid.Parse(externalID)
-	if err != nil {
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   "invalid building UUID",
-			Err:      err,
-		}
-	}
-	if err := c.shortcutService.SyncBuilding(ctx, buildingID); err != nil {
-		logger.ErrorContext(ctx, "shortcut building sync failed", "building_id", buildingID, "error", err)
-		return fmt.Errorf("sync shortcut building %s: %w", buildingID, err)
-	}
-	logger.InfoContext(ctx, "shortcut building synced", "building_id", buildingID)
+	logger.InfoContext(ctx, "shortcut scraper entity synced", "entity_id", task.EntityID)
 	return nil
 }
 
 func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
-	entityType, externalID, err := parseEntityID(task.EntityID)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to parse entity ID", "entity_id", task.EntityID, "error", err)
+	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
+		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", task.EntityID, "error", err)
 		return err
 	}
-	if entityType != "ad" {
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   fmt.Sprintf("expected ad entity type for API sync, got: %s", entityType),
-		}
-	}
-	adID, err := strconv.ParseInt(externalID, 10, 64)
-	if err != nil {
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   "invalid ad ID",
-			Err:      err,
-		}
-	}
-	if err := c.shortcutService.SyncAd(ctx, adID); err != nil {
-		logger.ErrorContext(ctx, "shortcut ad sync failed", "ad_id", adID, "error", err)
-		return fmt.Errorf("sync shortcut ad %d: %w", adID, err)
-	}
-	logger.InfoContext(ctx, "shortcut ad synced", "ad_id", adID)
+	logger.InfoContext(ctx, "shortcut api entity synced", "entity_id", task.EntityID)
 	return nil
 }

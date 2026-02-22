@@ -9,10 +9,10 @@ import (
 )
 
 func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger) error {
-	adIDs, buildingIDs, err := c.frontdoorService.SyncSitemap(ctx)
+	adIDs, buildingIDs, err := c.syncRunner.FrontdoorSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "frontdoor sitemap sync failed", "error", err)
-		return fmt.Errorf("frontdoor sitemap sync: %w", err)
+		return err
 	}
 	var regErrors []error
 	if len(adIDs) > 0 {
@@ -35,30 +35,10 @@ func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.
 }
 
 func (c *Consumer) handleFrontdoorSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
-	entityType, externalID, err := parseEntityID(task.EntityID)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to parse entity ID", "entity_id", task.EntityID, "error", err)
+	if err := c.syncRunner.FrontdoorSyncEntity(ctx, task.EntityID); err != nil {
+		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", task.EntityID, "error", err)
 		return err
 	}
-	switch entityType {
-	case "ad":
-		if err := c.frontdoorService.SyncAd(ctx, externalID); err != nil {
-			logger.ErrorContext(ctx, "frontdoor ad sync failed", "external_id", externalID, "error", err)
-			return fmt.Errorf("sync frontdoor ad %s: %w", externalID, err)
-		}
-		logger.InfoContext(ctx, "frontdoor ad synced", "external_id", externalID)
-		return nil
-	case "building":
-		if err := c.frontdoorService.SyncBuilding(ctx, externalID); err != nil {
-			logger.ErrorContext(ctx, "frontdoor building sync failed", "external_id", externalID, "error", err)
-			return fmt.Errorf("sync frontdoor building %s: %w", externalID, err)
-		}
-		logger.InfoContext(ctx, "frontdoor building synced", "external_id", externalID)
-		return nil
-	default:
-		return &EntityParseError{
-			EntityID: task.EntityID,
-			Reason:   fmt.Sprintf("unknown frontdoor entity type: %s", entityType),
-		}
-	}
+	logger.InfoContext(ctx, "frontdoor entity synced", "entity_id", task.EntityID)
+	return nil
 }

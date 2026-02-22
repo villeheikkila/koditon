@@ -12,18 +12,16 @@ import (
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/shortcut"
+	"koditon-go/internal/syncflows"
 	"koditon-go/internal/taskqueue"
 	taskqueuedb "koditon-go/internal/taskqueue/db"
 )
 
 type Consumer struct {
-	logger           *slog.Logger
-	taskQueueClient  *taskqueue.Client
-	pricesService    *prices.Service
-	shortcutService  *shortcut.Service
-	frontdoorService *frontdoor.Service
-	postalService    *postal.Service
-	workerPool       *taskqueue.WorkerPool
+	logger          *slog.Logger
+	taskQueueClient *taskqueue.Client
+	syncRunner      *syncflows.Runner
+	workerPool      *taskqueue.WorkerPool
 }
 
 type Config struct {
@@ -31,26 +29,14 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
-	return Config{
-		WorkerCount: 1,
-	}
+	return Config{WorkerCount: 1}
 }
 
-func New(
-	logger *slog.Logger,
-	taskQueueClient *taskqueue.Client,
-	pricesService *prices.Service,
-	shortcutService *shortcut.Service,
-	frontdoorService *frontdoor.Service,
-	postalService *postal.Service,
-) *Consumer {
+func New(logger *slog.Logger, taskQueueClient *taskqueue.Client, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Consumer {
 	return &Consumer{
-		logger:           logger,
-		taskQueueClient:  taskQueueClient,
-		pricesService:    pricesService,
-		shortcutService:  shortcutService,
-		frontdoorService: frontdoorService,
-		postalService:    postalService,
+		logger:          logger,
+		taskQueueClient: taskQueueClient,
+		syncRunner:      syncflows.NewRunner(logger, pricesService, shortcutService, frontdoorService, postalService),
 	}
 }
 
@@ -62,12 +48,7 @@ func (c *Consumer) Start(ctx context.Context, cfg Config, pool *pgxpool.Pool) er
 	workerConfig.Logger = c.logger
 	workerConfig.TaskTimeout = 30 * time.Minute
 	workerConfig.VisibilityTimeout = 35 * time.Minute
-	c.workerPool = taskqueue.NewWorkerPool(
-		cfg.WorkerCount,
-		pool,
-		c.handleTask,
-		workerConfig,
-	)
+	c.workerPool = taskqueue.NewWorkerPool(cfg.WorkerCount, pool, c.handleTask, workerConfig)
 	c.workerPool.Start(ctx)
 	c.logger.InfoContext(ctx, "consumer started", "worker_count", cfg.WorkerCount)
 	return nil
@@ -83,13 +64,7 @@ func (c *Consumer) Stop() {
 }
 
 func (c *Consumer) handleTask(taskCtx context.Context, task taskqueuedb.TaskQueueTask) error {
-	taskLogger := c.logger.With(
-		"task_id", task.TaskID,
-		"task_type", task.TaskType,
-		"entity_id", task.EntityID,
-		"attempt", task.Attempt,
-		"priority", task.Priority,
-	)
+	taskLogger := c.logger.With("task_id", task.TaskID, "task_type", task.TaskType, "entity_id", task.EntityID, "attempt", task.Attempt, "priority", task.Priority)
 	var err error
 	switch task.TaskType {
 	case taskqueue.TaskTypeFrontdoorSitemapSync:
@@ -113,10 +88,7 @@ func (c *Consumer) handleTask(taskCtx context.Context, task taskqueuedb.TaskQueu
 	case taskqueue.TaskTypePostalSync:
 		err = c.handlePostalSync(taskCtx, taskLogger)
 	default:
-		return taskqueue.NewPermanentError(
-			fmt.Errorf("unknown task type: %s", task.TaskType),
-			"unrecognized task type",
-		)
+		return taskqueue.NewPermanentError(fmt.Errorf("unknown task type: %s", task.TaskType), "unrecognized task type")
 	}
 	if err != nil {
 		return classifyError(err, task)
