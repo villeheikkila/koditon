@@ -257,8 +257,8 @@ func buildSubsystems() []subsystem {
 				},
 				{
 					Title:         "Search Transactions",
-					Description:   "Search prices data by city and street address or postal code",
-					Prompts:       []string{"city name", "street address or postal code"},
+					Description:   "Search prices data by city and neighborhood / postal code",
+					Prompts:       []string{"city name", "neighborhood name or postal code"},
 					UseCityPicker: true,
 					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
 						city := strings.TrimSpace(inputs[0])

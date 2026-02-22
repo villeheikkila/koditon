@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
 
 	"koditon-go/internal/syncflows"
 )
@@ -94,6 +95,8 @@ type model struct {
 	awaitingCity     bool
 	cityLoading      bool
 	cityList         list.Model
+	citySearch       textinput.Model
+	cityOptions      []string
 	awaitingInput    bool
 	inputAction      action
 	inputPromptStep  int
@@ -153,11 +156,16 @@ func NewModel(runner *syncflows.Runner) tea.Model {
 	actList.Styles.NoItems = sts.muted
 	cityList := list.New([]list.Item{}, delegate, 56, 18)
 	cityList.Title = "Select City"
-	cityList.SetShowStatusBar(true)
-	cityList.SetFilteringEnabled(true)
+	cityList.SetShowStatusBar(false)
+	cityList.SetFilteringEnabled(false)
 	cityList.SetShowPagination(true)
 	cityList.Styles.Title = sts.title
 	cityList.Styles.NoItems = sts.muted
+	citySearch := textinput.New()
+	citySearch.Placeholder = "type city name"
+	citySearch.Prompt = "Search: "
+	citySearch.CharLimit = 128
+	citySearch.Width = 42
 	vp := viewport.New(80, 20)
 	vp.SetContent(sts.muted.Render("Waiting for updates..."))
 	pb := progress.New(progress.WithDefaultGradient())
@@ -168,6 +176,8 @@ func NewModel(runner *syncflows.Runner) tea.Model {
 		subsystemList: subList,
 		actionList:    actList,
 		cityList:      cityList,
+		citySearch:    citySearch,
+		cityOptions:   make([]string, 0),
 		navStage:      stageSubsystem,
 		input:         ti,
 		spinner:       sp,
@@ -261,14 +271,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastError = fmt.Sprintf("load cities: %v", msg.err)
 			return m, nil
 		}
-		items := make([]list.Item, 0, len(msg.cities))
-		for i, city := range msg.cities {
-			items = append(items, navItem{idx: i, title: city, desc: "prices city"})
-		}
-		m.cityList.SetItems(items)
-		if len(items) > 0 {
-			m.cityList.Select(0)
-		}
+		m.cityOptions = append(m.cityOptions[:0], msg.cities...)
+		m.applyCityFilter(m.citySearch.Value())
 		return m, nil
 	case tea.KeyMsg:
 		if m.awaitingCity {
@@ -278,6 +282,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.awaitingCity = false
 				m.cityLoading = false
+				m.citySearch.Blur()
 				m.inputPromptStep = 0
 				m.inputValues = m.inputValues[:0]
 				return m, nil
@@ -292,6 +297,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.awaitingCity = false
 				m.cityLoading = false
+				m.citySearch.Blur()
 				m.inputValues = append(m.inputValues, item.title)
 				if len(m.inputAction.Prompts) <= 1 {
 					inputs := append([]string(nil), m.inputValues...)
@@ -305,12 +311,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue("")
 				m.input.Focus()
 				return m, textinput.Blink
-			default:
+			case "up", "k", "down", "j", "pgup", "pgdown", "home", "end":
 				if m.cityLoading {
 					return m, nil
 				}
 				var cmd tea.Cmd
 				m.cityList, cmd = m.cityList.Update(msg)
+				return m, cmd
+			default:
+				if m.cityLoading {
+					return m, nil
+				}
+				var cmd tea.Cmd
+				m.citySearch, cmd = m.citySearch.Update(msg)
+				m.applyCityFilter(m.citySearch.Value())
 				return m, cmd
 			}
 		}
@@ -451,9 +465,11 @@ func (m model) startCityPicker(a action) (tea.Model, tea.Cmd) {
 	m.inputAction = a
 	m.inputPromptStep = 0
 	m.inputValues = m.inputValues[:0]
+	m.cityOptions = m.cityOptions[:0]
+	m.citySearch.SetValue("")
+	m.citySearch.Focus()
 	m.cityList.Title = "Select City"
 	m.cityList.SetItems([]list.Item{})
-	m.cityList.ResetFilter()
 	return m, fetchPricesCitiesCmd(m.runner)
 }
 
@@ -479,6 +495,35 @@ func fetchPricesCitiesCmd(runner *syncflows.Runner) tea.Cmd {
 	return func() tea.Msg {
 		cities, err := runner.PricesFetchCities(context.Background())
 		return cityOptionsMsg{cities: cities, err: err}
+	}
+}
+
+func (m *model) applyCityFilter(query string) {
+	query = strings.TrimSpace(strings.ToLower(query))
+	if len(m.cityOptions) == 0 {
+		m.cityList.SetItems([]list.Item{})
+		return
+	}
+	var items []list.Item
+	if query == "" {
+		items = make([]list.Item, 0, len(m.cityOptions))
+		for i, city := range m.cityOptions {
+			items = append(items, navItem{idx: i, title: city, desc: "prices city"})
+		}
+	} else {
+		lowered := make([]string, len(m.cityOptions))
+		for i, city := range m.cityOptions {
+			lowered[i] = strings.ToLower(city)
+		}
+		matches := fuzzy.Find(query, lowered)
+		items = make([]list.Item, 0, len(matches))
+		for _, match := range matches {
+			items = append(items, navItem{idx: match.Index, title: m.cityOptions[match.Index], desc: fmt.Sprintf("score %d", match.Score)})
+		}
+	}
+	m.cityList.SetItems(items)
+	if len(items) > 0 {
+		m.cityList.Select(0)
 	}
 }
 
@@ -614,6 +659,7 @@ func (m *model) resize() {
 	m.subsystemList.SetSize(listW, contentH)
 	m.actionList.SetSize(listW, contentH)
 	m.cityList.SetSize(max(56, m.width-10), max(10, m.height-14))
+	m.citySearch.Width = max(24, min(60, m.width-16))
 	m.activity.Width = max(56, m.width-10)
 	m.activity.Height = max(10, m.height-18)
 	m.progressBar.Width = max(24, m.width-14)
@@ -629,12 +675,12 @@ func (m model) View() string {
 		if m.cityLoading {
 			body = m.styles.muted.Render("Loading cities...")
 		} else {
-			body = m.cityList.View()
+			body = m.citySearch.View() + "\n\n" + m.cityList.View()
 		}
 		panel := m.styles.panel.Width(max(56, min(110, m.width-8))).Render(
 			m.styles.title.Render(m.inputAction.Title) + "\n" +
 				m.styles.description.Render(m.inputAction.Description) + "\n\n" +
-				m.styles.inputLabel.Render("Select city (Enter) • Fuzzy filter (/) • Esc cancel") + "\n" +
+				m.styles.inputLabel.Render("Type to fuzzy-match cities. Enter selects closest match. Esc cancel") + "\n" +
 				body,
 		)
 		return m.styles.app.Render(panel)

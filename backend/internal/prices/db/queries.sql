@@ -124,14 +124,16 @@ LEFT JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 LEFT JOIN public.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
-WHERE pc.prices_city_name ILIKE sqlc.arg(city_name)
+WHERE lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim(sqlc.arg(city_name))) || '%')
   AND (
-      sqlc.arg(search_term) = ''
-      OR ht.prices_transaction_description ILIKE ('%' || sqlc.arg(search_term) || '%')
+      trim(sqlc.arg(search_term)) = ''
       OR pn.prices_neighborhood_name ILIKE ('%' || sqlc.arg(search_term) || '%')
       OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
       OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
       OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR COALESCE(pm.postal_municipality_name_fi, '') ILIKE ('%' || sqlc.arg(search_term) || '%')
+      OR lower(regexp_replace(COALESCE(pn.prices_neighborhood_name, ''), '[^[:alnum:]]+', '', 'g'))
+            LIKE ('%' || lower(regexp_replace(sqlc.arg(search_term), '[^[:alnum:]]+', '', 'g')) || '%')
   )
 ORDER BY ht.prices_transaction_created_at DESC
 LIMIT COALESCE(sqlc.narg('limit_count')::int, 200);

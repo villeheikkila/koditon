@@ -818,14 +818,16 @@ LEFT JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 LEFT JOIN public.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
-WHERE pc.prices_city_name ILIKE $1
+WHERE lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim($1)) || '%')
   AND (
-      $2 = ''
-      OR ht.prices_transaction_description ILIKE ('%' || $2 || '%')
+      trim($2) = ''
       OR pn.prices_neighborhood_name ILIKE ('%' || $2 || '%')
       OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%' || $2 || '%')
       OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%' || $2 || '%')
       OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%' || $2 || '%')
+      OR COALESCE(pm.postal_municipality_name_fi, '') ILIKE ('%' || $2 || '%')
+      OR lower(regexp_replace(COALESCE(pn.prices_neighborhood_name, ''), '[^[:alnum:]]+', '', 'g'))
+            LIKE ('%' || lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')) || '%')
   )
 ORDER BY ht.prices_transaction_created_at DESC
 LIMIT COALESCE($3::int, 200)
