@@ -54,7 +54,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
 	runner := syncflows.NewRunner(logger, pricesService, shortcutService, frontdoorService, postalService)
-	p := tea.NewProgram(tui.NewModel(runner), tea.WithAltScreen(), tea.WithOutput(stderr))
+	p := tea.NewProgram(tui.NewApp(runner).Model(), tea.WithAltScreen(), tea.WithOutput(stderr))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
 	}

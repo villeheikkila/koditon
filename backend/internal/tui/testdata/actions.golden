@@ -1,0 +1,34 @@
+                                                                                                    
+  Koditon Manual Sync                                                                               
+  Subsystems > Frontdoor > Actions                                                                  
+  Enter select/run • Esc back • q quit • Ctrl+C cancel active job                                   
+                                                                                                    
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────╮  
+  │   Frontdoor Actions                                                                          │  
+  │                                                                                              │  
+  │   Full Sitemap Sync                                                                          │  
+  │     Fetch sitemap and sync all frontdoor ad/building entities now                            │  
+  │                                                                                              │  
+  │   Sync Ad by ID                                                                              │  
+  │     Sync one frontdoor ad by friendly ID                                                     │  
+  │                                                                                              │  
+  │   Sync Building by ID                                                                        │  
+  │     Sync one frontdoor building by housing company ID                                        │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │                                                                                              │  
+  │   ↑/k up • ↓/j down • q quit • ? more                                                        │  
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                    

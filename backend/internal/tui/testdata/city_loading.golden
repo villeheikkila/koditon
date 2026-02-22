@@ -1,0 +1,13 @@
+                                                                                                  
+  Koditon Manual Sync                                                                             
+  Subsystems > Prices > Actions                                                                   
+  Enter select/run • Esc back • q quit • Ctrl+C cancel active job                                 
+                                                                                                  
+  ╭────────────────────────────────────────────────────────────────────────────────────────────╮  
+  │ Sync City by Name                                                                          │  
+  │ Sync prices data for one city                                                              │  
+  │                                                                                            │  
+  │ Type to fuzzy-match cities. Enter selects closest match. Esc cancel                        │  
+  │ Loading cities...                                                                          │  
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                  

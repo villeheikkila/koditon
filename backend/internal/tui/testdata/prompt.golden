@@ -1,0 +1,13 @@
+                                                                                                
+  Koditon Manual Sync                                                                           
+  Subsystems > Frontdoor > Actions                                                              
+  Enter select/run • Esc back • q quit • Ctrl+C cancel active job                               
+                                                                                                
+  ╭──────────────────────────────────────────────────────────────────────────────────────────╮  
+  │ Sync Ad by ID                                                                            │  
+  │ Sync one frontdoor ad by friendly ID                                                     │  
+  │                                                                                          │  
+  │ Enter friendly ad id (1/1) (Esc to cancel)                                               │  
+  │ > friendly ad id                                                                         │  
+  ╰──────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                

@@ -21,6 +21,7 @@ This includes:
 - Coding style and naming conventions
 - Testing guidelines
 - Commit and pull request guidelines
+- TUI architecture (`internal/tui`) including router, primitives, screen flow, and snapshot tests
 
 ## Taskfile Shortcuts
 
