@@ -19,8 +19,8 @@ WITH unified AS (
         COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}') AS city,
         COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}') AS postal,
         COALESCE(
-            NULLIF(sa.shortcut_ad_data #>> '{priceData,priceSell}', '')::bigint,
-            NULLIF(sa.shortcut_ad_data #>> '{priceData,price}', '')::bigint
+            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
         ) AS price,
         COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS area,
         concat_ws(' ',
@@ -43,8 +43,8 @@ WITH unified AS (
         COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS city,
         COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS postal,
         COALESCE(
-            NULLIF(fa.frontdoor_ad_data #>> '{debfFreePrice}', '')::bigint,
-            NULLIF(fa.frontdoor_ad_data #>> '{preparsed,price}', '')::bigint
+            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
         ) AS price,
         COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS area,
         concat_ws(' ',
@@ -138,7 +138,10 @@ SELECT
     fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}' AS ad_address,
     COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS ad_city,
     COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS ad_postal,
-    COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{debfFreePrice}', '')::bigint, NULLIF(fa.frontdoor_ad_data #>> '{preparsed,price}', '')::bigint) AS ad_price,
+    COALESCE(
+        NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+        NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
+    ) AS ad_price,
     COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS ad_area,
     fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS ad_room_layout,
     fa.frontdoor_ad_data #>> '{property,apartmentType}' AS ad_property_type,
@@ -282,7 +285,10 @@ SELECT
     sa.shortcut_building_id,
     sa.shortcut_ad_data #>> '{address,formattedAddress}' AS ad_address,
     sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS ad_room_layout,
-    COALESCE(NULLIF(sa.shortcut_ad_data #>> '{priceData,priceSell}', '')::bigint, NULLIF(sa.shortcut_ad_data #>> '{priceData,price}', '')::bigint) AS ad_price,
+    COALESCE(
+        NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+        NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
+    ) AS ad_price,
     COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS ad_area,
     sb.shortcut_building_external_id,
     sb.shortcut_building_url,
@@ -352,8 +358,8 @@ WITH unified AS (
         COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}') AS city,
         COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}') AS postal,
         COALESCE(
-            NULLIF(sa.shortcut_ad_data #>> '{priceData,priceSell}', '')::bigint,
-            NULLIF(sa.shortcut_ad_data #>> '{priceData,price}', '')::bigint
+            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
         ) AS price,
         COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS area,
         sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS room_layout,
@@ -386,8 +392,8 @@ WITH unified AS (
         COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS city,
         COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS postal,
         COALESCE(
-            NULLIF(fa.frontdoor_ad_data #>> '{debfFreePrice}', '')::bigint,
-            NULLIF(fa.frontdoor_ad_data #>> '{preparsed,price}', '')::bigint
+            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint,
+            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\\.-]', '', 'g'), '')::numeric::bigint
         ) AS price,
         COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS area,
         fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS room_layout,

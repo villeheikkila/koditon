@@ -69,25 +69,47 @@ func (f *formPrimitive) Resize(width int) {
 }
 
 func (f *formPrimitive) Update(msg tea.Msg) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
-	if ok {
-		switch key.String() {
-		case "tab", "down", "j":
-			f.moveFocus(1)
-			return nil
-		case "shift+tab", "up", "k":
-			f.moveFocus(-1)
-			return nil
-		case "left", "h":
-			return f.shiftChoice(-1)
-		case "right", "l":
-			return f.shiftChoice(1)
-		}
-	}
 	if len(f.fields) == 0 {
 		return nil
 	}
 	field := &f.fields[f.focus]
+	key, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch key.String() {
+		case "tab", "down":
+			f.moveFocus(1)
+			return nil
+		case "shift+tab", "up":
+			f.moveFocus(-1)
+			return nil
+		case "left":
+			if field.Kind == formFieldChoice {
+				return f.shiftChoice(-1)
+			}
+		case "right":
+			if field.Kind == formFieldChoice {
+				return f.shiftChoice(1)
+			}
+		case "j":
+			if field.Kind == formFieldChoice {
+				f.moveFocus(1)
+				return nil
+			}
+		case "k":
+			if field.Kind == formFieldChoice {
+				f.moveFocus(-1)
+				return nil
+			}
+		case "h":
+			if field.Kind == formFieldChoice {
+				return f.shiftChoice(-1)
+			}
+		case "l":
+			if field.Kind == formFieldChoice {
+				return f.shiftChoice(1)
+			}
+		}
+	}
 	if field.Kind != formFieldText {
 		return nil
 	}
