@@ -16,6 +16,8 @@ func TestScreenSnapshots(t *testing.T) {
 	prompt.Resize(100, 34)
 	city := newCityPickerScreen(ctx, ctx.subsystems[2].Actions[3], nil, "Subsystems > Prices > Actions")
 	city.Resize(100, 34)
+	searchForm := newTransactionsSearchFormScreen(ctx, ctx.subsystems[2].Actions[4], []string{"Helsinki"}, "Subsystems > Prices > Actions")
+	searchForm.Resize(100, 34)
 	cases := []struct {
 		name   string
 		screen Screen
@@ -24,6 +26,7 @@ func TestScreenSnapshots(t *testing.T) {
 		{name: "actions", screen: actions},
 		{name: "prompt", screen: prompt},
 		{name: "city_loading", screen: city},
+		{name: "transactions_search_form", screen: searchForm},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

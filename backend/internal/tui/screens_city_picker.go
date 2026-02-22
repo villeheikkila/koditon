@@ -66,11 +66,7 @@ func (s *cityPickerScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 				return nil
 			}
 			inputs := append(append([]string(nil), s.values...), city)
-			if len(s.action.Prompts) > len(inputs) {
-				nav.Replace(newPromptScreen(s.ctx, s.action, inputs, len(inputs), s.breadcrumb))
-				return nil
-			}
-			nav.Replace(newJobScreen(s.ctx, s.action, inputs, s.breadcrumb))
+			nav.Replace(nextScreenForActionInput(s.ctx, s.action, inputs, s.breadcrumb))
 			return nil
 		}
 	}

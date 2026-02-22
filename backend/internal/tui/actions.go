@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +37,7 @@ type action struct {
 	Description   string
 	Prompts       []string
 	UseCityPicker bool
+	BuildInput    func(ctx *appContext, action action, values []string, breadcrumb string) Screen
 	Run           func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error)
 }
 
@@ -257,17 +260,36 @@ func buildSubsystems() []subsystem {
 				},
 				{
 					Title:         "Search Transactions",
-					Description:   "Search prices data by city and neighborhood / postal code",
-					Prompts:       []string{"city name", "neighborhood name or postal code"},
+					Description:   "Targeted search with city/postal query, area filters and sorting",
+					Prompts:       []string{"city name"},
 					UseCityPicker: true,
+					BuildInput:    newTransactionsSearchFormScreen,
 					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						city := strings.TrimSpace(inputs[0])
-						search := strings.TrimSpace(inputs[1])
-						report(progressUpdate{Message: fmt.Sprintf("Searching city=%s query=%s", city, search)})
-						rows, err := runner.PricesSearchTransactionsByCityAndAddress(ctx, city, search, 500)
+						city := safeInput(inputs, 0)
+						search := safeInput(inputs, 1)
+						minArea, err := parseOptionalFloat64(safeInput(inputs, 2))
+						if err != nil {
+							return actionResult{}, fmt.Errorf("parse min area: %w", err)
+						}
+						maxArea, err := parseOptionalFloat64(safeInput(inputs, 3))
+						if err != nil {
+							return actionResult{}, fmt.Errorf("parse max area: %w", err)
+						}
+						if minArea != nil && maxArea != nil && *minArea > *maxArea {
+							return actionResult{}, fmt.Errorf("min area cannot be greater than max area")
+						}
+						sortMode := parseSortMode(safeInput(inputs, 4))
+						limit, err := parseOptionalInt32Default(safeInput(inputs, 5), 500, 1, 5000)
+						if err != nil {
+							return actionResult{}, fmt.Errorf("parse limit: %w", err)
+						}
+						report(progressUpdate{Message: fmt.Sprintf("Searching city=%s query=%s min_area=%s max_area=%s sort=%s limit=%d", city, search, formatOptionalFloat(minArea), formatOptionalFloat(maxArea), sortMode, limit)})
+						rows, err := runner.PricesSearchTransactionsByCityAndAddress(ctx, city, search, limit)
 						if err != nil {
 							return actionResult{}, err
 						}
+						rows = filterRowsByArea(rows, minArea, maxArea)
+						sortRows(rows, sortMode)
 						tableRows := make([][]string, 0, len(rows))
 						for _, row := range rows {
 							tableRows = append(tableRows, []string{
@@ -294,7 +316,7 @@ func buildSubsystems() []subsystem {
 						}
 						report(progressUpdate{Message: fmt.Sprintf("Found %d rows", len(tableRows))})
 						return actionResult{
-							Output: fmt.Sprintf("city=%s query=%s rows=%d", city, search, len(tableRows)),
+							Output: fmt.Sprintf("city=%s query=%s area=%s-%s sort=%s rows=%d", city, search, formatOptionalFloat(minArea), formatOptionalFloat(maxArea), sortMode, len(tableRows)),
 							Table: &actionTable{
 								Title: "Prices Transaction Matches",
 								Columns: []string{
@@ -326,6 +348,103 @@ func buildSubsystems() []subsystem {
 			},
 		},
 	}
+}
+
+func safeInput(inputs []string, idx int) string {
+	if idx < 0 || idx >= len(inputs) {
+		return ""
+	}
+	return strings.TrimSpace(inputs[idx])
+}
+
+func parseOptionalFloat64(v string) (*float64, error) {
+	trimmed := strings.TrimSpace(v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func parseOptionalInt32Default(v string, fallback, minValue, maxValue int32) (int32, error) {
+	trimmed := strings.TrimSpace(v)
+	if trimmed == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseInt(trimmed, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	value := int32(parsed)
+	if value < minValue || value > maxValue {
+		return 0, fmt.Errorf("must be between %d and %d", minValue, maxValue)
+	}
+	return value, nil
+}
+
+func formatOptionalFloat(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f", *v)
+}
+
+func filterRowsByArea(rows []prices.SearchTransactionsRow, minArea, maxArea *float64) []prices.SearchTransactionsRow {
+	if minArea == nil && maxArea == nil {
+		return rows
+	}
+	filtered := make([]prices.SearchTransactionsRow, 0, len(rows))
+	for _, row := range rows {
+		if minArea != nil && row.Area < *minArea {
+			continue
+		}
+		if maxArea != nil && row.Area > *maxArea {
+			continue
+		}
+		filtered = append(filtered, row)
+	}
+	return filtered
+}
+
+func parseSortMode(v string) string {
+	switch strings.TrimSpace(strings.ToLower(v)) {
+	case "price_asc", "price_desc", "date_asc", "date_desc":
+		return strings.TrimSpace(strings.ToLower(v))
+	default:
+		return "price_asc"
+	}
+}
+
+func sortRows(rows []prices.SearchTransactionsRow, sortMode string) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		left := rows[i]
+		right := rows[j]
+		switch sortMode {
+		case "price_desc":
+			if left.Price == right.Price {
+				return left.CreatedAt.After(right.CreatedAt)
+			}
+			return left.Price > right.Price
+		case "date_asc":
+			if left.CreatedAt.Equal(right.CreatedAt) {
+				return left.Price < right.Price
+			}
+			return left.CreatedAt.Before(right.CreatedAt)
+		case "date_desc":
+			if left.CreatedAt.Equal(right.CreatedAt) {
+				return left.Price < right.Price
+			}
+			return left.CreatedAt.After(right.CreatedAt)
+		default:
+			if left.Price == right.Price {
+				return left.CreatedAt.After(right.CreatedAt)
+			}
+			return left.Price < right.Price
+		}
+	})
 }
 
 func boolToYN(v bool) string {

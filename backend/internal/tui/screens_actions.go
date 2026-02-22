@@ -47,15 +47,7 @@ func (s *actionsScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 			return nil
 		case "enter", "right", "l":
 			a := s.selectedAction()
-			if len(a.Prompts) == 0 {
-				nav.Push(newJobScreen(s.ctx, a, nil, breadcrumbForActions(s.ctx.subsystems[s.subsystemIdx])))
-				return nil
-			}
-			if a.UseCityPicker {
-				nav.Push(newCityPickerScreen(s.ctx, a, nil, breadcrumbForActions(s.ctx.subsystems[s.subsystemIdx])))
-				return nil
-			}
-			nav.Push(newPromptScreen(s.ctx, a, nil, 0, breadcrumbForActions(s.ctx.subsystems[s.subsystemIdx])))
+			nav.Push(nextScreenForActionInput(s.ctx, a, nil, breadcrumbForActions(s.ctx.subsystems[s.subsystemIdx])))
 			return nil
 		}
 	}

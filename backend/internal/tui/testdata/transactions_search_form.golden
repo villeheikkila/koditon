@@ -1,0 +1,30 @@
+                                                                                                  
+  Koditon Manual Sync                                                                             
+  Subsystems > Prices > Actions                                                                   
+  Enter select/run • Esc back • q quit • Ctrl+C cancel active job                                 
+                                                                                                  
+  ╭────────────────────────────────────────────────────────────────────────────────────────────╮  
+  │ Search Transactions                                                                        │  
+  │ Targeted transaction search form                                                           │  
+  │                                                                                            │  
+  │ City                                                                                       │  
+  │   Helsinki                                                                                 │  
+  │                                                                                            │  
+  │ > Postal code, neighborhood or address                                                     │  
+  │   > 00170                                                                                  │  
+  │                                                                                            │  
+  │   Min area (m2)                                                                            │  
+  │   > 35                                                                                     │  
+  │                                                                                            │  
+  │   Max area (m2)                                                                            │  
+  │   > 45                                                                                     │  
+  │                                                                                            │  
+  │   Sort                                                                                     │  
+  │   [h/l]   Price ascending (cheapest first)                                                 │  
+  │                                                                                            │  
+  │   Max rows                                                                                 │  
+  │   > 500                                                                                    │  
+  │                                                                                            │  
+  │ Enter runs search. Tab/j/k move fields. h/l changes sort mode.                             │  
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯  
+                                                                                                  

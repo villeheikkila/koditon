@@ -53,7 +53,7 @@ func (s *promptScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 			s.values = append(s.values, value)
 			next := s.step + 1
 			if next >= len(s.action.Prompts) {
-				nav.Replace(newJobScreen(s.ctx, s.action, s.values, s.breadcrumb))
+				nav.Replace(nextScreenForActionInput(s.ctx, s.action, s.values, s.breadcrumb))
 				return nil
 			}
 			s.step = next
