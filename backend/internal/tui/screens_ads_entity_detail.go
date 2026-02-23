@@ -128,6 +128,9 @@ func (s *adsEntityDetailScreen) renderContent(width int) string {
 		renderDetailLine(s.ctx.styles, "URL", canonical.URL),
 		renderDetailLine(s.ctx.styles, "Last Seen", canonical.LastSeenAt.Format("2006-01-02 15:04:05Z07:00")),
 	)
+	for _, field := range s.detail.CanonicalExtra {
+		lines = append(lines, renderDetailLine(s.ctx.styles, field.Label, field.Value))
+	}
 	if len(s.detail.SourceSpecific) > 0 {
 		lines = append(lines, "", s.ctx.styles.progressLabel.Render("Source Specific"))
 		for _, field := range s.detail.SourceSpecific {

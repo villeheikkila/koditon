@@ -83,6 +83,7 @@ type UnifiedCanonicalFields struct {
 
 type UnifiedEntityDetail struct {
 	Canonical      UnifiedCanonicalFields
+	CanonicalExtra []DetailField
 	SourceSpecific []DetailField
 	Related        []DetailField
 	Raw            RawPayload
@@ -178,6 +179,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: pgUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatPgInt8(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
 			detail.Raw = buildRawPayload(row.ShortcutAdData)
+			detail = promoteCanonicalFields(detail, "Ad Type", "Building ID", "Building External ID", "Housing Company")
 			return cleanDetail(detail), nil
 		case "building":
 			buildingID, err := uuid.Parse(nativeID)
@@ -195,6 +197,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt64Value(row.ShortcutBuildingExternalID)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building Type", Value: valueOrEmpty(row.ShortcutBuildingBuildingType)}, {Label: "Building Subtype", Value: valueOrEmpty(row.ShortcutBuildingBuildingSubtype)}, {Label: "Construction Year", Value: formatInt32(row.ShortcutBuildingConstructionYear)}, {Label: "Floor Count", Value: formatInt32(row.ShortcutBuildingFloorCount)}, {Label: "Apartment Count", Value: formatInt32(row.ShortcutBuildingApartmentCount)}, {Label: "Heating System", Value: valueOrEmpty(row.ShortcutBuildingHeatingSystem)}, {Label: "Building Material", Value: valueOrEmpty(row.ShortcutBuildingBuildingMaterial)}, {Label: "Plot Type", Value: valueOrEmpty(row.ShortcutBuildingPlotType)}, {Label: "Wall Structure", Value: valueOrEmpty(row.ShortcutBuildingWallStructure)}, {Label: "Heat Source", Value: valueOrEmpty(row.ShortcutBuildingHeatSource)}, {Label: "Has Elevator", Value: valueOrEmpty(row.ShortcutBuildingHasElevator)}, {Label: "Has Sauna", Value: valueOrEmpty(row.ShortcutBuildingHasSauna)}, {Label: "Latitude", Value: formatFloat64Ptr(row.ShortcutBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.ShortcutBuildingLongitude)}, {Label: "Page Not Found", Value: formatBoolPtr(row.ShortcutBuildingPageNotFound)}}
 			detail.Related = []DetailField{{Label: "Linked Ads", Value: strconv.FormatInt(row.AdCount, 10)}, {Label: "Listings", Value: strconv.FormatInt(row.ListingCount, 10)}, {Label: "Rentals", Value: strconv.FormatInt(row.RentalCount, 10)}}
 			detail.Raw = buildRawPayload(row.RawJson)
+			detail = promoteCanonicalFields(detail, "External ID", "Housing Company", "Building Type", "Building Subtype", "Construction Year", "Floor Count", "Apartment Count")
 			return cleanDetail(detail), nil
 		default:
 			return UnifiedEntityDetail{}, fmt.Errorf("unsupported shortcut kind: %s", kind)
@@ -212,6 +215,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: pgInt8ToPointer(row.AdPrice), Area: pgFloat8ToPointer(row.AdArea), RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), LastSeenAt: row.FrontdoorAdLastSeenAt.Time}}
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: valueOrEmpty(row.AdPropertyType)}, {Label: "Condition", Value: valueOrEmpty(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
 			detail.Raw = buildRawPayload(row.FrontdoorAdData)
+			detail = promoteCanonicalFields(detail, "External ID", "Property Type", "Condition")
 			return cleanDetail(detail), nil
 		case "announcement":
 			announcementID, err := uuid.Parse(nativeID)
@@ -229,6 +233,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt32(row.FrontdoorBuildingAnnouncementExternalID)}, {Label: "Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID)}, {Label: "Property Type", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType)}, {Label: "Property Subtype", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype)}, {Label: "Published", Value: formatBoolPtr(row.FrontdoorBuildingAnnouncementPublished)}}
 			detail.Related = []DetailField{{Label: "Building ID", Value: pgUUIDToString(row.FrontdoorBuildingID)}, {Label: "Housing Company ID", Value: formatPgInt8(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Building Street", Value: valueOrEmpty(row.FrontdoorBuildingStreetAddress)}, {Label: "Building House #", Value: valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, {Label: "Building Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Building Municipality", Value: valueOrEmpty(row.FrontdoorBuildingMunicipality)}}
 			detail.Raw = buildRawPayload(row.RawJson)
+			detail = promoteCanonicalFields(detail, "External ID", "Friendly ID", "Property Type", "Property Subtype", "Published")
 			return cleanDetail(detail), nil
 		case "building":
 			buildingID, err := uuid.Parse(nativeID)
@@ -246,6 +251,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			detail.SourceSpecific = []DetailField{{Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Business ID", Value: valueOrEmpty(row.FrontdoorBuildingBusinessID)}, {Label: "Housing Company ID", Value: formatPgInt8(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Apartment Count", Value: formatInt32(row.FrontdoorBuildingApartmentCount)}, {Label: "Floor Count", Value: formatInt32(row.FrontdoorBuildingFloorCount)}, {Label: "Build Year", Value: formatInt32(row.FrontdoorBuildingBuildYear)}, {Label: "Has Elevator", Value: formatBoolPtr(row.FrontdoorBuildingHasElevator)}, {Label: "Has Sauna", Value: formatBoolPtr(row.FrontdoorBuildingHasSauna)}, {Label: "Energy Certificate", Value: valueOrEmpty(row.FrontdoorBuildingEnergyCertificateCode)}, {Label: "Heating", Value: valueOrEmpty(row.FrontdoorBuildingHeating)}, {Label: "Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Latitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLongitude)}}
 			detail.Related = []DetailField{{Label: "Announcement Count", Value: strconv.FormatInt(row.AnnouncementCount, 10)}}
 			detail.Raw = buildRawPayload(row.FrontdoorBuildingData)
+			detail = promoteCanonicalFields(detail, "Company", "Business ID", "Housing Company ID", "Housing Friendly ID", "Apartment Count", "Floor Count", "Build Year")
 			return cleanDetail(detail), nil
 		default:
 			return UnifiedEntityDetail{}, fmt.Errorf("unsupported frontdoor kind: %s", kind)
@@ -334,8 +340,37 @@ func emptyToNil(value string) *string {
 }
 
 func cleanDetail(detail UnifiedEntityDetail) UnifiedEntityDetail {
+	detail.CanonicalExtra = compactFields(detail.CanonicalExtra)
 	detail.SourceSpecific = compactFields(detail.SourceSpecific)
 	detail.Related = compactFields(detail.Related)
+	return detail
+}
+
+func promoteCanonicalFields(detail UnifiedEntityDetail, labels ...string) UnifiedEntityDetail {
+	if len(labels) == 0 || len(detail.SourceSpecific) == 0 {
+		return detail
+	}
+	wanted := make(map[string]struct{}, len(labels))
+	for _, label := range labels {
+		normalized := strings.ToLower(strings.TrimSpace(label))
+		if normalized == "" {
+			continue
+		}
+		wanted[normalized] = struct{}{}
+	}
+	if len(wanted) == 0 {
+		return detail
+	}
+	remaining := make([]DetailField, 0, len(detail.SourceSpecific))
+	for _, field := range detail.SourceSpecific {
+		key := strings.ToLower(strings.TrimSpace(field.Label))
+		if _, ok := wanted[key]; ok {
+			detail.CanonicalExtra = append(detail.CanonicalExtra, field)
+			continue
+		}
+		remaining = append(remaining, field)
+	}
+	detail.SourceSpecific = remaining
 	return detail
 }
 
