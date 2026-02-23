@@ -93,6 +93,36 @@ tasks:
         echo "Database dumped to ${FILENAME}"
         {{end}}
 
+  db:clone:prod:local:
+    desc: Dump production DB and restore into local DB (uses PROD_DATABASE_URL and LOCAL_DATABASE_URL; defaults PROD to DATABASE_URL)
+    cmds:
+      - |
+        PROD_CONN="{{.PROD_DATABASE_URL}}"
+        if [ -z "${PROD_CONN}" ]; then
+          PROD_CONN="{{.DATABASE_URL}}"
+        fi
+        if [ -z "${PROD_CONN}" ]; then
+          echo "Error: set PROD_DATABASE_URL or DATABASE_URL"
+          exit 1
+        fi
+        LOCAL_CONN="{{.LOCAL_DATABASE_URL}}"
+        if [ -z "${LOCAL_CONN}" ]; then
+          LOCAL_CONN="postgresql://{{.DB_USER}}:{{.DB_PASSWORD}}@{{.DB_HOST}}:{{.DB_PORT}}/{{.DB_NAME}}"
+        fi
+        if [ "${PROD_CONN}" = "${LOCAL_CONN}" ]; then
+          echo "Error: PROD and LOCAL connection strings are identical; aborting"
+          exit 1
+        fi
+        DUMP_FILE="{{.DUMP_FILE}}"
+        if [ -z "${DUMP_FILE}" ]; then
+          DUMP_FILE="/tmp/koditon_prod_$(date +%Y%m%d_%H%M%S).dump"
+        fi
+        echo "Dumping prod to ${DUMP_FILE}"
+        pg_dump "${PROD_CONN}" --format=custom --no-owner --no-privileges --file "${DUMP_FILE}"
+        echo "Restoring dump to local database"
+        pg_restore --clean --if-exists --no-owner --no-privileges --dbname "${LOCAL_CONN}" "${DUMP_FILE}"
+        echo "Clone complete"
+
   db:schema:
     desc: Dump concise public schema to db/schema.sql
     cmds:

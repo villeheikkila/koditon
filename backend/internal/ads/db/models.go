@@ -9,12 +9,19 @@ import (
 )
 
 type FrontdoorAd struct {
-	FrontdoorAdID           pgtype.UUID        `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID   string             `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl          string             `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
-	FrontdoorAdLastSeenAt   pgtype.Timestamptz `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdData         []byte             `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
-	FrontdoorAdPageNotFound bool               `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdID            pgtype.UUID        `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID    string             `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl           string             `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
+	FrontdoorAdLastSeenAt    pgtype.Timestamptz `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdData          []byte             `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
+	FrontdoorAdStreetAddress *string            `db:"frontdoor_ad_street_address" json:"frontdoor_ad_street_address"`
+	FrontdoorAdCity          *string            `db:"frontdoor_ad_city" json:"frontdoor_ad_city"`
+	FrontdoorAdPostal        *string            `db:"frontdoor_ad_postal" json:"frontdoor_ad_postal"`
+	FrontdoorAdPrice         pgtype.Int8        `db:"frontdoor_ad_price" json:"frontdoor_ad_price"`
+	FrontdoorAdAreaValue     *float64           `db:"frontdoor_ad_area_value" json:"frontdoor_ad_area_value"`
+	FrontdoorAdAddressKey    *string            `db:"frontdoor_ad_address_key" json:"frontdoor_ad_address_key"`
+	FrontdoorAdSearchText    *string            `db:"frontdoor_ad_search_text" json:"frontdoor_ad_search_text"`
+	FrontdoorAdPageNotFound  bool               `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
 }
 
 type FrontdoorBuilding struct {
@@ -60,12 +67,19 @@ type FrontdoorBuildingAnnouncement struct {
 }
 
 type ShortcutAd struct {
-	ShortcutAdID         int64              `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	ShortcutAdUrl        string             `db:"shortcut_ad_url" json:"shortcut_ad_url"`
-	ShortcutAdType       string             `db:"shortcut_ad_type" json:"shortcut_ad_type"`
-	ShortcutAdLastSeenAt pgtype.Timestamptz `db:"shortcut_ad_last_seen_at" json:"shortcut_ad_last_seen_at"`
-	ShortcutAdData       []byte             `db:"shortcut_ad_data" json:"shortcut_ad_data"`
-	ShortcutBuildingID   pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutAdID            int64              `db:"shortcut_ad_id" json:"shortcut_ad_id"`
+	ShortcutAdUrl           string             `db:"shortcut_ad_url" json:"shortcut_ad_url"`
+	ShortcutAdType          string             `db:"shortcut_ad_type" json:"shortcut_ad_type"`
+	ShortcutAdLastSeenAt    pgtype.Timestamptz `db:"shortcut_ad_last_seen_at" json:"shortcut_ad_last_seen_at"`
+	ShortcutAdData          []byte             `db:"shortcut_ad_data" json:"shortcut_ad_data"`
+	ShortcutAdStreetAddress *string            `db:"shortcut_ad_street_address" json:"shortcut_ad_street_address"`
+	ShortcutAdCity          *string            `db:"shortcut_ad_city" json:"shortcut_ad_city"`
+	ShortcutAdPostal        *string            `db:"shortcut_ad_postal" json:"shortcut_ad_postal"`
+	ShortcutAdPrice         pgtype.Int8        `db:"shortcut_ad_price" json:"shortcut_ad_price"`
+	ShortcutAdAreaValue     *float64           `db:"shortcut_ad_area_value" json:"shortcut_ad_area_value"`
+	ShortcutAdAddressKey    *string            `db:"shortcut_ad_address_key" json:"shortcut_ad_address_key"`
+	ShortcutAdSearchText    *string            `db:"shortcut_ad_search_text" json:"shortcut_ad_search_text"`
+	ShortcutBuildingID      pgtype.UUID        `db:"shortcut_building_id" json:"shortcut_building_id"`
 }
 
 type ShortcutBuilding struct {

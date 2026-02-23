@@ -17,14 +17,11 @@ WITH unified AS (
     SELECT
         'shortcut'::text AS source,
         'ad'::text AS kind,
-        COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}') AS city,
-        COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}') AS postal,
-        COALESCE(
-            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-        ) AS price,
-        COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS area,
-        concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, sa.shortcut_ad_data #>> '{address,formattedAddress}', sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
+        sa.shortcut_ad_city AS city,
+        sa.shortcut_ad_postal AS postal,
+        sa.shortcut_ad_price AS price,
+        COALESCE(sa.shortcut_ad_area_value, 0::float8) AS area,
+        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
@@ -41,14 +38,11 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'ad'::text AS kind,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS city,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS postal,
-        COALESCE(
-            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-        ) AS price,
-        COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS area,
-        concat_ws(' ', fa.frontdoor_ad_external_id, fa.frontdoor_ad_url, fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}', fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}') AS searchable
+        fa.frontdoor_ad_city AS city,
+        fa.frontdoor_ad_postal AS postal,
+        fa.frontdoor_ad_price AS price,
+        COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS area,
+        fa.frontdoor_ad_search_text AS searchable
     FROM public.frontdoor_ads fa
     UNION ALL
     SELECT
@@ -114,6 +108,112 @@ func (q *Queries) CountUnifiedEntities(ctx context.Context, arg *CountUnifiedEnt
 	return count, err
 }
 
+const findCrossSourceAdMatches = `-- name: FindCrossSourceAdMatches :many
+SELECT
+    sa.shortcut_ad_id,
+    fa.frontdoor_ad_external_id,
+    sa.shortcut_ad_address_key AS address_key,
+    sa.shortcut_ad_street_address AS shortcut_street,
+    fa.frontdoor_ad_street_address AS frontdoor_street,
+    sa.shortcut_ad_postal AS shortcut_postal,
+    fa.frontdoor_ad_postal AS frontdoor_postal,
+    sa.shortcut_ad_city AS shortcut_city,
+    fa.frontdoor_ad_city AS frontdoor_city,
+    sa.shortcut_ad_price AS shortcut_price,
+    fa.frontdoor_ad_price AS frontdoor_price,
+    sa.shortcut_ad_area_value AS shortcut_area,
+    fa.frontdoor_ad_area_value AS frontdoor_area
+FROM public.shortcut_ads sa
+JOIN public.frontdoor_ads fa ON sa.shortcut_ad_address_key = fa.frontdoor_ad_address_key
+WHERE sa.shortcut_ad_address_key IS NOT NULL
+  AND sa.shortcut_ad_address_key <> ''
+  AND ($1::text IS NULL OR trim($1::text) = '' OR lower(COALESCE(sa.shortcut_ad_city, fa.frontdoor_ad_city, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
+  AND (
+      $2::bigint IS NULL
+      OR (
+          sa.shortcut_ad_price IS NOT NULL
+          AND fa.frontdoor_ad_price IS NOT NULL
+          AND abs(sa.shortcut_ad_price - fa.frontdoor_ad_price) <= $2::bigint
+      )
+  )
+  AND (
+      $3::float8 IS NULL
+      OR (
+          sa.shortcut_ad_area_value IS NOT NULL
+          AND fa.frontdoor_ad_area_value IS NOT NULL
+          AND abs(sa.shortcut_ad_area_value - fa.frontdoor_ad_area_value) <= $3::float8
+      )
+  )
+ORDER BY
+    abs(COALESCE(sa.shortcut_ad_price, 0) - COALESCE(fa.frontdoor_ad_price, 0)) ASC,
+    abs(COALESCE(sa.shortcut_ad_area_value, 0) - COALESCE(fa.frontdoor_ad_area_value, 0)) ASC,
+    sa.shortcut_ad_last_seen_at DESC,
+    fa.frontdoor_ad_last_seen_at DESC
+LIMIT $4::int
+`
+
+type FindCrossSourceAdMatchesParams struct {
+	CityFilter    *string  `db:"city_filter" json:"city_filter"`
+	MaxPriceDelta *int64   `db:"max_price_delta" json:"max_price_delta"`
+	MaxAreaDelta  *float64 `db:"max_area_delta" json:"max_area_delta"`
+	LimitCount    int32    `db:"limit_count" json:"limit_count"`
+}
+
+type FindCrossSourceAdMatchesRow struct {
+	ShortcutAdID          int64       `db:"shortcut_ad_id" json:"shortcut_ad_id"`
+	FrontdoorAdExternalID string      `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
+	AddressKey            *string     `db:"address_key" json:"address_key"`
+	ShortcutStreet        *string     `db:"shortcut_street" json:"shortcut_street"`
+	FrontdoorStreet       *string     `db:"frontdoor_street" json:"frontdoor_street"`
+	ShortcutPostal        *string     `db:"shortcut_postal" json:"shortcut_postal"`
+	FrontdoorPostal       *string     `db:"frontdoor_postal" json:"frontdoor_postal"`
+	ShortcutCity          *string     `db:"shortcut_city" json:"shortcut_city"`
+	FrontdoorCity         *string     `db:"frontdoor_city" json:"frontdoor_city"`
+	ShortcutPrice         pgtype.Int8 `db:"shortcut_price" json:"shortcut_price"`
+	FrontdoorPrice        pgtype.Int8 `db:"frontdoor_price" json:"frontdoor_price"`
+	ShortcutArea          *float64    `db:"shortcut_area" json:"shortcut_area"`
+	FrontdoorArea         *float64    `db:"frontdoor_area" json:"frontdoor_area"`
+}
+
+func (q *Queries) FindCrossSourceAdMatches(ctx context.Context, arg *FindCrossSourceAdMatchesParams) ([]FindCrossSourceAdMatchesRow, error) {
+	rows, err := q.db.Query(ctx, findCrossSourceAdMatches,
+		arg.CityFilter,
+		arg.MaxPriceDelta,
+		arg.MaxAreaDelta,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindCrossSourceAdMatchesRow{}
+	for rows.Next() {
+		var i FindCrossSourceAdMatchesRow
+		if err := rows.Scan(
+			&i.ShortcutAdID,
+			&i.FrontdoorAdExternalID,
+			&i.AddressKey,
+			&i.ShortcutStreet,
+			&i.FrontdoorStreet,
+			&i.ShortcutPostal,
+			&i.FrontdoorPostal,
+			&i.ShortcutCity,
+			&i.FrontdoorCity,
+			&i.ShortcutPrice,
+			&i.FrontdoorPrice,
+			&i.ShortcutArea,
+			&i.FrontdoorArea,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFrontdoorAdUnifiedDetail = `-- name: GetFrontdoorAdUnifiedDetail :one
 SELECT
     fa.frontdoor_ad_id,
@@ -121,14 +221,11 @@ SELECT
     fa.frontdoor_ad_url,
     fa.frontdoor_ad_last_seen_at,
     fa.frontdoor_ad_page_not_found,
-    fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}' AS ad_address,
-    COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS ad_city,
-    COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS ad_postal,
-    COALESCE(
-        NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-        NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-    ) AS ad_price,
-    COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS ad_area,
+    fa.frontdoor_ad_street_address AS ad_address,
+    fa.frontdoor_ad_city AS ad_city,
+    fa.frontdoor_ad_postal AS ad_postal,
+    fa.frontdoor_ad_price AS ad_price,
+    COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS ad_area,
     fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS ad_room_layout,
     fa.frontdoor_ad_data #>> '{property,apartmentType}' AS ad_property_type,
     fa.frontdoor_ad_data #>> '{property,condition}' AS ad_condition,
@@ -148,7 +245,7 @@ type GetFrontdoorAdUnifiedDetailRow struct {
 	AdCity                  *string            `db:"ad_city" json:"ad_city"`
 	AdPostal                *string            `db:"ad_postal" json:"ad_postal"`
 	AdPrice                 pgtype.Int8        `db:"ad_price" json:"ad_price"`
-	AdArea                  pgtype.Float8      `db:"ad_area" json:"ad_area"`
+	AdArea                  *float64           `db:"ad_area" json:"ad_area"`
 	AdRoomLayout            *string            `db:"ad_room_layout" json:"ad_room_layout"`
 	AdPropertyType          *string            `db:"ad_property_type" json:"ad_property_type"`
 	AdCondition             *string            `db:"ad_condition" json:"ad_condition"`
@@ -387,15 +484,12 @@ SELECT
     sa.shortcut_ad_type,
     sa.shortcut_ad_last_seen_at,
     sa.shortcut_building_id,
-    sa.shortcut_ad_data #>> '{address,formattedAddress}' AS ad_address,
-    sa.shortcut_ad_data #>> '{address,city,name}' AS ad_city,
-    COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}') AS ad_postal,
+    sa.shortcut_ad_street_address AS ad_address,
+    sa.shortcut_ad_city AS ad_city,
+    sa.shortcut_ad_postal AS ad_postal,
     sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS ad_room_layout,
-    COALESCE(
-        NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-        NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-    ) AS ad_price,
-    COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS ad_area,
+    sa.shortcut_ad_price AS ad_price,
+    COALESCE(sa.shortcut_ad_area_value, 0::float8) AS ad_area,
     sa.shortcut_ad_data,
     sb.shortcut_building_external_id,
     sb.shortcut_building_url,
@@ -420,7 +514,7 @@ type GetShortcutAdUnifiedDetailRow struct {
 	AdPostal                       *string            `db:"ad_postal" json:"ad_postal"`
 	AdRoomLayout                   *string            `db:"ad_room_layout" json:"ad_room_layout"`
 	AdPrice                        pgtype.Int8        `db:"ad_price" json:"ad_price"`
-	AdArea                         pgtype.Float8      `db:"ad_area" json:"ad_area"`
+	AdArea                         *float64           `db:"ad_area" json:"ad_area"`
 	ShortcutAdData                 []byte             `db:"shortcut_ad_data" json:"shortcut_ad_data"`
 	ShortcutBuildingExternalID     pgtype.Int8        `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
 	ShortcutBuildingUrl            *string            `db:"shortcut_building_url" json:"shortcut_building_url"`
@@ -581,19 +675,16 @@ WITH unified AS (
         'ad'::text AS kind,
         sa.shortcut_ad_id::text AS native_id,
         ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id,
-        COALESCE(sa.shortcut_ad_data #>> '{address,formattedAddress}', sb.shortcut_building_address, sa.shortcut_ad_id::text) AS headline,
-        COALESCE(sa.shortcut_ad_data #>> '{address,formattedAddress}', sb.shortcut_building_address) AS address,
-        COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}') AS city,
-        COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}') AS postal,
-        COALESCE(
-            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,priceSell}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-            NULLIF(regexp_replace(sa.shortcut_ad_data #>> '{priceData,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-        ) AS price,
-        COALESCE(NULLIF(sa.shortcut_ad_data #>> '{adData,size}', '')::float8, 0::float8) AS area,
+        COALESCE(sa.shortcut_ad_street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text) AS headline,
+        COALESCE(sa.shortcut_ad_street_address, sb.shortcut_building_address) AS address,
+        sa.shortcut_ad_city AS city,
+        sa.shortcut_ad_postal AS postal,
+        sa.shortcut_ad_price AS price,
+        COALESCE(sa.shortcut_ad_area_value, 0::float8) AS area,
         sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS room_layout,
         sa.shortcut_ad_url AS url,
         sa.shortcut_ad_last_seen_at AS last_seen_at,
-        concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, sa.shortcut_ad_data #>> '{address,formattedAddress}', sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
+        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
@@ -619,19 +710,16 @@ WITH unified AS (
         'ad'::text AS kind,
         fa.frontdoor_ad_external_id AS native_id,
         ('frontdoor:ad:' || fa.frontdoor_ad_external_id) AS canonical_id,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_external_id) AS headline,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}') AS address,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}') AS city,
-        COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}') AS postal,
-        COALESCE(
-            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{debfFreePrice}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint,
-            NULLIF(regexp_replace(fa.frontdoor_ad_data #>> '{preparsed,price}', '[^0-9\.-]', '', 'g'), '')::numeric::bigint
-        ) AS price,
-        COALESCE(NULLIF(fa.frontdoor_ad_data #>> '{preparsed,area}', '')::float8, 0::float8) AS area,
+        COALESCE(fa.frontdoor_ad_street_address, fa.frontdoor_ad_external_id) AS headline,
+        fa.frontdoor_ad_street_address AS address,
+        fa.frontdoor_ad_city AS city,
+        fa.frontdoor_ad_postal AS postal,
+        fa.frontdoor_ad_price AS price,
+        COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS area,
         fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS room_layout,
         fa.frontdoor_ad_url AS url,
         fa.frontdoor_ad_last_seen_at AS last_seen_at,
-        concat_ws(' ', fa.frontdoor_ad_external_id, fa.frontdoor_ad_url, fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}', fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}') AS searchable
+        fa.frontdoor_ad_search_text AS searchable
     FROM public.frontdoor_ads fa
     UNION ALL
     SELECT
@@ -735,7 +823,7 @@ type SearchUnifiedEntitiesRow struct {
 	City        *string            `db:"city" json:"city"`
 	Postal      *string            `db:"postal" json:"postal"`
 	Price       pgtype.Int8        `db:"price" json:"price"`
-	Area        pgtype.Float8      `db:"area" json:"area"`
+	Area        *float64           `db:"area" json:"area"`
 	RoomLayout  *string            `db:"room_layout" json:"room_layout"`
 	Url         string             `db:"url" json:"url"`
 	LastSeenAt  pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`

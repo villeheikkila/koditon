@@ -30,6 +30,13 @@ CREATE TABLE public.shortcut_ads (
     shortcut_ad_type text NOT NULL,
     shortcut_ad_last_seen_at timestamptz NOT NULL,
     shortcut_ad_data jsonb,
+    shortcut_ad_street_address text,
+    shortcut_ad_city text,
+    shortcut_ad_postal text,
+    shortcut_ad_price int8,
+    shortcut_ad_area_value float8,
+    shortcut_ad_address_key text,
+    shortcut_ad_search_text text,
     shortcut_building_id uuid,
     PRIMARY KEY (shortcut_ad_id)
 );
@@ -52,6 +59,13 @@ CREATE TABLE public.frontdoor_ads (
     frontdoor_ad_url text NOT NULL,
     frontdoor_ad_last_seen_at timestamptz NOT NULL,
     frontdoor_ad_data jsonb,
+    frontdoor_ad_street_address text,
+    frontdoor_ad_city text,
+    frontdoor_ad_postal text,
+    frontdoor_ad_price int8,
+    frontdoor_ad_area_value float8,
+    frontdoor_ad_address_key text,
+    frontdoor_ad_search_text text,
     frontdoor_ad_page_not_found bool NOT NULL,
     PRIMARY KEY (frontdoor_ad_id)
 );
