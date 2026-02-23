@@ -103,6 +103,37 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
+					Title:	   "Sitemap Discover",
+					Description: "Fetch frontdoor sitemap and report discovered entities without syncing",
+					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
+						adIDs, buildingIDs, err := runner.FrontdoorSitemap(ctx)
+						if err != nil {
+							return actionResult{}, err
+						}
+						return actionResult{Output: fmt.Sprintf("discovered ads=%d buildings=%d total=%d", len(adIDs), len(buildingIDs), len(adIDs)+len(buildingIDs))}, nil
+					},
+				},
+				{
+					Title:	   "Sync Buildings",
+					Description: "Fetch frontdoor sitemap and sync only buildings in batch",
+					BuildInput:  newBatchSyncSettingsScreen,
+					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+						opts, err := parseBatchRunOptions(inputs)
+						if err != nil {
+							return actionResult{}, err
+						}
+						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
+						_, buildingIDs, err := runner.FrontdoorSitemap(ctx)
+						if err != nil {
+							return actionResult{}, err
+						}
+						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings", len(buildingIDs))})
+						batch := runEntityBatch(ctx, buildingIDs, runner.FrontdoorSyncEntity, nil, report, opts)
+						return actionResult{Output: fmt.Sprintf("buildings=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					},
+				},
+				{
 					Title:       "Sync Ad by ID",
 					Description: "Sync one frontdoor ad by friendly ID",
 					Prompts:     []string{"friendly ad id"},
@@ -154,6 +185,37 @@ func buildSubsystems() []subsystem {
 						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings and %d ads", len(buildingIDs), len(adIDs))})
 						batch := runEntityBatch(ctx, entityIDs, runner.ShortcutSyncEntity, shortcutDetailFn(runner), report, opts)
 						return actionResult{Output: fmt.Sprintf("discovered buildings=%d ads=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), len(adIDs), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					},
+				},
+				{
+					Title:	   "Sitemap Discover",
+					Description: "Fetch shortcut sitemap and report discovered entities without syncing",
+					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
+						buildingIDs, adIDs, err := runner.ShortcutSitemap(ctx)
+						if err != nil {
+							return actionResult{}, err
+						}
+						return actionResult{Output: fmt.Sprintf("discovered buildings=%d ads=%d total=%d", len(buildingIDs), len(adIDs), len(buildingIDs)+len(adIDs))}, nil
+					},
+				},
+				{
+					Title:	   "Sync Buildings",
+					Description: "Fetch shortcut sitemap and sync only buildings in batch",
+					BuildInput:  newBatchSyncSettingsScreen,
+					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+						opts, err := parseBatchRunOptions(inputs)
+						if err != nil {
+							return actionResult{}, err
+						}
+						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
+						buildingIDs, _, err := runner.ShortcutSitemap(ctx)
+						if err != nil {
+							return actionResult{}, err
+						}
+						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings", len(buildingIDs))})
+						batch := runEntityBatch(ctx, buildingIDs, runner.ShortcutSyncEntity, shortcutDetailFn(runner), report, opts)
+						return actionResult{Output: fmt.Sprintf("buildings=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
 					},
 				},
 				{
@@ -209,6 +271,19 @@ func buildSubsystems() []subsystem {
 						report(progressUpdate{Message: fmt.Sprintf("Discovered %d cities", len(cities))})
 						batch := runEntityBatch(ctx, entityIDs, runner.PricesSyncCityEntity, nil, report, opts)
 						return actionResult{Output: fmt.Sprintf("cities=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(cities), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					},
+				},
+				{
+					Title:	   "Cities Discover",
+					Description: "Fetch available prices cities without syncing",
+					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+						report(progressUpdate{Message: "Fetching prices cities..."})
+						cities, err := runner.PricesFetchCities(ctx)
+						if err != nil {
+							return actionResult{}, err
+						}
+						report(progressUpdate{Message: fmt.Sprintf("Discovered %d cities", len(cities))})
+						return actionResult{Output: fmt.Sprintf("cities=%d list=%s", len(cities), strings.Join(cities, ", "))}, nil
 					},
 				},
 				{

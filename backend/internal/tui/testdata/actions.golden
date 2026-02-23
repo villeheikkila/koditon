@@ -9,17 +9,17 @@
   │   Full Sitemap Sync                                                                          │  
   │     Fetch sitemap and sync all frontdoor ad/building entities now                            │  
   │                                                                                              │  
+  │   Sitemap Discover                                                                           │  
+  │     Fetch frontdoor sitemap and report discovered entities without syncing                   │  
+  │                                                                                              │  
+  │   Sync Buildings                                                                             │  
+  │     Fetch frontdoor sitemap and sync only buildings in batch                                 │  
+  │                                                                                              │  
   │   Sync Ad by ID                                                                              │  
   │     Sync one frontdoor ad by friendly ID                                                     │  
   │                                                                                              │  
   │   Sync Building by ID                                                                        │  
   │     Sync one frontdoor building by housing company ID                                        │  
-  │                                                                                              │  
-  │                                                                                              │  
-  │                                                                                              │  
-  │                                                                                              │  
-  │                                                                                              │  
-  │                                                                                              │  
   │                                                                                              │  
   │                                                                                              │  
   │                                                                                              │  

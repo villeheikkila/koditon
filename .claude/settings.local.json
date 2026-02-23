@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PGPASSWORD=postgres pg_restore:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(xxd:*)",
+      "Bash(go build:*)",
+      "Bash(python3 -c:*)",
+      "Bash(go test:*)",
+      "Bash(UPDATE_GOLDEN=1 go test:*)"
+    ]
+  }
+}
