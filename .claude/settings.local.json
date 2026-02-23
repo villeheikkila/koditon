@@ -9,7 +9,12 @@
       "Bash(go build:*)",
       "Bash(python3 -c:*)",
       "Bash(go test:*)",
-      "Bash(UPDATE_GOLDEN=1 go test:*)"
+      "Bash(UPDATE_GOLDEN=1 go test:*)",
+      "Bash(psql:*)",
+      "Bash(curl:*)",
+      "Bash(gunzip:*)",
+      "Bash(/tmp/test_fetch2.go:*)",
+      "Bash(go run:*)"
     ]
   }
 }

@@ -85,7 +85,7 @@ func (j *jobView) OnFinished(msg runFinishedMsg) {
 		j.rebuildResultTable()
 	}
 	if msg.err != nil {
-		j.lastError = msg.err.Error()
+		j.lastError = formatErrMultiline(msg.err)
 		j.pushProgressLine("Finished with errors")
 		j.refreshActivity()
 		return
@@ -183,6 +183,29 @@ func (j *jobView) View(running bool) string {
 		}
 		if j.lastDuration > 0 {
 			b.WriteString(j.styles.muted.Render("Duration: " + j.lastDuration.Round(time.Millisecond).String()))
+		}
+	}
+	return b.String()
+}
+
+func formatErrMultiline(err error) string {
+	if err == nil {
+		return ""
+	}
+	var b strings.Builder
+	for i, line := range strings.Split(err.Error(), "\n") {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		parts := strings.Split(line, ": ")
+		for j, part := range parts {
+			if j > 0 {
+				b.WriteString("\n")
+				for range j {
+					b.WriteString("  ")
+				}
+			}
+			b.WriteString(part)
 		}
 	}
 	return b.String()

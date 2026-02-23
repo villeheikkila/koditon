@@ -634,11 +634,25 @@ func trimForProgress(value string, maxLen int) string {
 	return v[:maxLen-3] + "..."
 }
 
-func shortErr(err error) string {
+func formatErr(err error) string {
 	if err == nil {
 		return ""
 	}
-	return trimForProgress(err.Error(), 120)
+	parts := strings.Split(err.Error(), ": ")
+	if len(parts) <= 1 {
+		return err.Error()
+	}
+	var b strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			b.WriteString("\n")
+			for range i {
+				b.WriteString("  ")
+			}
+		}
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func runEntityBatch(ctx context.Context, entityIDs []string, syncFn func(context.Context, string) error, detailFn entityDetailFn, report reportFn, opts batchRunOptions) *batchRunReport {
@@ -675,7 +689,7 @@ func runEntityBatch(ctx context.Context, entityIDs []string, syncFn func(context
 			result.Errors = append(result.Errors, fmt.Errorf("%s: %w", entityID, err))
 			result.Failed++
 			batch.Failed = append(batch.Failed, entityID)
-			report(progressUpdate{Message: fmt.Sprintf("Failed %s (%d/%d): %s", entityID, i+1, len(entityIDs), shortErr(err)), Current: i + 1, Total: len(entityIDs)})
+			report(progressUpdate{Message: fmt.Sprintf("Failed %s (%d/%d): %s", entityID, i+1, len(entityIDs), formatErr(err)), Current: i + 1, Total: len(entityIDs)})
 			continue
 		}
 		result.Success++

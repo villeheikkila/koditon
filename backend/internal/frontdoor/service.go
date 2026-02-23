@@ -98,21 +98,19 @@ func (s *Service) SyncAd(ctx context.Context, friendlyID string) error {
 }
 
 func (s *Service) SyncBuilding(ctx context.Context, externalID string) error {
-	housingCompanyID, err := strconv.ParseInt(externalID, 10, 64)
+	buildingURL, housingCompanyID, err := s.resolveBuildingURL(ctx, externalID)
 	if err != nil {
-		return fmt.Errorf("invalid housing company ID %q: %w", externalID, err)
+		return err
 	}
-	housingCompanyIDPg := pgtype.Int8{Int64: housingCompanyID, Valid: true}
-	buildingURL, err := s.queries.GetFrontdoorBuildingURLByHousingCompanyID(ctx, housingCompanyIDPg)
+	buildingData, err := s.client.GetBuildingPageData(ctx, buildingURL)
 	if err != nil {
-		return fmt.Errorf("get building url (housing_company_id=%d): %w", housingCompanyID, err)
+		return fmt.Errorf("fetch building data (id=%s, url=%s): %w", externalID, buildingURL, err)
 	}
-	if buildingURL == nil {
-		return fmt.Errorf("building url is null (housing_company_id=%d)", housingCompanyID)
-	}
-	buildingData, err := s.client.GetBuildingPageData(ctx, *buildingURL)
-	if err != nil {
-		return fmt.Errorf("fetch building data (housing_company_id=%d, url=%s): %w", housingCompanyID, *buildingURL, err)
+	if housingCompanyID == 0 {
+		housingCompanyID = extractHousingCompanyID(buildingData)
+		if housingCompanyID == 0 {
+			return fmt.Errorf("cannot determine housing company ID for building %s", externalID)
+		}
 	}
 	if err := s.upsertBuildingData(ctx, housingCompanyID, buildingData); err != nil {
 		return fmt.Errorf("upsert building data (housing_company_id=%d): %w", housingCompanyID, err)
@@ -124,6 +122,47 @@ func (s *Service) SyncBuilding(ctx context.Context, externalID string) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (url string, housingCompanyID int64, err error) {
+	if id, parseErr := strconv.ParseInt(externalID, 10, 64); parseErr == nil {
+		pgID := pgtype.Int8{Int64: id, Valid: true}
+		u, lookupErr := s.queries.GetFrontdoorBuildingURLByHousingCompanyID(ctx, pgID)
+		if lookupErr != nil {
+			return "", 0, fmt.Errorf("get building url (housing_company_id=%d): %w", id, lookupErr)
+		}
+		if u == nil {
+			return "", 0, fmt.Errorf("building url is null (housing_company_id=%d)", id)
+		}
+		return *u, id, nil
+	}
+	var buildingUUID pgtype.UUID
+	if scanErr := buildingUUID.Scan(externalID); scanErr != nil {
+		return "", 0, fmt.Errorf("invalid building identifier %q: not a housing company ID or UUID", externalID)
+	}
+	building, lookupErr := s.queries.GetFrontdoorBuildingByID(ctx, buildingUUID)
+	if lookupErr != nil {
+		return "", 0, fmt.Errorf("lookup building by UUID %s: %w", externalID, lookupErr)
+	}
+	if building.FrontdoorBuildingUrl == nil {
+		return "", 0, fmt.Errorf("building %s has no URL", externalID)
+	}
+	var hcID int64
+	if building.FrontdoorBuildingHousingCompanyID.Valid {
+		hcID = building.FrontdoorBuildingHousingCompanyID.Int64
+	}
+	return *building.FrontdoorBuildingUrl, hcID, nil
+}
+
+func extractHousingCompanyID(data *client.HousingCompanyResponse) int64 {
+	if data == nil || data.HousingCompanyPage == nil || data.HousingCompanyPage.Response == nil {
+		return 0
+	}
+	hca := data.HousingCompanyPage.Response.HousingCompanyAnnouncement
+	if hca == nil || hca.HousingCompany == nil || hca.HousingCompany.ID == nil {
+		return 0
+	}
+	return int64(*hca.HousingCompany.ID)
 }
 
 func (s *Service) upsertBuildingData(ctx context.Context, housingCompanyID int64, buildingData *client.HousingCompanyResponse) error {

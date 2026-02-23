@@ -220,7 +220,6 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]SitemapEntry, error) 
 func (c *Client) applyDefaultHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Accept-Language", "en-GB,en;q=0.9")
-	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("User-Agent", c.userAgent)
 	if c.cookie != "" {
