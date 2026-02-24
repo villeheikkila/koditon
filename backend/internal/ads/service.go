@@ -18,18 +18,19 @@ import (
 )
 
 type SearchParams struct {
-	Query    string
-	Source   string
-	Kind     string
-	MinPrice *int64
-	MaxPrice *int64
-	MinArea  *float64
-	MaxArea  *float64
-	City     string
-	Postal   string
-	Page     int32
-	PageSize int32
-	Sort     string
+	Query       string
+	Source      string
+	Kind        string
+	ListingType string
+	MinPrice    *int64
+	MaxPrice    *int64
+	MinArea     *float64
+	MaxArea     *float64
+	City        string
+	Postal      string
+	Page        int32
+	PageSize    int32
+	Sort        string
 }
 
 type UnifiedEntityRow struct {
@@ -103,33 +104,39 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	source := stringPtr(normalized.Source)
 	kind := stringPtr(normalized.Kind)
 	sort := stringPtr(normalized.Sort)
+	listingTypeFilter := emptyToNil(normalized.ListingType)
+	if normalized.ListingType == "all" {
+		listingTypeFilter = nil
+	}
 	count, err := s.queries.CountUnifiedEntities(ctx, &db.CountUnifiedEntitiesParams{
-		SourceFilter: source,
-		KindFilter:   kind,
-		QueryText:    emptyToNil(normalized.Query),
-		CityFilter:   emptyToNil(normalized.City),
-		PostalFilter: emptyToNil(normalized.Postal),
-		MinPrice:     normalized.MinPrice,
-		MaxPrice:     normalized.MaxPrice,
-		MinArea:      normalized.MinArea,
-		MaxArea:      normalized.MaxArea,
+		SourceFilter:      source,
+		KindFilter:        kind,
+		QueryText:         emptyToNil(normalized.Query),
+		CityFilter:        emptyToNil(normalized.City),
+		PostalFilter:      emptyToNil(normalized.Postal),
+		MinPrice:          normalized.MinPrice,
+		MaxPrice:          normalized.MaxPrice,
+		MinArea:           normalized.MinArea,
+		MaxArea:           normalized.MaxArea,
+		ListingTypeFilter: listingTypeFilter,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("count unified entities: %w", err)
 	}
 	rows, err := s.queries.SearchUnifiedEntities(ctx, &db.SearchUnifiedEntitiesParams{
-		SortMode:     sort,
-		OffsetCount:  offset,
-		LimitCount:   normalized.PageSize,
-		SourceFilter: source,
-		KindFilter:   kind,
-		QueryText:    emptyToNil(normalized.Query),
-		CityFilter:   emptyToNil(normalized.City),
-		PostalFilter: emptyToNil(normalized.Postal),
-		MinPrice:     normalized.MinPrice,
-		MaxPrice:     normalized.MaxPrice,
-		MinArea:      normalized.MinArea,
-		MaxArea:      normalized.MaxArea,
+		SortMode:          sort,
+		OffsetCount:       offset,
+		LimitCount:        normalized.PageSize,
+		SourceFilter:      source,
+		KindFilter:        kind,
+		QueryText:         emptyToNil(normalized.Query),
+		CityFilter:        emptyToNil(normalized.City),
+		PostalFilter:      emptyToNil(normalized.Postal),
+		MinPrice:          normalized.MinPrice,
+		MaxPrice:          normalized.MaxPrice,
+		MinArea:           normalized.MinArea,
+		MaxArea:           normalized.MaxArea,
+		ListingTypeFilter: listingTypeFilter,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("search unified entities: %w", err)
@@ -280,7 +287,7 @@ func ParseCanonicalID(value string) (string, string, string, error) {
 }
 
 func normalizeSearchParams(params SearchParams) SearchParams {
-	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort)}
+	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), ListingType: normalizeListingType(params.ListingType), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort)}
 	if normalized.Page < 1 {
 		normalized.Page = 1
 	}
@@ -300,6 +307,15 @@ func normalizeKind(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "ad", "announcement", "building":
 		return strings.ToLower(strings.TrimSpace(kind))
+	default:
+		return "all"
+	}
+}
+
+func normalizeListingType(listingType string) string {
+	switch strings.ToLower(strings.TrimSpace(listingType)) {
+	case "listing", "rental":
+		return strings.ToLower(strings.TrimSpace(listingType))
 	default:
 		return "all"
 	}

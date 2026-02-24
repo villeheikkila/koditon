@@ -14,7 +14,8 @@ WITH unified AS (
         sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS room_layout,
         sa.shortcut_ad_url AS url,
         sa.shortcut_ad_last_seen_at AS last_seen_at,
-        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
+        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable,
+        sa.shortcut_ad_type AS listing_type
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
@@ -32,7 +33,8 @@ WITH unified AS (
         NULL::text AS room_layout,
         sb.shortcut_building_url AS url,
         COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at, now()) AS last_seen_at,
-        concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable
+        concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable,
+        NULL::text AS listing_type
     FROM public.shortcut_buildings sb
     UNION ALL
     SELECT
@@ -49,7 +51,8 @@ WITH unified AS (
         fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS room_layout,
         fa.frontdoor_ad_url AS url,
         fa.frontdoor_ad_last_seen_at AS last_seen_at,
-        fa.frontdoor_ad_search_text AS searchable
+        fa.frontdoor_ad_search_text AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_ads fa
     UNION ALL
     SELECT
@@ -66,7 +69,8 @@ WITH unified AS (
         fba.frontdoor_building_announcement_room_structure AS room_layout,
         fb.frontdoor_building_url AS url,
         fba.frontdoor_building_announcement_last_seen_at AS last_seen_at,
-        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable
+        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_building_announcements fba
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     UNION ALL
@@ -84,7 +88,8 @@ WITH unified AS (
         NULL::text AS room_layout,
         fb.frontdoor_building_url AS url,
         COALESCE(fb.frontdoor_building_last_seen_at, now()) AS last_seen_at,
-        concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable
+        concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_buildings fb
 ), filtered AS (
     SELECT *
@@ -98,6 +103,7 @@ WITH unified AS (
       AND (sqlc.narg('max_price')::bigint IS NULL OR u.price <= sqlc.narg('max_price')::bigint)
       AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
       AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
+      AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text)
 )
 SELECT
     source,
@@ -136,7 +142,8 @@ WITH unified AS (
         sa.shortcut_ad_postal AS postal,
         sa.shortcut_ad_price AS price,
         COALESCE(sa.shortcut_ad_area_value, 0::float8) AS area,
-        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable
+        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable,
+        sa.shortcut_ad_type AS listing_type
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
@@ -147,7 +154,8 @@ WITH unified AS (
         NULL::text AS postal,
         NULL::bigint AS price,
         0::float8 AS area,
-        concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable
+        concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable,
+        NULL::text AS listing_type
     FROM public.shortcut_buildings sb
     UNION ALL
     SELECT
@@ -157,7 +165,8 @@ WITH unified AS (
         fa.frontdoor_ad_postal AS postal,
         fa.frontdoor_ad_price AS price,
         COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS area,
-        fa.frontdoor_ad_search_text AS searchable
+        fa.frontdoor_ad_search_text AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_ads fa
     UNION ALL
     SELECT
@@ -167,7 +176,8 @@ WITH unified AS (
         fb.frontdoor_building_postcode AS postal,
         CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS price,
         COALESCE(fba.frontdoor_building_announcement_area, 0::float8) AS area,
-        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable
+        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_building_announcements fba
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     UNION ALL
@@ -178,7 +188,8 @@ WITH unified AS (
         fb.frontdoor_building_postcode AS postal,
         NULL::bigint AS price,
         0::float8 AS area,
-        concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable
+        concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable,
+        NULL::text AS listing_type
     FROM public.frontdoor_buildings fb
 )
 SELECT COUNT(*)::bigint AS count
@@ -191,7 +202,8 @@ WHERE (sqlc.arg(source_filter) = 'all' OR u.source = sqlc.arg(source_filter))
   AND (sqlc.narg('min_price')::bigint IS NULL OR u.price >= sqlc.narg('min_price')::bigint)
   AND (sqlc.narg('max_price')::bigint IS NULL OR u.price <= sqlc.narg('max_price')::bigint)
   AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
-  AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8);
+  AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
+  AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text);
 
 -- name: FindCrossSourceAdMatches :many
 SELECT
