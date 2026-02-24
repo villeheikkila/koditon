@@ -1,34 +1,34 @@
-                                                                                                  
-  Koditon Manual Sync                                                                             
-  Subsystems > Ads > Actions > Detail                                                             
-  Esc back • j/k scroll • x raw JSON • q quit                                                     
-                                                                                                  
-  ╭────────────────────────────────────────────────────────────────────────────────────────────╮  
-  │ Canonical                                                                                  │  
-  │ Canonical ID: shortcut:ad:12345                                                            │  
-  │ Source: shortcut                                                                           │  
-  │ Kind: ad                                                                                   │  
-  │ Native ID: 12345                                                                           │  
-  │ Headline: Mannerheimintie 1                                                                │  
-  │ Address: Mannerheimintie 1                                                                 │  
-  │ City: Helsinki                                                                             │  
-  │ Postal: 00100                                                                              │  
-  │ Price: 230000                                                                              │  
-  │ Area: 48.5                                                                                 │  
-  │ Room Layout: 2h+k                                                                          │  
-  │ URL: https://example.test/ad/12345                                                         │  
-  │ Last Seen: 2026-02-22 10:00:00Z                                                            │  
-  │                                                                                            │  
-  │ Source Specific                                                                            │  
-  │ Ad Type: listing                                                                           │  
-  │ Building ID: 3f0268f4-2c8f-4a5a-af96-07025833928f                                          │  
-  │                                                                                            │  
-  │ Related                                                                                    │  
-  │ Building Listings: 17                                                                      │  
-  │ Building Rentals: 6                                                                        │  
-  │                                                                                            │  
-  │ Raw JSON                                                                                   │  
-  ╰────────────────────────────────────────────────────────────────────────────────────────────╯  
-                                                                                                  
-  Esc back • j/k scroll • PgUp/PgDn • x toggle raw JSON                                           
-                                                                                                  
+                                                                                                
+  [1;38;5;86mKoditon Manual Sync[m                                                                           
+  [1;38;5;111mSubsystems > Ads > Actions > Detail[m                                                           
+  [38;5;244mEsc back • j/k scroll • x raw JSON • q quit[m                                                   
+                                                                                                
+  [38;5;238m╭──────────────────────────────────────────────────────────────────────────────────────────╮[m  
+  [38;5;238m│[m [1;38;5;117mCanonical[m                                                                                [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mCanonical ID[m: [38;5;252mshortcut:ad:12345[m                                                          [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mSource[m: [38;5;252mshortcut[m                                                                         [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mKind[m: [38;5;252mad[m                                                                                 [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mNative ID[m: [38;5;252m12345[m                                                                         [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mHeadline[m: [38;5;252mMannerheimintie 1[m                                                              [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mAddress[m: [38;5;252mMannerheimintie 1[m                                                               [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mCity[m: [38;5;252mHelsinki[m                                                                           [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mPostal[m: [38;5;252m00100[m                                                                            [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mPrice[m: [38;5;252m230000[m                                                                            [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mArea[m: [38;5;252m48.5[m                                                                               [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mRoom Layout[m: [38;5;252m2h+k[m                                                                        [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mURL[m: [38;5;252mhttps://example.test/ad/12345[m                                                       [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mLast Seen[m: [38;5;252m2026-02-22 10:00:00Z[m                                                          [38;5;238m│[m  
+  [38;5;238m│[m                                                                                          [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;117mSource Specific[m                                                                          [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mAd Type[m: [38;5;252mlisting[m                                                                         [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mBuilding ID[m: [38;5;252m3f0268f4-2c8f-4a5a-af96-07025833928f[m                                        [38;5;238m│[m  
+  [38;5;238m│[m                                                                                          [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;117mRelated[m                                                                                  [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mBuilding Listings[m: [38;5;252m17[m                                                                    [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;75mBuilding Rentals[m: [38;5;252m6[m                                                                      [38;5;238m│[m  
+  [38;5;238m│[m                                                                                          [38;5;238m│[m  
+  [38;5;238m│[m [1;38;5;117mRaw JSON[m                                                                                 [38;5;238m│[m  
+  [38;5;238m╰──────────────────────────────────────────────────────────────────────────────────────────╯[m  
+                                                                                                
+  [38;5;245mEsc back • j/k scroll • PgUp/PgDn • x toggle raw JSON[m                                         
+                                                                                                

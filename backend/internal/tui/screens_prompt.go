@@ -1,7 +1,7 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
-import "github.com/charmbracelet/bubbles/textinput"
+import tea "charm.land/bubbletea/v2"
+import "charm.land/bubbles/v2/textinput"
 
 type promptScreen struct {
 	ctx        *appContext
@@ -37,7 +37,7 @@ func (s *promptScreen) Resize(width int, height int) {
 }
 
 func (s *promptScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc":

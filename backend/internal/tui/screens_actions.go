@@ -1,6 +1,6 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type actionsScreen struct {
 	ctx          *appContext
@@ -39,7 +39,7 @@ func (s *actionsScreen) Resize(width int, height int) {
 }
 
 func (s *actionsScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc", "left", "h", "backspace":

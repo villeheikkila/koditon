@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	openrouter "github.com/revrost/go-openrouter"
 
@@ -56,7 +56,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
 	runner := syncflows.NewRunner(logger, adsService, pricesService, shortcutService, frontdoorService, postalService)
-	p := tea.NewProgram(tui.NewApp(runner).Model(), tea.WithAltScreen(), tea.WithOutput(stderr))
+	p := tea.NewProgram(tui.NewApp(runner).Model(), tea.WithOutput(stderr))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
 	}

@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 type promptInput struct {
@@ -15,7 +15,7 @@ func newPromptInput() promptInput {
 	ti := textinput.New()
 	ti.Placeholder = "input"
 	ti.CharLimit = 256
-	ti.Width = 48
+	ti.SetWidth(48)
 	ti.Prompt = "> "
 	return promptInput{model: ti}
 }
@@ -41,7 +41,7 @@ func (p *promptInput) Value() string {
 }
 
 func (p *promptInput) Resize(width int) {
-	p.model.Width = max(24, min(60, width))
+	p.model.SetWidth(max(24, min(60, width)))
 }
 
 func (p *promptInput) Update(msg tea.Msg) tea.Cmd {

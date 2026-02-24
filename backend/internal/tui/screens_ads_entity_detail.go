@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"koditon-go/internal/ads"
 )
@@ -58,7 +58,7 @@ func (s *adsEntityDetailScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 		s.scroll = 0
 		return nil
 	}
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return nil
 	}

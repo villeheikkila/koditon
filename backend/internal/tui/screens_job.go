@@ -3,7 +3,7 @@ package tui
 import (
 	"errors"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 type jobScreen struct {
@@ -45,7 +45,7 @@ func (s *jobScreen) Resize(width int, height int) {
 }
 
 func (s *jobScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc", "left", "h", "backspace":

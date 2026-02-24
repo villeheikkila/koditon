@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -22,7 +22,7 @@ func newFuzzyPicker(title string, st styles) fuzzyPicker {
 	search.Placeholder = "type city name"
 	search.Prompt = "Search: "
 	search.CharLimit = 128
-	search.Width = 42
+	search.SetWidth(42)
 	l := newSelectableList(title, 56, 18, st)
 	l.model.SetShowPagination(true)
 	return fuzzyPicker{list: l, search: search, options: make([]string, 0), styles: st}
@@ -38,7 +38,7 @@ func (f *fuzzyPicker) Blur() {
 
 func (f *fuzzyPicker) Resize(width int, height int) {
 	f.list.Resize(max(56, width-10), max(10, height-14))
-	f.search.Width = max(24, min(60, width-16))
+	f.search.SetWidth(max(24, min(60, width-16)))
 }
 
 func (f *fuzzyPicker) SetOptions(options []string) {
@@ -48,7 +48,7 @@ func (f *fuzzyPicker) SetOptions(options []string) {
 }
 
 func (f *fuzzyPicker) Update(msg tea.Msg) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "up", "k", "down", "j", "pgup", "pgdown", "home", "end":

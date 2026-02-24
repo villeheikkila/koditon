@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 type batchSyncSettingsScreen struct {
@@ -42,7 +42,7 @@ func (s *batchSyncSettingsScreen) Resize(width int, height int) {
 }
 
 func (s *batchSyncSettingsScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc":

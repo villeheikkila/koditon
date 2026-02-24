@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type formChoice struct {
@@ -73,7 +73,7 @@ func (f *formPrimitive) Update(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 	field := &f.fields[f.focus]
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "tab", "down":

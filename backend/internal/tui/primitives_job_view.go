@@ -6,12 +6,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/table"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type jobView struct {
@@ -38,9 +38,9 @@ type jobView struct {
 func newJobView(st styles) jobView {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	pb := progress.New(progress.WithDefaultGradient())
-	pb.Width = 34
-	vp := viewport.New(80, 20)
+	pb := progress.New(progress.WithDefaultBlend())
+	pb.SetWidth(34)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 	vp.SetContent(st.muted.Render("Waiting for updates..."))
 	return jobView{styles: st, spinner: sp, progressBar: pb, activity: vp, followOutput: true, progressLines: make([]string, 0, 300), resultTable: table.New()}
 }
@@ -96,9 +96,9 @@ func (j *jobView) OnFinished(msg runFinishedMsg) {
 }
 
 func (j *jobView) Resize(width int, height int) {
-	j.activity.Width = max(56, width-10)
-	j.activity.Height = max(10, height-18)
-	j.progressBar.Width = max(24, width-14)
+	j.activity.SetWidth(max(56, width-10))
+	j.activity.SetHeight(max(10, height-18))
+	j.progressBar.SetWidth(max(24, width-14))
 	if j.hasResultTable {
 		j.resultTable.SetHeight(max(8, height-18))
 		j.resultTable.SetWidth(max(56, width-8))
@@ -112,15 +112,15 @@ func (j *jobView) UpdateRunning(msg tea.Msg) tea.Cmd {
 		j.spinner, cmd = j.spinner.Update(typed)
 		return cmd
 	case progress.FrameMsg:
-		next, cmd := j.progressBar.Update(typed)
-		j.progressBar = next.(progress.Model)
+		var cmd tea.Cmd
+		j.progressBar, cmd = j.progressBar.Update(typed)
 		return cmd
 	}
 	return nil
 }
 
 func (j *jobView) UpdateFinished(msg tea.Msg) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "end", "G":
@@ -222,7 +222,7 @@ func (j *jobView) pushProgressLine(line string) {
 		lines[i] = strings.TrimRight(lines[i], " ")
 	}
 	wrapped := make([]string, 0, len(lines))
-	contentWidth := max(24, j.activity.Width-14)
+	contentWidth := max(24, j.activity.Width()-14)
 	for _, raw := range lines {
 		if strings.TrimSpace(raw) == "" {
 			wrapped = append(wrapped, "")

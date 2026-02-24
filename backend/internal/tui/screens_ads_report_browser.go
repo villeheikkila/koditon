@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
 
 	"koditon-go/internal/ads"
 )
@@ -69,7 +69,7 @@ func (s *adsReportBrowserScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 		s.table.SetCursor(0)
 		return nil
 	}
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc", "left", "h", "backspace":

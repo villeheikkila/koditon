@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"koditon-go/internal/ads"
 )
@@ -62,7 +62,7 @@ func (s *adsReportFormScreen) Resize(width int, height int) {
 }
 
 func (s *adsReportFormScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc":

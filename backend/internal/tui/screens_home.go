@@ -1,7 +1,7 @@
 package tui
 
 import "strings"
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type homeScreen struct {
 	ctx    *appContext
@@ -37,7 +37,7 @@ func (s *homeScreen) Resize(width int, height int) {
 }
 
 func (s *homeScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "enter", "right", "l":

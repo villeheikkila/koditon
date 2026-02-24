@@ -1,6 +1,6 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 type cityOptionsMsg struct {
 	cities []string
@@ -50,7 +50,7 @@ func (s *cityPickerScreen) Update(msg tea.Msg, nav Navigator) tea.Cmd {
 		s.picker.SetOptions(optionsMsg.cities)
 		return nil
 	}
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		switch key.String() {
 		case "esc":

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"koditon-go/internal/syncflows"
 )
@@ -68,7 +68,7 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.router.resize(typed.Width, typed.Height)
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if typed.String() == "ctrl+c" {
 			if m.ctx.runtime.CancelActive() {
 				return m, nil
@@ -98,14 +98,18 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *rootModel) View() string {
+func (m *rootModel) View() tea.View {
 	top := m.router.top()
 	if top == nil {
-		return m.ctx.styles.app.Render(m.ctx.styles.error.Render("no screen"))
+		v := tea.NewView(m.ctx.styles.app.Render(m.ctx.styles.error.Render("no screen")))
+		v.AltScreen = true
+		return v
 	}
 	state := top.ShellState()
 	state.Body = top.View()
-	return renderShell(m.ctx.styles, state)
+	v := tea.NewView(renderShell(m.ctx.styles, state))
+	v.AltScreen = true
+	return v
 }
 
 func fetchPricesCitiesCmd(runner *syncflows.Runner) tea.Cmd {
