@@ -67,6 +67,7 @@ CREATE TABLE public.frontdoor_ads (
     frontdoor_ad_address_key text,
     frontdoor_ad_search_text text,
     frontdoor_ad_page_not_found bool NOT NULL,
+    frontdoor_ad_publishing_time timestamptz,
     PRIMARY KEY (frontdoor_ad_id)
 );
 

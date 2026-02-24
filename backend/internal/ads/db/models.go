@@ -9,19 +9,20 @@ import (
 )
 
 type FrontdoorAd struct {
-	FrontdoorAdID            pgtype.UUID        `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID    string             `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl           string             `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
-	FrontdoorAdLastSeenAt    pgtype.Timestamptz `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdData          []byte             `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
-	FrontdoorAdStreetAddress *string            `db:"frontdoor_ad_street_address" json:"frontdoor_ad_street_address"`
-	FrontdoorAdCity          *string            `db:"frontdoor_ad_city" json:"frontdoor_ad_city"`
-	FrontdoorAdPostal        *string            `db:"frontdoor_ad_postal" json:"frontdoor_ad_postal"`
-	FrontdoorAdPrice         pgtype.Int8        `db:"frontdoor_ad_price" json:"frontdoor_ad_price"`
-	FrontdoorAdAreaValue     *float64           `db:"frontdoor_ad_area_value" json:"frontdoor_ad_area_value"`
-	FrontdoorAdAddressKey    *string            `db:"frontdoor_ad_address_key" json:"frontdoor_ad_address_key"`
-	FrontdoorAdSearchText    *string            `db:"frontdoor_ad_search_text" json:"frontdoor_ad_search_text"`
-	FrontdoorAdPageNotFound  bool               `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdID             pgtype.UUID        `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID     string             `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl            string             `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
+	FrontdoorAdLastSeenAt     pgtype.Timestamptz `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdData           []byte             `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
+	FrontdoorAdStreetAddress  *string            `db:"frontdoor_ad_street_address" json:"frontdoor_ad_street_address"`
+	FrontdoorAdCity           *string            `db:"frontdoor_ad_city" json:"frontdoor_ad_city"`
+	FrontdoorAdPostal         *string            `db:"frontdoor_ad_postal" json:"frontdoor_ad_postal"`
+	FrontdoorAdPrice          pgtype.Int8        `db:"frontdoor_ad_price" json:"frontdoor_ad_price"`
+	FrontdoorAdAreaValue      *float64           `db:"frontdoor_ad_area_value" json:"frontdoor_ad_area_value"`
+	FrontdoorAdAddressKey     *string            `db:"frontdoor_ad_address_key" json:"frontdoor_ad_address_key"`
+	FrontdoorAdSearchText     *string            `db:"frontdoor_ad_search_text" json:"frontdoor_ad_search_text"`
+	FrontdoorAdPageNotFound   bool               `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdPublishingTime pgtype.Timestamptz `db:"frontdoor_ad_publishing_time" json:"frontdoor_ad_publishing_time"`
 }
 
 type FrontdoorBuilding struct {

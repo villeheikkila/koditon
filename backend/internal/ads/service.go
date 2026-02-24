@@ -18,19 +18,21 @@ import (
 )
 
 type SearchParams struct {
-	Query       string
-	Source      string
-	Kind        string
-	ListingType string
-	MinPrice    *int64
-	MaxPrice    *int64
-	MinArea     *float64
-	MaxArea     *float64
-	City        string
-	Postal      string
-	Page        int32
-	PageSize    int32
-	Sort        string
+	Query          string
+	Source         string
+	Kind           string
+	ListingType    string
+	MinPrice       *int64
+	MaxPrice       *int64
+	MinArea        *float64
+	MaxArea        *float64
+	City           string
+	Postal         string
+	Page           int32
+	PageSize       int32
+	Sort           string
+	PublishedAfter *time.Time
+	PublishedBefore *time.Time
 }
 
 type UnifiedEntityRow struct {
@@ -108,6 +110,8 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	if normalized.ListingType == "all" {
 		listingTypeFilter = nil
 	}
+	publishedAfter := timePtrToTimestamptz(normalized.PublishedAfter)
+	publishedBefore := timePtrToTimestamptz(normalized.PublishedBefore)
 	count, err := s.queries.CountUnifiedEntities(ctx, &db.CountUnifiedEntitiesParams{
 		SourceFilter:      source,
 		KindFilter:        kind,
@@ -119,6 +123,8 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MinArea:           normalized.MinArea,
 		MaxArea:           normalized.MaxArea,
 		ListingTypeFilter: listingTypeFilter,
+		PublishedAfter:    publishedAfter,
+		PublishedBefore:   publishedBefore,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("count unified entities: %w", err)
@@ -137,6 +143,8 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MinArea:           normalized.MinArea,
 		MaxArea:           normalized.MaxArea,
 		ListingTypeFilter: listingTypeFilter,
+		PublishedAfter:    publishedAfter,
+		PublishedBefore:   publishedBefore,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("search unified entities: %w", err)
@@ -287,7 +295,7 @@ func ParseCanonicalID(value string) (string, string, string, error) {
 }
 
 func normalizeSearchParams(params SearchParams) SearchParams {
-	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), ListingType: normalizeListingType(params.ListingType), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort)}
+	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), ListingType: normalizeListingType(params.ListingType), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
 	if normalized.Page < 1 {
 		normalized.Page = 1
 	}
@@ -525,4 +533,11 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func timePtrToTimestamptz(t *time.Time) pgtype.Timestamptz {
+	if t == nil {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: *t, Valid: true}
 }

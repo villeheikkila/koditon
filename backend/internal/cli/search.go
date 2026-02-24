@@ -5,24 +5,27 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"koditon-go/internal/ads"
 )
 
 type SearchFlags struct {
-	Query       string
-	Source      string
-	Kind        string
-	ListingType string
-	City        string
-	Postal      string
-	MinPrice    int
-	MaxPrice    int
-	MinArea     float64
-	MaxArea     float64
-	Sort        string
-	Limit       int
-	Page        int
+	Query          string
+	Source         string
+	Kind           string
+	ListingType    string
+	City           string
+	Postal         string
+	MinPrice       int
+	MaxPrice       int
+	MinArea        float64
+	MaxArea        float64
+	Sort           string
+	Limit          int
+	Page           int
+	PublishedAfter string
+	PublishedBefore string
 }
 
 func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
@@ -55,6 +58,20 @@ func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
 	}
 	if f.MaxArea > 0 {
 		params.MaxArea = &f.MaxArea
+	}
+	if f.PublishedAfter != "" {
+		t, err := time.Parse("2006-01-02", f.PublishedAfter)
+		if err != nil {
+			return fmt.Errorf("parse --after date: %w", err)
+		}
+		params.PublishedAfter = &t
+	}
+	if f.PublishedBefore != "" {
+		t, err := time.Parse("2006-01-02", f.PublishedBefore)
+		if err != nil {
+			return fmt.Errorf("parse --before date: %w", err)
+		}
+		params.PublishedBefore = &t
 	}
 
 	result, err := svc.Search(ctx, params)

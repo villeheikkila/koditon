@@ -22,7 +22,8 @@
       "Bash(APP_ENV=development LOG_LEVEL=error AUTH_JWT_SIGNING_KEY=dummy AUTH_JWT_ISSUER=dummy ./cli search:*)",
       "Bash(APP_ENV=development LOG_LEVEL=error AUTH_JWT_SIGNING_KEY=dummy AUTH_JWT_ISSUER=dummy ./cli:*)",
       "Bash(DATABASE_URL='postgres://postgres:postgres@localhost:5432/koditon?sslmode=disable' sqlc generate:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(DATABASE_URL=\"$DATABASE_URL\" sqlc generate:*)"
     ]
   }
 }

@@ -76,6 +76,8 @@ func runSearch(ctx context.Context, args []string) error {
 	fs.StringVar(&f.Sort, "sort", "seen_desc", "Sort: price_asc, price_desc, area_asc, area_desc, seen_desc")
 	fs.IntVar(&f.Limit, "limit", 25, "Results per page (25, 50, 100)")
 	fs.IntVar(&f.Page, "page", 1, "Page number")
+	fs.StringVar(&f.PublishedAfter, "after", "", "Published after date (YYYY-MM-DD)")
+	fs.StringVar(&f.PublishedBefore, "before", "", "Published before date (YYYY-MM-DD)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

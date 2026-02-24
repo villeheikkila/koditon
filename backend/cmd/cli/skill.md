@@ -31,6 +31,8 @@ cd backend && go build -o cli ./cmd/cli/
 | `--sort` | string | seen_desc | price_asc, price_desc, area_asc, area_desc, seen_desc |
 | `--limit` | int | 25 | Results per page (25, 50, or 100) |
 | `--page` | int | 1 | Page number |
+| `--after` | string | | Published after date (YYYY-MM-DD) |
+| `--before` | string | | Published before date (YYYY-MM-DD) |
 
 **Examples:**
 
