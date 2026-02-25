@@ -1,0 +1,73 @@
+-- name: GetFrontdoorAdByExternalID :one
+SELECT * FROM public.frontdoor_ads
+WHERE frontdoor_ad_external_id = $1;
+
+-- name: ListFrontdoorAds :many
+SELECT * FROM public.frontdoor_ads
+ORDER BY frontdoor_ad_last_seen_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: ListUnprocessedFrontdoorAds :many
+SELECT * FROM public.frontdoor_ads
+WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
+ORDER BY frontdoor_ad_first_seen_at ASC
+LIMIT $1;
+
+-- name: UpsertFrontdoorAds :exec
+INSERT INTO public.frontdoor_ads (frontdoor_ad_external_id)
+SELECT unnest($1::text[])
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE SET
+    frontdoor_ad_last_seen_at = NOW(),
+    frontdoor_ad_updated_at = NOW();
+
+-- name: UpsertFrontdoorAdFromSitemap :one
+INSERT INTO public.frontdoor_ads (
+    frontdoor_ad_external_id,
+    frontdoor_ad_url,
+    frontdoor_ad_first_seen_at,
+    frontdoor_ad_last_seen_at,
+    frontdoor_ad_updated_at
+) VALUES ($1, $2, now(), now(), now())
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
+SET frontdoor_ad_last_seen_at = now(),
+    frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
+RETURNING *;
+
+-- name: BatchUpsertFrontdoorAdsFromSitemap :many
+INSERT INTO public.frontdoor_ads (
+    frontdoor_ad_external_id,
+    frontdoor_ad_url,
+    frontdoor_ad_first_seen_at,
+    frontdoor_ad_last_seen_at,
+    frontdoor_ad_updated_at
+)
+SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
+ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
+SET frontdoor_ad_last_seen_at = now(),
+    frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
+RETURNING *;
+
+-- name: UpdateFrontdoorAdData :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_data = $2::jsonb,
+    frontdoor_ad_processed_at = NOW(),
+    frontdoor_ad_updated_at = NOW(),
+    frontdoor_ad_page_not_found = false
+WHERE frontdoor_ad_external_id = $1;
+
+-- name: MarkFrontdoorAdProcessed :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_processed_at = now(), frontdoor_ad_updated_at = now()
+WHERE frontdoor_ad_id = $1;
+
+-- name: MarkFrontdoorAdNotFoundByExternalID :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_page_not_found = true,
+    frontdoor_ad_processed_at = NOW(),
+    frontdoor_ad_updated_at = NOW()
+WHERE frontdoor_ad_external_id = $1;
+
+-- name: MarkFrontdoorAdNotFound :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_page_not_found = true, frontdoor_ad_updated_at = now()
+WHERE frontdoor_ad_id = $1;
