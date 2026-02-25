@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const updateNeighborhoodPostalCode = `-- name: UpdateNeighborhoodPostalCode :exec
@@ -20,12 +20,12 @@ WHERE prices_neighborhood_name = $2
 `
 
 type UpdateNeighborhoodPostalCodeParams struct {
-	PostalCodeID pgtype.UUID `db:"postal_code_id" json:"postal_code_id"`
-	Name         string      `db:"name" json:"name"`
-	CityID       pgtype.UUID `db:"city_id" json:"city_id"`
+	PostalCodeID *uuid.UUID `json:"postal_code_id"`
+	Name         string     `json:"name"`
+	CityID       uuid.UUID  `json:"city_id"`
 }
 
-func (q *Queries) UpdateNeighborhoodPostalCode(ctx context.Context, arg *UpdateNeighborhoodPostalCodeParams) error {
+func (q *Queries) UpdateNeighborhoodPostalCode(ctx context.Context, arg UpdateNeighborhoodPostalCodeParams) error {
 	_, err := q.db.Exec(ctx, updateNeighborhoodPostalCode, arg.PostalCodeID, arg.Name, arg.CityID)
 	return err
 }
@@ -38,11 +38,11 @@ WHERE prices_neighborhood_id = $2
 `
 
 type UpdateNeighborhoodPostiPostalCodeParams struct {
-	PostalCodeID   pgtype.UUID `db:"postal_code_id" json:"postal_code_id"`
-	NeighborhoodID pgtype.UUID `db:"neighborhood_id" json:"neighborhood_id"`
+	PostalCodeID   *uuid.UUID `json:"postal_code_id"`
+	NeighborhoodID uuid.UUID  `json:"neighborhood_id"`
 }
 
-func (q *Queries) UpdateNeighborhoodPostiPostalCode(ctx context.Context, arg *UpdateNeighborhoodPostiPostalCodeParams) error {
+func (q *Queries) UpdateNeighborhoodPostiPostalCode(ctx context.Context, arg UpdateNeighborhoodPostiPostalCodeParams) error {
 	_, err := q.db.Exec(ctx, updateNeighborhoodPostiPostalCode, arg.PostalCodeID, arg.NeighborhoodID)
 	return err
 }
@@ -85,12 +85,12 @@ RETURNING prices_neighborhood_id, prices_neighborhood_name, prices_city_id, pric
 `
 
 type UpsertPricesNeighborhoodParams struct {
-	Name         string      `db:"name" json:"name"`
-	CityID       pgtype.UUID `db:"city_id" json:"city_id"`
-	PostalCodeID pgtype.UUID `db:"postal_code_id" json:"postal_code_id"`
+	Name         string     `json:"name"`
+	CityID       uuid.UUID  `json:"city_id"`
+	PostalCodeID *uuid.UUID `json:"postal_code_id"`
 }
 
-func (q *Queries) UpsertPricesNeighborhood(ctx context.Context, arg *UpsertPricesNeighborhoodParams) (PricesNeighborhood, error) {
+func (q *Queries) UpsertPricesNeighborhood(ctx context.Context, arg UpsertPricesNeighborhoodParams) (PricesNeighborhood, error) {
 	row := q.db.QueryRow(ctx, upsertPricesNeighborhood, arg.Name, arg.CityID, arg.PostalCodeID)
 	var i PricesNeighborhood
 	err := row.Scan(
@@ -127,11 +127,11 @@ RETURNING prices_neighborhood_id, prices_neighborhood_name, prices_city_id, pric
 `
 
 type UpsertPricesNeighborhoodsBulkParams struct {
-	CityID pgtype.UUID `db:"city_id" json:"city_id"`
-	Names  []string    `db:"names" json:"names"`
+	CityID uuid.UUID `json:"city_id"`
+	Names  []string  `json:"names"`
 }
 
-func (q *Queries) UpsertPricesNeighborhoodsBulk(ctx context.Context, arg *UpsertPricesNeighborhoodsBulkParams) ([]PricesNeighborhood, error) {
+func (q *Queries) UpsertPricesNeighborhoodsBulk(ctx context.Context, arg UpsertPricesNeighborhoodsBulkParams) ([]PricesNeighborhood, error) {
 	rows, err := q.db.Query(ctx, upsertPricesNeighborhoodsBulk, arg.CityID, arg.Names)
 	if err != nil {
 		return nil, err
@@ -173,11 +173,11 @@ RETURNING prices_postal_code_id, prices_postal_code_code, prices_city_id, prices
 `
 
 type UpsertPricesPostalCodeParams struct {
-	Code   string      `db:"code" json:"code"`
-	CityID pgtype.UUID `db:"city_id" json:"city_id"`
+	Code   string    `json:"code"`
+	CityID uuid.UUID `json:"city_id"`
 }
 
-func (q *Queries) UpsertPricesPostalCode(ctx context.Context, arg *UpsertPricesPostalCodeParams) (PricesPostalCode, error) {
+func (q *Queries) UpsertPricesPostalCode(ctx context.Context, arg UpsertPricesPostalCodeParams) (PricesPostalCode, error) {
 	row := q.db.QueryRow(ctx, upsertPricesPostalCode, arg.Code, arg.CityID)
 	var i PricesPostalCode
 	err := row.Scan(
@@ -206,11 +206,11 @@ RETURNING prices_postal_code_id, prices_postal_code_code, prices_city_id, prices
 `
 
 type UpsertPricesPostalCodesBulkParams struct {
-	CityID pgtype.UUID `db:"city_id" json:"city_id"`
-	Codes  []string    `db:"codes" json:"codes"`
+	CityID uuid.UUID `json:"city_id"`
+	Codes  []string  `json:"codes"`
 }
 
-func (q *Queries) UpsertPricesPostalCodesBulk(ctx context.Context, arg *UpsertPricesPostalCodesBulkParams) ([]PricesPostalCode, error) {
+func (q *Queries) UpsertPricesPostalCodesBulk(ctx context.Context, arg UpsertPricesPostalCodesBulkParams) ([]PricesPostalCode, error) {
 	rows, err := q.db.Query(ctx, upsertPricesPostalCodesBulk, arg.CityID, arg.Codes)
 	if err != nil {
 		return nil, err
@@ -294,23 +294,23 @@ RETURNING prices_transaction_id, prices_transaction_description, prices_transact
 `
 
 type UpsertPricesTransactionParams struct {
-	Description         string      `db:"description" json:"description"`
-	Type                string      `db:"type" json:"type"`
-	Area                float64     `db:"area" json:"area"`
-	Price               int32       `db:"price" json:"price"`
-	PricePerSquareMeter int32       `db:"price_per_square_meter" json:"price_per_square_meter"`
-	BuildYear           int32       `db:"build_year" json:"build_year"`
-	Floor               *string     `db:"floor" json:"floor"`
-	Elevator            bool        `db:"elevator" json:"elevator"`
-	Condition           *string     `db:"condition" json:"condition"`
-	Plot                *string     `db:"plot" json:"plot"`
-	EnergyClass         *string     `db:"energy_class" json:"energy_class"`
-	Category            string      `db:"category" json:"category"`
-	PeriodIdentifier    string      `db:"period_identifier" json:"period_identifier"`
-	NeighborhoodID      pgtype.UUID `db:"neighborhood_id" json:"neighborhood_id"`
+	Description         string     `json:"description"`
+	Type                string     `json:"type"`
+	Area                float64    `json:"area"`
+	Price               int32      `json:"price"`
+	PricePerSquareMeter int32      `json:"price_per_square_meter"`
+	BuildYear           int32      `json:"build_year"`
+	Floor               *string    `json:"floor"`
+	Elevator            bool       `json:"elevator"`
+	Condition           *string    `json:"condition"`
+	Plot                *string    `json:"plot"`
+	EnergyClass         *string    `json:"energy_class"`
+	Category            string     `json:"category"`
+	PeriodIdentifier    string     `json:"period_identifier"`
+	NeighborhoodID      *uuid.UUID `json:"neighborhood_id"`
 }
 
-func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg *UpsertPricesTransactionParams) (PricesTransaction, error) {
+func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg UpsertPricesTransactionParams) (PricesTransaction, error) {
 	row := q.db.QueryRow(ctx, upsertPricesTransaction,
 		arg.Description,
 		arg.Type,
@@ -453,23 +453,23 @@ WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 
 `
 
 type UpsertPricesTransactionsBulkParams struct {
-	Descriptions         []string      `db:"descriptions" json:"descriptions"`
-	Types                []string      `db:"types" json:"types"`
-	Areas                []float64     `db:"areas" json:"areas"`
-	Prices               []int32       `db:"prices" json:"prices"`
-	PricePerSquareMeters []int32       `db:"price_per_square_meters" json:"price_per_square_meters"`
-	BuildYears           []int32       `db:"build_years" json:"build_years"`
-	Floors               []string      `db:"floors" json:"floors"`
-	Elevators            []bool        `db:"elevators" json:"elevators"`
-	Conditions           []string      `db:"conditions" json:"conditions"`
-	Plots                []string      `db:"plots" json:"plots"`
-	EnergyClasses        []string      `db:"energy_classes" json:"energy_classes"`
-	Categories           []string      `db:"categories" json:"categories"`
-	PeriodIdentifiers    []string      `db:"period_identifiers" json:"period_identifiers"`
-	NeighborhoodIds      []pgtype.UUID `db:"neighborhood_ids" json:"neighborhood_ids"`
+	Descriptions         []string    `json:"descriptions"`
+	Types                []string    `json:"types"`
+	Areas                []float64   `json:"areas"`
+	Prices               []int32     `json:"prices"`
+	PricePerSquareMeters []int32     `json:"price_per_square_meters"`
+	BuildYears           []int32     `json:"build_years"`
+	Floors               []string    `json:"floors"`
+	Elevators            []bool      `json:"elevators"`
+	Conditions           []string    `json:"conditions"`
+	Plots                []string    `json:"plots"`
+	EnergyClasses        []string    `json:"energy_classes"`
+	Categories           []string    `json:"categories"`
+	PeriodIdentifiers    []string    `json:"period_identifiers"`
+	NeighborhoodIds      []uuid.UUID `json:"neighborhood_ids"`
 }
 
-func (q *Queries) UpsertPricesTransactionsBulk(ctx context.Context, arg *UpsertPricesTransactionsBulkParams) (int64, error) {
+func (q *Queries) UpsertPricesTransactionsBulk(ctx context.Context, arg UpsertPricesTransactionsBulkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertPricesTransactionsBulk,
 		arg.Descriptions,
 		arg.Types,

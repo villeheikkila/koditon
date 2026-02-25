@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const countUnmatchedNeighborhoods = `-- name: CountUnmatchedNeighborhoods :one
@@ -39,10 +39,10 @@ ORDER BY ppc.postal_postal_code_name_fi
 `
 
 type GetAvailablePostalCodesForMunicipalityRow struct {
-	PostalPostalCodeID       pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeCode     string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi   string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+	PostalPostalCodeID       uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode     string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi   string    `json:"postal_postal_code_name_fi"`
+	PostalMunicipalityNameFi string    `json:"postal_municipality_name_fi"`
 }
 
 func (q *Queries) GetAvailablePostalCodesForMunicipality(ctx context.Context, municipalityName string) ([]GetAvailablePostalCodesForMunicipalityRow, error) {
@@ -88,10 +88,10 @@ ORDER BY pm.postal_municipality_name_fi
 `
 
 type ListAvailableMunicipalitiesRow struct {
-	PostalMunicipalityID     pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityCode   string      `db:"postal_municipality_code" json:"postal_municipality_code"`
-	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
-	PostalMunicipalityNameSv *string     `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
+	PostalMunicipalityID     uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityCode   string    `json:"postal_municipality_code"`
+	PostalMunicipalityNameFi string    `json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv *string   `json:"postal_municipality_name_sv"`
 }
 
 func (q *Queries) ListAvailableMunicipalities(ctx context.Context) ([]ListAvailableMunicipalitiesRow, error) {
@@ -139,12 +139,12 @@ ORDER BY ppc.postal_postal_code_code
 `
 
 type ListAvailablePostalCodesRow struct {
-	PostalPostalCodeID       pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeCode     string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi   string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv   *string     `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
-	PostalMunicipalityID     pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
+	PostalPostalCodeID       uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode     string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi   string    `json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv   *string   `json:"postal_postal_code_name_sv"`
+	PostalMunicipalityID     uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityNameFi string    `json:"postal_municipality_name_fi"`
 }
 
 func (q *Queries) ListAvailablePostalCodes(ctx context.Context) ([]ListAvailablePostalCodesRow, error) {
@@ -195,16 +195,16 @@ ORDER BY hc.prices_city_name, hn.prices_neighborhood_name
 `
 
 type ListCitiesWithNeighborhoodsRow struct {
-	PricesCityID                pgtype.UUID `db:"prices_city_id" json:"prices_city_id"`
-	PricesCityName              string      `db:"prices_city_name" json:"prices_city_name"`
-	PricesCityCreatedAt         time.Time   `db:"prices_city_created_at" json:"prices_city_created_at"`
-	PricesCityUpdatedAt         time.Time   `db:"prices_city_updated_at" json:"prices_city_updated_at"`
-	PricesNeighborhoodID        pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
-	PricesNeighborhoodName      *string     `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
-	PricesNeighborhoodCreatedAt *time.Time  `db:"prices_neighborhood_created_at" json:"prices_neighborhood_created_at"`
-	PricesNeighborhoodUpdatedAt *time.Time  `db:"prices_neighborhood_updated_at" json:"prices_neighborhood_updated_at"`
-	PricesPostalCodeID          pgtype.UUID `db:"prices_postal_code_id" json:"prices_postal_code_id"`
-	PricesPostalCodeCode        *string     `db:"prices_postal_code_code" json:"prices_postal_code_code"`
+	PricesCityID                uuid.UUID  `json:"prices_city_id"`
+	PricesCityName              string     `json:"prices_city_name"`
+	PricesCityCreatedAt         time.Time  `json:"prices_city_created_at"`
+	PricesCityUpdatedAt         time.Time  `json:"prices_city_updated_at"`
+	PricesNeighborhoodID        *uuid.UUID `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName      *string    `json:"prices_neighborhood_name"`
+	PricesNeighborhoodCreatedAt *time.Time `json:"prices_neighborhood_created_at"`
+	PricesNeighborhoodUpdatedAt *time.Time `json:"prices_neighborhood_updated_at"`
+	PricesPostalCodeID          *uuid.UUID `json:"prices_postal_code_id"`
+	PricesPostalCodeCode        *string    `json:"prices_postal_code_code"`
 }
 
 func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCitiesWithNeighborhoodsRow, error) {
@@ -364,7 +364,7 @@ WHERE prices_city_id = $1
 ORDER BY prices_postal_code_code
 `
 
-func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID pgtype.UUID) ([]PricesPostalCode, error) {
+func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID uuid.UUID) ([]PricesPostalCode, error) {
 	rows, err := q.db.Query(ctx, listPricesPostalCodesByCity, cityID)
 	if err != nil {
 		return nil, err
@@ -406,11 +406,11 @@ LIMIT 50 OFFSET $1
 `
 
 type ListUnmatchedNeighborhoodsBatchRow struct {
-	PricesNeighborhoodID   pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
-	PricesNeighborhoodName string      `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
-	PricesCityID           pgtype.UUID `db:"prices_city_id" json:"prices_city_id"`
-	PricesCityName         *string     `db:"prices_city_name" json:"prices_city_name"`
-	UnmatchedInCity        int64       `db:"unmatched_in_city" json:"unmatched_in_city"`
+	PricesNeighborhoodID   uuid.UUID `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName string    `json:"prices_neighborhood_name"`
+	PricesCityID           uuid.UUID `json:"prices_city_id"`
+	PricesCityName         *string   `json:"prices_city_name"`
+	UnmatchedInCity        int64     `json:"unmatched_in_city"`
 }
 
 func (q *Queries) ListUnmatchedNeighborhoodsBatch(ctx context.Context, batchOffset int64) ([]ListUnmatchedNeighborhoodsBatchRow, error) {

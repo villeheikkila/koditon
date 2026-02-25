@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createIdentity = `-- name: CreateIdentity :one
@@ -25,15 +25,15 @@ RETURNING identity_id, user_id, identity_provider, identity_external_id, identit
 `
 
 type CreateIdentityParams struct {
-	UserID                pgtype.UUID      `db:"user_id" json:"user_id"`
-	IdentityProvider      AuthAuthProvider `db:"identity_provider" json:"identity_provider"`
-	IdentityExternalID    string           `db:"identity_external_id" json:"identity_external_id"`
-	IdentityEmail         *string          `db:"identity_email" json:"identity_email"`
-	IdentityEmailVerified pgtype.Bool      `db:"identity_email_verified" json:"identity_email_verified"`
-	IdentityData          json.RawMessage  `db:"identity_data" json:"identity_data"`
+	UserID                uuid.UUID        `json:"user_id"`
+	IdentityProvider      AuthAuthProvider `json:"identity_provider"`
+	IdentityExternalID    string           `json:"identity_external_id"`
+	IdentityEmail         *string          `json:"identity_email"`
+	IdentityEmailVerified *bool            `json:"identity_email_verified"`
+	IdentityData          json.RawMessage  `json:"identity_data"`
 }
 
-func (q *Queries) CreateIdentity(ctx context.Context, arg *CreateIdentityParams) (AuthIdentity, error) {
+func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) (AuthIdentity, error) {
 	row := q.db.QueryRow(ctx, createIdentity,
 		arg.UserID,
 		arg.IdentityProvider,
@@ -63,7 +63,7 @@ WHERE user_id = $1
 ORDER BY identity_created_at ASC
 `
 
-func (q *Queries) GetIdentitiesByUserID(ctx context.Context, userID pgtype.UUID) ([]AuthIdentity, error) {
+func (q *Queries) GetIdentitiesByUserID(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error) {
 	rows, err := q.db.Query(ctx, getIdentitiesByUserID, userID)
 	if err != nil {
 		return nil, err
@@ -99,11 +99,11 @@ WHERE identity_provider = $1 AND identity_external_id = $2
 `
 
 type GetIdentityByProviderAndExternalIDParams struct {
-	IdentityProvider   AuthAuthProvider `db:"identity_provider" json:"identity_provider"`
-	IdentityExternalID string           `db:"identity_external_id" json:"identity_external_id"`
+	IdentityProvider   AuthAuthProvider `json:"identity_provider"`
+	IdentityExternalID string           `json:"identity_external_id"`
 }
 
-func (q *Queries) GetIdentityByProviderAndExternalID(ctx context.Context, arg *GetIdentityByProviderAndExternalIDParams) (AuthIdentity, error) {
+func (q *Queries) GetIdentityByProviderAndExternalID(ctx context.Context, arg GetIdentityByProviderAndExternalIDParams) (AuthIdentity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByProviderAndExternalID, arg.IdentityProvider, arg.IdentityExternalID)
 	var i AuthIdentity
 	err := row.Scan(
@@ -132,13 +132,13 @@ RETURNING identity_id, user_id, identity_provider, identity_external_id, identit
 `
 
 type UpdateIdentityParams struct {
-	IdentityID            pgtype.UUID     `db:"identity_id" json:"identity_id"`
-	IdentityEmail         *string         `db:"identity_email" json:"identity_email"`
-	IdentityEmailVerified pgtype.Bool     `db:"identity_email_verified" json:"identity_email_verified"`
-	IdentityData          json.RawMessage `db:"identity_data" json:"identity_data"`
+	IdentityID            uuid.UUID       `json:"identity_id"`
+	IdentityEmail         *string         `json:"identity_email"`
+	IdentityEmailVerified *bool           `json:"identity_email_verified"`
+	IdentityData          json.RawMessage `json:"identity_data"`
 }
 
-func (q *Queries) UpdateIdentity(ctx context.Context, arg *UpdateIdentityParams) (AuthIdentity, error) {
+func (q *Queries) UpdateIdentity(ctx context.Context, arg UpdateIdentityParams) (AuthIdentity, error) {
 	row := q.db.QueryRow(ctx, updateIdentity,
 		arg.IdentityID,
 		arg.IdentityEmail,

@@ -11,20 +11,20 @@ import (
 )
 
 type SearchFlags struct {
-	Query          string
-	Source         string
-	Kind           string
-	ListingType    string
-	City           string
-	Postal         string
-	MinPrice       int
-	MaxPrice       int
-	MinArea        float64
-	MaxArea        float64
-	Sort           string
-	Limit          int
-	Page           int
-	PublishedAfter string
+	Query           string
+	Source          string
+	Kind            string
+	ListingType     string
+	City            string
+	Postal          string
+	MinPrice        int
+	MaxPrice        int
+	MinArea         float64
+	MaxArea         float64
+	Sort            string
+	Limit           int
+	Page            int
+	PublishedAfter  string
 	PublishedBefore string
 }
 
@@ -79,10 +79,7 @@ func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
 		return fmt.Errorf("search: %w", err)
 	}
 
-	totalPages := int(math.Ceil(float64(result.Total) / float64(result.PageSize)))
-	if totalPages < 1 {
-		totalPages = 1
-	}
+	totalPages := max(int(math.Ceil(float64(result.Total)/float64(result.PageSize))), 1)
 
 	fmt.Println(headerStyle.Render(fmt.Sprintf("Found %d results (page %d of %d)", result.Total, result.Page, totalPages)))
 	fmt.Println()

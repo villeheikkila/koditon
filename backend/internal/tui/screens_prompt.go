@@ -1,7 +1,9 @@
 package tui
 
-import tea "charm.land/bubbletea/v2"
-import "charm.land/bubbles/v2/textinput"
+import (
+	tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/textinput"
+)
 
 type promptScreen struct {
 	ctx        *appContext

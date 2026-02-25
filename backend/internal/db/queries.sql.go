@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const archive = `-- name: Archive :one
@@ -21,11 +21,11 @@ SELECT pgmq.archive(
 `
 
 type ArchiveParams struct {
-	QueueName string `db:"queue_name" json:"queue_name"`
-	MsgID     int64  `db:"msg_id" json:"msg_id"`
+	QueueName string `json:"queue_name"`
+	MsgID     int64  `json:"msg_id"`
 }
 
-func (q *Queries) Archive(ctx context.Context, arg *ArchiveParams) (bool, error) {
+func (q *Queries) Archive(ctx context.Context, arg ArchiveParams) (bool, error) {
 	row := q.db.QueryRow(ctx, archive, arg.QueueName, arg.MsgID)
 	var archived bool
 	err := row.Scan(&archived)
@@ -41,11 +41,11 @@ FROM pgmq.archive(
 `
 
 type ArchiveBatchParams struct {
-	QueueName string  `db:"queue_name" json:"queue_name"`
-	MsgIds    []int64 `db:"msg_ids" json:"msg_ids"`
+	QueueName string  `json:"queue_name"`
+	MsgIds    []int64 `json:"msg_ids"`
 }
 
-func (q *Queries) ArchiveBatch(ctx context.Context, arg *ArchiveBatchParams) ([]int64, error) {
+func (q *Queries) ArchiveBatch(ctx context.Context, arg ArchiveBatchParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, archiveBatch, arg.QueueName, arg.MsgIds)
 	if err != nil {
 		return nil, err
@@ -146,21 +146,21 @@ WHERE ($1 = 'all' OR u.source = $1)
 `
 
 type CountUnifiedEntitiesParams struct {
-	SourceFilter      *string    `db:"source_filter" json:"source_filter"`
-	KindFilter        *string    `db:"kind_filter" json:"kind_filter"`
-	QueryText         *string    `db:"query_text" json:"query_text"`
-	CityFilter        *string    `db:"city_filter" json:"city_filter"`
-	PostalFilter      *string    `db:"postal_filter" json:"postal_filter"`
-	MinPrice          *int64     `db:"min_price" json:"min_price"`
-	MaxPrice          *int64     `db:"max_price" json:"max_price"`
-	MinArea           *float64   `db:"min_area" json:"min_area"`
-	MaxArea           *float64   `db:"max_area" json:"max_area"`
-	ListingTypeFilter *string    `db:"listing_type_filter" json:"listing_type_filter"`
-	PublishedAfter    *time.Time `db:"published_after" json:"published_after"`
-	PublishedBefore   *time.Time `db:"published_before" json:"published_before"`
+	SourceFilter      *string    `json:"source_filter"`
+	KindFilter        *string    `json:"kind_filter"`
+	QueryText         *string    `json:"query_text"`
+	CityFilter        *string    `json:"city_filter"`
+	PostalFilter      *string    `json:"postal_filter"`
+	MinPrice          *int64     `json:"min_price"`
+	MaxPrice          *int64     `json:"max_price"`
+	MinArea           *float64   `json:"min_area"`
+	MaxArea           *float64   `json:"max_area"`
+	ListingTypeFilter *string    `json:"listing_type_filter"`
+	PublishedAfter    *time.Time `json:"published_after"`
+	PublishedBefore   *time.Time `json:"published_before"`
 }
 
-func (q *Queries) CountUnifiedEntities(ctx context.Context, arg *CountUnifiedEntitiesParams) (int64, error) {
+func (q *Queries) CountUnifiedEntities(ctx context.Context, arg CountUnifiedEntitiesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countUnifiedEntities,
 		arg.SourceFilter,
 		arg.KindFilter,
@@ -189,12 +189,12 @@ SELECT pgmq.create_partitioned(
 `
 
 type CreatePartitionedQueueParams struct {
-	QueueName         string `db:"queue_name" json:"queue_name"`
-	PartitionInterval string `db:"partition_interval" json:"partition_interval"`
-	RetentionInterval string `db:"retention_interval" json:"retention_interval"`
+	QueueName         string `json:"queue_name"`
+	PartitionInterval string `json:"partition_interval"`
+	RetentionInterval string `json:"retention_interval"`
 }
 
-func (q *Queries) CreatePartitionedQueue(ctx context.Context, arg *CreatePartitionedQueueParams) error {
+func (q *Queries) CreatePartitionedQueue(ctx context.Context, arg CreatePartitionedQueueParams) error {
 	_, err := q.db.Exec(ctx, createPartitionedQueue, arg.QueueName, arg.PartitionInterval, arg.RetentionInterval)
 	return err
 }
@@ -225,11 +225,11 @@ SELECT pgmq.delete(
 `
 
 type DeleteParams struct {
-	QueueName string `db:"queue_name" json:"queue_name"`
-	MsgID     int64  `db:"msg_id" json:"msg_id"`
+	QueueName string `json:"queue_name"`
+	MsgID     int64  `json:"msg_id"`
 }
 
-func (q *Queries) Delete(ctx context.Context, arg *DeleteParams) (bool, error) {
+func (q *Queries) Delete(ctx context.Context, arg DeleteParams) (bool, error) {
 	row := q.db.QueryRow(ctx, delete, arg.QueueName, arg.MsgID)
 	var deleted bool
 	err := row.Scan(&deleted)
@@ -245,11 +245,11 @@ FROM pgmq.delete(
 `
 
 type DeleteBatchParams struct {
-	QueueName string  `db:"queue_name" json:"queue_name"`
-	MsgIds    []int64 `db:"msg_ids" json:"msg_ids"`
+	QueueName string  `json:"queue_name"`
+	MsgIds    []int64 `json:"msg_ids"`
 }
 
-func (q *Queries) DeleteBatch(ctx context.Context, arg *DeleteBatchParams) ([]int64, error) {
+func (q *Queries) DeleteBatch(ctx context.Context, arg DeleteBatchParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, deleteBatch, arg.QueueName, arg.MsgIds)
 	if err != nil {
 		return nil, err
@@ -325,29 +325,29 @@ LIMIT $4::int
 `
 
 type FindCrossSourceAdMatchesParams struct {
-	CityFilter    *string  `db:"city_filter" json:"city_filter"`
-	MaxPriceDelta *int64   `db:"max_price_delta" json:"max_price_delta"`
-	MaxAreaDelta  *float64 `db:"max_area_delta" json:"max_area_delta"`
-	LimitCount    int32    `db:"limit_count" json:"limit_count"`
+	CityFilter    *string  `json:"city_filter"`
+	MaxPriceDelta *int64   `json:"max_price_delta"`
+	MaxAreaDelta  *float64 `json:"max_area_delta"`
+	LimitCount    int32    `json:"limit_count"`
 }
 
 type FindCrossSourceAdMatchesRow struct {
-	ShortcutAdID          int64    `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	FrontdoorAdExternalID string   `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	AddressKey            *string  `db:"address_key" json:"address_key"`
-	ShortcutStreet        *string  `db:"shortcut_street" json:"shortcut_street"`
-	FrontdoorStreet       *string  `db:"frontdoor_street" json:"frontdoor_street"`
-	ShortcutPostal        *string  `db:"shortcut_postal" json:"shortcut_postal"`
-	FrontdoorPostal       *string  `db:"frontdoor_postal" json:"frontdoor_postal"`
-	ShortcutCity          *string  `db:"shortcut_city" json:"shortcut_city"`
-	FrontdoorCity         *string  `db:"frontdoor_city" json:"frontdoor_city"`
-	ShortcutPrice         *int64   `db:"shortcut_price" json:"shortcut_price"`
-	FrontdoorPrice        *int64   `db:"frontdoor_price" json:"frontdoor_price"`
-	ShortcutArea          *float64 `db:"shortcut_area" json:"shortcut_area"`
-	FrontdoorArea         *float64 `db:"frontdoor_area" json:"frontdoor_area"`
+	ShortcutAdID          int64    `json:"shortcut_ad_id"`
+	FrontdoorAdExternalID string   `json:"frontdoor_ad_external_id"`
+	AddressKey            *string  `json:"address_key"`
+	ShortcutStreet        *string  `json:"shortcut_street"`
+	FrontdoorStreet       *string  `json:"frontdoor_street"`
+	ShortcutPostal        *string  `json:"shortcut_postal"`
+	FrontdoorPostal       *string  `json:"frontdoor_postal"`
+	ShortcutCity          *string  `json:"shortcut_city"`
+	FrontdoorCity         *string  `json:"frontdoor_city"`
+	ShortcutPrice         *int64   `json:"shortcut_price"`
+	FrontdoorPrice        *int64   `json:"frontdoor_price"`
+	ShortcutArea          *float64 `json:"shortcut_area"`
+	FrontdoorArea         *float64 `json:"frontdoor_area"`
 }
 
-func (q *Queries) FindCrossSourceAdMatches(ctx context.Context, arg *FindCrossSourceAdMatchesParams) ([]FindCrossSourceAdMatchesRow, error) {
+func (q *Queries) FindCrossSourceAdMatches(ctx context.Context, arg FindCrossSourceAdMatchesParams) ([]FindCrossSourceAdMatchesRow, error) {
 	rows, err := q.db.Query(ctx, findCrossSourceAdMatches,
 		arg.CityFilter,
 		arg.MaxPriceDelta,
@@ -398,12 +398,12 @@ FROM pgmq.metrics_all()
 `
 
 type GetAllQueueMetricsRow struct {
-	QueueName       string    `db:"queue_name" json:"queue_name"`
-	QueueLength     int64     `db:"queue_length" json:"queue_length"`
-	NewestMsgAgeSec int32     `db:"newest_msg_age_sec" json:"newest_msg_age_sec"`
-	OldestMsgAgeSec int32     `db:"oldest_msg_age_sec" json:"oldest_msg_age_sec"`
-	TotalMessages   int64     `db:"total_messages" json:"total_messages"`
-	ScrapeTime      time.Time `db:"scrape_time" json:"scrape_time"`
+	QueueName       string    `json:"queue_name"`
+	QueueLength     int64     `json:"queue_length"`
+	NewestMsgAgeSec int32     `json:"newest_msg_age_sec"`
+	OldestMsgAgeSec int32     `json:"oldest_msg_age_sec"`
+	TotalMessages   int64     `json:"total_messages"`
+	ScrapeTime      time.Time `json:"scrape_time"`
 }
 
 func (q *Queries) GetAllQueueMetrics(ctx context.Context) ([]GetAllQueueMetricsRow, error) {
@@ -455,20 +455,20 @@ LIMIT 1
 `
 
 type GetFrontdoorAdUnifiedDetailRow struct {
-	FrontdoorAdID           pgtype.UUID     `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID   string          `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl          string          `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
-	FrontdoorAdLastSeenAt   time.Time       `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdPageNotFound bool            `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
-	AdAddress               *string         `db:"ad_address" json:"ad_address"`
-	AdCity                  *string         `db:"ad_city" json:"ad_city"`
-	AdPostal                *string         `db:"ad_postal" json:"ad_postal"`
-	AdPrice                 *int64          `db:"ad_price" json:"ad_price"`
-	AdArea                  *float64        `db:"ad_area" json:"ad_area"`
-	AdRoomLayout            *string         `db:"ad_room_layout" json:"ad_room_layout"`
-	AdPropertyType          *string         `db:"ad_property_type" json:"ad_property_type"`
-	AdCondition             *string         `db:"ad_condition" json:"ad_condition"`
-	FrontdoorAdData         json.RawMessage `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
+	FrontdoorAdID           uuid.UUID       `json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID   string          `json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl          string          `json:"frontdoor_ad_url"`
+	FrontdoorAdLastSeenAt   time.Time       `json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdPageNotFound bool            `json:"frontdoor_ad_page_not_found"`
+	AdAddress               *string         `json:"ad_address"`
+	AdCity                  *string         `json:"ad_city"`
+	AdPostal                *string         `json:"ad_postal"`
+	AdPrice                 *int64          `json:"ad_price"`
+	AdArea                  *float64        `json:"ad_area"`
+	AdRoomLayout            *string         `json:"ad_room_layout"`
+	AdPropertyType          *string         `json:"ad_property_type"`
+	AdCondition             *string         `json:"ad_condition"`
+	FrontdoorAdData         json.RawMessage `json:"frontdoor_ad_data"`
 }
 
 func (q *Queries) GetFrontdoorAdUnifiedDetail(ctx context.Context, externalID string) (GetFrontdoorAdUnifiedDetailRow, error) {
@@ -551,33 +551,33 @@ LIMIT 1
 `
 
 type GetFrontdoorAnnouncementUnifiedDetailRow struct {
-	FrontdoorBuildingAnnouncementID              pgtype.UUID     `db:"frontdoor_building_announcement_id" json:"frontdoor_building_announcement_id"`
-	FrontdoorBuildingAnnouncementExternalID      *int32          `db:"frontdoor_building_announcement_external_id" json:"frontdoor_building_announcement_external_id"`
-	FrontdoorBuildingAnnouncementFriendlyID      *string         `db:"frontdoor_building_announcement_friendly_id" json:"frontdoor_building_announcement_friendly_id"`
-	FrontdoorBuildingAnnouncementLastSeenAt      time.Time       `db:"frontdoor_building_announcement_last_seen_at" json:"frontdoor_building_announcement_last_seen_at"`
-	FrontdoorBuildingAnnouncementAddressLine1    *string         `db:"frontdoor_building_announcement_address_line1" json:"frontdoor_building_announcement_address_line1"`
-	FrontdoorBuildingAnnouncementAddressLine2    *string         `db:"frontdoor_building_announcement_address_line2" json:"frontdoor_building_announcement_address_line2"`
-	FrontdoorBuildingAnnouncementLocation        *string         `db:"frontdoor_building_announcement_location" json:"frontdoor_building_announcement_location"`
-	FrontdoorBuildingAnnouncementSearchPrice     *float64        `db:"frontdoor_building_announcement_search_price" json:"frontdoor_building_announcement_search_price"`
-	FrontdoorBuildingAnnouncementArea            *float64        `db:"frontdoor_building_announcement_area" json:"frontdoor_building_announcement_area"`
-	FrontdoorBuildingAnnouncementRoomStructure   *string         `db:"frontdoor_building_announcement_room_structure" json:"frontdoor_building_announcement_room_structure"`
-	FrontdoorBuildingAnnouncementPropertyType    *string         `db:"frontdoor_building_announcement_property_type" json:"frontdoor_building_announcement_property_type"`
-	FrontdoorBuildingAnnouncementPropertySubtype *string         `db:"frontdoor_building_announcement_property_subtype" json:"frontdoor_building_announcement_property_subtype"`
-	FrontdoorBuildingAnnouncementPublished       *bool           `db:"frontdoor_building_announcement_published" json:"frontdoor_building_announcement_published"`
-	FrontdoorBuildingID                          pgtype.UUID     `db:"frontdoor_building_id" json:"frontdoor_building_id"`
-	FrontdoorBuildingUrl                         *string         `db:"frontdoor_building_url" json:"frontdoor_building_url"`
-	FrontdoorBuildingHousingCompanyID            *int64          `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
-	FrontdoorBuildingHousingCompanyFriendlyID    *string         `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
-	FrontdoorBuildingCompanyName                 *string         `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
-	FrontdoorBuildingStreetAddress               *string         `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
-	FrontdoorBuildingHouseNumber                 *string         `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
-	FrontdoorBuildingPostcode                    *string         `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
-	FrontdoorBuildingPostArea                    *string         `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
-	FrontdoorBuildingMunicipality                *string         `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
-	RawJson                                      json.RawMessage `db:"raw_json" json:"raw_json"`
+	FrontdoorBuildingAnnouncementID              uuid.UUID       `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementExternalID      *int32          `json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID      *string         `json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementLastSeenAt      time.Time       `json:"frontdoor_building_announcement_last_seen_at"`
+	FrontdoorBuildingAnnouncementAddressLine1    *string         `json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2    *string         `json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation        *string         `json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice     *float64        `json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementArea            *float64        `json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementRoomStructure   *string         `json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementPropertyType    *string         `json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype *string         `json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementPublished       *bool           `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingID                          uuid.UUID       `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                         *string         `json:"frontdoor_building_url"`
+	FrontdoorBuildingHousingCompanyID            *int64          `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID    *string         `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingCompanyName                 *string         `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingStreetAddress               *string         `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber                 *string         `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                    *string         `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                    *string         `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality                *string         `json:"frontdoor_building_municipality"`
+	RawJson                                      json.RawMessage `json:"raw_json"`
 }
 
-func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, announcementID pgtype.UUID) (GetFrontdoorAnnouncementUnifiedDetailRow, error) {
+func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, announcementID uuid.UUID) (GetFrontdoorAnnouncementUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getFrontdoorAnnouncementUnifiedDetail, announcementID)
 	var i GetFrontdoorAnnouncementUnifiedDetailRow
 	err := row.Scan(
@@ -640,32 +640,32 @@ LIMIT 1
 `
 
 type GetFrontdoorBuildingUnifiedDetailRow struct {
-	FrontdoorBuildingID                       pgtype.UUID     `db:"frontdoor_building_id" json:"frontdoor_building_id"`
-	FrontdoorBuildingUrl                      *string         `db:"frontdoor_building_url" json:"frontdoor_building_url"`
-	FrontdoorBuildingLastSeenAt               time.Time       `db:"frontdoor_building_last_seen_at" json:"frontdoor_building_last_seen_at"`
-	FrontdoorBuildingCompanyName              *string         `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
-	FrontdoorBuildingBusinessID               *string         `db:"frontdoor_building_business_id" json:"frontdoor_building_business_id"`
-	FrontdoorBuildingApartmentCount           *int32          `db:"frontdoor_building_apartment_count" json:"frontdoor_building_apartment_count"`
-	FrontdoorBuildingFloorCount               *int32          `db:"frontdoor_building_floor_count" json:"frontdoor_building_floor_count"`
-	FrontdoorBuildingBuildYear                *int32          `db:"frontdoor_building_build_year" json:"frontdoor_building_build_year"`
-	FrontdoorBuildingHasElevator              *bool           `db:"frontdoor_building_has_elevator" json:"frontdoor_building_has_elevator"`
-	FrontdoorBuildingHasSauna                 *bool           `db:"frontdoor_building_has_sauna" json:"frontdoor_building_has_sauna"`
-	FrontdoorBuildingEnergyCertificateCode    *string         `db:"frontdoor_building_energy_certificate_code" json:"frontdoor_building_energy_certificate_code"`
-	FrontdoorBuildingHeating                  *string         `db:"frontdoor_building_heating" json:"frontdoor_building_heating"`
-	FrontdoorBuildingStreetAddress            *string         `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
-	FrontdoorBuildingHouseNumber              *string         `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
-	FrontdoorBuildingPostcode                 *string         `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
-	FrontdoorBuildingPostArea                 *string         `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
-	FrontdoorBuildingMunicipality             *string         `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
-	FrontdoorBuildingLatitude                 *float64        `db:"frontdoor_building_latitude" json:"frontdoor_building_latitude"`
-	FrontdoorBuildingLongitude                *float64        `db:"frontdoor_building_longitude" json:"frontdoor_building_longitude"`
-	FrontdoorBuildingHousingCompanyID         *int64          `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
-	FrontdoorBuildingHousingCompanyFriendlyID *string         `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
-	AnnouncementCount                         int64           `db:"announcement_count" json:"announcement_count"`
-	FrontdoorBuildingData                     json.RawMessage `db:"frontdoor_building_data" json:"frontdoor_building_data"`
+	FrontdoorBuildingID                       uuid.UUID       `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string         `json:"frontdoor_building_url"`
+	FrontdoorBuildingLastSeenAt               time.Time       `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingCompanyName              *string         `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string         `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32          `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32          `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingBuildYear                *int32          `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool           `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool           `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string         `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingHeating                  *string         `json:"frontdoor_building_heating"`
+	FrontdoorBuildingStreetAddress            *string         `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string         `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string         `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string         `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string         `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingLatitude                 *float64        `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64        `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingHousingCompanyID         *int64          `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string         `json:"frontdoor_building_housing_company_friendly_id"`
+	AnnouncementCount                         int64           `json:"announcement_count"`
+	FrontdoorBuildingData                     json.RawMessage `json:"frontdoor_building_data"`
 }
 
-func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildingID pgtype.UUID) (GetFrontdoorBuildingUnifiedDetailRow, error) {
+func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildingID uuid.UUID) (GetFrontdoorBuildingUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getFrontdoorBuildingUnifiedDetail, buildingID)
 	var i GetFrontdoorBuildingUnifiedDetailRow
 	err := row.Scan(
@@ -707,10 +707,10 @@ WHERE queue_name = $1
 `
 
 type GetQueueInfoRow struct {
-	QueueName     string    `db:"queue_name" json:"queue_name"`
-	IsPartitioned bool      `db:"is_partitioned" json:"is_partitioned"`
-	IsUnlogged    bool      `db:"is_unlogged" json:"is_unlogged"`
-	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+	QueueName     string    `json:"queue_name"`
+	IsPartitioned bool      `json:"is_partitioned"`
+	IsUnlogged    bool      `json:"is_unlogged"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 func (q *Queries) GetQueueInfo(ctx context.Context, queueName *string) (GetQueueInfoRow, error) {
@@ -738,12 +738,12 @@ FROM pgmq.metrics($1)
 `
 
 type GetQueueMetricsRow struct {
-	QueueName       string    `db:"queue_name" json:"queue_name"`
-	QueueLength     int64     `db:"queue_length" json:"queue_length"`
-	NewestMsgAgeSec int32     `db:"newest_msg_age_sec" json:"newest_msg_age_sec"`
-	OldestMsgAgeSec int32     `db:"oldest_msg_age_sec" json:"oldest_msg_age_sec"`
-	TotalMessages   int64     `db:"total_messages" json:"total_messages"`
-	ScrapeTime      time.Time `db:"scrape_time" json:"scrape_time"`
+	QueueName       string    `json:"queue_name"`
+	QueueLength     int64     `json:"queue_length"`
+	NewestMsgAgeSec int32     `json:"newest_msg_age_sec"`
+	OldestMsgAgeSec int32     `json:"oldest_msg_age_sec"`
+	TotalMessages   int64     `json:"total_messages"`
+	ScrapeTime      time.Time `json:"scrape_time"`
 }
 
 // ============================================
@@ -790,24 +790,24 @@ LIMIT 1
 `
 
 type GetShortcutAdUnifiedDetailRow struct {
-	ShortcutAdID                   int64           `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	ShortcutAdUrl                  string          `db:"shortcut_ad_url" json:"shortcut_ad_url"`
-	ShortcutAdType                 string          `db:"shortcut_ad_type" json:"shortcut_ad_type"`
-	ShortcutAdLastSeenAt           time.Time       `db:"shortcut_ad_last_seen_at" json:"shortcut_ad_last_seen_at"`
-	ShortcutBuildingID             pgtype.UUID     `db:"shortcut_building_id" json:"shortcut_building_id"`
-	AdAddress                      *string         `db:"ad_address" json:"ad_address"`
-	AdCity                         *string         `db:"ad_city" json:"ad_city"`
-	AdPostal                       *string         `db:"ad_postal" json:"ad_postal"`
-	AdRoomLayout                   *string         `db:"ad_room_layout" json:"ad_room_layout"`
-	AdPrice                        *int64          `db:"ad_price" json:"ad_price"`
-	AdArea                         *float64        `db:"ad_area" json:"ad_area"`
-	ShortcutAdData                 json.RawMessage `db:"shortcut_ad_data" json:"shortcut_ad_data"`
-	ShortcutBuildingExternalID     *int64          `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
-	ShortcutBuildingUrl            *string         `db:"shortcut_building_url" json:"shortcut_building_url"`
-	ShortcutBuildingAddress        *string         `db:"shortcut_building_address" json:"shortcut_building_address"`
-	ShortcutBuildingHousingCompany *string         `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
-	BuildingListingCount           int64           `db:"building_listing_count" json:"building_listing_count"`
-	BuildingRentalCount            int64           `db:"building_rental_count" json:"building_rental_count"`
+	ShortcutAdID                   int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl                  string          `json:"shortcut_ad_url"`
+	ShortcutAdType                 string          `json:"shortcut_ad_type"`
+	ShortcutAdLastSeenAt           time.Time       `json:"shortcut_ad_last_seen_at"`
+	ShortcutBuildingID             *uuid.UUID      `json:"shortcut_building_id"`
+	AdAddress                      *string         `json:"ad_address"`
+	AdCity                         *string         `json:"ad_city"`
+	AdPostal                       *string         `json:"ad_postal"`
+	AdRoomLayout                   *string         `json:"ad_room_layout"`
+	AdPrice                        *int64          `json:"ad_price"`
+	AdArea                         *float64        `json:"ad_area"`
+	ShortcutAdData                 json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutBuildingExternalID     *int64          `json:"shortcut_building_external_id"`
+	ShortcutBuildingUrl            *string         `json:"shortcut_building_url"`
+	ShortcutBuildingAddress        *string         `json:"shortcut_building_address"`
+	ShortcutBuildingHousingCompany *string         `json:"shortcut_building_housing_company"`
+	BuildingListingCount           int64           `json:"building_listing_count"`
+	BuildingRentalCount            int64           `json:"building_rental_count"`
 }
 
 func (q *Queries) GetShortcutAdUnifiedDetail(ctx context.Context, adID int64) (GetShortcutAdUnifiedDetailRow, error) {
@@ -892,35 +892,35 @@ LIMIT 1
 `
 
 type GetShortcutBuildingUnifiedDetailRow struct {
-	ShortcutBuildingID               pgtype.UUID     `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingExternalID       int64           `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
-	ShortcutBuildingUrl              string          `db:"shortcut_building_url" json:"shortcut_building_url"`
-	ShortcutBuildingAddress          *string         `db:"shortcut_building_address" json:"shortcut_building_address"`
-	ShortcutBuildingHousingCompany   *string         `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
-	ShortcutBuildingBuildingType     *string         `db:"shortcut_building_building_type" json:"shortcut_building_building_type"`
-	ShortcutBuildingBuildingSubtype  *string         `db:"shortcut_building_building_subtype" json:"shortcut_building_building_subtype"`
-	ShortcutBuildingConstructionYear *int32          `db:"shortcut_building_construction_year" json:"shortcut_building_construction_year"`
-	ShortcutBuildingFloorCount       *int32          `db:"shortcut_building_floor_count" json:"shortcut_building_floor_count"`
-	ShortcutBuildingApartmentCount   *int32          `db:"shortcut_building_apartment_count" json:"shortcut_building_apartment_count"`
-	ShortcutBuildingHeatingSystem    *string         `db:"shortcut_building_heating_system" json:"shortcut_building_heating_system"`
-	ShortcutBuildingBuildingMaterial *string         `db:"shortcut_building_building_material" json:"shortcut_building_building_material"`
-	ShortcutBuildingPlotType         *string         `db:"shortcut_building_plot_type" json:"shortcut_building_plot_type"`
-	ShortcutBuildingWallStructure    *string         `db:"shortcut_building_wall_structure" json:"shortcut_building_wall_structure"`
-	ShortcutBuildingHeatSource       *string         `db:"shortcut_building_heat_source" json:"shortcut_building_heat_source"`
-	ShortcutBuildingHasElevator      *string         `db:"shortcut_building_has_elevator" json:"shortcut_building_has_elevator"`
-	ShortcutBuildingHasSauna         *string         `db:"shortcut_building_has_sauna" json:"shortcut_building_has_sauna"`
-	ShortcutBuildingLatitude         *float64        `db:"shortcut_building_latitude" json:"shortcut_building_latitude"`
-	ShortcutBuildingLongitude        *float64        `db:"shortcut_building_longitude" json:"shortcut_building_longitude"`
-	ShortcutBuildingUpdatedAt        time.Time       `db:"shortcut_building_updated_at" json:"shortcut_building_updated_at"`
-	ShortcutBuildingProcessedAt      *time.Time      `db:"shortcut_building_processed_at" json:"shortcut_building_processed_at"`
-	ShortcutBuildingPageNotFound     *bool           `db:"shortcut_building_page_not_found" json:"shortcut_building_page_not_found"`
-	AdCount                          int64           `db:"ad_count" json:"ad_count"`
-	ListingCount                     int64           `db:"listing_count" json:"listing_count"`
-	RentalCount                      int64           `db:"rental_count" json:"rental_count"`
-	RawJson                          json.RawMessage `db:"raw_json" json:"raw_json"`
+	ShortcutBuildingID               uuid.UUID       `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID       int64           `json:"shortcut_building_external_id"`
+	ShortcutBuildingUrl              string          `json:"shortcut_building_url"`
+	ShortcutBuildingAddress          *string         `json:"shortcut_building_address"`
+	ShortcutBuildingHousingCompany   *string         `json:"shortcut_building_housing_company"`
+	ShortcutBuildingBuildingType     *string         `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype  *string         `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear *int32          `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount       *int32          `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount   *int32          `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem    *string         `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial *string         `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType         *string         `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure    *string         `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource       *string         `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator      *string         `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna         *string         `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude         *float64        `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude        *float64        `json:"shortcut_building_longitude"`
+	ShortcutBuildingUpdatedAt        time.Time       `json:"shortcut_building_updated_at"`
+	ShortcutBuildingProcessedAt      *time.Time      `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound     *bool           `json:"shortcut_building_page_not_found"`
+	AdCount                          int64           `json:"ad_count"`
+	ListingCount                     int64           `json:"listing_count"`
+	RentalCount                      int64           `json:"rental_count"`
+	RawJson                          json.RawMessage `json:"raw_json"`
 }
 
-func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, buildingID pgtype.UUID) (GetShortcutBuildingUnifiedDetailRow, error) {
+func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, buildingID uuid.UUID) (GetShortcutBuildingUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getShortcutBuildingUnifiedDetail, buildingID)
 	var i GetShortcutBuildingUnifiedDetailRow
 	err := row.Scan(
@@ -977,19 +977,19 @@ ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code
 `
 
 type ListMunicipalitiesWithPostalCodesRow struct {
-	PostalMunicipalityID           pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityCode         string      `db:"postal_municipality_code" json:"postal_municipality_code"`
-	PostalMunicipalityNameFi       string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
-	PostalMunicipalityNameSv       *string     `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
-	PostalMunicipalityCreatedAt    time.Time   `db:"postal_municipality_created_at" json:"postal_municipality_created_at"`
-	PostalMunicipalityUpdatedAt    time.Time   `db:"postal_municipality_updated_at" json:"postal_municipality_updated_at"`
-	PostalPostalCodeID             pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeCode           string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi         string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv         *string     `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
-	PostalPostalCodeNeighborhoodFi *string     `db:"postal_postal_code_neighborhood_fi" json:"postal_postal_code_neighborhood_fi"`
-	PostalPostalCodeCreatedAt      time.Time   `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
-	PostalPostalCodeUpdatedAt      time.Time   `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
+	PostalMunicipalityID           uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityCode         string    `json:"postal_municipality_code"`
+	PostalMunicipalityNameFi       string    `json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv       *string   `json:"postal_municipality_name_sv"`
+	PostalMunicipalityCreatedAt    time.Time `json:"postal_municipality_created_at"`
+	PostalMunicipalityUpdatedAt    time.Time `json:"postal_municipality_updated_at"`
+	PostalPostalCodeID             uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode           string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi         string    `json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv         *string   `json:"postal_postal_code_name_sv"`
+	PostalPostalCodeNeighborhoodFi *string   `json:"postal_postal_code_neighborhood_fi"`
+	PostalPostalCodeCreatedAt      time.Time `json:"postal_postal_code_created_at"`
+	PostalPostalCodeUpdatedAt      time.Time `json:"postal_postal_code_updated_at"`
 }
 
 func (q *Queries) ListMunicipalitiesWithPostalCodes(ctx context.Context) ([]ListMunicipalitiesWithPostalCodesRow, error) {
@@ -1043,10 +1043,10 @@ ORDER BY pm.postal_municipality_name_fi
 `
 
 type ListMunicipalitiesWithPriceDataRow struct {
-	PostalMunicipalityID     pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityCode   string      `db:"postal_municipality_code" json:"postal_municipality_code"`
-	PostalMunicipalityNameFi string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
-	PostalMunicipalityNameSv *string     `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
+	PostalMunicipalityID     uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityCode   string    `json:"postal_municipality_code"`
+	PostalMunicipalityNameFi string    `json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv *string   `json:"postal_municipality_name_sv"`
 }
 
 func (q *Queries) ListMunicipalitiesWithPriceData(ctx context.Context) ([]ListMunicipalitiesWithPriceDataRow, error) {
@@ -1090,13 +1090,13 @@ ORDER BY ppc.postal_postal_code_code
 `
 
 type ListPostalCodesWithPriceDataForMunicipalityRow struct {
-	PostalPostalCodeID     pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeCode   string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv *string     `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
+	PostalPostalCodeID     uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode   string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi string    `json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv *string   `json:"postal_postal_code_name_sv"`
 }
 
-func (q *Queries) ListPostalCodesWithPriceDataForMunicipality(ctx context.Context, municipalityID pgtype.UUID) ([]ListPostalCodesWithPriceDataForMunicipalityRow, error) {
+func (q *Queries) ListPostalCodesWithPriceDataForMunicipality(ctx context.Context, municipalityID *uuid.UUID) ([]ListPostalCodesWithPriceDataForMunicipalityRow, error) {
 	rows, err := q.db.Query(ctx, listPostalCodesWithPriceDataForMunicipality, municipalityID)
 	if err != nil {
 		return nil, err
@@ -1132,10 +1132,10 @@ FROM pgmq.list_queues()
 `
 
 type ListQueuesRow struct {
-	QueueName     string    `db:"queue_name" json:"queue_name"`
-	IsPartitioned bool      `db:"is_partitioned" json:"is_partitioned"`
-	IsUnlogged    bool      `db:"is_unlogged" json:"is_unlogged"`
-	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+	QueueName     string    `json:"queue_name"`
+	IsPartitioned bool      `json:"is_partitioned"`
+	IsUnlogged    bool      `json:"is_unlogged"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // ============================================
@@ -1178,12 +1178,12 @@ FROM pgmq.pop($1)
 `
 
 type PopRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64           `json:"msg_id"`
+	ReadCt     int32           `json:"read_ct"`
+	EnqueuedAt time.Time       `json:"enqueued_at"`
+	Vt         time.Time       `json:"vt"`
+	Message    json.RawMessage `json:"message"`
+	Headers    json.RawMessage `json:"headers"`
 }
 
 func (q *Queries) Pop(ctx context.Context, queueName string) ([]PopRow, error) {
@@ -1240,21 +1240,21 @@ FROM pgmq.read(
 `
 
 type ReadParams struct {
-	QueueName   string `db:"queue_name" json:"queue_name"`
-	VtSeconds   int32  `db:"vt_seconds" json:"vt_seconds"`
-	NumMessages int32  `db:"num_messages" json:"num_messages"`
+	QueueName   string `json:"queue_name"`
+	VtSeconds   int32  `json:"vt_seconds"`
+	NumMessages int32  `json:"num_messages"`
 }
 
 type ReadRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64           `json:"msg_id"`
+	ReadCt     int32           `json:"read_ct"`
+	EnqueuedAt time.Time       `json:"enqueued_at"`
+	Vt         time.Time       `json:"vt"`
+	Message    json.RawMessage `json:"message"`
+	Headers    json.RawMessage `json:"headers"`
 }
 
-func (q *Queries) Read(ctx context.Context, arg *ReadParams) ([]ReadRow, error) {
+func (q *Queries) Read(ctx context.Context, arg ReadParams) ([]ReadRow, error) {
 	rows, err := q.db.Query(ctx, read, arg.QueueName, arg.VtSeconds, arg.NumMessages)
 	if err != nil {
 		return nil, err
@@ -1425,40 +1425,40 @@ OFFSET $2::int
 `
 
 type SearchUnifiedEntitiesParams struct {
-	SortMode          *string    `db:"sort_mode" json:"sort_mode"`
-	OffsetCount       int32      `db:"offset_count" json:"offset_count"`
-	LimitCount        int32      `db:"limit_count" json:"limit_count"`
-	SourceFilter      *string    `db:"source_filter" json:"source_filter"`
-	KindFilter        *string    `db:"kind_filter" json:"kind_filter"`
-	QueryText         *string    `db:"query_text" json:"query_text"`
-	CityFilter        *string    `db:"city_filter" json:"city_filter"`
-	PostalFilter      *string    `db:"postal_filter" json:"postal_filter"`
-	MinPrice          *int64     `db:"min_price" json:"min_price"`
-	MaxPrice          *int64     `db:"max_price" json:"max_price"`
-	MinArea           *float64   `db:"min_area" json:"min_area"`
-	MaxArea           *float64   `db:"max_area" json:"max_area"`
-	ListingTypeFilter *string    `db:"listing_type_filter" json:"listing_type_filter"`
-	PublishedAfter    *time.Time `db:"published_after" json:"published_after"`
-	PublishedBefore   *time.Time `db:"published_before" json:"published_before"`
+	SortMode          *string    `json:"sort_mode"`
+	OffsetCount       int32      `json:"offset_count"`
+	LimitCount        int32      `json:"limit_count"`
+	SourceFilter      *string    `json:"source_filter"`
+	KindFilter        *string    `json:"kind_filter"`
+	QueryText         *string    `json:"query_text"`
+	CityFilter        *string    `json:"city_filter"`
+	PostalFilter      *string    `json:"postal_filter"`
+	MinPrice          *int64     `json:"min_price"`
+	MaxPrice          *int64     `json:"max_price"`
+	MinArea           *float64   `json:"min_area"`
+	MaxArea           *float64   `json:"max_area"`
+	ListingTypeFilter *string    `json:"listing_type_filter"`
+	PublishedAfter    *time.Time `json:"published_after"`
+	PublishedBefore   *time.Time `json:"published_before"`
 }
 
 type SearchUnifiedEntitiesRow struct {
-	Source      string    `db:"source" json:"source"`
-	Kind        string    `db:"kind" json:"kind"`
-	NativeID    string    `db:"native_id" json:"native_id"`
-	CanonicalID *string   `db:"canonical_id" json:"canonical_id"`
-	Headline    *string   `db:"headline" json:"headline"`
-	Address     *string   `db:"address" json:"address"`
-	City        *string   `db:"city" json:"city"`
-	Postal      *string   `db:"postal" json:"postal"`
-	Price       *int64    `db:"price" json:"price"`
-	Area        *float64  `db:"area" json:"area"`
-	RoomLayout  *string   `db:"room_layout" json:"room_layout"`
-	Url         string    `db:"url" json:"url"`
-	LastSeenAt  time.Time `db:"last_seen_at" json:"last_seen_at"`
+	Source      string    `json:"source"`
+	Kind        string    `json:"kind"`
+	NativeID    string    `json:"native_id"`
+	CanonicalID *string   `json:"canonical_id"`
+	Headline    *string   `json:"headline"`
+	Address     *string   `json:"address"`
+	City        *string   `json:"city"`
+	Postal      *string   `json:"postal"`
+	Price       *int64    `json:"price"`
+	Area        *float64  `json:"area"`
+	RoomLayout  *string   `json:"room_layout"`
+	Url         string    `json:"url"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
 }
 
-func (q *Queries) SearchUnifiedEntities(ctx context.Context, arg *SearchUnifiedEntitiesParams) ([]SearchUnifiedEntitiesRow, error) {
+func (q *Queries) SearchUnifiedEntities(ctx context.Context, arg SearchUnifiedEntitiesParams) ([]SearchUnifiedEntitiesRow, error) {
 	rows, err := q.db.Query(ctx, searchUnifiedEntities,
 		arg.SortMode,
 		arg.OffsetCount,
@@ -1518,15 +1518,15 @@ SELECT pgmq.send(
 `
 
 type SendParams struct {
-	QueueName    string          `db:"queue_name" json:"queue_name"`
-	Message      json.RawMessage `db:"message" json:"message"`
-	DelaySeconds int32           `db:"delay_seconds" json:"delay_seconds"`
+	QueueName    string          `json:"queue_name"`
+	Message      json.RawMessage `json:"message"`
+	DelaySeconds int32           `json:"delay_seconds"`
 }
 
 // ============================================
 // PGMQ MESSAGE OPERATIONS
 // ============================================
-func (q *Queries) Send(ctx context.Context, arg *SendParams) (int64, error) {
+func (q *Queries) Send(ctx context.Context, arg SendParams) (int64, error) {
 	row := q.db.QueryRow(ctx, send, arg.QueueName, arg.Message, arg.DelaySeconds)
 	var msg_id int64
 	err := row.Scan(&msg_id)
@@ -1543,12 +1543,12 @@ FROM pgmq.send_batch(
 `
 
 type SendBatchParams struct {
-	QueueName    string            `db:"queue_name" json:"queue_name"`
-	Messages     []json.RawMessage `db:"messages" json:"messages"`
-	DelaySeconds int32             `db:"delay_seconds" json:"delay_seconds"`
+	QueueName    string            `json:"queue_name"`
+	Messages     []json.RawMessage `json:"messages"`
+	DelaySeconds int32             `json:"delay_seconds"`
 }
 
-func (q *Queries) SendBatch(ctx context.Context, arg *SendBatchParams) ([]int64, error) {
+func (q *Queries) SendBatch(ctx context.Context, arg SendBatchParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, sendBatch, arg.QueueName, arg.Messages, arg.DelaySeconds)
 	if err != nil {
 		return nil, err
@@ -1584,21 +1584,21 @@ FROM pgmq.set_vt(
 `
 
 type SetVTParams struct {
-	QueueName string `db:"queue_name" json:"queue_name"`
-	MsgID     int64  `db:"msg_id" json:"msg_id"`
-	VtSeconds int32  `db:"vt_seconds" json:"vt_seconds"`
+	QueueName string `json:"queue_name"`
+	MsgID     int64  `json:"msg_id"`
+	VtSeconds int32  `json:"vt_seconds"`
 }
 
 type SetVTRow struct {
-	MsgID      int64           `db:"msg_id" json:"msg_id"`
-	ReadCt     int32           `db:"read_ct" json:"read_ct"`
-	EnqueuedAt time.Time       `db:"enqueued_at" json:"enqueued_at"`
-	Vt         time.Time       `db:"vt" json:"vt"`
-	Message    json.RawMessage `db:"message" json:"message"`
-	Headers    json.RawMessage `db:"headers" json:"headers"`
+	MsgID      int64           `json:"msg_id"`
+	ReadCt     int32           `json:"read_ct"`
+	EnqueuedAt time.Time       `json:"enqueued_at"`
+	Vt         time.Time       `json:"vt"`
+	Message    json.RawMessage `json:"message"`
+	Headers    json.RawMessage `json:"headers"`
 }
 
-func (q *Queries) SetVT(ctx context.Context, arg *SetVTParams) ([]SetVTRow, error) {
+func (q *Queries) SetVT(ctx context.Context, arg SetVTParams) ([]SetVTRow, error) {
 	rows, err := q.db.Query(ctx, setVT, arg.QueueName, arg.MsgID, arg.VtSeconds)
 	if err != nil {
 		return nil, err
@@ -1652,13 +1652,13 @@ RETURNING postal_ad_area_id, postal_ad_area_code, postal_ad_area_name_fi, postal
 `
 
 type UpsertPostalAdAreasBulkParams struct {
-	Codes   []string `db:"codes" json:"codes"`
-	NamesFi []string `db:"names_fi" json:"names_fi"`
-	NamesSv []string `db:"names_sv" json:"names_sv"`
+	Codes   []string `json:"codes"`
+	NamesFi []string `json:"names_fi"`
+	NamesSv []string `json:"names_sv"`
 }
 
 // Ad Areas
-func (q *Queries) UpsertPostalAdAreasBulk(ctx context.Context, arg *UpsertPostalAdAreasBulkParams) ([]PostalAdArea, error) {
+func (q *Queries) UpsertPostalAdAreasBulk(ctx context.Context, arg UpsertPostalAdAreasBulkParams) ([]PostalAdArea, error) {
 	rows, err := q.db.Query(ctx, upsertPostalAdAreasBulk, arg.Codes, arg.NamesFi, arg.NamesSv)
 	if err != nil {
 		return nil, err
@@ -1716,14 +1716,14 @@ RETURNING postal_municipality_id, postal_municipality_code, postal_municipality_
 `
 
 type UpsertPostalMunicipalitiesBulkParams struct {
-	Codes              []string `db:"codes" json:"codes"`
-	NamesFi            []string `db:"names_fi" json:"names_fi"`
-	NamesSv            []string `db:"names_sv" json:"names_sv"`
-	LanguageRatioCodes []string `db:"language_ratio_codes" json:"language_ratio_codes"`
+	Codes              []string `json:"codes"`
+	NamesFi            []string `json:"names_fi"`
+	NamesSv            []string `json:"names_sv"`
+	LanguageRatioCodes []string `json:"language_ratio_codes"`
 }
 
 // Municipalities
-func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg *UpsertPostalMunicipalitiesBulkParams) ([]PostalMunicipality, error) {
+func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg UpsertPostalMunicipalitiesBulkParams) ([]PostalMunicipality, error) {
 	rows, err := q.db.Query(ctx, upsertPostalMunicipalitiesBulk,
 		arg.Codes,
 		arg.NamesFi,
@@ -1826,21 +1826,21 @@ SET postal_postal_code_date = EXCLUDED.postal_postal_code_date,
 `
 
 type UpsertPostalPostalCodesBulkParams struct {
-	Dates           []time.Time   `db:"dates" json:"dates"`
-	Codes           []string      `db:"codes" json:"codes"`
-	NamesFi         []string      `db:"names_fi" json:"names_fi"`
-	NamesSv         []string      `db:"names_sv" json:"names_sv"`
-	AbbrsFi         []string      `db:"abbrs_fi" json:"abbrs_fi"`
-	AbbrsSv         []string      `db:"abbrs_sv" json:"abbrs_sv"`
-	NeighborhoodsFi []string      `db:"neighborhoods_fi" json:"neighborhoods_fi"`
-	ValidsFrom      []time.Time   `db:"valids_from" json:"valids_from"`
-	TypeCodes       []string      `db:"type_codes" json:"type_codes"`
-	AdAreaIds       []pgtype.UUID `db:"ad_area_ids" json:"ad_area_ids"`
-	MunicipalityIds []pgtype.UUID `db:"municipality_ids" json:"municipality_ids"`
+	Dates           []time.Time `json:"dates"`
+	Codes           []string    `json:"codes"`
+	NamesFi         []string    `json:"names_fi"`
+	NamesSv         []string    `json:"names_sv"`
+	AbbrsFi         []string    `json:"abbrs_fi"`
+	AbbrsSv         []string    `json:"abbrs_sv"`
+	NeighborhoodsFi []string    `json:"neighborhoods_fi"`
+	ValidsFrom      []time.Time `json:"valids_from"`
+	TypeCodes       []string    `json:"type_codes"`
+	AdAreaIds       []uuid.UUID `json:"ad_area_ids"`
+	MunicipalityIds []uuid.UUID `json:"municipality_ids"`
 }
 
 // Postal Codes
-func (q *Queries) UpsertPostalPostalCodesBulk(ctx context.Context, arg *UpsertPostalPostalCodesBulkParams) (int64, error) {
+func (q *Queries) UpsertPostalPostalCodesBulk(ctx context.Context, arg UpsertPostalPostalCodesBulkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertPostalPostalCodesBulk,
 		arg.Dates,
 		arg.Codes,

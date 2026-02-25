@@ -7,17 +7,17 @@ import (
 	"koditon-go/internal/frontdoor/client"
 	"koditon-go/internal/util"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
-func mapBatchUpsertAdsFromSitemapParams(entries []client.SitemapEntry) *db.BatchUpsertFrontdoorAdsFromSitemapParams {
+func mapBatchUpsertAdsFromSitemapParams(entries []client.SitemapEntry) db.BatchUpsertFrontdoorAdsFromSitemapParams {
 	externalIDs := make([]string, len(entries))
 	urls := make([]string, len(entries))
 	for i, entry := range entries {
 		externalIDs[i] = entry.ID
 		urls[i] = entry.URL.String()
 	}
-	return &db.BatchUpsertFrontdoorAdsFromSitemapParams{
+	return db.BatchUpsertFrontdoorAdsFromSitemapParams{
 		Column1: externalIDs,
 		Column2: urls,
 	}
@@ -31,8 +31,8 @@ func mapBatchUpsertBuildingsFromSitemapParams(entries []client.SitemapEntry) []s
 	return urls
 }
 
-func mapAdParams(friendlyID string, ad *client.AdResponse) *db.UpdateFrontdoorAdDataParams {
-	params := &db.UpdateFrontdoorAdDataParams{
+func mapAdParams(friendlyID string, ad *client.AdResponse) db.UpdateFrontdoorAdDataParams {
+	params := db.UpdateFrontdoorAdDataParams{
 		FrontdoorAdExternalID: friendlyID,
 	}
 	if jsonData, err := json.Marshal(ad); err == nil {
@@ -41,8 +41,8 @@ func mapAdParams(friendlyID string, ad *client.AdResponse) *db.UpdateFrontdoorAd
 	return params
 }
 
-func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyResponse) *db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {
-	p := &db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams{
+func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyResponse) db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {
+	p := db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams{
 		FrontdoorBuildingHousingCompanyID: util.Int64Ptr(housingCompanyID),
 	}
 	if page := data.HousingCompanyPage; page != nil && page.Response != nil {
@@ -70,8 +70,8 @@ func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyRespon
 					p.FrontdoorBuildingDistrict = hc.District.DefaultName
 				}
 				if gc := hc.GeoCode; gc != nil {
-					p.FrontdoorBuildingLatitude = util.ToFloat8(gc.Latitude)
-					p.FrontdoorBuildingLongitude = util.ToFloat8(gc.Longitude)
+					p.FrontdoorBuildingLatitude = gc.Latitude
+					p.FrontdoorBuildingLongitude = gc.Longitude
 				}
 			}
 		}
@@ -89,27 +89,27 @@ func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyRespon
 			if p.FrontdoorBuildingFloorCount == nil {
 				p.FrontdoorBuildingFloorCount = util.FloatToInt32Ptr(info.FloorCount)
 			}
-			p.FrontdoorBuildingHasElevator = util.ToBoolean(info.HasElevator)
-			p.FrontdoorBuildingHasSauna = util.ToBoolean(info.HasSauna)
+			p.FrontdoorBuildingHasElevator = info.HasElevator
+			p.FrontdoorBuildingHasSauna = info.HasSauna
 			p.FrontdoorBuildingEnergyCertificateCode = info.EnergyCertificateCode
 			p.FrontdoorBuildingPlotHoldingType = info.PlotHoldingType
 			p.FrontdoorBuildingOuterRoofMaterial = info.OuterRoofMaterial
 			p.FrontdoorBuildingOuterRoofType = info.OuterRoofType
 			p.FrontdoorBuildingCarStorageDescription = info.CarStorageDescription
 			if r := info.ClassifiedPastRenovationsDetected; r != nil {
-				p.FrontdoorBuildingElevatorRenovated = util.ToBoolean(r.ElevatorRenovated)
+				p.FrontdoorBuildingElevatorRenovated = r.ElevatorRenovated
 				p.FrontdoorBuildingElevatorRenovatedYear = util.Int32Ptr(r.ElevatorRenovatedYear)
-				p.FrontdoorBuildingFacadeRenovated = util.ToBoolean(r.FacadeRenovated)
+				p.FrontdoorBuildingFacadeRenovated = r.FacadeRenovated
 				p.FrontdoorBuildingFacadeRenovatedYear = util.Int32Ptr(r.FacadeRenovatedYear)
-				p.FrontdoorBuildingWindowRenovated = util.ToBoolean(r.WindowRenovated)
+				p.FrontdoorBuildingWindowRenovated = r.WindowRenovated
 				p.FrontdoorBuildingWindowRenovatedYear = util.Int32Ptr(r.WindowRenovatedYear)
-				p.FrontdoorBuildingRoofRenovated = util.ToBoolean(r.RoofRenovated)
+				p.FrontdoorBuildingRoofRenovated = r.RoofRenovated
 				p.FrontdoorBuildingRoofRenovatedYear = util.Int32Ptr(r.RoofRenovatedYear)
-				p.FrontdoorBuildingPipeRenovated = util.ToBoolean(r.PipeRenovated)
+				p.FrontdoorBuildingPipeRenovated = r.PipeRenovated
 				p.FrontdoorBuildingPipeRenovatedYear = util.Int32Ptr(r.PipeRenovatedYear)
-				p.FrontdoorBuildingBalconyRenovated = util.ToBoolean(r.BalconyRenovated)
+				p.FrontdoorBuildingBalconyRenovated = r.BalconyRenovated
 				p.FrontdoorBuildingBalconyRenovatedYear = util.Int32Ptr(r.BalconyRenovatedYear)
-				p.FrontdoorBuildingElectricityRenovated = util.ToBoolean(r.ElectricityRenovated)
+				p.FrontdoorBuildingElectricityRenovated = r.ElectricityRenovated
 				p.FrontdoorBuildingElectricityRenovatedYear = util.Int32Ptr(r.ElectricityRenovatedYear)
 			}
 		}
@@ -123,11 +123,11 @@ func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyRespon
 			if p.FrontdoorBuildingDistrict == nil {
 				p.FrontdoorBuildingDistrict = addr.District
 			}
-			if !p.FrontdoorBuildingLatitude.Valid { //nolint:govet
-				p.FrontdoorBuildingLatitude = util.ToFloat8(addr.Latitude)
+			if p.FrontdoorBuildingLatitude == nil {
+				p.FrontdoorBuildingLatitude = addr.Latitude
 			}
-			if !p.FrontdoorBuildingLongitude.Valid {
-				p.FrontdoorBuildingLongitude = util.ToFloat8(addr.Longitude)
+			if p.FrontdoorBuildingLongitude == nil {
+				p.FrontdoorBuildingLongitude = addr.Longitude
 			}
 		}
 		if bp := resp.BuildingsGroupedByPurpose; bp != nil && len(bp.ResidentialOrBusinessPremises) > 0 {
@@ -145,31 +145,31 @@ func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyRespon
 	return p
 }
 
-func mapAnnouncementParams(ann client.Announcement, buildingID pgtype.UUID) *db.UpsertFrontdoorBuildingAnnouncementParams {
-	return &db.UpsertFrontdoorBuildingAnnouncementParams{
+func mapAnnouncementParams(ann client.Announcement, buildingID uuid.UUID) db.UpsertFrontdoorBuildingAnnouncementParams {
+	return db.UpsertFrontdoorBuildingAnnouncementParams{
 		FrontdoorBuildingAnnouncementExternalID:               util.Int32Ptr(ann.ID),
 		FrontdoorBuildingAnnouncementFriendlyID:               ann.FriendlyID,
-		FrontdoorBuildingAnnouncementUnpublishingTime:         util.ToFloat8(ann.UnpublishingTime),
+		FrontdoorBuildingAnnouncementUnpublishingTime:         ann.UnpublishingTime,
 		FrontdoorBuildingAnnouncementAddressLine1:             ann.AddressLine1,
 		FrontdoorBuildingAnnouncementAddressLine2:             ann.AddressLine2,
 		FrontdoorBuildingAnnouncementLocation:                 ann.Location,
-		FrontdoorBuildingAnnouncementSearchPrice:              util.ToFloat8(ann.SearchPrice),
-		FrontdoorBuildingAnnouncementNotifyPriceChanged:       util.ToBoolean(ann.NotifyPriceChanged),
+		FrontdoorBuildingAnnouncementSearchPrice:              ann.SearchPrice,
+		FrontdoorBuildingAnnouncementNotifyPriceChanged:       ann.NotifyPriceChanged,
 		FrontdoorBuildingAnnouncementPropertyType:             ann.PropertyType,
 		FrontdoorBuildingAnnouncementPropertySubtype:          ann.PropertySubtype,
 		FrontdoorBuildingAnnouncementConstructionFinishedYear: util.Int32Ptr(ann.ConstructionFinishedYear),
 		FrontdoorBuildingAnnouncementMainImageUri:             ann.MainImageURI,
-		FrontdoorBuildingAnnouncementHasOpenBidding:           util.ToBoolean(ann.HasOpenBidding),
+		FrontdoorBuildingAnnouncementHasOpenBidding:           ann.HasOpenBidding,
 		FrontdoorBuildingAnnouncementRoomStructure:            ann.RoomStructure,
-		FrontdoorBuildingAnnouncementArea:                     util.ToFloat8(ann.Area),
-		FrontdoorBuildingAnnouncementTotalArea:                util.ToFloat8(ann.TotalArea),
-		FrontdoorBuildingAnnouncementPricePerSquare:           util.ToFloat8(ann.PricePerSquare),
+		FrontdoorBuildingAnnouncementArea:                     ann.Area,
+		FrontdoorBuildingAnnouncementTotalArea:                ann.TotalArea,
+		FrontdoorBuildingAnnouncementPricePerSquare:           ann.PricePerSquare,
 		FrontdoorBuildingAnnouncementDaysOnMarket:             util.Int32Ptr(ann.DaysOnMarket),
-		FrontdoorBuildingAnnouncementNewBuilding:              util.ToBoolean(ann.NewBuilding),
-		FrontdoorBuildingAnnouncementMainImageHidden:          util.ToBoolean(ann.MainImageHidden),
-		FrontdoorBuildingAnnouncementIsCompanyAnnouncement:    util.ToBoolean(ann.IsCompanyAnnouncement),
-		FrontdoorBuildingAnnouncementShowBiddingIndicators:    util.ToBoolean(ann.ShowBiddingIndicators),
-		FrontdoorBuildingAnnouncementPublished:                util.ToBoolean(ann.Published),
+		FrontdoorBuildingAnnouncementNewBuilding:              ann.NewBuilding,
+		FrontdoorBuildingAnnouncementMainImageHidden:          ann.MainImageHidden,
+		FrontdoorBuildingAnnouncementIsCompanyAnnouncement:    ann.IsCompanyAnnouncement,
+		FrontdoorBuildingAnnouncementShowBiddingIndicators:    ann.ShowBiddingIndicators,
+		FrontdoorBuildingAnnouncementPublished:                ann.Published,
 		FrontdoorBuildingAnnouncementRentPeriod:               ann.RentPeriod,
 		FrontdoorBuildingAnnouncementRentalUniqueNo:           util.Int32Ptr(ann.RentalUniqueNo),
 		FrontdoorBuildingID:                                   buildingID,

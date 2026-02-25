@@ -60,7 +60,7 @@ func (c *Client) CreatePartitionedQueue(ctx context.Context, queueName, partitio
 	if err := ValidateQueueName(queueName); err != nil {
 		return fmt.Errorf("create partitioned queue %s: %w", queueName, err)
 	}
-	err := c.queries.CreatePartitionedQueue(ctx, &db.CreatePartitionedQueueParams{
+	err := c.queries.CreatePartitionedQueue(ctx, db.CreatePartitionedQueueParams{
 		QueueName:         queueName,
 		PartitionInterval: partitionInterval,
 		RetentionInterval: retentionInterval,
@@ -122,7 +122,7 @@ func (c *Client) SendWithDelay(ctx context.Context, queueName string, msg json.R
 	if err := ValidateQueueName(queueName); err != nil {
 		return 0, fmt.Errorf("send message to queue %s: %w", queueName, err)
 	}
-	msgID, err := c.queries.Send(ctx, &db.SendParams{
+	msgID, err := c.queries.Send(ctx, db.SendParams{
 		QueueName:    queueName,
 		Message:      msg,
 		DelaySeconds: int32(delaySecs),
@@ -141,7 +141,7 @@ func (c *Client) SendBatchWithDelay(ctx context.Context, queueName string, msgs 
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("send batch to queue %s: %w", queueName, err)
 	}
-	msgIDs, err := c.queries.SendBatch(ctx, &db.SendBatchParams{
+	msgIDs, err := c.queries.SendBatch(ctx, db.SendBatchParams{
 		QueueName:    queueName,
 		Messages:     msgs,
 		DelaySeconds: int32(delaySecs),
@@ -157,7 +157,7 @@ func (c *Client) Read(ctx context.Context, queueName string, vtSecs int64) (*Mes
 		return nil, fmt.Errorf("read from queue %s: %w", queueName, err)
 	}
 	vtSecs = withDefaultVT(vtSecs)
-	rows, err := c.queries.Read(ctx, &db.ReadParams{
+	rows, err := c.queries.Read(ctx, db.ReadParams{
 		QueueName:   queueName,
 		VtSeconds:   int32(vtSecs),
 		NumMessages: 1,
@@ -185,7 +185,7 @@ func (c *Client) ReadBatch(ctx context.Context, queueName string, vtSecs int64, 
 		return nil, fmt.Errorf("read batch from queue %s: %w", queueName, err)
 	}
 	vtSecs = withDefaultVT(vtSecs)
-	rows, err := c.queries.Read(ctx, &db.ReadParams{
+	rows, err := c.queries.Read(ctx, db.ReadParams{
 		QueueName:   queueName,
 		VtSeconds:   int32(vtSecs),
 		NumMessages: int32(numMsgs),
@@ -234,7 +234,7 @@ func (c *Client) Archive(ctx context.Context, queueName string, msgID int64) (bo
 	if err := ValidateQueueName(queueName); err != nil {
 		return false, fmt.Errorf("archive message %d from queue %s: %w", msgID, queueName, err)
 	}
-	archived, err := c.queries.Archive(ctx, &db.ArchiveParams{
+	archived, err := c.queries.Archive(ctx, db.ArchiveParams{
 		QueueName: queueName,
 		MsgID:     msgID,
 	})
@@ -248,7 +248,7 @@ func (c *Client) ArchiveBatch(ctx context.Context, queueName string, msgIDs []in
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("archive batch from queue %s: %w", queueName, err)
 	}
-	archivedIDs, err := c.queries.ArchiveBatch(ctx, &db.ArchiveBatchParams{
+	archivedIDs, err := c.queries.ArchiveBatch(ctx, db.ArchiveBatchParams{
 		QueueName: queueName,
 		MsgIds:    msgIDs,
 	})
@@ -262,7 +262,7 @@ func (c *Client) Delete(ctx context.Context, queueName string, msgID int64) (boo
 	if err := ValidateQueueName(queueName); err != nil {
 		return false, fmt.Errorf("delete message %d from queue %s: %w", msgID, queueName, err)
 	}
-	deleted, err := c.queries.Delete(ctx, &db.DeleteParams{
+	deleted, err := c.queries.Delete(ctx, db.DeleteParams{
 		QueueName: queueName,
 		MsgID:     msgID,
 	})
@@ -276,7 +276,7 @@ func (c *Client) DeleteBatch(ctx context.Context, queueName string, msgIDs []int
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("delete batch from queue %s: %w", queueName, err)
 	}
-	deletedIDs, err := c.queries.DeleteBatch(ctx, &db.DeleteBatchParams{
+	deletedIDs, err := c.queries.DeleteBatch(ctx, db.DeleteBatchParams{
 		QueueName: queueName,
 		MsgIds:    msgIDs,
 	})
@@ -290,7 +290,7 @@ func (c *Client) SetVisibilityTimeout(ctx context.Context, queueName string, msg
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("set visibility timeout for message %d in queue %s: %w", msgID, queueName, err)
 	}
-	rows, err := c.queries.SetVT(ctx, &db.SetVTParams{
+	rows, err := c.queries.SetVT(ctx, db.SetVTParams{
 		QueueName: queueName,
 		MsgID:     msgID,
 		VtSeconds: int32(vtSecs),

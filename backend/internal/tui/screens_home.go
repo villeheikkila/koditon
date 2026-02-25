@@ -1,7 +1,9 @@
 package tui
 
-import "strings"
-import tea "charm.land/bubbletea/v2"
+import (
+	"strings"
+	tea "charm.land/bubbletea/v2"
+)
 
 type homeScreen struct {
 	ctx    *appContext

@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"koditon-go/internal/db"
 )
@@ -113,7 +113,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	}
 	publishedAfter := normalized.PublishedAfter
 	publishedBefore := normalized.PublishedBefore
-	count, err := s.queries.CountUnifiedEntities(ctx, &db.CountUnifiedEntitiesParams{
+	count, err := s.queries.CountUnifiedEntities(ctx, db.CountUnifiedEntitiesParams{
 		SourceFilter:      source,
 		KindFilter:        kind,
 		QueryText:         emptyToNil(normalized.Query),
@@ -130,7 +130,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("count unified entities: %w", err)
 	}
-	rows, err := s.queries.SearchUnifiedEntities(ctx, &db.SearchUnifiedEntitiesParams{
+	rows, err := s.queries.SearchUnifiedEntities(ctx, db.SearchUnifiedEntitiesParams{
 		SortMode:          sort,
 		OffsetCount:       offset,
 		LimitCount:        normalized.PageSize,
@@ -192,7 +192,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
 			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt}}
-			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: pgUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
+			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: ptrUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
 			detail.Raw = buildRawPayload(row.ShortcutAdData)
 			detail = promoteCanonicalFields(detail, "Ad Type", "Building ID", "Building External ID", "Housing Company")
@@ -202,7 +202,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			if err != nil {
 				return UnifiedEntityDetail{}, fmt.Errorf("parse shortcut building id: %w", err)
 			}
-			row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+			row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, buildingID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return UnifiedEntityDetail{}, fmt.Errorf("shortcut building not found")
@@ -238,7 +238,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			if err != nil {
 				return UnifiedEntityDetail{}, fmt.Errorf("parse frontdoor announcement id: %w", err)
 			}
-			row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, pgtype.UUID{Bytes: announcementID, Valid: true})
+			row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, announcementID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor announcement not found")
@@ -247,7 +247,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			}
 			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), formatInt32(row.FrontdoorBuildingAnnouncementExternalID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine2)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingAnnouncementLocation), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), Price: float64ToInt64Ptr(row.FrontdoorBuildingAnnouncementSearchPrice), Area: row.FrontdoorBuildingAnnouncementArea, RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), URL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: row.FrontdoorBuildingAnnouncementLastSeenAt}}
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt32(row.FrontdoorBuildingAnnouncementExternalID)}, {Label: "Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID)}, {Label: "Property Type", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType)}, {Label: "Property Subtype", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype)}, {Label: "Published", Value: formatBoolPtr(row.FrontdoorBuildingAnnouncementPublished)}}
-			detail.Related = []DetailField{{Label: "Building ID", Value: pgUUIDToString(row.FrontdoorBuildingID)}, {Label: "Housing Company ID", Value: formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Building Street", Value: valueOrEmpty(row.FrontdoorBuildingStreetAddress)}, {Label: "Building House #", Value: valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, {Label: "Building Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Building Municipality", Value: valueOrEmpty(row.FrontdoorBuildingMunicipality)}}
+			detail.Related = []DetailField{{Label: "Building ID", Value: row.FrontdoorBuildingID.String()}, {Label: "Housing Company ID", Value: formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Building Street", Value: valueOrEmpty(row.FrontdoorBuildingStreetAddress)}, {Label: "Building House #", Value: valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, {Label: "Building Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Building Municipality", Value: valueOrEmpty(row.FrontdoorBuildingMunicipality)}}
 			detail.Raw = buildRawPayload(row.RawJson)
 			detail = promoteCanonicalFields(detail, "External ID", "Friendly ID", "Property Type", "Property Subtype", "Published")
 			return cleanDetail(detail), nil
@@ -256,7 +256,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			if err != nil {
 				return UnifiedEntityDetail{}, fmt.Errorf("parse frontdoor building id: %w", err)
 			}
-			row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+			row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, buildingID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor building not found")
@@ -346,10 +346,8 @@ func resolveURL(raw, shortcutBase, frontdoorBase string) (string, error) {
 	}
 
 	// Shortcut ad paths
-	for _, prefix := range shortcutAdPrefixes {
-		if category == prefix {
-			return CanonicalID("shortcut", "ad", id), nil
-		}
+	if slices.Contains(shortcutAdPrefixes, category) {
+		return CanonicalID("shortcut", "ad", id), nil
 	}
 
 	// /talo/{uuid} exists on both sources — use host to disambiguate.
@@ -567,11 +565,11 @@ func float64ToInt64Ptr(value *float64) *int64 {
 	return &v
 }
 
-func pgUUIDToString(value pgtype.UUID) string {
-	if !value.Valid {
+func ptrUUIDToString(value *uuid.UUID) string {
+	if value == nil {
 		return ""
 	}
-	return uuid.UUID(value.Bytes).String()
+	return value.String()
 }
 
 func firstTimeValue(first time.Time, rest ...*time.Time) time.Time {

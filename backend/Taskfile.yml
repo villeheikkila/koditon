@@ -69,10 +69,15 @@ tasks:
       - sqlc generate -f sqlc.yaml
     sources:
       - sqlc.yaml
-      - internal/*/db/schema.sql
-      - internal/*/db/queries.sql
+      - db/schema.sql
+      - db/queries/**/*.sql
     generates:
-      - internal/*/db/*.go
+      - internal/db/*.go
+
+  db:vet:
+    desc: Run sqlc vet rules (requires DATABASE_URL)
+    cmds:
+      - sqlc vet -f sqlc.yaml
 
   db:dump:
     desc: Create a database backup (optional FILE=path/to/backup.sql, defaults to timestamped file)
@@ -203,6 +208,7 @@ tasks:
   fix:
     desc: Autofix formatting + lints (writes changes)
     cmds:
+      - go fix ./...
       - gofumpt -w .
       - goimports -w .
       - golangci-lint run ./... --fix --timeout=5m

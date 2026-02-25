@@ -155,7 +155,7 @@ func (s *adsEntityDetailScreen) renderContent(width int) string {
 			title = title + " (expanded)"
 		}
 		lines = append(lines, s.ctx.styles.muted.Render(title))
-		for _, line := range strings.Split(raw, "\n") {
+		for line := range strings.SplitSeq(raw, "\n") {
 			lines = append(lines, trimForProgress(line, max(40, width-2)))
 		}
 	}
@@ -177,7 +177,8 @@ func renderDetailLine(st styles, label string, value string) string {
 
 func fetchAdsEntityDetailCmd(runner interface {
 	AdsReportDetail(context.Context, string) (ads.UnifiedEntityDetail, error)
-}, canonicalID string) tea.Cmd {
+}, canonicalID string,
+) tea.Cmd {
 	return func() tea.Msg {
 		if runner == nil {
 			return adsEntityDetailMsg{err: fmt.Errorf("runner unavailable")}

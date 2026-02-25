@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type postalCity struct {
@@ -63,9 +62,6 @@ func (s *Server) postalCitiesHandler(ctx context.Context, _ *struct{}) (*postalC
 	return output, nil
 }
 
-func formatUUID(id pgtype.UUID) string {
-	if !id.Valid {
-		return ""
-	}
-	return uuid.UUID(id.Bytes).String()
+func formatUUID(id uuid.UUID) string {
+	return id.String()
 }

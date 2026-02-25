@@ -56,7 +56,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		return tokens, nil
 	}
 	tokenStore := func(ctx context.Context, tokens *shortcutclient.Tokens, expiresAt time.Time) error {
-		_, err := shortcutQueries.InsertShortcutToken(ctx, &db.InsertShortcutTokenParams{
+		_, err := shortcutQueries.InsertShortcutToken(ctx, db.InsertShortcutTokenParams{
 			ShortcutTokenCuid:      tokens.CUID,
 			ShortcutTokenToken:     tokens.Token,
 			ShortcutTokenLoaded:    tokens.Loaded,

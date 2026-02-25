@@ -173,7 +173,7 @@ func (w *Worker) processNextTask(ctx context.Context) (err error) {
 		"priority", task.Priority,
 	)
 	workerID := strPtr(w.workerID)
-	if err := w.queries.UpdateTaskToProcessing(ctx, &db.UpdateTaskToProcessingParams{TaskID: task.TaskID, WorkerID: workerID}); err != nil {
+	if err := w.queries.UpdateTaskToProcessing(ctx, db.UpdateTaskToProcessingParams{TaskID: task.TaskID, WorkerID: workerID}); err != nil {
 		taskLogger.ErrorContext(ctx, "failed to update task to processing", "error", err)
 		return NewTaskError("Worker.UpdateTaskToProcessing", err).
 			WithTaskID(task.TaskID).
@@ -256,7 +256,7 @@ func (w *Worker) scheduleRetry(ctx context.Context, logger *slog.Logger, task db
 		"retry_delay", retryDelay.String(),
 		"retry_at", retryAt,
 	)
-	if err := w.queries.UpdateTaskToPendingForRetry(ctx, &db.UpdateTaskToPendingForRetryParams{TaskID: task.TaskID, ScheduledFor: retryAt}); err != nil {
+	if err := w.queries.UpdateTaskToPendingForRetry(ctx, db.UpdateTaskToPendingForRetryParams{TaskID: task.TaskID, ScheduledFor: retryAt}); err != nil {
 		logger.ErrorContext(ctx, "failed to update task for retry", "error", err)
 		return
 	}
@@ -265,7 +265,7 @@ func (w *Worker) scheduleRetry(ctx context.Context, logger *slog.Logger, task db
 		logger.ErrorContext(ctx, "failed to enqueue retry", "error", err)
 		return
 	}
-	_ = w.queries.UpdateTaskQueueMessageId(ctx, &db.UpdateTaskQueueMessageIdParams{TaskID: task.TaskID, QueueMessageID: int64Ptr(msgID)})
+	_ = w.queries.UpdateTaskQueueMessageId(ctx, db.UpdateTaskQueueMessageIdParams{TaskID: task.TaskID, QueueMessageID: int64Ptr(msgID)})
 }
 
 func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask, totalAttempts int64, lastErr error, duration time.Duration) {
@@ -300,7 +300,7 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 	} else {
 		taskMetadata = []byte("{}")
 	}
-	_, dlqErr := w.queries.InsertIntoDLQ(ctx, &db.InsertIntoDLQParams{
+	_, dlqErr := w.queries.InsertIntoDLQ(ctx, db.InsertIntoDLQParams{
 		OriginalTaskID:    task.TaskID,
 		EntityID:          task.EntityID,
 		TaskType:          task.TaskType,
@@ -319,7 +319,7 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 	}
 	// Mark original task as failed
 	lastErrorText := strPtr(lastErr.Error())
-	if err := w.queries.UpdateTaskToFailed(ctx, &db.UpdateTaskToFailedParams{TaskID: task.TaskID, LastError: lastErrorText}); err != nil {
+	if err := w.queries.UpdateTaskToFailed(ctx, db.UpdateTaskToFailedParams{TaskID: task.TaskID, LastError: lastErrorText}); err != nil {
 		logger.ErrorContext(ctx, "failed to mark task as failed", "error", err)
 	}
 }

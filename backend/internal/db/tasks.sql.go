@@ -42,17 +42,17 @@ RETURNING task_id, entity_id, task_type, status, priority, attempt, max_attempts
 `
 
 type CreateTaskParams struct {
-	EntityID     string     `db:"entity_id" json:"entity_id"`
-	TaskType     string     `db:"task_type" json:"task_type"`
-	Status       string     `db:"status" json:"status"`
-	Priority     int32      `db:"priority" json:"priority"`
-	Attempt      int32      `db:"attempt" json:"attempt"`
-	MaxAttempts  int32      `db:"max_attempts" json:"max_attempts"`
-	ScheduledFor time.Time  `db:"scheduled_for" json:"scheduled_for"`
-	RunOn        *time.Time `db:"run_on" json:"run_on"`
+	EntityID     string     `json:"entity_id"`
+	TaskType     string     `json:"task_type"`
+	Status       string     `json:"status"`
+	Priority     int32      `json:"priority"`
+	Attempt      int32      `json:"attempt"`
+	MaxAttempts  int32      `json:"max_attempts"`
+	ScheduledFor time.Time  `json:"scheduled_for"`
+	RunOn        *time.Time `json:"run_on"`
 }
 
-func (q *Queries) CreateTask(ctx context.Context, arg *CreateTaskParams) (TaskQueueTask, error) {
+func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (TaskQueueTask, error) {
 	row := q.db.QueryRow(ctx, createTask,
 		arg.EntityID,
 		arg.TaskType,
@@ -102,15 +102,15 @@ RETURNING task_id, entity_id, task_type, status, priority, attempt, max_attempts
 `
 
 type CreateTaskWithPriorityParams struct {
-	EntityID     string     `db:"entity_id" json:"entity_id"`
-	TaskType     string     `db:"task_type" json:"task_type"`
-	Priority     int32      `db:"priority" json:"priority"`
-	MaxAttempts  int32      `db:"max_attempts" json:"max_attempts"`
-	ScheduledFor time.Time  `db:"scheduled_for" json:"scheduled_for"`
-	RunOn        *time.Time `db:"run_on" json:"run_on"`
+	EntityID     string     `json:"entity_id"`
+	TaskType     string     `json:"task_type"`
+	Priority     int32      `json:"priority"`
+	MaxAttempts  int32      `json:"max_attempts"`
+	ScheduledFor time.Time  `json:"scheduled_for"`
+	RunOn        *time.Time `json:"run_on"`
 }
 
-func (q *Queries) CreateTaskWithPriority(ctx context.Context, arg *CreateTaskWithPriorityParams) (TaskQueueTask, error) {
+func (q *Queries) CreateTaskWithPriority(ctx context.Context, arg CreateTaskWithPriorityParams) (TaskQueueTask, error) {
 	row := q.db.QueryRow(ctx, createTaskWithPriority,
 		arg.EntityID,
 		arg.TaskType,
@@ -190,11 +190,11 @@ FROM task_queue.task
 `
 
 type GetDailyProgressRow struct {
-	CompletedToday int64 `db:"completed_today" json:"completed_today"`
-	InProgress     int64 `db:"in_progress" json:"in_progress"`
-	ReadyToProcess int64 `db:"ready_to_process" json:"ready_to_process"`
-	ScheduledLater int64 `db:"scheduled_later" json:"scheduled_later"`
-	FailedToday    int64 `db:"failed_today" json:"failed_today"`
+	CompletedToday int64 `json:"completed_today"`
+	InProgress     int64 `json:"in_progress"`
+	ReadyToProcess int64 `json:"ready_to_process"`
+	ScheduledLater int64 `json:"scheduled_later"`
+	FailedToday    int64 `json:"failed_today"`
 }
 
 func (q *Queries) GetDailyProgress(ctx context.Context) (GetDailyProgressRow, error) {
@@ -281,12 +281,12 @@ WHERE entity_id = $1
 `
 
 type GetTaskByEntityAndDateParams struct {
-	EntityID string     `db:"entity_id" json:"entity_id"`
-	TaskType string     `db:"task_type" json:"task_type"`
-	RunOn    *time.Time `db:"run_on" json:"run_on"`
+	EntityID string     `json:"entity_id"`
+	TaskType string     `json:"task_type"`
+	RunOn    *time.Time `json:"run_on"`
 }
 
-func (q *Queries) GetTaskByEntityAndDate(ctx context.Context, arg *GetTaskByEntityAndDateParams) (TaskQueueTask, error) {
+func (q *Queries) GetTaskByEntityAndDate(ctx context.Context, arg GetTaskByEntityAndDateParams) (TaskQueueTask, error) {
 	row := q.db.QueryRow(ctx, getTaskByEntityAndDate, arg.EntityID, arg.TaskType, arg.RunOn)
 	var i TaskQueueTask
 	err := row.Scan(
@@ -323,13 +323,13 @@ FROM task_queue.task
 `
 
 type GetTaskStatusSummaryRow struct {
-	Pending        int64          `db:"pending" json:"pending"`
-	Processing     int64          `db:"processing" json:"processing"`
-	Completed      int64          `db:"completed" json:"completed"`
-	Failed         int64          `db:"failed" json:"failed"`
-	Stopped        int64          `db:"stopped" json:"stopped"`
-	Total          int64          `db:"total" json:"total"`
-	SuccessRatePct pgtype.Numeric `db:"success_rate_pct" json:"success_rate_pct"`
+	Pending        int64          `json:"pending"`
+	Processing     int64          `json:"processing"`
+	Completed      int64          `json:"completed"`
+	Failed         int64          `json:"failed"`
+	Stopped        int64          `json:"stopped"`
+	Total          int64          `json:"total"`
+	SuccessRatePct pgtype.Numeric `json:"success_rate_pct"`
 }
 
 func (q *Queries) GetTaskStatusSummary(ctx context.Context) (GetTaskStatusSummaryRow, error) {
@@ -421,10 +421,10 @@ ORDER BY oldest_task_started
 `
 
 type ListActiveWorkersRow struct {
-	WorkerID             *string   `db:"worker_id" json:"worker_id"`
-	ActiveTasks          int64     `db:"active_tasks" json:"active_tasks"`
-	OldestTaskStarted    time.Time `db:"oldest_task_started" json:"oldest_task_started"`
-	OldestTaskAgeSeconds int32     `db:"oldest_task_age_seconds" json:"oldest_task_age_seconds"`
+	WorkerID             *string   `json:"worker_id"`
+	ActiveTasks          int64     `json:"active_tasks"`
+	OldestTaskStarted    time.Time `json:"oldest_task_started"`
+	OldestTaskAgeSeconds int32     `json:"oldest_task_age_seconds"`
 }
 
 func (q *Queries) ListActiveWorkers(ctx context.Context) ([]ListActiveWorkersRow, error) {
@@ -534,17 +534,17 @@ LIMIT $1
 `
 
 type ListRecentFailuresRow struct {
-	TaskID      int64      `db:"task_id" json:"task_id"`
-	EntityID    string     `db:"entity_id" json:"entity_id"`
-	TaskType    string     `db:"task_type" json:"task_type"`
-	Status      string     `db:"status" json:"status"`
-	Priority    int32      `db:"priority" json:"priority"`
-	Attempt     int32      `db:"attempt" json:"attempt"`
-	MaxAttempts int32      `db:"max_attempts" json:"max_attempts"`
-	LastError   *string    `db:"last_error" json:"last_error"`
-	FailedAt    *time.Time `db:"failed_at" json:"failed_at"`
-	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time  `db:"updated_at" json:"updated_at"`
+	TaskID      int64      `json:"task_id"`
+	EntityID    string     `json:"entity_id"`
+	TaskType    string     `json:"task_type"`
+	Status      string     `json:"status"`
+	Priority    int32      `json:"priority"`
+	Attempt     int32      `json:"attempt"`
+	MaxAttempts int32      `json:"max_attempts"`
+	LastError   *string    `json:"last_error"`
+	FailedAt    *time.Time `json:"failed_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 func (q *Queries) ListRecentFailures(ctx context.Context, limit int64) ([]ListRecentFailuresRow, error) {
@@ -605,11 +605,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListScheduledTasksParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListScheduledTasks(ctx context.Context, arg *ListScheduledTasksParams) ([]TaskQueueTask, error) {
+func (q *Queries) ListScheduledTasks(ctx context.Context, arg ListScheduledTasksParams) ([]TaskQueueTask, error) {
 	rows, err := q.db.Query(ctx, listScheduledTasks, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -672,23 +672,23 @@ ORDER BY started_at
 `
 
 type ListStuckTasksRow struct {
-	TaskID         int64      `db:"task_id" json:"task_id"`
-	EntityID       string     `db:"entity_id" json:"entity_id"`
-	TaskType       string     `db:"task_type" json:"task_type"`
-	Status         string     `db:"status" json:"status"`
-	Priority       int32      `db:"priority" json:"priority"`
-	Attempt        int32      `db:"attempt" json:"attempt"`
-	MaxAttempts    int32      `db:"max_attempts" json:"max_attempts"`
-	LastError      *string    `db:"last_error" json:"last_error"`
-	WorkerID       *string    `db:"worker_id" json:"worker_id"`
-	ScheduledFor   time.Time  `db:"scheduled_for" json:"scheduled_for"`
-	StartedAt      *time.Time `db:"started_at" json:"started_at"`
-	CompletedAt    *time.Time `db:"completed_at" json:"completed_at"`
-	RunOn          *time.Time `db:"run_on" json:"run_on"`
-	QueueMessageID *int64     `db:"queue_message_id" json:"queue_message_id"`
-	CreatedAt      time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time  `db:"updated_at" json:"updated_at"`
-	StuckSeconds   int32      `db:"stuck_seconds" json:"stuck_seconds"`
+	TaskID         int64      `json:"task_id"`
+	EntityID       string     `json:"entity_id"`
+	TaskType       string     `json:"task_type"`
+	Status         string     `json:"status"`
+	Priority       int32      `json:"priority"`
+	Attempt        int32      `json:"attempt"`
+	MaxAttempts    int32      `json:"max_attempts"`
+	LastError      *string    `json:"last_error"`
+	WorkerID       *string    `json:"worker_id"`
+	ScheduledFor   time.Time  `json:"scheduled_for"`
+	StartedAt      *time.Time `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	RunOn          *time.Time `json:"run_on"`
+	QueueMessageID *int64     `json:"queue_message_id"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	StuckSeconds   int32      `json:"stuck_seconds"`
 }
 
 func (q *Queries) ListStuckTasks(ctx context.Context) ([]ListStuckTasksRow, error) {
@@ -753,11 +753,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListTasksParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListTasks(ctx context.Context, arg *ListTasksParams) ([]TaskQueueTask, error) {
+func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]TaskQueueTask, error) {
 	rows, err := q.db.Query(ctx, listTasks, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -819,12 +819,12 @@ LIMIT $2 OFFSET $3
 `
 
 type ListTasksByEntityParams struct {
-	EntityID string `db:"entity_id" json:"entity_id"`
-	Limit    int64  `db:"limit" json:"limit"`
-	Offset   int64  `db:"offset" json:"offset"`
+	EntityID string `json:"entity_id"`
+	Limit    int64  `json:"limit"`
+	Offset   int64  `json:"offset"`
 }
 
-func (q *Queries) ListTasksByEntity(ctx context.Context, arg *ListTasksByEntityParams) ([]TaskQueueTask, error) {
+func (q *Queries) ListTasksByEntity(ctx context.Context, arg ListTasksByEntityParams) ([]TaskQueueTask, error) {
 	rows, err := q.db.Query(ctx, listTasksByEntity, arg.EntityID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -886,12 +886,12 @@ LIMIT $2 OFFSET $3
 `
 
 type ListTasksByStatusParams struct {
-	Status string `db:"status" json:"status"`
-	Limit  int64  `db:"limit" json:"limit"`
-	Offset int64  `db:"offset" json:"offset"`
+	Status string `json:"status"`
+	Limit  int64  `json:"limit"`
+	Offset int64  `json:"offset"`
 }
 
-func (q *Queries) ListTasksByStatus(ctx context.Context, arg *ListTasksByStatusParams) ([]TaskQueueTask, error) {
+func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusParams) ([]TaskQueueTask, error) {
 	rows, err := q.db.Query(ctx, listTasksByStatus, arg.Status, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -998,11 +998,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskPriorityParams struct {
-	TaskID   int64 `db:"task_id" json:"task_id"`
-	Priority int32 `db:"priority" json:"priority"`
+	TaskID   int64 `json:"task_id"`
+	Priority int32 `json:"priority"`
 }
 
-func (q *Queries) UpdateTaskPriority(ctx context.Context, arg *UpdateTaskPriorityParams) error {
+func (q *Queries) UpdateTaskPriority(ctx context.Context, arg UpdateTaskPriorityParams) error {
 	_, err := q.db.Exec(ctx, updateTaskPriority, arg.TaskID, arg.Priority)
 	return err
 }
@@ -1016,11 +1016,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskQueueMessageIdParams struct {
-	TaskID         int64  `db:"task_id" json:"task_id"`
-	QueueMessageID *int64 `db:"queue_message_id" json:"queue_message_id"`
+	TaskID         int64  `json:"task_id"`
+	QueueMessageID *int64 `json:"queue_message_id"`
 }
 
-func (q *Queries) UpdateTaskQueueMessageId(ctx context.Context, arg *UpdateTaskQueueMessageIdParams) error {
+func (q *Queries) UpdateTaskQueueMessageId(ctx context.Context, arg UpdateTaskQueueMessageIdParams) error {
 	_, err := q.db.Exec(ctx, updateTaskQueueMessageId, arg.TaskID, arg.QueueMessageID)
 	return err
 }
@@ -1034,11 +1034,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskStatusParams struct {
-	TaskID int64  `db:"task_id" json:"task_id"`
-	Status string `db:"status" json:"status"`
+	TaskID int64  `json:"task_id"`
+	Status string `json:"status"`
 }
 
-func (q *Queries) UpdateTaskStatus(ctx context.Context, arg *UpdateTaskStatusParams) error {
+func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error {
 	_, err := q.db.Exec(ctx, updateTaskStatus, arg.TaskID, arg.Status)
 	return err
 }
@@ -1069,11 +1069,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskToFailedParams struct {
-	TaskID    int64   `db:"task_id" json:"task_id"`
-	LastError *string `db:"last_error" json:"last_error"`
+	TaskID    int64   `json:"task_id"`
+	LastError *string `json:"last_error"`
 }
 
-func (q *Queries) UpdateTaskToFailed(ctx context.Context, arg *UpdateTaskToFailedParams) error {
+func (q *Queries) UpdateTaskToFailed(ctx context.Context, arg UpdateTaskToFailedParams) error {
 	_, err := q.db.Exec(ctx, updateTaskToFailed, arg.TaskID, arg.LastError)
 	return err
 }
@@ -1092,11 +1092,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskToPendingParams struct {
-	TaskID       int64     `db:"task_id" json:"task_id"`
-	ScheduledFor time.Time `db:"scheduled_for" json:"scheduled_for"`
+	TaskID       int64     `json:"task_id"`
+	ScheduledFor time.Time `json:"scheduled_for"`
 }
 
-func (q *Queries) UpdateTaskToPending(ctx context.Context, arg *UpdateTaskToPendingParams) error {
+func (q *Queries) UpdateTaskToPending(ctx context.Context, arg UpdateTaskToPendingParams) error {
 	_, err := q.db.Exec(ctx, updateTaskToPending, arg.TaskID, arg.ScheduledFor)
 	return err
 }
@@ -1114,11 +1114,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskToPendingForRetryParams struct {
-	TaskID       int64     `db:"task_id" json:"task_id"`
-	ScheduledFor time.Time `db:"scheduled_for" json:"scheduled_for"`
+	TaskID       int64     `json:"task_id"`
+	ScheduledFor time.Time `json:"scheduled_for"`
 }
 
-func (q *Queries) UpdateTaskToPendingForRetry(ctx context.Context, arg *UpdateTaskToPendingForRetryParams) error {
+func (q *Queries) UpdateTaskToPendingForRetry(ctx context.Context, arg UpdateTaskToPendingForRetryParams) error {
 	_, err := q.db.Exec(ctx, updateTaskToPendingForRetry, arg.TaskID, arg.ScheduledFor)
 	return err
 }
@@ -1135,11 +1135,11 @@ WHERE task_id = $1
 `
 
 type UpdateTaskToProcessingParams struct {
-	TaskID   int64   `db:"task_id" json:"task_id"`
-	WorkerID *string `db:"worker_id" json:"worker_id"`
+	TaskID   int64   `json:"task_id"`
+	WorkerID *string `json:"worker_id"`
 }
 
-func (q *Queries) UpdateTaskToProcessing(ctx context.Context, arg *UpdateTaskToProcessingParams) error {
+func (q *Queries) UpdateTaskToProcessing(ctx context.Context, arg UpdateTaskToProcessingParams) error {
 	_, err := q.db.Exec(ctx, updateTaskToProcessing, arg.TaskID, arg.WorkerID)
 	return err
 }
@@ -1174,15 +1174,15 @@ RETURNING task_id, entity_id, task_type, status, priority, attempt, max_attempts
 `
 
 type UpsertTaskForDateParams struct {
-	EntityID     string     `db:"entity_id" json:"entity_id"`
-	TaskType     string     `db:"task_type" json:"task_type"`
-	Column3      *int32     `db:"column_3" json:"column_3"`
-	MaxAttempts  int32      `db:"max_attempts" json:"max_attempts"`
-	ScheduledFor time.Time  `db:"scheduled_for" json:"scheduled_for"`
-	RunOn        *time.Time `db:"run_on" json:"run_on"`
+	EntityID     string     `json:"entity_id"`
+	TaskType     string     `json:"task_type"`
+	Column3      *int32     `json:"column_3"`
+	MaxAttempts  int32      `json:"max_attempts"`
+	ScheduledFor time.Time  `json:"scheduled_for"`
+	RunOn        *time.Time `json:"run_on"`
 }
 
-func (q *Queries) UpsertTaskForDate(ctx context.Context, arg *UpsertTaskForDateParams) (TaskQueueTask, error) {
+func (q *Queries) UpsertTaskForDate(ctx context.Context, arg UpsertTaskForDateParams) (TaskQueueTask, error) {
 	row := q.db.QueryRow(ctx, upsertTaskForDate,
 		arg.EntityID,
 		arg.TaskType,

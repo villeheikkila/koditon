@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const getShortcutBuildingListingsByBuildingID = `-- name: GetShortcutBuildingListingsByBuildingID :many
@@ -17,7 +17,7 @@ WHERE shortcut_building_id = $1
 ORDER BY shortcut_building_listing_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, shortcutBuildingID pgtype.UUID) ([]ShortcutBuildingListing, error) {
+func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, shortcutBuildingID uuid.UUID) ([]ShortcutBuildingListing, error) {
 	rows, err := q.db.Query(ctx, getShortcutBuildingListingsByBuildingID, shortcutBuildingID)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ WHERE shortcut_building_id = $1
 ORDER BY shortcut_building_rental_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, shortcutBuildingID pgtype.UUID) ([]ShortcutBuildingRental, error) {
+func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, shortcutBuildingID uuid.UUID) ([]ShortcutBuildingRental, error) {
 	rows, err := q.db.Query(ctx, getShortcutBuildingRentalsByBuildingID, shortcutBuildingID)
 	if err != nil {
 		return nil, err
@@ -104,16 +104,16 @@ RETURNING shortcut_building_listing_id, shortcut_building_id, shortcut_building_
 `
 
 type UpsertShortcutBuildingListingParams struct {
-	ShortcutBuildingID                   pgtype.UUID   `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingListingLayout        *string       `db:"shortcut_building_listing_layout" json:"shortcut_building_listing_layout"`
-	ShortcutBuildingListingSize          pgtype.Float8 `db:"shortcut_building_listing_size" json:"shortcut_building_listing_size"`
-	ShortcutBuildingListingPrice         pgtype.Float8 `db:"shortcut_building_listing_price" json:"shortcut_building_listing_price"`
-	ShortcutBuildingListingPricePerSqm   pgtype.Float8 `db:"shortcut_building_listing_price_per_sqm" json:"shortcut_building_listing_price_per_sqm"`
-	ShortcutBuildingListingMarketingTime *string       `db:"shortcut_building_listing_marketing_time" json:"shortcut_building_listing_marketing_time"`
-	ShortcutBuildingListingIdx           *int32        `db:"shortcut_building_listing_idx" json:"shortcut_building_listing_idx"`
+	ShortcutBuildingID                   uuid.UUID `json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string   `json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64  `json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64  `json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64  `json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingMarketingTime *string   `json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32    `json:"shortcut_building_listing_idx"`
 }
 
-func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg *UpsertShortcutBuildingListingParams) (ShortcutBuildingListing, error) {
+func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg UpsertShortcutBuildingListingParams) (ShortcutBuildingListing, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingListing,
 		arg.ShortcutBuildingID,
 		arg.ShortcutBuildingListingLayout,
@@ -157,15 +157,15 @@ RETURNING shortcut_building_rental_id, shortcut_building_id, shortcut_building_r
 `
 
 type UpsertShortcutBuildingRentalParams struct {
-	ShortcutBuildingID                  pgtype.UUID   `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingRentalLayout        *string       `db:"shortcut_building_rental_layout" json:"shortcut_building_rental_layout"`
-	ShortcutBuildingRentalSize          pgtype.Float8 `db:"shortcut_building_rental_size" json:"shortcut_building_rental_size"`
-	ShortcutBuildingRentalPrice         pgtype.Float8 `db:"shortcut_building_rental_price" json:"shortcut_building_rental_price"`
-	ShortcutBuildingRentalMarketingTime *string       `db:"shortcut_building_rental_marketing_time" json:"shortcut_building_rental_marketing_time"`
-	ShortcutBuildingRentalIdx           *int32        `db:"shortcut_building_rental_idx" json:"shortcut_building_rental_idx"`
+	ShortcutBuildingID                  uuid.UUID `json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string   `json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64  `json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64  `json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalMarketingTime *string   `json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32    `json:"shortcut_building_rental_idx"`
 }
 
-func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg *UpsertShortcutBuildingRentalParams) (ShortcutBuildingRental, error) {
+func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg UpsertShortcutBuildingRentalParams) (ShortcutBuildingRental, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingRental,
 		arg.ShortcutBuildingID,
 		arg.ShortcutBuildingRentalLayout,

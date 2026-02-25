@@ -92,13 +92,13 @@ RETURNING shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut
 `
 
 type InsertShortcutTokenParams struct {
-	ShortcutTokenCuid      string    `db:"shortcut_token_cuid" json:"shortcut_token_cuid"`
-	ShortcutTokenToken     string    `db:"shortcut_token_token" json:"shortcut_token_token"`
-	ShortcutTokenLoaded    string    `db:"shortcut_token_loaded" json:"shortcut_token_loaded"`
-	ShortcutTokenExpiresAt time.Time `db:"shortcut_token_expires_at" json:"shortcut_token_expires_at"`
+	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string    `json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string    `json:"shortcut_token_loaded"`
+	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
-func (q *Queries) InsertShortcutToken(ctx context.Context, arg *InsertShortcutTokenParams) (ShortcutToken, error) {
+func (q *Queries) InsertShortcutToken(ctx context.Context, arg InsertShortcutTokenParams) (ShortcutToken, error) {
 	row := q.db.QueryRow(ctx, insertShortcutToken,
 		arg.ShortcutTokenCuid,
 		arg.ShortcutTokenToken,

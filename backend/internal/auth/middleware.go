@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -114,19 +115,9 @@ func GetFeatureFlags(ctx context.Context) []string {
 }
 
 func HasRole(ctx context.Context, role string) bool {
-	for _, r := range GetRoles(ctx) {
-		if r == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(GetRoles(ctx), role)
 }
 
 func HasFeatureFlag(ctx context.Context, flag string) bool {
-	for _, f := range GetFeatureFlags(ctx) {
-		if f == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(GetFeatureFlags(ctx), flag)
 }

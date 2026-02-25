@@ -54,8 +54,10 @@ type Tokens struct {
 	Token  string
 }
 
-type TokenStore func(ctx context.Context, tokens *Tokens, expiresAt time.Time) error
-type TokenLoader func(ctx context.Context) (*Tokens, error)
+type (
+	TokenStore  func(ctx context.Context, tokens *Tokens, expiresAt time.Time) error
+	TokenLoader func(ctx context.Context) (*Tokens, error)
+)
 
 type Client struct {
 	httpClient *http.Client

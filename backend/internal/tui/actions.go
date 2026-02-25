@@ -103,7 +103,7 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
-					Title:	   "Sitemap Discover",
+					Title:       "Sitemap Discover",
 					Description: "Fetch frontdoor sitemap and report discovered entities without syncing",
 					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
@@ -115,7 +115,7 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
-					Title:	   "Sync Buildings",
+					Title:       "Sync Buildings",
 					Description: "Fetch frontdoor sitemap and sync only buildings in batch",
 					BuildInput:  newBatchSyncSettingsScreen,
 					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
@@ -188,7 +188,7 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
-					Title:	   "Sitemap Discover",
+					Title:       "Sitemap Discover",
 					Description: "Fetch shortcut sitemap and report discovered entities without syncing",
 					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
@@ -200,7 +200,7 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
-					Title:	   "Sync Buildings",
+					Title:       "Sync Buildings",
 					Description: "Fetch shortcut sitemap and sync only buildings in batch",
 					BuildInput:  newBatchSyncSettingsScreen,
 					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
@@ -274,7 +274,7 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
-					Title:	   "Cities Discover",
+					Title:       "Cities Discover",
 					Description: "Fetch available prices cities without syncing",
 					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching prices cities..."})

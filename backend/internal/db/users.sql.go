@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -34,7 +34,7 @@ SET user_deleted_at = now(), user_updated_at = now()
 WHERE user_id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, userID pgtype.UUID) error {
+func (q *Queries) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUser, userID)
 	return err
 }
@@ -44,7 +44,7 @@ SELECT user_id, user_created_at, user_updated_at, user_deleted_at FROM auth.user
 WHERE user_id = $1 AND user_deleted_at IS NULL
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, userID pgtype.UUID) (AuthUser, error) {
+func (q *Queries) GetUserByID(ctx context.Context, userID uuid.UUID) (AuthUser, error) {
 	row := q.db.QueryRow(ctx, getUserByID, userID)
 	var i AuthUser
 	err := row.Scan(

@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const getActiveFeatureFlags = `-- name: GetActiveFeatureFlags :many
@@ -32,7 +32,7 @@ AND NOT EXISTS (
 )
 `
 
-func (q *Queries) GetActiveFeatureFlags(ctx context.Context, userID pgtype.UUID) ([]string, error) {
+func (q *Queries) GetActiveFeatureFlags(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	rows, err := q.db.Query(ctx, getActiveFeatureFlags, userID)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ WHERE ur.user_id = $1
 ORDER BY r.role_name
 `
 
-func (q *Queries) GetUserRoles(ctx context.Context, userID pgtype.UUID) ([]AuthRole, error) {
+func (q *Queries) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]AuthRole, error) {
 	rows, err := q.db.Query(ctx, getUserRoles, userID)
 	if err != nil {
 		return nil, err
@@ -108,11 +108,11 @@ SELECT EXISTS (
 `
 
 type HasFeatureFlagParams struct {
-	UserID   pgtype.UUID `db:"user_id" json:"user_id"`
-	FlagName string      `db:"flag_name" json:"flag_name"`
+	UserID   uuid.UUID `json:"user_id"`
+	FlagName string    `json:"flag_name"`
 }
 
-func (q *Queries) HasFeatureFlag(ctx context.Context, arg *HasFeatureFlagParams) (bool, error) {
+func (q *Queries) HasFeatureFlag(ctx context.Context, arg HasFeatureFlagParams) (bool, error) {
 	row := q.db.QueryRow(ctx, hasFeatureFlag, arg.UserID, arg.FlagName)
 	var has_flag bool
 	err := row.Scan(&has_flag)
@@ -128,11 +128,11 @@ SELECT EXISTS (
 `
 
 type HasRoleParams struct {
-	UserID   pgtype.UUID `db:"user_id" json:"user_id"`
-	RoleName string      `db:"role_name" json:"role_name"`
+	UserID   uuid.UUID `json:"user_id"`
+	RoleName string    `json:"role_name"`
 }
 
-func (q *Queries) HasRole(ctx context.Context, arg *HasRoleParams) (bool, error) {
+func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) {
 	row := q.db.QueryRow(ctx, hasRole, arg.UserID, arg.RoleName)
 	var has_role bool
 	err := row.Scan(&has_role)

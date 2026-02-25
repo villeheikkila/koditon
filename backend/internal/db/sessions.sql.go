@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const cleanupExpiredSessions = `-- name: CleanupExpiredSessions :exec
@@ -43,12 +43,12 @@ RETURNING refresh_token_id, session_id, refresh_token_token_hash, refresh_token_
 `
 
 type CreateRefreshTokenParams struct {
-	SessionID             pgtype.UUID `db:"session_id" json:"session_id"`
-	RefreshTokenTokenHash string      `db:"refresh_token_token_hash" json:"refresh_token_token_hash"`
-	RefreshTokenCounter   int64       `db:"refresh_token_counter" json:"refresh_token_counter"`
+	SessionID             uuid.UUID `json:"session_id"`
+	RefreshTokenTokenHash string    `json:"refresh_token_token_hash"`
+	RefreshTokenCounter   int64     `json:"refresh_token_counter"`
 }
 
-func (q *Queries) CreateRefreshToken(ctx context.Context, arg *CreateRefreshTokenParams) (AuthRefreshToken, error) {
+func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (AuthRefreshToken, error) {
 	row := q.db.QueryRow(ctx, createRefreshToken, arg.SessionID, arg.RefreshTokenTokenHash, arg.RefreshTokenCounter)
 	var i AuthRefreshToken
 	err := row.Scan(
@@ -77,16 +77,16 @@ RETURNING session_id, user_id, session_device_id, session_user_agent, session_ip
 `
 
 type CreateSessionParams struct {
-	UserID                     pgtype.UUID      `db:"user_id" json:"user_id"`
-	SessionDeviceID            pgtype.UUID      `db:"session_device_id" json:"session_device_id"`
-	SessionUserAgent           *string          `db:"session_user_agent" json:"session_user_agent"`
-	SessionIp                  *string          `db:"session_ip" json:"session_ip"`
-	SessionProvider            AuthAuthProvider `db:"session_provider" json:"session_provider"`
-	SessionRefreshTokenHmacKey string           `db:"session_refresh_token_hmac_key" json:"session_refresh_token_hmac_key"`
-	SessionNotAfter            *time.Time       `db:"session_not_after" json:"session_not_after"`
+	UserID                     uuid.UUID        `json:"user_id"`
+	SessionDeviceID            *uuid.UUID       `json:"session_device_id"`
+	SessionUserAgent           *string          `json:"session_user_agent"`
+	SessionIp                  *string          `json:"session_ip"`
+	SessionProvider            AuthAuthProvider `json:"session_provider"`
+	SessionRefreshTokenHmacKey string           `json:"session_refresh_token_hmac_key"`
+	SessionNotAfter            *time.Time       `json:"session_not_after"`
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (AuthSession, error) {
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (AuthSession, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.UserID,
 		arg.SessionDeviceID,
@@ -122,7 +122,7 @@ WHERE session_id = $1
   AND (session_not_after IS NULL OR session_not_after > now())
 `
 
-func (q *Queries) GetActiveSessionByID(ctx context.Context, sessionID pgtype.UUID) (AuthSession, error) {
+func (q *Queries) GetActiveSessionByID(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
 	row := q.db.QueryRow(ctx, getActiveSessionByID, sessionID)
 	var i AuthSession
 	err := row.Scan(
@@ -169,11 +169,11 @@ WHERE session_id = $1 AND refresh_token_counter = $2
 `
 
 type GetRefreshTokenBySessionAndCounterParams struct {
-	SessionID           pgtype.UUID `db:"session_id" json:"session_id"`
-	RefreshTokenCounter int64       `db:"refresh_token_counter" json:"refresh_token_counter"`
+	SessionID           uuid.UUID `json:"session_id"`
+	RefreshTokenCounter int64     `json:"refresh_token_counter"`
 }
 
-func (q *Queries) GetRefreshTokenBySessionAndCounter(ctx context.Context, arg *GetRefreshTokenBySessionAndCounterParams) (AuthRefreshToken, error) {
+func (q *Queries) GetRefreshTokenBySessionAndCounter(ctx context.Context, arg GetRefreshTokenBySessionAndCounterParams) (AuthRefreshToken, error) {
 	row := q.db.QueryRow(ctx, getRefreshTokenBySessionAndCounter, arg.SessionID, arg.RefreshTokenCounter)
 	var i AuthRefreshToken
 	err := row.Scan(
@@ -193,7 +193,7 @@ SELECT session_id, user_id, session_device_id, session_user_agent, session_ip, s
 WHERE session_id = $1
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, sessionID pgtype.UUID) (AuthSession, error) {
+func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
 	row := q.db.QueryRow(ctx, getSessionByID, sessionID)
 	var i AuthSession
 	err := row.Scan(
@@ -221,7 +221,7 @@ WHERE user_id = $1
 ORDER BY session_created_at DESC
 `
 
-func (q *Queries) GetSessionsByUserID(ctx context.Context, userID pgtype.UUID) ([]AuthSession, error) {
+func (q *Queries) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]AuthSession, error) {
 	rows, err := q.db.Query(ctx, getSessionsByUserID, userID)
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ SET refresh_token_revoked = true, refresh_token_updated_at = now()
 WHERE session_id = $1 AND refresh_token_revoked = false
 `
 
-func (q *Queries) RevokeAllSessionRefreshTokens(ctx context.Context, sessionID pgtype.UUID) error {
+func (q *Queries) RevokeAllSessionRefreshTokens(ctx context.Context, sessionID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeAllSessionRefreshTokens, sessionID)
 	return err
 }
@@ -272,7 +272,7 @@ SET session_revoked_at = now(), session_updated_at = now()
 WHERE user_id = $1 AND session_revoked_at IS NULL
 `
 
-func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID pgtype.UUID) error {
+func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeAllUserSessions, userID)
 	return err
 }
@@ -284,11 +284,11 @@ WHERE user_id = $1 AND session_id != $2 AND session_revoked_at IS NULL
 `
 
 type RevokeAllUserSessionsExceptParams struct {
-	UserID    pgtype.UUID `db:"user_id" json:"user_id"`
-	SessionID pgtype.UUID `db:"session_id" json:"session_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	SessionID uuid.UUID `json:"session_id"`
 }
 
-func (q *Queries) RevokeAllUserSessionsExcept(ctx context.Context, arg *RevokeAllUserSessionsExceptParams) error {
+func (q *Queries) RevokeAllUserSessionsExcept(ctx context.Context, arg RevokeAllUserSessionsExceptParams) error {
 	_, err := q.db.Exec(ctx, revokeAllUserSessionsExcept, arg.UserID, arg.SessionID)
 	return err
 }
@@ -310,7 +310,7 @@ SET session_revoked_at = now(), session_updated_at = now()
 WHERE session_id = $1
 `
 
-func (q *Queries) RevokeSession(ctx context.Context, sessionID pgtype.UUID) error {
+func (q *Queries) RevokeSession(ctx context.Context, sessionID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeSession, sessionID)
 	return err
 }
@@ -325,7 +325,7 @@ WHERE session_id = $1
 RETURNING session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at
 `
 
-func (q *Queries) UpdateSessionRefreshed(ctx context.Context, sessionID pgtype.UUID) (AuthSession, error) {
+func (q *Queries) UpdateSessionRefreshed(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
 	row := q.db.QueryRow(ctx, updateSessionRefreshed, sessionID)
 	var i AuthSession
 	err := row.Scan(

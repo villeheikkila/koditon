@@ -3,7 +3,7 @@ package prices
 import (
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 
 	"koditon-go/internal/db"
 	"koditon-go/internal/prices/client"
@@ -14,23 +14,23 @@ func mapUpsertCityParams(name string) string {
 	return util.TrimUnicodeSpace(name)
 }
 
-func mapUpsertPostalCodesBulkParams(codes []string, cityID pgtype.UUID) *db.UpsertPricesPostalCodesBulkParams {
+func mapUpsertPostalCodesBulkParams(codes []string, cityID uuid.UUID) db.UpsertPricesPostalCodesBulkParams {
 	trimmed := make([]string, len(codes))
 	for i, code := range codes {
 		trimmed[i] = util.TrimUnicodeSpace(code)
 	}
-	return &db.UpsertPricesPostalCodesBulkParams{
+	return db.UpsertPricesPostalCodesBulkParams{
 		Codes:  trimmed,
 		CityID: cityID,
 	}
 }
 
-func mapUpsertNeighborhoodsBulkParams(names []string, cityID pgtype.UUID) *db.UpsertPricesNeighborhoodsBulkParams {
+func mapUpsertNeighborhoodsBulkParams(names []string, cityID uuid.UUID) db.UpsertPricesNeighborhoodsBulkParams {
 	trimmed := make([]string, len(names))
 	for i, name := range names {
 		trimmed[i] = util.TrimUnicodeSpace(name)
 	}
-	return &db.UpsertPricesNeighborhoodsBulkParams{
+	return db.UpsertPricesNeighborhoodsBulkParams{
 		Names:  trimmed,
 		CityID: cityID,
 	}
@@ -60,7 +60,7 @@ func emptyToNull(s string) string {
 	return util.TrimUnicodeSpace(s)
 }
 
-func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, neighborhoodIDs map[string]pgtype.UUID, periodIdentifier string) (*db.UpsertPricesTransactionsBulkParams, error) {
+func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, neighborhoodIDs map[string]uuid.UUID, periodIdentifier string) (*db.UpsertPricesTransactionsBulkParams, error) {
 	seen := make(map[transactionKey]struct{})
 	params := &db.UpsertPricesTransactionsBulkParams{}
 	for _, tx := range transactions {

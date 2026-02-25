@@ -5,7 +5,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type SignInAnonymousInput struct {
@@ -23,7 +22,7 @@ func (h *Handlers) SignInAnonymous(ctx context.Context, input *SignInAnonymousIn
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid device ID format")
 	}
-	deviceID := &pgtype.UUID{Bytes: parsed, Valid: true}
+	deviceID := &parsed
 	resp, err := h.service.SignInAnonymous(ctx, SignInAnonymousRequest{
 		DeviceID:  deviceID,
 		UserAgent: input.UserAgent,

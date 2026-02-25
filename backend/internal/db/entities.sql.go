@@ -153,11 +153,11 @@ WHERE entity_id = $1
 `
 
 type UpdateEntityStatusParams struct {
-	EntityID string `db:"entity_id" json:"entity_id"`
-	Status   string `db:"status" json:"status"`
+	EntityID string `json:"entity_id"`
+	Status   string `json:"status"`
 }
 
-func (q *Queries) UpdateEntityStatus(ctx context.Context, arg *UpdateEntityStatusParams) error {
+func (q *Queries) UpdateEntityStatus(ctx context.Context, arg UpdateEntityStatusParams) error {
 	_, err := q.db.Exec(ctx, updateEntityStatus, arg.EntityID, arg.Status)
 	return err
 }
@@ -191,14 +191,14 @@ RETURNING entity_id, entity_type, status, scheduling_strategy, metadata, created
 `
 
 type UpsertEntityParams struct {
-	EntityID   string          `db:"entity_id" json:"entity_id"`
-	EntityType string          `db:"entity_type" json:"entity_type"`
-	Column3    *string         `db:"column_3" json:"column_3"`
-	Column4    *string         `db:"column_4" json:"column_4"`
-	Column5    json.RawMessage `db:"column_5" json:"column_5"`
+	EntityID   string          `json:"entity_id"`
+	EntityType string          `json:"entity_type"`
+	Column3    *string         `json:"column_3"`
+	Column4    *string         `json:"column_4"`
+	Column5    json.RawMessage `json:"column_5"`
 }
 
-func (q *Queries) UpsertEntity(ctx context.Context, arg *UpsertEntityParams) (TaskQueueEntityRegistry, error) {
+func (q *Queries) UpsertEntity(ctx context.Context, arg UpsertEntityParams) (TaskQueueEntityRegistry, error) {
 	row := q.db.QueryRow(ctx, upsertEntity,
 		arg.EntityID,
 		arg.EntityType,

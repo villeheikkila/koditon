@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -97,430 +98,430 @@ func (ns NullAuthPushTokenType) Value() (driver.Value, error) {
 }
 
 type AuthDevice struct {
-	DeviceID                 pgtype.UUID           `db:"device_id" json:"device_id"`
-	UserID                   pgtype.UUID           `db:"user_id" json:"user_id"`
-	DeviceName               *string               `db:"device_name" json:"device_name"`
-	DeviceOs                 *string               `db:"device_os" json:"device_os"`
-	DeviceAppVersion         *string               `db:"device_app_version" json:"device_app_version"`
-	DevicePushToken          *string               `db:"device_push_token" json:"device_push_token"`
-	DevicePushTokenType      NullAuthPushTokenType `db:"device_push_token_type" json:"device_push_token_type"`
-	DevicePushTokenUpdatedAt *time.Time            `db:"device_push_token_updated_at" json:"device_push_token_updated_at"`
-	DeviceCreatedAt          time.Time             `db:"device_created_at" json:"device_created_at"`
-	DeviceUpdatedAt          time.Time             `db:"device_updated_at" json:"device_updated_at"`
-	DeviceLastSeenAt         time.Time             `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceID                 uuid.UUID             `json:"device_id"`
+	UserID                   uuid.UUID             `json:"user_id"`
+	DeviceName               *string               `json:"device_name"`
+	DeviceOs                 *string               `json:"device_os"`
+	DeviceAppVersion         *string               `json:"device_app_version"`
+	DevicePushToken          *string               `json:"device_push_token"`
+	DevicePushTokenType      NullAuthPushTokenType `json:"device_push_token_type"`
+	DevicePushTokenUpdatedAt *time.Time            `json:"device_push_token_updated_at"`
+	DeviceCreatedAt          time.Time             `json:"device_created_at"`
+	DeviceUpdatedAt          time.Time             `json:"device_updated_at"`
+	DeviceLastSeenAt         time.Time             `json:"device_last_seen_at"`
 }
 
 type AuthFeatureFlag struct {
-	FlagID             pgtype.UUID `db:"flag_id" json:"flag_id"`
-	FlagName           string      `db:"flag_name" json:"flag_name"`
-	FlagDescription    *string     `db:"flag_description" json:"flag_description"`
-	FlagDefaultEnabled bool        `db:"flag_default_enabled" json:"flag_default_enabled"`
-	FlagCreatedAt      time.Time   `db:"flag_created_at" json:"flag_created_at"`
+	FlagID             uuid.UUID `json:"flag_id"`
+	FlagName           string    `json:"flag_name"`
+	FlagDescription    *string   `json:"flag_description"`
+	FlagDefaultEnabled bool      `json:"flag_default_enabled"`
+	FlagCreatedAt      time.Time `json:"flag_created_at"`
 }
 
 type AuthIdentity struct {
-	IdentityID            pgtype.UUID      `db:"identity_id" json:"identity_id"`
-	UserID                pgtype.UUID      `db:"user_id" json:"user_id"`
-	IdentityProvider      AuthAuthProvider `db:"identity_provider" json:"identity_provider"`
-	IdentityExternalID    string           `db:"identity_external_id" json:"identity_external_id"`
-	IdentityEmail         *string          `db:"identity_email" json:"identity_email"`
-	IdentityEmailVerified *bool            `db:"identity_email_verified" json:"identity_email_verified"`
-	IdentityData          json.RawMessage  `db:"identity_data" json:"identity_data"`
-	IdentityCreatedAt     time.Time        `db:"identity_created_at" json:"identity_created_at"`
-	IdentityUpdatedAt     time.Time        `db:"identity_updated_at" json:"identity_updated_at"`
+	IdentityID            uuid.UUID        `json:"identity_id"`
+	UserID                uuid.UUID        `json:"user_id"`
+	IdentityProvider      AuthAuthProvider `json:"identity_provider"`
+	IdentityExternalID    string           `json:"identity_external_id"`
+	IdentityEmail         *string          `json:"identity_email"`
+	IdentityEmailVerified *bool            `json:"identity_email_verified"`
+	IdentityData          json.RawMessage  `json:"identity_data"`
+	IdentityCreatedAt     time.Time        `json:"identity_created_at"`
+	IdentityUpdatedAt     time.Time        `json:"identity_updated_at"`
 }
 
 type AuthRefreshToken struct {
-	RefreshTokenID        int64       `db:"refresh_token_id" json:"refresh_token_id"`
-	SessionID             pgtype.UUID `db:"session_id" json:"session_id"`
-	RefreshTokenTokenHash string      `db:"refresh_token_token_hash" json:"refresh_token_token_hash"`
-	RefreshTokenCounter   int64       `db:"refresh_token_counter" json:"refresh_token_counter"`
-	RefreshTokenRevoked   bool        `db:"refresh_token_revoked" json:"refresh_token_revoked"`
-	RefreshTokenCreatedAt time.Time   `db:"refresh_token_created_at" json:"refresh_token_created_at"`
-	RefreshTokenUpdatedAt time.Time   `db:"refresh_token_updated_at" json:"refresh_token_updated_at"`
+	RefreshTokenID        int64     `json:"refresh_token_id"`
+	SessionID             uuid.UUID `json:"session_id"`
+	RefreshTokenTokenHash string    `json:"refresh_token_token_hash"`
+	RefreshTokenCounter   int64     `json:"refresh_token_counter"`
+	RefreshTokenRevoked   bool      `json:"refresh_token_revoked"`
+	RefreshTokenCreatedAt time.Time `json:"refresh_token_created_at"`
+	RefreshTokenUpdatedAt time.Time `json:"refresh_token_updated_at"`
 }
 
 type AuthRole struct {
-	RoleID          pgtype.UUID `db:"role_id" json:"role_id"`
-	RoleName        string      `db:"role_name" json:"role_name"`
-	RoleDescription *string     `db:"role_description" json:"role_description"`
-	RoleCreatedAt   time.Time   `db:"role_created_at" json:"role_created_at"`
+	RoleID          uuid.UUID `json:"role_id"`
+	RoleName        string    `json:"role_name"`
+	RoleDescription *string   `json:"role_description"`
+	RoleCreatedAt   time.Time `json:"role_created_at"`
 }
 
 type AuthRoleFeatureFlag struct {
-	RoleID pgtype.UUID `db:"role_id" json:"role_id"`
-	FlagID pgtype.UUID `db:"flag_id" json:"flag_id"`
+	RoleID uuid.UUID `json:"role_id"`
+	FlagID uuid.UUID `json:"flag_id"`
 }
 
 type AuthSession struct {
-	SessionID                  pgtype.UUID      `db:"session_id" json:"session_id"`
-	UserID                     pgtype.UUID      `db:"user_id" json:"user_id"`
-	SessionDeviceID            pgtype.UUID      `db:"session_device_id" json:"session_device_id"`
-	SessionUserAgent           *string          `db:"session_user_agent" json:"session_user_agent"`
-	SessionIp                  *string          `db:"session_ip" json:"session_ip"`
-	SessionProvider            AuthAuthProvider `db:"session_provider" json:"session_provider"`
-	SessionRefreshTokenHmacKey string           `db:"session_refresh_token_hmac_key" json:"session_refresh_token_hmac_key"`
-	SessionRefreshTokenCounter int64            `db:"session_refresh_token_counter" json:"session_refresh_token_counter"`
-	SessionCreatedAt           time.Time        `db:"session_created_at" json:"session_created_at"`
-	SessionUpdatedAt           time.Time        `db:"session_updated_at" json:"session_updated_at"`
-	SessionRefreshedAt         *time.Time       `db:"session_refreshed_at" json:"session_refreshed_at"`
-	SessionNotAfter            *time.Time       `db:"session_not_after" json:"session_not_after"`
-	SessionRevokedAt           *time.Time       `db:"session_revoked_at" json:"session_revoked_at"`
+	SessionID                  uuid.UUID        `json:"session_id"`
+	UserID                     uuid.UUID        `json:"user_id"`
+	SessionDeviceID            *uuid.UUID       `json:"session_device_id"`
+	SessionUserAgent           *string          `json:"session_user_agent"`
+	SessionIp                  *string          `json:"session_ip"`
+	SessionProvider            AuthAuthProvider `json:"session_provider"`
+	SessionRefreshTokenHmacKey string           `json:"session_refresh_token_hmac_key"`
+	SessionRefreshTokenCounter int64            `json:"session_refresh_token_counter"`
+	SessionCreatedAt           time.Time        `json:"session_created_at"`
+	SessionUpdatedAt           time.Time        `json:"session_updated_at"`
+	SessionRefreshedAt         *time.Time       `json:"session_refreshed_at"`
+	SessionNotAfter            *time.Time       `json:"session_not_after"`
+	SessionRevokedAt           *time.Time       `json:"session_revoked_at"`
 }
 
 type AuthUser struct {
-	UserID        pgtype.UUID `db:"user_id" json:"user_id"`
-	UserCreatedAt time.Time   `db:"user_created_at" json:"user_created_at"`
-	UserUpdatedAt time.Time   `db:"user_updated_at" json:"user_updated_at"`
-	UserDeletedAt *time.Time  `db:"user_deleted_at" json:"user_deleted_at"`
+	UserID        uuid.UUID  `json:"user_id"`
+	UserCreatedAt time.Time  `json:"user_created_at"`
+	UserUpdatedAt time.Time  `json:"user_updated_at"`
+	UserDeletedAt *time.Time `json:"user_deleted_at"`
 }
 
 type AuthUserFeatureFlag struct {
-	UserID            pgtype.UUID `db:"user_id" json:"user_id"`
-	FlagID            pgtype.UUID `db:"flag_id" json:"flag_id"`
-	UserFlagEnabled   bool        `db:"user_flag_enabled" json:"user_flag_enabled"`
-	UserFlagCreatedAt time.Time   `db:"user_flag_created_at" json:"user_flag_created_at"`
+	UserID            uuid.UUID `json:"user_id"`
+	FlagID            uuid.UUID `json:"flag_id"`
+	UserFlagEnabled   bool      `json:"user_flag_enabled"`
+	UserFlagCreatedAt time.Time `json:"user_flag_created_at"`
 }
 
 type AuthUserRole struct {
-	UserID            pgtype.UUID `db:"user_id" json:"user_id"`
-	RoleID            pgtype.UUID `db:"role_id" json:"role_id"`
-	UserRoleCreatedAt time.Time   `db:"user_role_created_at" json:"user_role_created_at"`
+	UserID            uuid.UUID `json:"user_id"`
+	RoleID            uuid.UUID `json:"role_id"`
+	UserRoleCreatedAt time.Time `json:"user_role_created_at"`
 }
 
 type FrontdoorAd struct {
-	FrontdoorAdID             pgtype.UUID     `db:"frontdoor_ad_id" json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID     string          `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl            string          `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
-	FrontdoorAdFirstSeenAt    time.Time       `db:"frontdoor_ad_first_seen_at" json:"frontdoor_ad_first_seen_at"`
-	FrontdoorAdLastSeenAt     time.Time       `db:"frontdoor_ad_last_seen_at" json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdUpdatedAt      time.Time       `db:"frontdoor_ad_updated_at" json:"frontdoor_ad_updated_at"`
-	FrontdoorAdData           json.RawMessage `db:"frontdoor_ad_data" json:"frontdoor_ad_data"`
-	FrontdoorAdProcessedAt    *time.Time      `db:"frontdoor_ad_processed_at" json:"frontdoor_ad_processed_at"`
-	FrontdoorAdPageNotFound   bool            `db:"frontdoor_ad_page_not_found" json:"frontdoor_ad_page_not_found"`
-	FrontdoorAdPublishingTime *time.Time      `db:"frontdoor_ad_publishing_time" json:"frontdoor_ad_publishing_time"`
-	PostalPostalCodeID        pgtype.UUID     `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	FrontdoorAdAddress        *string         `db:"frontdoor_ad_address" json:"frontdoor_ad_address"`
-	FrontdoorAdArea           pgtype.Numeric  `db:"frontdoor_ad_area" json:"frontdoor_ad_area"`
-	FrontdoorAdRoomLayout     *string         `db:"frontdoor_ad_room_layout" json:"frontdoor_ad_room_layout"`
-	FrontdoorAdAskingPrice    pgtype.Numeric  `db:"frontdoor_ad_asking_price" json:"frontdoor_ad_asking_price"`
-	FrontdoorAdStreetAddress  *string         `db:"frontdoor_ad_street_address" json:"frontdoor_ad_street_address"`
-	FrontdoorAdCity           *string         `db:"frontdoor_ad_city" json:"frontdoor_ad_city"`
-	FrontdoorAdPostal         *string         `db:"frontdoor_ad_postal" json:"frontdoor_ad_postal"`
-	FrontdoorAdPrice          *int64          `db:"frontdoor_ad_price" json:"frontdoor_ad_price"`
-	FrontdoorAdAreaValue      *float64        `db:"frontdoor_ad_area_value" json:"frontdoor_ad_area_value"`
-	FrontdoorAdAddressKey     *string         `db:"frontdoor_ad_address_key" json:"frontdoor_ad_address_key"`
-	FrontdoorAdSearchText     *string         `db:"frontdoor_ad_search_text" json:"frontdoor_ad_search_text"`
+	FrontdoorAdID             uuid.UUID       `json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID     string          `json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl            string          `json:"frontdoor_ad_url"`
+	FrontdoorAdFirstSeenAt    time.Time       `json:"frontdoor_ad_first_seen_at"`
+	FrontdoorAdLastSeenAt     time.Time       `json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdUpdatedAt      time.Time       `json:"frontdoor_ad_updated_at"`
+	FrontdoorAdData           json.RawMessage `json:"frontdoor_ad_data"`
+	FrontdoorAdProcessedAt    *time.Time      `json:"frontdoor_ad_processed_at"`
+	FrontdoorAdPageNotFound   bool            `json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdPublishingTime *time.Time      `json:"frontdoor_ad_publishing_time"`
+	PostalPostalCodeID        *uuid.UUID      `json:"postal_postal_code_id"`
+	FrontdoorAdAddress        *string         `json:"frontdoor_ad_address"`
+	FrontdoorAdArea           pgtype.Numeric  `json:"frontdoor_ad_area"`
+	FrontdoorAdRoomLayout     *string         `json:"frontdoor_ad_room_layout"`
+	FrontdoorAdAskingPrice    pgtype.Numeric  `json:"frontdoor_ad_asking_price"`
+	FrontdoorAdStreetAddress  *string         `json:"frontdoor_ad_street_address"`
+	FrontdoorAdCity           *string         `json:"frontdoor_ad_city"`
+	FrontdoorAdPostal         *string         `json:"frontdoor_ad_postal"`
+	FrontdoorAdPrice          *int64          `json:"frontdoor_ad_price"`
+	FrontdoorAdAreaValue      *float64        `json:"frontdoor_ad_area_value"`
+	FrontdoorAdAddressKey     *string         `json:"frontdoor_ad_address_key"`
+	FrontdoorAdSearchText     *string         `json:"frontdoor_ad_search_text"`
 }
 
 type FrontdoorBuilding struct {
-	FrontdoorBuildingID                       pgtype.UUID       `db:"frontdoor_building_id" json:"frontdoor_building_id"`
-	FrontdoorBuildingUrl                      *string           `db:"frontdoor_building_url" json:"frontdoor_building_url"`
-	FrontdoorBuildingFirstSeenAt              time.Time         `db:"frontdoor_building_first_seen_at" json:"frontdoor_building_first_seen_at"`
-	FrontdoorBuildingLastSeenAt               time.Time         `db:"frontdoor_building_last_seen_at" json:"frontdoor_building_last_seen_at"`
-	FrontdoorBuildingUpdatedAt                time.Time         `db:"frontdoor_building_updated_at" json:"frontdoor_building_updated_at"`
-	FrontdoorBuildingCompanyName              *string           `db:"frontdoor_building_company_name" json:"frontdoor_building_company_name"`
-	FrontdoorBuildingBusinessID               *string           `db:"frontdoor_building_business_id" json:"frontdoor_building_business_id"`
-	FrontdoorBuildingApartmentCount           *int32            `db:"frontdoor_building_apartment_count" json:"frontdoor_building_apartment_count"`
-	FrontdoorBuildingFloorCount               *int32            `db:"frontdoor_building_floor_count" json:"frontdoor_building_floor_count"`
-	FrontdoorBuildingConstructionEndYear      *int32            `db:"frontdoor_building_construction_end_year" json:"frontdoor_building_construction_end_year"`
-	FrontdoorBuildingBuildYear                *int32            `db:"frontdoor_building_build_year" json:"frontdoor_building_build_year"`
-	FrontdoorBuildingHasElevator              *bool             `db:"frontdoor_building_has_elevator" json:"frontdoor_building_has_elevator"`
-	FrontdoorBuildingHasSauna                 *bool             `db:"frontdoor_building_has_sauna" json:"frontdoor_building_has_sauna"`
-	FrontdoorBuildingEnergyCertificateCode    *string           `db:"frontdoor_building_energy_certificate_code" json:"frontdoor_building_energy_certificate_code"`
-	FrontdoorBuildingPlotHoldingType          *string           `db:"frontdoor_building_plot_holding_type" json:"frontdoor_building_plot_holding_type"`
-	FrontdoorBuildingOuterRoofMaterial        *string           `db:"frontdoor_building_outer_roof_material" json:"frontdoor_building_outer_roof_material"`
-	FrontdoorBuildingOuterRoofType            *string           `db:"frontdoor_building_outer_roof_type" json:"frontdoor_building_outer_roof_type"`
-	FrontdoorBuildingHeating                  *string           `db:"frontdoor_building_heating" json:"frontdoor_building_heating"`
-	FrontdoorBuildingHeatingFuel              []string          `db:"frontdoor_building_heating_fuel" json:"frontdoor_building_heating_fuel"`
-	FrontdoorBuildingStreetAddress            *string           `db:"frontdoor_building_street_address" json:"frontdoor_building_street_address"`
-	FrontdoorBuildingHouseNumber              *string           `db:"frontdoor_building_house_number" json:"frontdoor_building_house_number"`
-	FrontdoorBuildingPostcode                 *string           `db:"frontdoor_building_postcode" json:"frontdoor_building_postcode"`
-	FrontdoorBuildingPostArea                 *string           `db:"frontdoor_building_post_area" json:"frontdoor_building_post_area"`
-	FrontdoorBuildingMunicipality             *string           `db:"frontdoor_building_municipality" json:"frontdoor_building_municipality"`
-	FrontdoorBuildingDistrict                 *string           `db:"frontdoor_building_district" json:"frontdoor_building_district"`
-	FrontdoorBuildingLatitude                 *float64          `db:"frontdoor_building_latitude" json:"frontdoor_building_latitude"`
-	FrontdoorBuildingLongitude                *float64          `db:"frontdoor_building_longitude" json:"frontdoor_building_longitude"`
-	FrontdoorBuildingElevatorRenovated        *bool             `db:"frontdoor_building_elevator_renovated" json:"frontdoor_building_elevator_renovated"`
-	FrontdoorBuildingElevatorRenovatedYear    *int32            `db:"frontdoor_building_elevator_renovated_year" json:"frontdoor_building_elevator_renovated_year"`
-	FrontdoorBuildingFacadeRenovated          *bool             `db:"frontdoor_building_facade_renovated" json:"frontdoor_building_facade_renovated"`
-	FrontdoorBuildingFacadeRenovatedYear      *int32            `db:"frontdoor_building_facade_renovated_year" json:"frontdoor_building_facade_renovated_year"`
-	FrontdoorBuildingWindowRenovated          *bool             `db:"frontdoor_building_window_renovated" json:"frontdoor_building_window_renovated"`
-	FrontdoorBuildingWindowRenovatedYear      *int32            `db:"frontdoor_building_window_renovated_year" json:"frontdoor_building_window_renovated_year"`
-	FrontdoorBuildingRoofRenovated            *bool             `db:"frontdoor_building_roof_renovated" json:"frontdoor_building_roof_renovated"`
-	FrontdoorBuildingRoofRenovatedYear        *int32            `db:"frontdoor_building_roof_renovated_year" json:"frontdoor_building_roof_renovated_year"`
-	FrontdoorBuildingPipeRenovated            *bool             `db:"frontdoor_building_pipe_renovated" json:"frontdoor_building_pipe_renovated"`
-	FrontdoorBuildingPipeRenovatedYear        *int32            `db:"frontdoor_building_pipe_renovated_year" json:"frontdoor_building_pipe_renovated_year"`
-	FrontdoorBuildingBalconyRenovated         *bool             `db:"frontdoor_building_balcony_renovated" json:"frontdoor_building_balcony_renovated"`
-	FrontdoorBuildingBalconyRenovatedYear     *int32            `db:"frontdoor_building_balcony_renovated_year" json:"frontdoor_building_balcony_renovated_year"`
-	FrontdoorBuildingElectricityRenovated     *bool             `db:"frontdoor_building_electricity_renovated" json:"frontdoor_building_electricity_renovated"`
-	FrontdoorBuildingElectricityRenovatedYear *int32            `db:"frontdoor_building_electricity_renovated_year" json:"frontdoor_building_electricity_renovated_year"`
-	FrontdoorBuildingContactPhone             *string           `db:"frontdoor_building_contact_phone" json:"frontdoor_building_contact_phone"`
-	FrontdoorBuildingContactOfficeName        *string           `db:"frontdoor_building_contact_office_name" json:"frontdoor_building_contact_office_name"`
-	FrontdoorBuildingContactOfficeID          *int32            `db:"frontdoor_building_contact_office_id" json:"frontdoor_building_contact_office_id"`
-	FrontdoorBuildingDescription              *string           `db:"frontdoor_building_description" json:"frontdoor_building_description"`
-	FrontdoorBuildingCarStorageDescription    *string           `db:"frontdoor_building_car_storage_description" json:"frontdoor_building_car_storage_description"`
-	FrontdoorBuildingOtherInfo                *string           `db:"frontdoor_building_other_info" json:"frontdoor_building_other_info"`
-	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `db:"frontdoor_building_additional_addresses" json:"frontdoor_building_additional_addresses"`
-	FrontdoorBuildingLinks                    []json.RawMessage `db:"frontdoor_building_links" json:"frontdoor_building_links"`
-	FrontdoorBuildingData                     json.RawMessage   `db:"frontdoor_building_data" json:"frontdoor_building_data"`
-	FrontdoorBuildingProcessedAt              *time.Time        `db:"frontdoor_building_processed_at" json:"frontdoor_building_processed_at"`
-	FrontdoorBuildingHousingCompanyID         *int64            `db:"frontdoor_building_housing_company_id" json:"frontdoor_building_housing_company_id"`
-	FrontdoorBuildingHousingCompanyFriendlyID *string           `db:"frontdoor_building_housing_company_friendly_id" json:"frontdoor_building_housing_company_friendly_id"`
-	FrontdoorBuildingGeom                     interface{}       `db:"frontdoor_building_geom" json:"frontdoor_building_geom"`
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
 }
 
 type FrontdoorBuildingAnnouncement struct {
-	FrontdoorBuildingAnnouncementID                       pgtype.UUID `db:"frontdoor_building_announcement_id" json:"frontdoor_building_announcement_id"`
-	FrontdoorBuildingAnnouncementExternalID               *int32      `db:"frontdoor_building_announcement_external_id" json:"frontdoor_building_announcement_external_id"`
-	FrontdoorBuildingAnnouncementFriendlyID               *string     `db:"frontdoor_building_announcement_friendly_id" json:"frontdoor_building_announcement_friendly_id"`
-	FrontdoorBuildingAnnouncementUnpublishingTime         *float64    `db:"frontdoor_building_announcement_unpublishing_time" json:"frontdoor_building_announcement_unpublishing_time"`
-	FrontdoorBuildingAnnouncementAddressLine1             *string     `db:"frontdoor_building_announcement_address_line1" json:"frontdoor_building_announcement_address_line1"`
-	FrontdoorBuildingAnnouncementAddressLine2             *string     `db:"frontdoor_building_announcement_address_line2" json:"frontdoor_building_announcement_address_line2"`
-	FrontdoorBuildingAnnouncementLocation                 *string     `db:"frontdoor_building_announcement_location" json:"frontdoor_building_announcement_location"`
-	FrontdoorBuildingAnnouncementSearchPrice              *float64    `db:"frontdoor_building_announcement_search_price" json:"frontdoor_building_announcement_search_price"`
-	FrontdoorBuildingAnnouncementNotifyPriceChanged       *bool       `db:"frontdoor_building_announcement_notify_price_changed" json:"frontdoor_building_announcement_notify_price_changed"`
-	FrontdoorBuildingAnnouncementPropertyType             *string     `db:"frontdoor_building_announcement_property_type" json:"frontdoor_building_announcement_property_type"`
-	FrontdoorBuildingAnnouncementPropertySubtype          *string     `db:"frontdoor_building_announcement_property_subtype" json:"frontdoor_building_announcement_property_subtype"`
-	FrontdoorBuildingAnnouncementConstructionFinishedYear *int32      `db:"frontdoor_building_announcement_construction_finished_year" json:"frontdoor_building_announcement_construction_finished_year"`
-	FrontdoorBuildingAnnouncementMainImageUri             *string     `db:"frontdoor_building_announcement_main_image_uri" json:"frontdoor_building_announcement_main_image_uri"`
-	FrontdoorBuildingAnnouncementHasOpenBidding           *bool       `db:"frontdoor_building_announcement_has_open_bidding" json:"frontdoor_building_announcement_has_open_bidding"`
-	FrontdoorBuildingAnnouncementRoomStructure            *string     `db:"frontdoor_building_announcement_room_structure" json:"frontdoor_building_announcement_room_structure"`
-	FrontdoorBuildingAnnouncementArea                     *float64    `db:"frontdoor_building_announcement_area" json:"frontdoor_building_announcement_area"`
-	FrontdoorBuildingAnnouncementTotalArea                *float64    `db:"frontdoor_building_announcement_total_area" json:"frontdoor_building_announcement_total_area"`
-	FrontdoorBuildingAnnouncementPricePerSquare           *float64    `db:"frontdoor_building_announcement_price_per_square" json:"frontdoor_building_announcement_price_per_square"`
-	FrontdoorBuildingAnnouncementDaysOnMarket             *int32      `db:"frontdoor_building_announcement_days_on_market" json:"frontdoor_building_announcement_days_on_market"`
-	FrontdoorBuildingAnnouncementNewBuilding              *bool       `db:"frontdoor_building_announcement_new_building" json:"frontdoor_building_announcement_new_building"`
-	FrontdoorBuildingAnnouncementMainImageHidden          *bool       `db:"frontdoor_building_announcement_main_image_hidden" json:"frontdoor_building_announcement_main_image_hidden"`
-	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    *bool       `db:"frontdoor_building_announcement_is_company_announcement" json:"frontdoor_building_announcement_is_company_announcement"`
-	FrontdoorBuildingAnnouncementShowBiddingIndicators    *bool       `db:"frontdoor_building_announcement_show_bidding_indicators" json:"frontdoor_building_announcement_show_bidding_indicators"`
-	FrontdoorBuildingAnnouncementPublished                *bool       `db:"frontdoor_building_announcement_published" json:"frontdoor_building_announcement_published"`
-	FrontdoorBuildingAnnouncementRentPeriod               *string     `db:"frontdoor_building_announcement_rent_period" json:"frontdoor_building_announcement_rent_period"`
-	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32      `db:"frontdoor_building_announcement_rental_unique_no" json:"frontdoor_building_announcement_rental_unique_no"`
-	FrontdoorBuildingID                                   pgtype.UUID `db:"frontdoor_building_id" json:"frontdoor_building_id"`
-	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time   `db:"frontdoor_building_announcement_first_seen_at" json:"frontdoor_building_announcement_first_seen_at"`
-	FrontdoorBuildingAnnouncementLastSeenAt               time.Time   `db:"frontdoor_building_announcement_last_seen_at" json:"frontdoor_building_announcement_last_seen_at"`
-	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time  `db:"frontdoor_building_announcement_unpublishing_time_date" json:"frontdoor_building_announcement_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
+	FrontdoorBuildingAnnouncementAddressLine1             *string    `json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2             *string    `json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation                 *string    `json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice              *float64   `json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementNotifyPriceChanged       *bool      `json:"frontdoor_building_announcement_notify_price_changed"`
+	FrontdoorBuildingAnnouncementPropertyType             *string    `json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype          *string    `json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementConstructionFinishedYear *int32     `json:"frontdoor_building_announcement_construction_finished_year"`
+	FrontdoorBuildingAnnouncementMainImageUri             *string    `json:"frontdoor_building_announcement_main_image_uri"`
+	FrontdoorBuildingAnnouncementHasOpenBidding           *bool      `json:"frontdoor_building_announcement_has_open_bidding"`
+	FrontdoorBuildingAnnouncementRoomStructure            *string    `json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementArea                     *float64   `json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementTotalArea                *float64   `json:"frontdoor_building_announcement_total_area"`
+	FrontdoorBuildingAnnouncementPricePerSquare           *float64   `json:"frontdoor_building_announcement_price_per_square"`
+	FrontdoorBuildingAnnouncementDaysOnMarket             *int32     `json:"frontdoor_building_announcement_days_on_market"`
+	FrontdoorBuildingAnnouncementNewBuilding              *bool      `json:"frontdoor_building_announcement_new_building"`
+	FrontdoorBuildingAnnouncementMainImageHidden          *bool      `json:"frontdoor_building_announcement_main_image_hidden"`
+	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    *bool      `json:"frontdoor_building_announcement_is_company_announcement"`
+	FrontdoorBuildingAnnouncementShowBiddingIndicators    *bool      `json:"frontdoor_building_announcement_show_bidding_indicators"`
+	FrontdoorBuildingAnnouncementPublished                *bool      `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod               *string    `json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32     `json:"frontdoor_building_announcement_rental_unique_no"`
+	FrontdoorBuildingID                                   uuid.UUID  `json:"frontdoor_building_id"`
+	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time  `json:"frontdoor_building_announcement_first_seen_at"`
+	FrontdoorBuildingAnnouncementLastSeenAt               time.Time  `json:"frontdoor_building_announcement_last_seen_at"`
+	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
 }
 
 type PostalAdArea struct {
-	PostalAdAreaID        pgtype.UUID `db:"postal_ad_area_id" json:"postal_ad_area_id"`
-	PostalAdAreaCode      string      `db:"postal_ad_area_code" json:"postal_ad_area_code"`
-	PostalAdAreaNameFi    string      `db:"postal_ad_area_name_fi" json:"postal_ad_area_name_fi"`
-	PostalAdAreaNameSv    *string     `db:"postal_ad_area_name_sv" json:"postal_ad_area_name_sv"`
-	PostalAdAreaCreatedAt time.Time   `db:"postal_ad_area_created_at" json:"postal_ad_area_created_at"`
-	PostalAdAreaUpdatedAt time.Time   `db:"postal_ad_area_updated_at" json:"postal_ad_area_updated_at"`
+	PostalAdAreaID        uuid.UUID `json:"postal_ad_area_id"`
+	PostalAdAreaCode      string    `json:"postal_ad_area_code"`
+	PostalAdAreaNameFi    string    `json:"postal_ad_area_name_fi"`
+	PostalAdAreaNameSv    *string   `json:"postal_ad_area_name_sv"`
+	PostalAdAreaCreatedAt time.Time `json:"postal_ad_area_created_at"`
+	PostalAdAreaUpdatedAt time.Time `json:"postal_ad_area_updated_at"`
 }
 
 type PostalMunicipality struct {
-	PostalMunicipalityID                pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalMunicipalityCode              string      `db:"postal_municipality_code" json:"postal_municipality_code"`
-	PostalMunicipalityNameFi            string      `db:"postal_municipality_name_fi" json:"postal_municipality_name_fi"`
-	PostalMunicipalityNameSv            *string     `db:"postal_municipality_name_sv" json:"postal_municipality_name_sv"`
-	PostalMunicipalityLanguageRatioCode *string     `db:"postal_municipality_language_ratio_code" json:"postal_municipality_language_ratio_code"`
-	PostalMunicipalityCreatedAt         time.Time   `db:"postal_municipality_created_at" json:"postal_municipality_created_at"`
-	PostalMunicipalityUpdatedAt         time.Time   `db:"postal_municipality_updated_at" json:"postal_municipality_updated_at"`
+	PostalMunicipalityID                uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityCode              string    `json:"postal_municipality_code"`
+	PostalMunicipalityNameFi            string    `json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv            *string   `json:"postal_municipality_name_sv"`
+	PostalMunicipalityLanguageRatioCode *string   `json:"postal_municipality_language_ratio_code"`
+	PostalMunicipalityCreatedAt         time.Time `json:"postal_municipality_created_at"`
+	PostalMunicipalityUpdatedAt         time.Time `json:"postal_municipality_updated_at"`
 }
 
 type PostalPostalCode struct {
-	PostalPostalCodeID             pgtype.UUID `db:"postal_postal_code_id" json:"postal_postal_code_id"`
-	PostalPostalCodeDate           time.Time   `db:"postal_postal_code_date" json:"postal_postal_code_date"`
-	PostalPostalCodeCode           string      `db:"postal_postal_code_code" json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi         string      `db:"postal_postal_code_name_fi" json:"postal_postal_code_name_fi"`
-	PostalPostalCodeNameSv         *string     `db:"postal_postal_code_name_sv" json:"postal_postal_code_name_sv"`
-	PostalPostalCodeAbbrFi         *string     `db:"postal_postal_code_abbr_fi" json:"postal_postal_code_abbr_fi"`
-	PostalPostalCodeAbbrSv         *string     `db:"postal_postal_code_abbr_sv" json:"postal_postal_code_abbr_sv"`
-	PostalPostalCodeValidFrom      *time.Time  `db:"postal_postal_code_valid_from" json:"postal_postal_code_valid_from"`
-	PostalPostalCodeTypeCode       *string     `db:"postal_postal_code_type_code" json:"postal_postal_code_type_code"`
-	PostalAdAreaID                 pgtype.UUID `db:"postal_ad_area_id" json:"postal_ad_area_id"`
-	PostalMunicipalityID           pgtype.UUID `db:"postal_municipality_id" json:"postal_municipality_id"`
-	PostalPostalCodeCreatedAt      time.Time   `db:"postal_postal_code_created_at" json:"postal_postal_code_created_at"`
-	PostalPostalCodeUpdatedAt      time.Time   `db:"postal_postal_code_updated_at" json:"postal_postal_code_updated_at"`
-	PostalPostalCodeNeighborhoodFi *string     `db:"postal_postal_code_neighborhood_fi" json:"postal_postal_code_neighborhood_fi"`
+	PostalPostalCodeID             uuid.UUID  `json:"postal_postal_code_id"`
+	PostalPostalCodeDate           time.Time  `json:"postal_postal_code_date"`
+	PostalPostalCodeCode           string     `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi         string     `json:"postal_postal_code_name_fi"`
+	PostalPostalCodeNameSv         *string    `json:"postal_postal_code_name_sv"`
+	PostalPostalCodeAbbrFi         *string    `json:"postal_postal_code_abbr_fi"`
+	PostalPostalCodeAbbrSv         *string    `json:"postal_postal_code_abbr_sv"`
+	PostalPostalCodeValidFrom      *time.Time `json:"postal_postal_code_valid_from"`
+	PostalPostalCodeTypeCode       *string    `json:"postal_postal_code_type_code"`
+	PostalAdAreaID                 *uuid.UUID `json:"postal_ad_area_id"`
+	PostalMunicipalityID           *uuid.UUID `json:"postal_municipality_id"`
+	PostalPostalCodeCreatedAt      time.Time  `json:"postal_postal_code_created_at"`
+	PostalPostalCodeUpdatedAt      time.Time  `json:"postal_postal_code_updated_at"`
+	PostalPostalCodeNeighborhoodFi *string    `json:"postal_postal_code_neighborhood_fi"`
 }
 
 type PricesCity struct {
-	PricesCityID        pgtype.UUID `db:"prices_city_id" json:"prices_city_id"`
-	PricesCityName      string      `db:"prices_city_name" json:"prices_city_name"`
-	PricesCityCreatedAt time.Time   `db:"prices_city_created_at" json:"prices_city_created_at"`
-	PricesCityUpdatedAt time.Time   `db:"prices_city_updated_at" json:"prices_city_updated_at"`
+	PricesCityID        uuid.UUID `json:"prices_city_id"`
+	PricesCityName      string    `json:"prices_city_name"`
+	PricesCityCreatedAt time.Time `json:"prices_city_created_at"`
+	PricesCityUpdatedAt time.Time `json:"prices_city_updated_at"`
 }
 
 type PricesNeighborhood struct {
-	PricesNeighborhoodID                 pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
-	PricesNeighborhoodName               string      `db:"prices_neighborhood_name" json:"prices_neighborhood_name"`
-	PricesCityID                         pgtype.UUID `db:"prices_city_id" json:"prices_city_id"`
-	PricesPostalCodeID                   pgtype.UUID `db:"prices_postal_code_id" json:"prices_postal_code_id"`
-	PricesNeighborhoodCreatedAt          time.Time   `db:"prices_neighborhood_created_at" json:"prices_neighborhood_created_at"`
-	PricesNeighborhoodUpdatedAt          time.Time   `db:"prices_neighborhood_updated_at" json:"prices_neighborhood_updated_at"`
-	PricesNeighborhoodPostalPostalCodeID pgtype.UUID `db:"prices_neighborhood_postal_postal_code_id" json:"prices_neighborhood_postal_postal_code_id"`
+	PricesNeighborhoodID                 uuid.UUID  `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string     `json:"prices_neighborhood_name"`
+	PricesCityID                         uuid.UUID  `json:"prices_city_id"`
+	PricesPostalCodeID                   *uuid.UUID `json:"prices_postal_code_id"`
+	PricesNeighborhoodCreatedAt          time.Time  `json:"prices_neighborhood_created_at"`
+	PricesNeighborhoodUpdatedAt          time.Time  `json:"prices_neighborhood_updated_at"`
+	PricesNeighborhoodPostalPostalCodeID *uuid.UUID `json:"prices_neighborhood_postal_postal_code_id"`
 }
 
 type PricesPostalCode struct {
-	PricesPostalCodeID        pgtype.UUID `db:"prices_postal_code_id" json:"prices_postal_code_id"`
-	PricesPostalCodeCode      string      `db:"prices_postal_code_code" json:"prices_postal_code_code"`
-	PricesCityID              pgtype.UUID `db:"prices_city_id" json:"prices_city_id"`
-	PricesPostalCodeCreatedAt time.Time   `db:"prices_postal_code_created_at" json:"prices_postal_code_created_at"`
-	PricesPostalCodeUpdatedAt time.Time   `db:"prices_postal_code_updated_at" json:"prices_postal_code_updated_at"`
+	PricesPostalCodeID        uuid.UUID `json:"prices_postal_code_id"`
+	PricesPostalCodeCode      string    `json:"prices_postal_code_code"`
+	PricesCityID              uuid.UUID `json:"prices_city_id"`
+	PricesPostalCodeCreatedAt time.Time `json:"prices_postal_code_created_at"`
+	PricesPostalCodeUpdatedAt time.Time `json:"prices_postal_code_updated_at"`
 }
 
 type PricesTransaction struct {
-	PricesTransactionID                  pgtype.UUID `db:"prices_transaction_id" json:"prices_transaction_id"`
-	PricesTransactionDescription         string      `db:"prices_transaction_description" json:"prices_transaction_description"`
-	PricesTransactionType                string      `db:"prices_transaction_type" json:"prices_transaction_type"`
-	PricesTransactionArea                float64     `db:"prices_transaction_area" json:"prices_transaction_area"`
-	PricesTransactionPrice               int32       `db:"prices_transaction_price" json:"prices_transaction_price"`
-	PricesTransactionPricePerSquareMeter int32       `db:"prices_transaction_price_per_square_meter" json:"prices_transaction_price_per_square_meter"`
-	PricesTransactionBuildYear           int32       `db:"prices_transaction_build_year" json:"prices_transaction_build_year"`
-	PricesTransactionFloor               *string     `db:"prices_transaction_floor" json:"prices_transaction_floor"`
-	PricesTransactionElevator            bool        `db:"prices_transaction_elevator" json:"prices_transaction_elevator"`
-	PricesTransactionCondition           *string     `db:"prices_transaction_condition" json:"prices_transaction_condition"`
-	PricesTransactionPlot                *string     `db:"prices_transaction_plot" json:"prices_transaction_plot"`
-	PricesTransactionEnergyClass         *string     `db:"prices_transaction_energy_class" json:"prices_transaction_energy_class"`
-	PricesTransactionPeriodIdentifier    string      `db:"prices_transaction_period_identifier" json:"prices_transaction_period_identifier"`
-	PricesTransactionCreatedAt           time.Time   `db:"prices_transaction_created_at" json:"prices_transaction_created_at"`
-	PricesTransactionUpdatedAt           time.Time   `db:"prices_transaction_updated_at" json:"prices_transaction_updated_at"`
-	PricesTransactionCategory            string      `db:"prices_transaction_category" json:"prices_transaction_category"`
-	PricesNeighborhoodID                 pgtype.UUID `db:"prices_neighborhood_id" json:"prices_neighborhood_id"`
+	PricesTransactionID                  uuid.UUID  `json:"prices_transaction_id"`
+	PricesTransactionDescription         string     `json:"prices_transaction_description"`
+	PricesTransactionType                string     `json:"prices_transaction_type"`
+	PricesTransactionArea                float64    `json:"prices_transaction_area"`
+	PricesTransactionPrice               int32      `json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32      `json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32      `json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string    `json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool       `json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string    `json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string    `json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string    `json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string     `json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time  `json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time  `json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string     `json:"prices_transaction_category"`
+	PricesNeighborhoodID                 *uuid.UUID `json:"prices_neighborhood_id"`
 }
 
 type SchemaMigration struct {
-	Version int32 `db:"version" json:"version"`
+	Version int32 `json:"version"`
 }
 
 type ShortcutAd struct {
-	ShortcutAdID            int64           `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	ShortcutAdUrl           string          `db:"shortcut_ad_url" json:"shortcut_ad_url"`
-	ShortcutAdType          string          `db:"shortcut_ad_type" json:"shortcut_ad_type"`
-	ShortcutAdFirstSeenAt   time.Time       `db:"shortcut_ad_first_seen_at" json:"shortcut_ad_first_seen_at"`
-	ShortcutAdLastSeenAt    time.Time       `db:"shortcut_ad_last_seen_at" json:"shortcut_ad_last_seen_at"`
-	ShortcutAdData          json.RawMessage `db:"shortcut_ad_data" json:"shortcut_ad_data"`
-	ShortcutAdUpdatedAt     *time.Time      `db:"shortcut_ad_updated_at" json:"shortcut_ad_updated_at"`
-	ShortcutBuildingID      pgtype.UUID     `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutAdAddress       *string         `db:"shortcut_ad_address" json:"shortcut_ad_address"`
-	ShortcutAdArea          pgtype.Numeric  `db:"shortcut_ad_area" json:"shortcut_ad_area"`
-	ShortcutAdRoomLayout    *string         `db:"shortcut_ad_room_layout" json:"shortcut_ad_room_layout"`
-	ShortcutAdAskingPrice   pgtype.Numeric  `db:"shortcut_ad_asking_price" json:"shortcut_ad_asking_price"`
-	ShortcutAdStreetAddress *string         `db:"shortcut_ad_street_address" json:"shortcut_ad_street_address"`
-	ShortcutAdCity          *string         `db:"shortcut_ad_city" json:"shortcut_ad_city"`
-	ShortcutAdPostal        *string         `db:"shortcut_ad_postal" json:"shortcut_ad_postal"`
-	ShortcutAdPrice         *int64          `db:"shortcut_ad_price" json:"shortcut_ad_price"`
-	ShortcutAdAreaValue     *float64        `db:"shortcut_ad_area_value" json:"shortcut_ad_area_value"`
-	ShortcutAdAddressKey    *string         `db:"shortcut_ad_address_key" json:"shortcut_ad_address_key"`
-	ShortcutAdSearchText    *string         `db:"shortcut_ad_search_text" json:"shortcut_ad_search_text"`
+	ShortcutAdID            int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl           string          `json:"shortcut_ad_url"`
+	ShortcutAdType          string          `json:"shortcut_ad_type"`
+	ShortcutAdFirstSeenAt   time.Time       `json:"shortcut_ad_first_seen_at"`
+	ShortcutAdLastSeenAt    time.Time       `json:"shortcut_ad_last_seen_at"`
+	ShortcutAdData          json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutAdUpdatedAt     *time.Time      `json:"shortcut_ad_updated_at"`
+	ShortcutBuildingID      *uuid.UUID      `json:"shortcut_building_id"`
+	ShortcutAdAddress       *string         `json:"shortcut_ad_address"`
+	ShortcutAdArea          pgtype.Numeric  `json:"shortcut_ad_area"`
+	ShortcutAdRoomLayout    *string         `json:"shortcut_ad_room_layout"`
+	ShortcutAdAskingPrice   pgtype.Numeric  `json:"shortcut_ad_asking_price"`
+	ShortcutAdStreetAddress *string         `json:"shortcut_ad_street_address"`
+	ShortcutAdCity          *string         `json:"shortcut_ad_city"`
+	ShortcutAdPostal        *string         `json:"shortcut_ad_postal"`
+	ShortcutAdPrice         *int64          `json:"shortcut_ad_price"`
+	ShortcutAdAreaValue     *float64        `json:"shortcut_ad_area_value"`
+	ShortcutAdAddressKey    *string         `json:"shortcut_ad_address_key"`
+	ShortcutAdSearchText    *string         `json:"shortcut_ad_search_text"`
 }
 
 type ShortcutBuilding struct {
-	ShortcutBuildingID                      pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingExternalID              int64       `db:"shortcut_building_external_id" json:"shortcut_building_external_id"`
-	ShortcutBuildingBuildingID              *string     `db:"shortcut_building_building_id" json:"shortcut_building_building_id"`
-	ShortcutBuildingBuildingType            *string     `db:"shortcut_building_building_type" json:"shortcut_building_building_type"`
-	ShortcutBuildingBuildingSubtype         *string     `db:"shortcut_building_building_subtype" json:"shortcut_building_building_subtype"`
-	ShortcutBuildingConstructionYear        *int32      `db:"shortcut_building_construction_year" json:"shortcut_building_construction_year"`
-	ShortcutBuildingFloorCount              *int32      `db:"shortcut_building_floor_count" json:"shortcut_building_floor_count"`
-	ShortcutBuildingApartmentCount          *int32      `db:"shortcut_building_apartment_count" json:"shortcut_building_apartment_count"`
-	ShortcutBuildingHeatingSystem           *string     `db:"shortcut_building_heating_system" json:"shortcut_building_heating_system"`
-	ShortcutBuildingBuildingMaterial        *string     `db:"shortcut_building_building_material" json:"shortcut_building_building_material"`
-	ShortcutBuildingPlotType                *string     `db:"shortcut_building_plot_type" json:"shortcut_building_plot_type"`
-	ShortcutBuildingWallStructure           *string     `db:"shortcut_building_wall_structure" json:"shortcut_building_wall_structure"`
-	ShortcutBuildingHeatSource              *string     `db:"shortcut_building_heat_source" json:"shortcut_building_heat_source"`
-	ShortcutBuildingHasElevator             *string     `db:"shortcut_building_has_elevator" json:"shortcut_building_has_elevator"`
-	ShortcutBuildingHasSauna                *string     `db:"shortcut_building_has_sauna" json:"shortcut_building_has_sauna"`
-	ShortcutBuildingLatitude                *float64    `db:"shortcut_building_latitude" json:"shortcut_building_latitude"`
-	ShortcutBuildingLongitude               *float64    `db:"shortcut_building_longitude" json:"shortcut_building_longitude"`
-	ShortcutBuildingAdditionalAddresses     *string     `db:"shortcut_building_additional_addresses" json:"shortcut_building_additional_addresses"`
-	ShortcutBuildingUrl                     string      `db:"shortcut_building_url" json:"shortcut_building_url"`
-	ShortcutBuildingCreatedAt               time.Time   `db:"shortcut_building_created_at" json:"shortcut_building_created_at"`
-	ShortcutBuildingUpdatedAt               time.Time   `db:"shortcut_building_updated_at" json:"shortcut_building_updated_at"`
-	ShortcutBuildingAddress                 *string     `db:"shortcut_building_address" json:"shortcut_building_address"`
-	ShortcutBuildingProcessedAt             *time.Time  `db:"shortcut_building_processed_at" json:"shortcut_building_processed_at"`
-	ShortcutBuildingPageNotFound            *bool       `db:"shortcut_building_page_not_found" json:"shortcut_building_page_not_found"`
-	ShortcutBuildingFrameConstructionMethod *string     `db:"shortcut_building_frame_construction_method" json:"shortcut_building_frame_construction_method"`
-	ShortcutBuildingHousingCompany          *string     `db:"shortcut_building_housing_company" json:"shortcut_building_housing_company"`
-	ShortcutBuildingGeom                    interface{} `db:"shortcut_building_geom" json:"shortcut_building_geom"`
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
 }
 
 type ShortcutBuildingListing struct {
-	ShortcutBuildingListingID            pgtype.UUID `db:"shortcut_building_listing_id" json:"shortcut_building_listing_id"`
-	ShortcutBuildingID                   pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingListingLayout        *string     `db:"shortcut_building_listing_layout" json:"shortcut_building_listing_layout"`
-	ShortcutBuildingListingSize          *float64    `db:"shortcut_building_listing_size" json:"shortcut_building_listing_size"`
-	ShortcutBuildingListingPrice         *float64    `db:"shortcut_building_listing_price" json:"shortcut_building_listing_price"`
-	ShortcutBuildingListingPricePerSqm   *float64    `db:"shortcut_building_listing_price_per_sqm" json:"shortcut_building_listing_price_per_sqm"`
-	ShortcutBuildingListingDeletedAt     *time.Time  `db:"shortcut_building_listing_deleted_at" json:"shortcut_building_listing_deleted_at"`
-	ShortcutBuildingListingCreatedAt     time.Time   `db:"shortcut_building_listing_created_at" json:"shortcut_building_listing_created_at"`
-	ShortcutBuildingListingUpdatedAt     time.Time   `db:"shortcut_building_listing_updated_at" json:"shortcut_building_listing_updated_at"`
-	ShortcutBuildingListingMarketingTime *string     `db:"shortcut_building_listing_marketing_time" json:"shortcut_building_listing_marketing_time"`
-	ShortcutBuildingListingIdx           *int32      `db:"shortcut_building_listing_idx" json:"shortcut_building_listing_idx"`
+	ShortcutBuildingListingID            uuid.UUID  `json:"shortcut_building_listing_id"`
+	ShortcutBuildingID                   uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string    `json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64   `json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64   `json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64   `json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingDeletedAt     *time.Time `json:"shortcut_building_listing_deleted_at"`
+	ShortcutBuildingListingCreatedAt     time.Time  `json:"shortcut_building_listing_created_at"`
+	ShortcutBuildingListingUpdatedAt     time.Time  `json:"shortcut_building_listing_updated_at"`
+	ShortcutBuildingListingMarketingTime *string    `json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32     `json:"shortcut_building_listing_idx"`
 }
 
 type ShortcutBuildingRental struct {
-	ShortcutBuildingRentalID            pgtype.UUID `db:"shortcut_building_rental_id" json:"shortcut_building_rental_id"`
-	ShortcutBuildingID                  pgtype.UUID `db:"shortcut_building_id" json:"shortcut_building_id"`
-	ShortcutBuildingRentalLayout        *string     `db:"shortcut_building_rental_layout" json:"shortcut_building_rental_layout"`
-	ShortcutBuildingRentalSize          *float64    `db:"shortcut_building_rental_size" json:"shortcut_building_rental_size"`
-	ShortcutBuildingRentalPrice         *float64    `db:"shortcut_building_rental_price" json:"shortcut_building_rental_price"`
-	ShortcutBuildingRentalDeletedAt     *time.Time  `db:"shortcut_building_rental_deleted_at" json:"shortcut_building_rental_deleted_at"`
-	ShortcutBuildingRentalCreatedAt     time.Time   `db:"shortcut_building_rental_created_at" json:"shortcut_building_rental_created_at"`
-	ShortcutBuildingRentalUpdatedAt     time.Time   `db:"shortcut_building_rental_updated_at" json:"shortcut_building_rental_updated_at"`
-	ShortcutBuildingRentalMarketingTime *string     `db:"shortcut_building_rental_marketing_time" json:"shortcut_building_rental_marketing_time"`
-	ShortcutBuildingRentalIdx           *int32      `db:"shortcut_building_rental_idx" json:"shortcut_building_rental_idx"`
+	ShortcutBuildingRentalID            uuid.UUID  `json:"shortcut_building_rental_id"`
+	ShortcutBuildingID                  uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string    `json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64   `json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64   `json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalDeletedAt     *time.Time `json:"shortcut_building_rental_deleted_at"`
+	ShortcutBuildingRentalCreatedAt     time.Time  `json:"shortcut_building_rental_created_at"`
+	ShortcutBuildingRentalUpdatedAt     time.Time  `json:"shortcut_building_rental_updated_at"`
+	ShortcutBuildingRentalMarketingTime *string    `json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32     `json:"shortcut_building_rental_idx"`
 }
 
 type ShortcutToken struct {
-	ShortcutTokenID        pgtype.UUID `db:"shortcut_token_id" json:"shortcut_token_id"`
-	ShortcutTokenCuid      string      `db:"shortcut_token_cuid" json:"shortcut_token_cuid"`
-	ShortcutTokenToken     string      `db:"shortcut_token_token" json:"shortcut_token_token"`
-	ShortcutTokenLoaded    string      `db:"shortcut_token_loaded" json:"shortcut_token_loaded"`
-	ShortcutTokenCreatedAt time.Time   `db:"shortcut_token_created_at" json:"shortcut_token_created_at"`
-	ShortcutTokenUpdatedAt time.Time   `db:"shortcut_token_updated_at" json:"shortcut_token_updated_at"`
-	ShortcutTokenExpiresAt time.Time   `db:"shortcut_token_expires_at" json:"shortcut_token_expires_at"`
+	ShortcutTokenID        uuid.UUID `json:"shortcut_token_id"`
+	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string    `json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string    `json:"shortcut_token_loaded"`
+	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
+	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
+	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
 type TaskQueueDeadLetterQueue struct {
-	DlqID             int64           `db:"dlq_id" json:"dlq_id"`
-	OriginalTaskID    int64           `db:"original_task_id" json:"original_task_id"`
-	EntityID          string          `db:"entity_id" json:"entity_id"`
-	TaskType          string          `db:"task_type" json:"task_type"`
-	Priority          int32           `db:"priority" json:"priority"`
-	TotalAttempts     int32           `db:"total_attempts" json:"total_attempts"`
-	FirstError        *string         `db:"first_error" json:"first_error"`
-	LastError         string          `db:"last_error" json:"last_error"`
-	ErrorHistory      json.RawMessage `db:"error_history" json:"error_history"`
-	TaskMetadata      json.RawMessage `db:"task_metadata" json:"task_metadata"`
-	OriginalCreatedAt time.Time       `db:"original_created_at" json:"original_created_at"`
-	FirstAttemptedAt  *time.Time      `db:"first_attempted_at" json:"first_attempted_at"`
-	LastAttemptedAt   time.Time       `db:"last_attempted_at" json:"last_attempted_at"`
-	MovedToDlqAt      time.Time       `db:"moved_to_dlq_at" json:"moved_to_dlq_at"`
-	RequeuedAt        *time.Time      `db:"requeued_at" json:"requeued_at"`
-	RequeueCount      int32           `db:"requeue_count" json:"requeue_count"`
+	DlqID             int64           `json:"dlq_id"`
+	OriginalTaskID    int64           `json:"original_task_id"`
+	EntityID          string          `json:"entity_id"`
+	TaskType          string          `json:"task_type"`
+	Priority          int32           `json:"priority"`
+	TotalAttempts     int32           `json:"total_attempts"`
+	FirstError        *string         `json:"first_error"`
+	LastError         string          `json:"last_error"`
+	ErrorHistory      json.RawMessage `json:"error_history"`
+	TaskMetadata      json.RawMessage `json:"task_metadata"`
+	OriginalCreatedAt time.Time       `json:"original_created_at"`
+	FirstAttemptedAt  *time.Time      `json:"first_attempted_at"`
+	LastAttemptedAt   time.Time       `json:"last_attempted_at"`
+	MovedToDlqAt      time.Time       `json:"moved_to_dlq_at"`
+	RequeuedAt        *time.Time      `json:"requeued_at"`
+	RequeueCount      int32           `json:"requeue_count"`
 }
 
 type TaskQueueEntityRegistry struct {
-	EntityID           string          `db:"entity_id" json:"entity_id"`
-	EntityType         string          `db:"entity_type" json:"entity_type"`
-	Status             string          `db:"status" json:"status"`
-	SchedulingStrategy string          `db:"scheduling_strategy" json:"scheduling_strategy"`
-	Metadata           json.RawMessage `db:"metadata" json:"metadata"`
-	CreatedAt          time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt          time.Time       `db:"updated_at" json:"updated_at"`
+	EntityID           string          `json:"entity_id"`
+	EntityType         string          `json:"entity_type"`
+	Status             string          `json:"status"`
+	SchedulingStrategy string          `json:"scheduling_strategy"`
+	Metadata           json.RawMessage `json:"metadata"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
 type TaskQueueTask struct {
-	TaskID         int64      `db:"task_id" json:"task_id"`
-	EntityID       string     `db:"entity_id" json:"entity_id"`
-	TaskType       string     `db:"task_type" json:"task_type"`
-	Status         string     `db:"status" json:"status"`
-	Priority       int32      `db:"priority" json:"priority"`
-	Attempt        int32      `db:"attempt" json:"attempt"`
-	MaxAttempts    int32      `db:"max_attempts" json:"max_attempts"`
-	LastError      *string    `db:"last_error" json:"last_error"`
-	WorkerID       *string    `db:"worker_id" json:"worker_id"`
-	ScheduledFor   time.Time  `db:"scheduled_for" json:"scheduled_for"`
-	StartedAt      *time.Time `db:"started_at" json:"started_at"`
-	CompletedAt    *time.Time `db:"completed_at" json:"completed_at"`
-	RunOn          *time.Time `db:"run_on" json:"run_on"`
-	QueueMessageID *int64     `db:"queue_message_id" json:"queue_message_id"`
-	CreatedAt      time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time  `db:"updated_at" json:"updated_at"`
+	TaskID         int64      `json:"task_id"`
+	EntityID       string     `json:"entity_id"`
+	TaskType       string     `json:"task_type"`
+	Status         string     `json:"status"`
+	Priority       int32      `json:"priority"`
+	Attempt        int32      `json:"attempt"`
+	MaxAttempts    int32      `json:"max_attempts"`
+	LastError      *string    `json:"last_error"`
+	WorkerID       *string    `json:"worker_id"`
+	ScheduledFor   time.Time  `json:"scheduled_for"`
+	StartedAt      *time.Time `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	RunOn          *time.Time `json:"run_on"`
+	QueueMessageID *int64     `json:"queue_message_id"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }

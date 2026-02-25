@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // RFC3339Time wraps time.Time to marshal without fractional seconds for iOS compatibility
@@ -70,7 +69,7 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid postal_code_id")
 	}
-	rows, err := s.pricesQueries.ListTransactionsByPostalSelection(ctx, &db.ListTransactionsByPostalSelectionParams{
+	rows, err := s.pricesQueries.ListTransactionsByPostalSelection(ctx, db.ListTransactionsByPostalSelectionParams{
 		MunicipalityID: municipalityID,
 		PostalCodeID:   postalCodeID,
 	})
@@ -81,7 +80,7 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 	for _, row := range rows {
 		neighborhoodName := row.PricesNeighborhoodName
 		transactions = append(transactions, pricesTransaction{
-			ID:                  formatUUID(row.PricesTransactionID),
+			ID:                  row.PricesTransactionID.String(),
 			Description:         row.PricesTransactionDescription,
 			Type:                row.PricesTransactionType,
 			Area:                row.PricesTransactionArea,
@@ -97,12 +96,12 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
 			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
 			Category:            row.PricesTransactionCategory,
-			NeighborhoodID:      formatUUID(row.PricesNeighborhoodID),
+			NeighborhoodID:      row.PricesNeighborhoodID.String(),
 			NeighborhoodName:    &neighborhoodName,
-			PostalCodeID:        formatUUID(row.PostalPostalCodeID),
+			PostalCodeID:        row.PostalPostalCodeID.String(),
 			PostalCodeCode:      row.PostalPostalCodeCode,
 			PostalCodeNameFi:    row.PostalPostalCodeNameFi,
-			MunicipalityID:      formatUUID(row.PostalMunicipalityID),
+			MunicipalityID:      row.PostalMunicipalityID.String(),
 			MunicipalityNameFi:  row.PostalMunicipalityNameFi,
 		})
 	}
@@ -111,12 +110,12 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 	return output, nil
 }
 
-func parseUUIDParam(value string) (pgtype.UUID, error) {
+func parseUUIDParam(value string) (uuid.UUID, error) {
 	parsed, err := uuid.Parse(value)
 	if err != nil {
-		return pgtype.UUID{}, err
+		return uuid.Nil, err
 	}
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+	return parsed, nil
 }
 
 type pricesTransactionsFilteredInput struct {
@@ -130,10 +129,10 @@ type pricesTransactionsFilteredInput struct {
 }
 
 func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *pricesTransactionsFilteredInput) (*pricesTransactionsOutput, error) {
-	params := &db.ListTransactionsFilteredParams{}
+	params := db.ListTransactionsFilteredParams{}
 	if input.MunicipalityIDs != "" {
 		ids := strings.Split(input.MunicipalityIDs, ",")
-		uuids := make([]pgtype.UUID, 0, len(ids))
+		uuids := make([]uuid.UUID, 0, len(ids))
 		for _, id := range ids {
 			parsed, err := parseUUIDParam(strings.TrimSpace(id))
 			if err != nil {
@@ -145,7 +144,7 @@ func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *p
 	}
 	if input.PostalCodeIDs != "" {
 		ids := strings.Split(input.PostalCodeIDs, ",")
-		uuids := make([]pgtype.UUID, 0, len(ids))
+		uuids := make([]uuid.UUID, 0, len(ids))
 		for _, id := range ids {
 			parsed, err := parseUUIDParam(strings.TrimSpace(id))
 			if err != nil {
@@ -188,7 +187,7 @@ func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *p
 	for _, row := range rows {
 		neighborhoodName := row.PricesNeighborhoodName
 		transactions = append(transactions, pricesTransaction{
-			ID:                  formatUUID(row.PricesTransactionID),
+			ID:                  row.PricesTransactionID.String(),
 			Description:         row.PricesTransactionDescription,
 			Type:                row.PricesTransactionType,
 			Area:                row.PricesTransactionArea,
@@ -204,12 +203,12 @@ func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *p
 			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
 			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
 			Category:            row.PricesTransactionCategory,
-			NeighborhoodID:      formatUUID(row.PricesNeighborhoodID),
+			NeighborhoodID:      row.PricesNeighborhoodID.String(),
 			NeighborhoodName:    &neighborhoodName,
-			PostalCodeID:        formatUUID(row.PostalPostalCodeID),
+			PostalCodeID:        row.PostalPostalCodeID.String(),
 			PostalCodeCode:      row.PostalPostalCodeCode,
 			PostalCodeNameFi:    row.PostalPostalCodeNameFi,
-			MunicipalityID:      formatUUID(row.PostalMunicipalityID),
+			MunicipalityID:      row.PostalMunicipalityID.String(),
 			MunicipalityNameFi:  row.PostalMunicipalityNameFi,
 		})
 	}

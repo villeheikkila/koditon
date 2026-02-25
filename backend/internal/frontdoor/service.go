@@ -6,12 +6,11 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"koditon-go/internal/db"
 	"koditon-go/internal/frontdoor/client"
-
 	"koditon-go/internal/util"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Service struct {
@@ -138,8 +137,8 @@ func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (ur
 		}
 		return *u, id, nil
 	}
-	var buildingUUID pgtype.UUID
-	if scanErr := buildingUUID.Scan(externalID); scanErr != nil {
+	buildingUUID, parseErr := uuid.Parse(externalID)
+	if parseErr != nil {
 		return "", 0, fmt.Errorf("invalid building identifier %q: not a housing company ID or UUID", externalID)
 	}
 	building, lookupErr := s.queries.GetFrontdoorBuildingByID(ctx, buildingUUID)

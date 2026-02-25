@@ -18,13 +18,34 @@ sql:
       go:
         out: internal/db
         package: db
-        sql_package: "pgx/v5"
+        sql_package: pgx/v5
+        sql_driver: github.com/jackc/pgx/v5
         emit_json_tags: true
-        emit_db_tags: true
         emit_empty_slices: true
-        emit_params_struct_pointers: true
+        emit_pointers_for_null_types: true
         query_parameter_limit: 1
         overrides:
+          # UUID
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+          - db_type: "pg_catalog.uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "pg_catalog.uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
           # JSONB
           - db_type: "jsonb"
             go_type:
@@ -33,47 +54,81 @@ sql:
             nullable: true
             go_type:
               type: "json.RawMessage"
-          # Text
-          - db_type: "text"
-            nullable: false
+          # Timestamptz
+          - db_type: "timestamptz"
             go_type:
-              type: "string"
-          - db_type: "text"
+              import: "time"
+              type: "Time"
+          - db_type: "timestamptz"
             nullable: true
             go_type:
-              type: "string"
+              import: "time"
+              type: "Time"
               pointer: true
-          - db_type: "pg_catalog.text"
-            nullable: false
+          - db_type: "pg_catalog.timestamptz"
             go_type:
-              type: "string"
-          - db_type: "pg_catalog.text"
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.timestamptz"
             nullable: true
             go_type:
-              type: "string"
+              import: "time"
+              type: "Time"
               pointer: true
-          # Boolean
-          - db_type: "bool"
-            nullable: false
+          - db_type: "timestamp with time zone"
             go_type:
-              type: "bool"
-          - db_type: "bool"
+              import: "time"
+              type: "Time"
+          - db_type: "timestamp with time zone"
             nullable: true
             go_type:
-              type: "bool"
+              import: "time"
+              type: "Time"
               pointer: true
-          - db_type: "pg_catalog.bool"
-            nullable: false
+          # Timestamp
+          - db_type: "timestamp"
             go_type:
-              type: "bool"
-          - db_type: "pg_catalog.bool"
+              import: "time"
+              type: "Time"
+          - db_type: "timestamp"
             nullable: true
             go_type:
-              type: "bool"
+              import: "time"
+              type: "Time"
+              pointer: true
+          - db_type: "pg_catalog.timestamp"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.timestamp"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          # Date
+          - db_type: "date"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "date"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          - db_type: "pg_catalog.date"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.date"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
               pointer: true
           # Bigint (int8)
           - db_type: "bigint"
-            nullable: false
             go_type:
               type: "int64"
           - db_type: "bigint"
@@ -82,7 +137,6 @@ sql:
               type: "int64"
               pointer: true
           - db_type: "int8"
-            nullable: false
             go_type:
               type: "int64"
           - db_type: "int8"
@@ -91,7 +145,6 @@ sql:
               type: "int64"
               pointer: true
           - db_type: "pg_catalog.int8"
-            nullable: false
             go_type:
               type: "int64"
           - db_type: "pg_catalog.int8"
@@ -101,7 +154,6 @@ sql:
               pointer: true
           # Integer (int4)
           - db_type: "integer"
-            nullable: false
             go_type:
               type: "int32"
           - db_type: "integer"
@@ -110,7 +162,6 @@ sql:
               type: "int32"
               pointer: true
           - db_type: "int4"
-            nullable: false
             go_type:
               type: "int32"
           - db_type: "int4"
@@ -119,7 +170,6 @@ sql:
               type: "int32"
               pointer: true
           - db_type: "pg_catalog.int4"
-            nullable: false
             go_type:
               type: "int32"
           - db_type: "pg_catalog.int4"
@@ -129,7 +179,6 @@ sql:
               pointer: true
           # Float8 (double precision)
           - db_type: "float8"
-            nullable: false
             go_type:
               type: "float64"
           - db_type: "float8"
@@ -138,7 +187,6 @@ sql:
               type: "float64"
               pointer: true
           - db_type: "pg_catalog.float8"
-            nullable: false
             go_type:
               type: "float64"
           - db_type: "pg_catalog.float8"
@@ -146,52 +194,39 @@ sql:
             go_type:
               type: "float64"
               pointer: true
-          # Timestamptz
-          - db_type: "timestamptz"
-            nullable: false
+          # Text
+          - db_type: "text"
             go_type:
-              type: "time.Time"
-          - db_type: "timestamptz"
+              type: "string"
+          - db_type: "text"
             nullable: true
             go_type:
-              type: "time.Time"
+              type: "string"
               pointer: true
-          - db_type: "timestamp with time zone"
-            nullable: false
+          - db_type: "pg_catalog.text"
             go_type:
-              type: "time.Time"
-          - db_type: "timestamp with time zone"
+              type: "string"
+          - db_type: "pg_catalog.text"
             nullable: true
             go_type:
-              type: "time.Time"
+              type: "string"
               pointer: true
-          - db_type: "pg_catalog.timestamptz"
-            nullable: false
+          # Boolean
+          - db_type: "bool"
             go_type:
-              type: "time.Time"
-          - db_type: "pg_catalog.timestamptz"
+              type: "bool"
+          - db_type: "bool"
             nullable: true
             go_type:
-              type: "time.Time"
+              type: "bool"
               pointer: true
-          # Date
-          - db_type: "date"
-            nullable: false
+          - db_type: "pg_catalog.bool"
             go_type:
-              type: "time.Time"
-          - db_type: "date"
+              type: "bool"
+          - db_type: "pg_catalog.bool"
             nullable: true
             go_type:
-              type: "time.Time"
-              pointer: true
-          - db_type: "pg_catalog.date"
-            nullable: false
-            go_type:
-              type: "time.Time"
-          - db_type: "pg_catalog.date"
-            nullable: true
-            go_type:
-              type: "time.Time"
+              type: "bool"
               pointer: true
           # Inet
           - db_type: "inet"
@@ -199,3 +234,27 @@ sql:
             go_type:
               type: "string"
               pointer: true
+    # Vet rules applied via: sqlc vet
+    # sqlc/db-prepare requires a running database (DATABASE_URL must be set).
+    # The pattern-based rules work without a database connection.
+    rules:
+      - sqlc/db-prepare
+      - no-pg-catalog
+      - no-delete
+      - no-select-star
+
+rules:
+  - name: no-pg-catalog
+    message: "Avoid querying pg_catalog system tables directly"
+    rule: >-
+      query.sql.matches("(?i)\\bpg_catalog\\b") ||
+      query.sql.matches("(?i)\\bFROM\\s+pg_\\w+") ||
+      query.sql.matches("(?i)\\bJOIN\\s+pg_\\w+")
+  - name: no-delete
+    message: "DELETE statements must include a WHERE clause"
+    rule: >-
+      query.sql.matches("(?i)delete\\s+from\\s+\\w+\\s*;")
+  - name: no-select-star
+    message: "Avoid SELECT *; explicitly name columns so generated types stay stable"
+    rule: >-
+      query.sql.matches("(?i)select\\s+\\*")

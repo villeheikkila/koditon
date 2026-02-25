@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -62,7 +61,7 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 }
 
 type SignInAnonymousRequest struct {
-	DeviceID  *pgtype.UUID
+	DeviceID  *uuid.UUID
 	UserAgent string
 	IP        string
 }
@@ -76,7 +75,7 @@ type SignInAnonymousResponse struct {
 type SignInWithAppleRequest struct {
 	AuthorizationCode string
 	Nonce             string
-	DeviceID          *pgtype.UUID
+	DeviceID          *uuid.UUID
 	UserAgent         string
 	IP                string
 }
@@ -99,7 +98,7 @@ func (s *Service) SignInAnonymous(ctx context.Context, req SignInAnonymousReques
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 	externalID := uuid.New().String()
-	_, err = qtx.CreateIdentity(ctx, &db.CreateIdentityParams{
+	_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 		UserID:             user.UserID,
 		IdentityProvider:   db.AuthAuthProviderAnonymous,
 		IdentityExternalID: externalID,
@@ -121,18 +120,18 @@ func (s *Service) SignInAnonymous(ctx context.Context, req SignInAnonymousReques
 	if req.UserAgent != "" {
 		userAgent = &req.UserAgent
 	}
-	var deviceID pgtype.UUID
+	var deviceID *uuid.UUID
 	if req.DeviceID != nil {
-		deviceID = *req.DeviceID
-		_, err = qtx.UpsertDevice(ctx, &db.UpsertDeviceParams{
-			DeviceID: deviceID,
+		deviceID = req.DeviceID
+		_, err = qtx.UpsertDevice(ctx, db.UpsertDeviceParams{
+			DeviceID: *deviceID,
 			UserID:   user.UserID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("upsert device: %w", err)
 		}
 	}
-	session, err := qtx.CreateSession(ctx, &db.CreateSessionParams{
+	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
 		UserID:                     user.UserID,
 		SessionDeviceID:            deviceID,
 		SessionUserAgent:           userAgent,
@@ -145,7 +144,7 @@ func (s *Service) SignInAnonymous(ctx context.Context, req SignInAnonymousReques
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 	tokenHash := hashToken(hmacKey, session.SessionRefreshTokenCounter)
-	_, err = qtx.CreateRefreshToken(ctx, &db.CreateRefreshTokenParams{
+	_, err = qtx.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		SessionID:             session.SessionID,
 		RefreshTokenTokenHash: tokenHash,
 		RefreshTokenCounter:   session.SessionRefreshTokenCounter,
@@ -156,16 +155,14 @@ func (s *Service) SignInAnonymous(ctx context.Context, req SignInAnonymousReques
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	sessionUUID := pgToUUID(session.SessionID)
-	userUUID := pgToUUID(user.UserID)
-	tokens, err := s.generateTokenPair(ctx, sessionUUID, userUUID, session.SessionRefreshTokenCounter, sessionNotAfter, "", 0)
+	tokens, err := s.generateTokenPair(ctx, session.SessionID, user.UserID, session.SessionRefreshTokenCounter, sessionNotAfter, "", 0)
 	if err != nil {
 		return nil, fmt.Errorf("generate tokens: %w", err)
 	}
-	s.logger.Info("new anonymous user created", "user_id", userUUID)
+	s.logger.Info("new anonymous user created", "user_id", user.UserID)
 	return &SignInAnonymousResponse{
 		Tokens:    tokens,
-		UserID:    userUUID,
+		UserID:    user.UserID,
 		IsNewUser: true,
 	}, nil
 }
@@ -228,11 +225,11 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		"phone_verified": false,
 	})
 	s.logger.Debug("looking up existing identity", "provider", "apple", "external_id", identity.Subject)
-	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, &db.GetIdentityByProviderAndExternalIDParams{
+	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
 		IdentityProvider:   db.AuthAuthProviderApple,
 		IdentityExternalID: identity.Subject,
 	})
-	var userID pgtype.UUID
+	var userID uuid.UUID
 	var isNewUser bool
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -247,27 +244,27 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		}
 		userID = user.UserID
 		isNewUser = true
-		s.logger.Debug("creating identity for new user", "user_id", pgToUUID(userID))
-		_, err = qtx.CreateIdentity(ctx, &db.CreateIdentityParams{
+		s.logger.Debug("creating identity for new user", "user_id", userID)
+		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 			UserID:                userID,
 			IdentityProvider:      db.AuthAuthProviderApple,
 			IdentityExternalID:    identity.Subject,
 			IdentityEmail:         email,
-			IdentityEmailVerified: pgtype.Bool{Bool: emailVerified, Valid: true},
+			IdentityEmailVerified: &emailVerified,
 			IdentityData:          identityData,
 		})
 		if err != nil {
 			s.logger.Error("failed to create identity", "error", err)
 			return nil, fmt.Errorf("create identity: %w", err)
 		}
-		s.logger.Info("new user created via apple sign in", "user_id", pgToUUID(userID))
+		s.logger.Info("new user created via apple sign in", "user_id", userID)
 	} else {
 		userID = existingIdentity.UserID
-		s.logger.Debug("existing user found", "user_id", pgToUUID(userID), "identity_id", pgToUUID(existingIdentity.IdentityID))
-		_, err = qtx.UpdateIdentity(ctx, &db.UpdateIdentityParams{
+		s.logger.Debug("existing user found", "user_id", userID, "identity_id", existingIdentity.IdentityID)
+		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
 			IdentityID:            existingIdentity.IdentityID,
 			IdentityEmail:         email,
-			IdentityEmailVerified: pgtype.Bool{Bool: emailVerified, Valid: true},
+			IdentityEmailVerified: &emailVerified,
 			IdentityData:          identityData,
 		})
 		if err != nil {
@@ -289,12 +286,12 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	if req.UserAgent != "" {
 		userAgent = &req.UserAgent
 	}
-	var deviceID pgtype.UUID
+	var deviceID *uuid.UUID
 	if req.DeviceID != nil {
-		deviceID = *req.DeviceID
-		s.logger.Debug("upserting device", "device_id", pgToUUID(deviceID), "user_id", pgToUUID(userID))
-		_, err = qtx.UpsertDevice(ctx, &db.UpsertDeviceParams{
-			DeviceID: deviceID,
+		deviceID = req.DeviceID
+		s.logger.Debug("upserting device", "device_id", *deviceID, "user_id", userID)
+		_, err = qtx.UpsertDevice(ctx, db.UpsertDeviceParams{
+			DeviceID: *deviceID,
 			UserID:   userID,
 		})
 		if err != nil {
@@ -302,8 +299,8 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 			return nil, fmt.Errorf("upsert device: %w", err)
 		}
 	}
-	s.logger.Debug("creating session", "user_id", pgToUUID(userID), "has_device_id", deviceID.Valid)
-	session, err := qtx.CreateSession(ctx, &db.CreateSessionParams{
+	s.logger.Debug("creating session", "user_id", userID, "has_device_id", deviceID != nil)
+	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
 		UserID:                     userID,
 		SessionDeviceID:            deviceID,
 		SessionUserAgent:           userAgent,
@@ -316,10 +313,10 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		s.logger.Error("failed to create session", "error", err)
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	s.logger.Debug("session created", "session_id", pgToUUID(session.SessionID))
+	s.logger.Debug("session created", "session_id", session.SessionID)
 	s.logger.Debug("creating refresh token record")
 	tokenHash := hashToken(hmacKey, session.SessionRefreshTokenCounter)
-	_, err = qtx.CreateRefreshToken(ctx, &db.CreateRefreshTokenParams{
+	_, err = qtx.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		SessionID:             session.SessionID,
 		RefreshTokenTokenHash: tokenHash,
 		RefreshTokenCounter:   session.SessionRefreshTokenCounter,
@@ -333,23 +330,21 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		s.logger.Error("failed to commit transaction", "error", err)
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	sessionUUID := pgToUUID(session.SessionID)
-	userUUID := pgToUUID(userID)
 	appleTokenExpiry := time.Now().Add(180 * 24 * time.Hour)
 	s.logger.Debug("generating token pair")
-	tokens, err := s.generateTokenPair(ctx, sessionUUID, userUUID, session.SessionRefreshTokenCounter, sessionNotAfter, tokenResp.RefreshToken, appleTokenExpiry.Unix())
+	tokens, err := s.generateTokenPair(ctx, session.SessionID, userID, session.SessionRefreshTokenCounter, sessionNotAfter, tokenResp.RefreshToken, appleTokenExpiry.Unix())
 	if err != nil {
 		s.logger.Error("failed to generate tokens", "error", err)
 		return nil, fmt.Errorf("generate tokens: %w", err)
 	}
 	s.logger.Info("apple sign in completed successfully",
-		"user_id", userUUID,
-		"session_id", sessionUUID,
+		"user_id", userID,
+		"session_id", session.SessionID,
 		"is_new_user", isNewUser,
 	)
 	return &SignInWithAppleResponse{
 		Tokens:    tokens,
-		UserID:    userUUID,
+		UserID:    userID,
 		IsNewUser: isNewUser,
 	}, nil
 }
@@ -415,7 +410,7 @@ func (s *Service) RefreshTokens(ctx context.Context, req RefreshTokensRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("update session: %w", err)
 	}
-	oldToken, err := qtx.GetRefreshTokenBySessionAndCounter(ctx, &db.GetRefreshTokenBySessionAndCounterParams{
+	oldToken, err := qtx.GetRefreshTokenBySessionAndCounter(ctx, db.GetRefreshTokenBySessionAndCounterParams{
 		SessionID:           session.SessionID,
 		RefreshTokenCounter: claims.Counter,
 	})
@@ -423,7 +418,7 @@ func (s *Service) RefreshTokens(ctx context.Context, req RefreshTokensRequest) (
 		_ = qtx.RevokeRefreshToken(ctx, oldToken.RefreshTokenID)
 	}
 	tokenHash := hashToken(session.SessionRefreshTokenHmacKey, updatedSession.SessionRefreshTokenCounter)
-	_, err = qtx.CreateRefreshToken(ctx, &db.CreateRefreshTokenParams{
+	_, err = qtx.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		SessionID:             session.SessionID,
 		RefreshTokenTokenHash: tokenHash,
 		RefreshTokenCounter:   updatedSession.SessionRefreshTokenCounter,
@@ -438,15 +433,13 @@ func (s *Service) RefreshTokens(ctx context.Context, req RefreshTokensRequest) (
 	if session.SessionNotAfter != nil {
 		sessionNotAfter = *session.SessionNotAfter
 	}
-	sessionUUID := pgToUUID(session.SessionID)
-	userUUID := pgToUUID(session.UserID)
-	tokens, err := s.generateTokenPair(ctx, sessionUUID, userUUID, updatedSession.SessionRefreshTokenCounter, sessionNotAfter, newAppleRefreshToken, newAppleRefreshExp)
+	tokens, err := s.generateTokenPair(ctx, session.SessionID, session.UserID, updatedSession.SessionRefreshTokenCounter, sessionNotAfter, newAppleRefreshToken, newAppleRefreshExp)
 	if err != nil {
 		return nil, fmt.Errorf("generate tokens: %w", err)
 	}
 	return &RefreshTokensResponse{
 		Tokens: tokens,
-		UserID: userUUID,
+		UserID: session.UserID,
 	}, nil
 }
 
@@ -457,33 +450,31 @@ func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
 	}
 	defer tx.Rollback(ctx)
 	qtx := s.queries.WithTx(tx)
-	pgSessionID := uuidToPg(sessionID)
-	if err := qtx.RevokeSession(ctx, pgSessionID); err != nil {
+	if err := qtx.RevokeSession(ctx, sessionID); err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
-	if err := qtx.RevokeAllSessionRefreshTokens(ctx, pgSessionID); err != nil {
+	if err := qtx.RevokeAllSessionRefreshTokens(ctx, sessionID); err != nil {
 		return fmt.Errorf("revoke refresh tokens: %w", err)
 	}
 	return tx.Commit(ctx)
 }
 
 func (s *Service) SignOutWithOwnershipCheck(ctx context.Context, userID, sessionID uuid.UUID) error {
-	pgSessionID := uuidToPg(sessionID)
-	session, err := s.queries.GetSessionByID(ctx, pgSessionID)
+	session, err := s.queries.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrSessionNotFound
 		}
 		return fmt.Errorf("get session: %w", err)
 	}
-	if pgToUUID(session.UserID) != userID {
+	if session.UserID != userID {
 		return ErrSessionNotOwned
 	}
 	return s.SignOut(ctx, sessionID)
 }
 
 func (s *Service) SignOutAllSessions(ctx context.Context, userID uuid.UUID) error {
-	return s.queries.RevokeAllUserSessions(ctx, uuidToPg(userID))
+	return s.queries.RevokeAllUserSessions(ctx, userID)
 }
 
 func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*AccessTokenClaims, error) {
@@ -491,7 +482,7 @@ func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*A
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.queries.GetActiveSessionByID(ctx, uuidToPg(claims.SessionID))
+	_, err = s.queries.GetActiveSessionByID(ctx, claims.SessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSessionRevoked
@@ -502,7 +493,7 @@ func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*A
 }
 
 func (s *Service) GetUserByID(ctx context.Context, userID uuid.UUID) (db.AuthUser, error) {
-	user, err := s.queries.GetUserByID(ctx, uuidToPg(userID))
+	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.AuthUser{}, ErrUserNotFound
@@ -513,12 +504,11 @@ func (s *Service) GetUserByID(ctx context.Context, userID uuid.UUID) (db.AuthUse
 }
 
 func (s *Service) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]db.AuthSession, error) {
-	return s.queries.GetSessionsByUserID(ctx, uuidToPg(userID))
+	return s.queries.GetSessionsByUserID(ctx, userID)
 }
 
 func (s *Service) generateTokenPair(ctx context.Context, sessionID, userID uuid.UUID, counter int64, refreshExpiry time.Time, appleRefreshToken string, appleRefreshExp int64) (TokenPair, error) {
-	pgUserID := uuidToPg(userID)
-	roles, err := s.queries.GetUserRoles(ctx, pgUserID)
+	roles, err := s.queries.GetUserRoles(ctx, userID)
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("get user roles: %w", err)
 	}
@@ -526,7 +516,7 @@ func (s *Service) generateTokenPair(ctx context.Context, sessionID, userID uuid.
 	for i, r := range roles {
 		roleNames[i] = r.RoleName
 	}
-	flags, err := s.queries.GetActiveFeatureFlags(ctx, pgUserID)
+	flags, err := s.queries.GetActiveFeatureFlags(ctx, userID)
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("get feature flags: %w", err)
 	}
@@ -614,15 +604,4 @@ FOR UPDATE`
 		&session.SessionRevokedAt,
 	)
 	return session, err
-}
-
-func pgToUUID(pg pgtype.UUID) uuid.UUID {
-	if !pg.Valid {
-		return uuid.Nil
-	}
-	return uuid.UUID(pg.Bytes)
-}
-
-func uuidToPg(u uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: u, Valid: true}
 }

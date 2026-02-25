@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const batchUpsertFrontdoorAdsFromSitemap = `-- name: BatchUpsertFrontdoorAdsFromSitemap :many
@@ -28,11 +28,11 @@ RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor
 `
 
 type BatchUpsertFrontdoorAdsFromSitemapParams struct {
-	Column1 []string `db:"column_1" json:"column_1"`
-	Column2 []string `db:"column_2" json:"column_2"`
+	Column1 []string `json:"column_1"`
+	Column2 []string `json:"column_2"`
 }
 
-func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg *BatchUpsertFrontdoorAdsFromSitemapParams) ([]FrontdoorAd, error) {
+func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg BatchUpsertFrontdoorAdsFromSitemapParams) ([]FrontdoorAd, error) {
 	rows, err := q.db.Query(ctx, batchUpsertFrontdoorAdsFromSitemap, arg.Column1, arg.Column2)
 	if err != nil {
 		return nil, err
@@ -91,12 +91,12 @@ RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_s
 `
 
 type BatchUpsertShortcutAdsFromSitemapParams struct {
-	Column1 []int64  `db:"column_1" json:"column_1"`
-	Column2 []string `db:"column_2" json:"column_2"`
-	Column3 []string `db:"column_3" json:"column_3"`
+	Column1 []int64  `json:"column_1"`
+	Column2 []string `json:"column_2"`
+	Column3 []string `json:"column_3"`
 }
 
-func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg *BatchUpsertShortcutAdsFromSitemapParams) ([]ShortcutAd, error) {
+func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg BatchUpsertShortcutAdsFromSitemapParams) ([]ShortcutAd, error) {
 	rows, err := q.db.Query(ctx, batchUpsertShortcutAdsFromSitemap, arg.Column1, arg.Column2, arg.Column3)
 	if err != nil {
 		return nil, err
@@ -210,11 +210,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListFrontdoorAdsParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListFrontdoorAds(ctx context.Context, arg *ListFrontdoorAdsParams) ([]FrontdoorAd, error) {
+func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsParams) ([]FrontdoorAd, error) {
 	rows, err := q.db.Query(ctx, listFrontdoorAds, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -264,11 +264,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListShortcutAdsParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListShortcutAds(ctx context.Context, arg *ListShortcutAdsParams) ([]ShortcutAd, error) {
+func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams) ([]ShortcutAd, error) {
 	rows, err := q.db.Query(ctx, listShortcutAds, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -364,7 +364,7 @@ SET frontdoor_ad_page_not_found = true, frontdoor_ad_updated_at = now()
 WHERE frontdoor_ad_id = $1
 `
 
-func (q *Queries) MarkFrontdoorAdNotFound(ctx context.Context, frontdoorAdID pgtype.UUID) error {
+func (q *Queries) MarkFrontdoorAdNotFound(ctx context.Context, frontdoorAdID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markFrontdoorAdNotFound, frontdoorAdID)
 	return err
 }
@@ -388,7 +388,7 @@ SET frontdoor_ad_processed_at = now(), frontdoor_ad_updated_at = now()
 WHERE frontdoor_ad_id = $1
 `
 
-func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, frontdoorAdID pgtype.UUID) error {
+func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, frontdoorAdID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markFrontdoorAdProcessed, frontdoorAdID)
 	return err
 }
@@ -403,11 +403,11 @@ WHERE frontdoor_ad_external_id = $1
 `
 
 type UpdateFrontdoorAdDataParams struct {
-	FrontdoorAdExternalID string          `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	Column2               json.RawMessage `db:"column_2" json:"column_2"`
+	FrontdoorAdExternalID string          `json:"frontdoor_ad_external_id"`
+	Column2               json.RawMessage `json:"column_2"`
 }
 
-func (q *Queries) UpdateFrontdoorAdData(ctx context.Context, arg *UpdateFrontdoorAdDataParams) error {
+func (q *Queries) UpdateFrontdoorAdData(ctx context.Context, arg UpdateFrontdoorAdDataParams) error {
 	_, err := q.db.Exec(ctx, updateFrontdoorAdData, arg.FrontdoorAdExternalID, arg.Column2)
 	return err
 }
@@ -427,11 +427,11 @@ RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor
 `
 
 type UpsertFrontdoorAdFromSitemapParams struct {
-	FrontdoorAdExternalID string `db:"frontdoor_ad_external_id" json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl        string `db:"frontdoor_ad_url" json:"frontdoor_ad_url"`
+	FrontdoorAdExternalID string `json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl        string `json:"frontdoor_ad_url"`
 }
 
-func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg *UpsertFrontdoorAdFromSitemapParams) (FrontdoorAd, error) {
+func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg UpsertFrontdoorAdFromSitemapParams) (FrontdoorAd, error) {
 	row := q.db.QueryRow(ctx, upsertFrontdoorAdFromSitemap, arg.FrontdoorAdExternalID, arg.FrontdoorAdUrl)
 	var i FrontdoorAd
 	err := row.Scan(
@@ -496,14 +496,14 @@ RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_s
 `
 
 type UpsertShortcutAdParams struct {
-	ShortcutAdID       int64           `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	ShortcutAdUrl      string          `db:"shortcut_ad_url" json:"shortcut_ad_url"`
-	ShortcutAdType     string          `db:"shortcut_ad_type" json:"shortcut_ad_type"`
-	ShortcutAdData     json.RawMessage `db:"shortcut_ad_data" json:"shortcut_ad_data"`
-	ShortcutBuildingID pgtype.UUID     `db:"shortcut_building_id" json:"shortcut_building_id"`
+	ShortcutAdID       int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl      string          `json:"shortcut_ad_url"`
+	ShortcutAdType     string          `json:"shortcut_ad_type"`
+	ShortcutAdData     json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutBuildingID *uuid.UUID      `json:"shortcut_building_id"`
 }
 
-func (q *Queries) UpsertShortcutAd(ctx context.Context, arg *UpsertShortcutAdParams) (ShortcutAd, error) {
+func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdParams) (ShortcutAd, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutAd,
 		arg.ShortcutAdID,
 		arg.ShortcutAdUrl,
@@ -553,12 +553,12 @@ RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_s
 `
 
 type UpsertShortcutAdFromSitemapParams struct {
-	ShortcutAdID   int64  `db:"shortcut_ad_id" json:"shortcut_ad_id"`
-	ShortcutAdUrl  string `db:"shortcut_ad_url" json:"shortcut_ad_url"`
-	ShortcutAdType string `db:"shortcut_ad_type" json:"shortcut_ad_type"`
+	ShortcutAdID   int64  `json:"shortcut_ad_id"`
+	ShortcutAdUrl  string `json:"shortcut_ad_url"`
+	ShortcutAdType string `json:"shortcut_ad_type"`
 }
 
-func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg *UpsertShortcutAdFromSitemapParams) (ShortcutAd, error) {
+func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg UpsertShortcutAdFromSitemapParams) (ShortcutAd, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutAdFromSitemap, arg.ShortcutAdID, arg.ShortcutAdUrl, arg.ShortcutAdType)
 	var i ShortcutAd
 	err := row.Scan(

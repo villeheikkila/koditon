@@ -20,10 +20,10 @@ var templates = template.Must(template.New("").Funcs(template.FuncMap{
 }).ParseFS(templateFS, "templates/*.html"))
 
 type Handler struct {
-	ads          *ads.Service
-	shortcutBase string
+	ads           *ads.Service
+	shortcutBase  string
 	frontdoorBase string
-	logger       *slog.Logger
+	logger        *slog.Logger
 }
 
 func NewHandler(adsService *ads.Service, shortcutBase, frontdoorBase string, logger *slog.Logger) *Handler {

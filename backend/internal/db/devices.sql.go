@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createDevice = `-- name: CreateDevice :one
@@ -26,16 +26,16 @@ RETURNING device_id, user_id, device_name, device_os, device_app_version, device
 `
 
 type CreateDeviceParams struct {
-	UserID                   pgtype.UUID           `db:"user_id" json:"user_id"`
-	DeviceName               *string               `db:"device_name" json:"device_name"`
-	DeviceOs                 *string               `db:"device_os" json:"device_os"`
-	DeviceAppVersion         *string               `db:"device_app_version" json:"device_app_version"`
-	DevicePushToken          *string               `db:"device_push_token" json:"device_push_token"`
-	DevicePushTokenType      NullAuthPushTokenType `db:"device_push_token_type" json:"device_push_token_type"`
-	DevicePushTokenUpdatedAt *time.Time            `db:"device_push_token_updated_at" json:"device_push_token_updated_at"`
+	UserID                   uuid.UUID             `json:"user_id"`
+	DeviceName               *string               `json:"device_name"`
+	DeviceOs                 *string               `json:"device_os"`
+	DeviceAppVersion         *string               `json:"device_app_version"`
+	DevicePushToken          *string               `json:"device_push_token"`
+	DevicePushTokenType      NullAuthPushTokenType `json:"device_push_token_type"`
+	DevicePushTokenUpdatedAt *time.Time            `json:"device_push_token_updated_at"`
 }
 
-func (q *Queries) CreateDevice(ctx context.Context, arg *CreateDeviceParams) (AuthDevice, error) {
+func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (AuthDevice, error) {
 	row := q.db.QueryRow(ctx, createDevice,
 		arg.UserID,
 		arg.DeviceName,
@@ -67,7 +67,7 @@ DELETE FROM auth.devices
 WHERE device_id = $1
 `
 
-func (q *Queries) DeleteDevice(ctx context.Context, deviceID pgtype.UUID) error {
+func (q *Queries) DeleteDevice(ctx context.Context, deviceID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteDevice, deviceID)
 	return err
 }
@@ -77,7 +77,7 @@ DELETE FROM auth.devices
 WHERE user_id = $1
 `
 
-func (q *Queries) DeleteDevicesByUserID(ctx context.Context, userID pgtype.UUID) error {
+func (q *Queries) DeleteDevicesByUserID(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteDevicesByUserID, userID)
 	return err
 }
@@ -87,7 +87,7 @@ SELECT device_id, user_id, device_name, device_os, device_app_version, device_pu
 WHERE device_id = $1
 `
 
-func (q *Queries) GetDeviceByID(ctx context.Context, deviceID pgtype.UUID) (AuthDevice, error) {
+func (q *Queries) GetDeviceByID(ctx context.Context, deviceID uuid.UUID) (AuthDevice, error) {
 	row := q.db.QueryRow(ctx, getDeviceByID, deviceID)
 	var i AuthDevice
 	err := row.Scan(
@@ -112,7 +112,7 @@ WHERE user_id = $1
 ORDER BY device_last_seen_at DESC
 `
 
-func (q *Queries) GetDevicesByUserID(ctx context.Context, userID pgtype.UUID) ([]AuthDevice, error) {
+func (q *Queries) GetDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]AuthDevice, error) {
 	rows, err := q.db.Query(ctx, getDevicesByUserID, userID)
 	if err != nil {
 		return nil, err
@@ -156,13 +156,13 @@ RETURNING device_id, user_id, device_name, device_os, device_app_version, device
 `
 
 type UpdateDeviceParams struct {
-	DeviceID         pgtype.UUID `db:"device_id" json:"device_id"`
-	DeviceName       *string     `db:"device_name" json:"device_name"`
-	DeviceOs         *string     `db:"device_os" json:"device_os"`
-	DeviceAppVersion *string     `db:"device_app_version" json:"device_app_version"`
+	DeviceID         uuid.UUID `json:"device_id"`
+	DeviceName       *string   `json:"device_name"`
+	DeviceOs         *string   `json:"device_os"`
+	DeviceAppVersion *string   `json:"device_app_version"`
 }
 
-func (q *Queries) UpdateDevice(ctx context.Context, arg *UpdateDeviceParams) (AuthDevice, error) {
+func (q *Queries) UpdateDevice(ctx context.Context, arg UpdateDeviceParams) (AuthDevice, error) {
 	row := q.db.QueryRow(ctx, updateDevice,
 		arg.DeviceID,
 		arg.DeviceName,
@@ -192,7 +192,7 @@ SET device_last_seen_at = now()
 WHERE device_id = $1
 `
 
-func (q *Queries) UpdateDeviceLastSeen(ctx context.Context, deviceID pgtype.UUID) error {
+func (q *Queries) UpdateDeviceLastSeen(ctx context.Context, deviceID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, updateDeviceLastSeen, deviceID)
 	return err
 }
@@ -209,12 +209,12 @@ RETURNING device_id, user_id, device_name, device_os, device_app_version, device
 `
 
 type UpdateDevicePushTokenParams struct {
-	DeviceID            pgtype.UUID           `db:"device_id" json:"device_id"`
-	DevicePushToken     *string               `db:"device_push_token" json:"device_push_token"`
-	DevicePushTokenType NullAuthPushTokenType `db:"device_push_token_type" json:"device_push_token_type"`
+	DeviceID            uuid.UUID             `json:"device_id"`
+	DevicePushToken     *string               `json:"device_push_token"`
+	DevicePushTokenType NullAuthPushTokenType `json:"device_push_token_type"`
 }
 
-func (q *Queries) UpdateDevicePushToken(ctx context.Context, arg *UpdateDevicePushTokenParams) (AuthDevice, error) {
+func (q *Queries) UpdateDevicePushToken(ctx context.Context, arg UpdateDevicePushTokenParams) (AuthDevice, error) {
 	row := q.db.QueryRow(ctx, updateDevicePushToken, arg.DeviceID, arg.DevicePushToken, arg.DevicePushTokenType)
 	var i AuthDevice
 	err := row.Scan(
@@ -248,14 +248,14 @@ RETURNING device_id, user_id, device_name, device_os, device_app_version, device
 `
 
 type UpsertDeviceParams struct {
-	DeviceID         pgtype.UUID `db:"device_id" json:"device_id"`
-	UserID           pgtype.UUID `db:"user_id" json:"user_id"`
-	DeviceName       *string     `db:"device_name" json:"device_name"`
-	DeviceOs         *string     `db:"device_os" json:"device_os"`
-	DeviceAppVersion *string     `db:"device_app_version" json:"device_app_version"`
+	DeviceID         uuid.UUID `json:"device_id"`
+	UserID           uuid.UUID `json:"user_id"`
+	DeviceName       *string   `json:"device_name"`
+	DeviceOs         *string   `json:"device_os"`
+	DeviceAppVersion *string   `json:"device_app_version"`
 }
 
-func (q *Queries) UpsertDevice(ctx context.Context, arg *UpsertDeviceParams) (AuthDevice, error) {
+func (q *Queries) UpsertDevice(ctx context.Context, arg UpsertDeviceParams) (AuthDevice, error) {
 	row := q.db.QueryRow(ctx, upsertDevice,
 		arg.DeviceID,
 		arg.UserID,

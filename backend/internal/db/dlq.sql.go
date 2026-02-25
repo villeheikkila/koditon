@@ -16,11 +16,11 @@ SELECT task_queue.fnc__move_to_dlq($1::bigint, $2::jsonb) AS dlq_id
 `
 
 type CallMoveToDLQParams struct {
-	Column1 int64           `db:"column_1" json:"column_1"`
-	Column2 json.RawMessage `db:"column_2" json:"column_2"`
+	Column1 int64           `json:"column_1"`
+	Column2 json.RawMessage `json:"column_2"`
 }
 
-func (q *Queries) CallMoveToDLQ(ctx context.Context, arg *CallMoveToDLQParams) (int64, error) {
+func (q *Queries) CallMoveToDLQ(ctx context.Context, arg CallMoveToDLQParams) (int64, error) {
 	row := q.db.QueryRow(ctx, callMoveToDLQ, arg.Column1, arg.Column2)
 	var dlq_id int64
 	err := row.Scan(&dlq_id)
@@ -32,12 +32,12 @@ SELECT task_queue.fnc__requeue_from_dlq($1::bigint, $2::int, $3::int) AS task_id
 `
 
 type CallRequeueFromDLQParams struct {
-	Column1 int64 `db:"column_1" json:"column_1"`
-	Column2 int32 `db:"column_2" json:"column_2"`
-	Column3 int32 `db:"column_3" json:"column_3"`
+	Column1 int64 `json:"column_1"`
+	Column2 int32 `json:"column_2"`
+	Column3 int32 `json:"column_3"`
 }
 
-func (q *Queries) CallRequeueFromDLQ(ctx context.Context, arg *CallRequeueFromDLQParams) (int64, error) {
+func (q *Queries) CallRequeueFromDLQ(ctx context.Context, arg CallRequeueFromDLQParams) (int64, error) {
 	row := q.db.QueryRow(ctx, callRequeueFromDLQ, arg.Column1, arg.Column2, arg.Column3)
 	var task_id int64
 	err := row.Scan(&task_id)
@@ -53,9 +53,9 @@ FROM task_queue.dead_letter_queue
 `
 
 type CountDLQEntriesRow struct {
-	Total    int64 `db:"total" json:"total"`
-	Pending  int64 `db:"pending" json:"pending"`
-	Requeued int64 `db:"requeued" json:"requeued"`
+	Total    int64 `json:"total"`
+	Pending  int64 `json:"pending"`
+	Requeued int64 `json:"requeued"`
 }
 
 func (q *Queries) CountDLQEntries(ctx context.Context) (CountDLQEntriesRow, error) {
@@ -76,8 +76,8 @@ ORDER BY count DESC
 `
 
 type CountDLQEntriesByTaskTypeRow struct {
-	TaskType string `db:"task_type" json:"task_type"`
-	Count    int64  `db:"count" json:"count"`
+	TaskType string `json:"task_type"`
+	Count    int64  `json:"count"`
 }
 
 func (q *Queries) CountDLQEntriesByTaskType(ctx context.Context) ([]CountDLQEntriesByTaskTypeRow, error) {
@@ -191,21 +191,21 @@ RETURNING dlq_id, original_task_id, entity_id, task_type, priority, total_attemp
 `
 
 type InsertIntoDLQParams struct {
-	OriginalTaskID    int64           `db:"original_task_id" json:"original_task_id"`
-	EntityID          string          `db:"entity_id" json:"entity_id"`
-	TaskType          string          `db:"task_type" json:"task_type"`
-	Priority          int32           `db:"priority" json:"priority"`
-	TotalAttempts     int32           `db:"total_attempts" json:"total_attempts"`
-	FirstError        *string         `db:"first_error" json:"first_error"`
-	LastError         string          `db:"last_error" json:"last_error"`
-	ErrorHistory      json.RawMessage `db:"error_history" json:"error_history"`
-	TaskMetadata      json.RawMessage `db:"task_metadata" json:"task_metadata"`
-	OriginalCreatedAt time.Time       `db:"original_created_at" json:"original_created_at"`
-	FirstAttemptedAt  *time.Time      `db:"first_attempted_at" json:"first_attempted_at"`
-	LastAttemptedAt   time.Time       `db:"last_attempted_at" json:"last_attempted_at"`
+	OriginalTaskID    int64           `json:"original_task_id"`
+	EntityID          string          `json:"entity_id"`
+	TaskType          string          `json:"task_type"`
+	Priority          int32           `json:"priority"`
+	TotalAttempts     int32           `json:"total_attempts"`
+	FirstError        *string         `json:"first_error"`
+	LastError         string          `json:"last_error"`
+	ErrorHistory      json.RawMessage `json:"error_history"`
+	TaskMetadata      json.RawMessage `json:"task_metadata"`
+	OriginalCreatedAt time.Time       `json:"original_created_at"`
+	FirstAttemptedAt  *time.Time      `json:"first_attempted_at"`
+	LastAttemptedAt   time.Time       `json:"last_attempted_at"`
 }
 
-func (q *Queries) InsertIntoDLQ(ctx context.Context, arg *InsertIntoDLQParams) (TaskQueueDeadLetterQueue, error) {
+func (q *Queries) InsertIntoDLQ(ctx context.Context, arg InsertIntoDLQParams) (TaskQueueDeadLetterQueue, error) {
 	row := q.db.QueryRow(ctx, insertIntoDLQ,
 		arg.OriginalTaskID,
 		arg.EntityID,
@@ -266,11 +266,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListDLQEntriesParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListDLQEntries(ctx context.Context, arg *ListDLQEntriesParams) ([]TaskQueueDeadLetterQueue, error) {
+func (q *Queries) ListDLQEntries(ctx context.Context, arg ListDLQEntriesParams) ([]TaskQueueDeadLetterQueue, error) {
 	rows, err := q.db.Query(ctx, listDLQEntries, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -332,12 +332,12 @@ LIMIT $2 OFFSET $3
 `
 
 type ListDLQEntriesByEntityParams struct {
-	EntityID string `db:"entity_id" json:"entity_id"`
-	Limit    int64  `db:"limit" json:"limit"`
-	Offset   int64  `db:"offset" json:"offset"`
+	EntityID string `json:"entity_id"`
+	Limit    int64  `json:"limit"`
+	Offset   int64  `json:"offset"`
 }
 
-func (q *Queries) ListDLQEntriesByEntity(ctx context.Context, arg *ListDLQEntriesByEntityParams) ([]TaskQueueDeadLetterQueue, error) {
+func (q *Queries) ListDLQEntriesByEntity(ctx context.Context, arg ListDLQEntriesByEntityParams) ([]TaskQueueDeadLetterQueue, error) {
 	rows, err := q.db.Query(ctx, listDLQEntriesByEntity, arg.EntityID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -400,12 +400,12 @@ LIMIT $2 OFFSET $3
 `
 
 type ListDLQEntriesByTaskTypeParams struct {
-	TaskType string `db:"task_type" json:"task_type"`
-	Limit    int64  `db:"limit" json:"limit"`
-	Offset   int64  `db:"offset" json:"offset"`
+	TaskType string `json:"task_type"`
+	Limit    int64  `json:"limit"`
+	Offset   int64  `json:"offset"`
 }
 
-func (q *Queries) ListDLQEntriesByTaskType(ctx context.Context, arg *ListDLQEntriesByTaskTypeParams) ([]TaskQueueDeadLetterQueue, error) {
+func (q *Queries) ListDLQEntriesByTaskType(ctx context.Context, arg ListDLQEntriesByTaskTypeParams) ([]TaskQueueDeadLetterQueue, error) {
 	rows, err := q.db.Query(ctx, listDLQEntriesByTaskType, arg.TaskType, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
@@ -467,11 +467,11 @@ LIMIT $1 OFFSET $2
 `
 
 type ListDLQEntriesNotRequeuedParams struct {
-	Limit  int64 `db:"limit" json:"limit"`
-	Offset int64 `db:"offset" json:"offset"`
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
 }
 
-func (q *Queries) ListDLQEntriesNotRequeued(ctx context.Context, arg *ListDLQEntriesNotRequeuedParams) ([]TaskQueueDeadLetterQueue, error) {
+func (q *Queries) ListDLQEntriesNotRequeued(ctx context.Context, arg ListDLQEntriesNotRequeuedParams) ([]TaskQueueDeadLetterQueue, error) {
 	rows, err := q.db.Query(ctx, listDLQEntriesNotRequeued, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err

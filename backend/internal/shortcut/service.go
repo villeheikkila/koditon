@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AdType string
@@ -56,7 +55,7 @@ func NewService(
 		return tokens, nil
 	}
 	tokenStore := func(ctx context.Context, tokens *client.Tokens, expiresAt time.Time) error {
-		_, err := queries.InsertShortcutToken(ctx, &db.InsertShortcutTokenParams{
+		_, err := queries.InsertShortcutToken(ctx, db.InsertShortcutTokenParams{
 			ShortcutTokenCuid:      tokens.CUID,
 			ShortcutTokenToken:     tokens.Token,
 			ShortcutTokenLoaded:    tokens.Loaded,
@@ -181,13 +180,13 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 		s.logger.Warn("missing cardType in ad data, skipping sync", "ad_id", adID)
 		return nil
 	}
-	var shortcutBuildingID pgtype.UUID
+	var shortcutBuildingID *uuid.UUID
 	if buildingData, ok := adDataMap["buildingData"].(map[string]any); ok {
 		if buildingIDFloat, ok := buildingData["buildingId"].(float64); ok {
 			buildingIDInt := int64(buildingIDFloat)
 			building, err := s.queries.GetShortcutBuildingByExternalID(ctx, buildingIDInt)
 			if err == nil {
-				shortcutBuildingID = building.ShortcutBuildingID
+				shortcutBuildingID = &building.ShortcutBuildingID
 			}
 		}
 	}
@@ -203,7 +202,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 }
 
 func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error {
-	building, err := s.queries.GetShortcutBuildingByID(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+	building, err := s.queries.GetShortcutBuildingByID(ctx, buildingID)
 	if err != nil {
 		return fmt.Errorf("get building (building_id=%s): %w", buildingID, err)
 	}
@@ -213,7 +212,7 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 	scrapedBuilding, listings, rentals, err := s.client.ScrapeBuildingPage(ctx, int(building.ShortcutBuildingExternalID), building.ShortcutBuildingUrl)
 	if err != nil {
 		if errors.Is(err, client.ErrScraperErrorPage) {
-			if markErr := s.queries.MarkShortcutBuildingPageNotFound(ctx, pgtype.UUID{Bytes: buildingID, Valid: true}); markErr != nil {
+			if markErr := s.queries.MarkShortcutBuildingPageNotFound(ctx, buildingID); markErr != nil {
 				return fmt.Errorf("mark building page not found (building_id=%s): %w", buildingID, markErr)
 			}
 			return nil
@@ -229,18 +228,18 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 	}
 	var upsertErrors []error
 	for _, listing := range listings {
-		params := mapListingParams(pgtype.UUID{Bytes: buildingID, Valid: true}, &listing)
+		params := mapListingParams(buildingID, &listing)
 		if _, err := s.queries.UpsertShortcutBuildingListing(ctx, params); err != nil {
 			upsertErrors = append(upsertErrors, fmt.Errorf("upsert listing %d: %w", listing.Index, err))
 		}
 	}
 	for _, rental := range rentals {
-		params := mapRentalParams(pgtype.UUID{Bytes: buildingID, Valid: true}, &rental)
+		params := mapRentalParams(buildingID, &rental)
 		if _, err := s.queries.UpsertShortcutBuildingRental(ctx, params); err != nil {
 			upsertErrors = append(upsertErrors, fmt.Errorf("upsert rental %d: %w", rental.Index, err))
 		}
 	}
-	if err := s.queries.MarkShortcutBuildingProcessed(ctx, pgtype.UUID{Bytes: buildingID, Valid: true}); err != nil {
+	if err := s.queries.MarkShortcutBuildingProcessed(ctx, buildingID); err != nil {
 		return fmt.Errorf("mark building processed (building_id=%s): %w", buildingID, err)
 	}
 	if len(upsertErrors) > 0 && len(listings)+len(rentals) == len(upsertErrors) {
@@ -258,8 +257,8 @@ func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
 	if title := extractAdTitle(ad.ShortcutAdData); title != "" {
 		lines = append(lines, "title: "+title)
 	}
-	if ad.ShortcutBuildingID.Valid {
-		building, err := s.queries.GetShortcutBuildingByID(ctx, ad.ShortcutBuildingID)
+	if ad.ShortcutBuildingID != nil {
+		building, err := s.queries.GetShortcutBuildingByID(ctx, *ad.ShortcutBuildingID)
 		if err == nil {
 			if addr := firstNonEmptyString(building.ShortcutBuildingAddress, building.ShortcutBuildingHousingCompany); addr != "" {
 				lines = append(lines, "address: "+addr)
@@ -273,7 +272,7 @@ func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
 }
 
 func (s *Service) DescribeBuilding(ctx context.Context, buildingID uuid.UUID) (string, error) {
-	building, err := s.queries.GetShortcutBuildingByID(ctx, pgtype.UUID{Bytes: buildingID, Valid: true})
+	building, err := s.queries.GetShortcutBuildingByID(ctx, buildingID)
 	if err != nil {
 		return "", err
 	}

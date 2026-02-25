@@ -5,7 +5,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type SignInWithAppleInput struct {
@@ -26,7 +25,7 @@ func (h *Handlers) SignInWithApple(ctx context.Context, input *SignInWithAppleIn
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid device ID format", err)
 	}
-	deviceID := &pgtype.UUID{Bytes: parsed, Valid: true}
+	deviceID := &parsed
 	resp, err := h.service.SignInWithApple(ctx, SignInWithAppleRequest{
 		AuthorizationCode: input.Body.AuthorizationCode,
 		Nonce:             input.Body.Nonce,

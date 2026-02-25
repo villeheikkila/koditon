@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 
 	"koditon-go/internal/db"
 	"koditon-go/internal/postal/client"
@@ -42,21 +42,21 @@ func (s *Service) Sync(ctx context.Context, logger *slog.Logger) (*SyncResult, e
 	}
 	logger.InfoContext(ctx, "fetched postal codes", "count", len(records))
 	adAreaParams := extractAdAreas(records)
-	adAreaRows, err := s.queries.UpsertPostalAdAreasBulk(ctx, adAreaParams)
+	adAreaRows, err := s.queries.UpsertPostalAdAreasBulk(ctx, *adAreaParams)
 	if err != nil {
 		return nil, fmt.Errorf("upsert ad areas: %w", err)
 	}
-	adAreaIDs := make(map[string]pgtype.UUID, len(adAreaRows))
+	adAreaIDs := make(map[string]uuid.UUID, len(adAreaRows))
 	for _, row := range adAreaRows {
 		adAreaIDs[row.PostalAdAreaCode] = row.PostalAdAreaID
 	}
 	logger.InfoContext(ctx, "upserted ad areas", "count", len(adAreaRows))
 	municipalityParams := extractMunicipalities(records)
-	municipalityRows, err := s.queries.UpsertPostalMunicipalitiesBulk(ctx, municipalityParams)
+	municipalityRows, err := s.queries.UpsertPostalMunicipalitiesBulk(ctx, *municipalityParams)
 	if err != nil {
 		return nil, fmt.Errorf("upsert municipalities: %w", err)
 	}
-	municipalityIDs := make(map[string]pgtype.UUID, len(municipalityRows))
+	municipalityIDs := make(map[string]uuid.UUID, len(municipalityRows))
 	for _, row := range municipalityRows {
 		municipalityIDs[row.PostalMunicipalityCode] = row.PostalMunicipalityID
 	}

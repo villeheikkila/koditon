@@ -165,7 +165,8 @@ func buildAdsTableRows(rows []ads.UnifiedEntityRow) []table.Row {
 
 func fetchAdsReportPageCmd(runner interface {
 	AdsSearchReports(context.Context, ads.SearchParams) (ads.ReportPage, error)
-}, params ads.SearchParams) tea.Cmd {
+}, params ads.SearchParams,
+) tea.Cmd {
 	return func() tea.Msg {
 		if runner == nil {
 			return adsReportPageMsg{err: fmt.Errorf("runner unavailable")}

@@ -3,8 +3,6 @@ package util
 import (
 	"database/sql"
 	"encoding/json"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Nullable[T any] struct {
@@ -70,37 +68,9 @@ func FromSQLNullBool(nb sql.NullBool) Nullable[bool] {
 	}
 }
 
-func FromPgText(pt pgtype.Text) Nullable[string] {
-	return Nullable[string]{
-		Value: pt.String,
-		Valid: pt.Valid,
+func FromPtr[T any](p *T) Nullable[T] {
+	if p == nil {
+		return Nullable[T]{}
 	}
-}
-
-func FromPgInt4(pi pgtype.Int4) Nullable[int32] {
-	return Nullable[int32]{
-		Value: pi.Int32,
-		Valid: pi.Valid,
-	}
-}
-
-func FromPgInt8(pi pgtype.Int8) Nullable[int64] {
-	return Nullable[int64]{
-		Value: pi.Int64,
-		Valid: pi.Valid,
-	}
-}
-
-func FromPgFloat8(pf pgtype.Float8) Nullable[float64] {
-	return Nullable[float64]{
-		Value: pf.Float64,
-		Valid: pf.Valid,
-	}
-}
-
-func FromPgBool(pb pgtype.Bool) Nullable[bool] {
-	return Nullable[bool]{
-		Value: pb.Bool,
-		Valid: pb.Valid,
-	}
+	return Nullable[T]{Value: *p, Valid: true}
 }

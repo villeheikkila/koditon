@@ -46,9 +46,7 @@ const (
 	QueueName = "tasks"
 )
 
-var (
-	ErrNoRows = pgmq.ErrNoRows
-)
+var ErrNoRows = pgmq.ErrNoRows
 
 type TaskMessageData struct {
 	TaskID   int64  `json:"task_id"`
@@ -193,7 +191,7 @@ type QueueMetrics struct {
 }
 
 func (c *Client) RegisterEntity(ctx context.Context, entityID, entityType, status, schedulingStrategy string) error {
-	err := c.queries.CallRegisterEntity(ctx, &db.CallRegisterEntityParams{
+	err := c.queries.CallRegisterEntity(ctx, db.CallRegisterEntityParams{
 		Column1: entityID,
 		Column2: entityType,
 		Column3: status,
@@ -207,7 +205,7 @@ func (c *Client) RegisterEntity(ctx context.Context, entityID, entityType, statu
 }
 
 func (c *Client) RegisterEntities(ctx context.Context, entityIDs []string, entityType, schedulingStrategy string) (int, error) {
-	count, err := c.queries.CallRegisterEntities(ctx, &db.CallRegisterEntitiesParams{
+	count, err := c.queries.CallRegisterEntities(ctx, db.CallRegisterEntitiesParams{
 		Column1: entityIDs,
 		Column2: entityType,
 		Column3: schedulingStrategy,
@@ -236,7 +234,7 @@ func (c *Client) RequeueStuckTasks(ctx context.Context) (int, error) {
 
 // CreateTaskWithPriority creates a new task with the specified priority
 func (c *Client) CreateTaskWithPriority(ctx context.Context, entityID, taskType string, priority int, maxAttempts int, scheduledFor time.Time, runOn *time.Time) (int64, error) {
-	task, err := c.queries.CreateTaskWithPriority(ctx, &db.CreateTaskWithPriorityParams{
+	task, err := c.queries.CreateTaskWithPriority(ctx, db.CreateTaskWithPriorityParams{
 		EntityID:     entityID,
 		TaskType:     taskType,
 		Priority:     int32(priority),
@@ -251,7 +249,7 @@ func (c *Client) CreateTaskWithPriority(ctx context.Context, entityID, taskType 
 }
 
 func (c *Client) UpdateTaskPriority(ctx context.Context, taskID int64, priority int) error {
-	err := c.queries.UpdateTaskPriority(ctx, &db.UpdateTaskPriorityParams{TaskID: taskID, Priority: int32(priority)})
+	err := c.queries.UpdateTaskPriority(ctx, db.UpdateTaskPriorityParams{TaskID: taskID, Priority: int32(priority)})
 	if err != nil {
 		return fmt.Errorf("failed to update task priority: %w", err)
 	}
@@ -269,7 +267,7 @@ func (c *Client) GetDLQEntry(ctx context.Context, dlqID int64) (*DLQEntry, error
 }
 
 func (c *Client) ListDLQEntries(ctx context.Context, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntries(ctx, &db.ListDLQEntriesParams{
+	entries, err := c.queries.ListDLQEntries(ctx, db.ListDLQEntriesParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
 	})
@@ -284,7 +282,7 @@ func (c *Client) ListDLQEntries(ctx context.Context, limit, offset int) ([]DLQEn
 }
 
 func (c *Client) ListDLQEntriesNotRequeued(ctx context.Context, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesNotRequeued(ctx, &db.ListDLQEntriesNotRequeuedParams{
+	entries, err := c.queries.ListDLQEntriesNotRequeued(ctx, db.ListDLQEntriesNotRequeuedParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
 	})
@@ -299,7 +297,7 @@ func (c *Client) ListDLQEntriesNotRequeued(ctx context.Context, limit, offset in
 }
 
 func (c *Client) ListDLQEntriesByTaskType(ctx context.Context, taskType string, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesByTaskType(ctx, &db.ListDLQEntriesByTaskTypeParams{
+	entries, err := c.queries.ListDLQEntriesByTaskType(ctx, db.ListDLQEntriesByTaskTypeParams{
 		TaskType: taskType,
 		Limit:    int64(limit),
 		Offset:   int64(offset),
@@ -315,7 +313,7 @@ func (c *Client) ListDLQEntriesByTaskType(ctx context.Context, taskType string, 
 }
 
 func (c *Client) ListDLQEntriesByEntity(ctx context.Context, entityID string, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesByEntity(ctx, &db.ListDLQEntriesByEntityParams{
+	entries, err := c.queries.ListDLQEntriesByEntity(ctx, db.ListDLQEntriesByEntityParams{
 		EntityID: entityID,
 		Limit:    int64(limit),
 		Offset:   int64(offset),
@@ -362,7 +360,7 @@ func (c *Client) RequeueFromDLQ(ctx context.Context, dlqID int64, priority *int,
 	if priority != nil {
 		priorityVal = int64(*priority)
 	}
-	taskID, err := c.queries.CallRequeueFromDLQ(ctx, &db.CallRequeueFromDLQParams{
+	taskID, err := c.queries.CallRequeueFromDLQ(ctx, db.CallRequeueFromDLQParams{
 		Column1: dlqID,
 		Column2: int32(priorityVal),
 		Column3: int32(maxAttempts),
@@ -374,7 +372,7 @@ func (c *Client) RequeueFromDLQ(ctx context.Context, dlqID int64, priority *int,
 	if err != nil {
 		return taskID, fmt.Errorf("task created but failed to enqueue: %w", err)
 	}
-	_ = c.queries.UpdateTaskQueueMessageId(ctx, &db.UpdateTaskQueueMessageIdParams{TaskID: taskID, QueueMessageID: &msgID})
+	_ = c.queries.UpdateTaskQueueMessageId(ctx, db.UpdateTaskQueueMessageIdParams{TaskID: taskID, QueueMessageID: &msgID})
 	return taskID, nil
 }
 

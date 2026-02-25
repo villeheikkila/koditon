@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	openrouter "github.com/revrost/go-openrouter"
 
 	"koditon-go/internal/db"
@@ -102,7 +102,7 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 	if limit <= 0 {
 		limit = 200
 	}
-	rows, err := s.queries.SearchTransactionsByCityAndAddress(ctx, &db.SearchTransactionsByCityAndAddressParams{
+	rows, err := s.queries.SearchTransactionsByCityAndAddress(ctx, db.SearchTransactionsByCityAndAddressParams{
 		CityName:   cityName,
 		SearchTerm: searchTerm,
 		LimitCount: &limit,
@@ -205,9 +205,10 @@ func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, 
 	}
 	postalCodes = util.UniqueStrings(postalCodes)
 	result.postalCodes = len(postalCodes)
-	postalCodeMap := make(map[string]pgtype.UUID, len(postalCodes))
+	postalCodeMap := make(map[string]uuid.UUID, len(postalCodes))
 	if len(postalCodes) > 0 {
-		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams(postalCodes, cityID))
+		pcParams := mapUpsertPostalCodesBulkParams(postalCodes, cityID)
+		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, pcParams)
 		if err != nil {
 			return nil, fmt.Errorf("bulk upsert postal codes: %w", err)
 		}
@@ -246,9 +247,10 @@ func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, 
 		neighborhoodNames = append(neighborhoodNames, name)
 	}
 	result.neighborhoods = len(neighborhoodNames)
-	neighborhoodIDs := make(map[string]pgtype.UUID, len(neighborhoodNames))
+	neighborhoodIDs := make(map[string]uuid.UUID, len(neighborhoodNames))
 	if len(neighborhoodNames) > 0 {
-		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, mapUpsertNeighborhoodsBulkParams(neighborhoodNames, cityID))
+		nbParams := mapUpsertNeighborhoodsBulkParams(neighborhoodNames, cityID)
+		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, nbParams)
 		if err != nil {
 			return nil, fmt.Errorf("bulk upsert neighborhoods: %w", err)
 		}
@@ -262,8 +264,9 @@ func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, 
 		if !ok {
 			continue
 		}
-		_ = s.queries.UpdateNeighborhoodPostalCode(ctx, &db.UpdateNeighborhoodPostalCodeParams{
-			PostalCodeID: postalCodeID,
+		pcIDCopy := postalCodeID
+		_ = s.queries.UpdateNeighborhoodPostalCode(ctx, db.UpdateNeighborhoodPostalCodeParams{
+			PostalCodeID: &pcIDCopy,
 			Name:         neighborhoodName,
 			CityID:       cityID,
 		})
@@ -275,7 +278,7 @@ func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, 
 		if err != nil {
 			return nil, fmt.Errorf("build transaction params: %w", err)
 		}
-		if _, err := s.queries.UpsertPricesTransactionsBulk(ctx, params); err != nil {
+		if _, err := s.queries.UpsertPricesTransactionsBulk(ctx, *params); err != nil {
 			return nil, fmt.Errorf("bulk upsert transactions: %w", err)
 		}
 	}
@@ -361,8 +364,9 @@ func (s *Service) syncNeighborhoodsForPostalCode(
 	}
 	updated := 0
 	for name := range neighborhoodNames {
-		err := s.queries.UpdateNeighborhoodPostalCode(ctx, &db.UpdateNeighborhoodPostalCodeParams{
-			PostalCodeID: pc.PricesPostalCodeID,
+		pcID := pc.PricesPostalCodeID
+		err := s.queries.UpdateNeighborhoodPostalCode(ctx, db.UpdateNeighborhoodPostalCodeParams{
+			PostalCodeID: &pcID,
 			Name:         name,
 			CityID:       city.PricesCityID,
 		})
@@ -398,10 +402,11 @@ func (s *Service) SyncCityWithProgress(ctx context.Context, cityName string, pro
 	}
 	postalCodes = util.UniqueStrings(postalCodes)
 	report(SyncCityProgress{City: cityName, Step: "postal_codes_fetch_done", Count: len(postalCodes)})
-	postalCodeIDs := make(map[string]pgtype.UUID, len(postalCodes))
+	postalCodeIDs := make(map[string]uuid.UUID, len(postalCodes))
 	if len(postalCodes) > 0 {
 		report(SyncCityProgress{City: cityName, Step: "postal_codes_upsert_start", Count: len(postalCodes)})
-		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams(postalCodes, cityID))
+		pcParams := mapUpsertPostalCodesBulkParams(postalCodes, cityID)
+		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, pcParams)
 		if err != nil {
 			return fmt.Errorf("bulk upsert postal codes for %q: %w", cityName, err)
 		}
@@ -443,10 +448,11 @@ func (s *Service) SyncCityWithProgress(ctx context.Context, cityName string, pro
 	}
 	neighborhoods = util.UniqueStrings(neighborhoods)
 	report(SyncCityProgress{City: cityName, Step: "neighborhoods_merge_done", Count: len(neighborhoods)})
-	neighborhoodIDs := make(map[string]pgtype.UUID, len(neighborhoods))
+	neighborhoodIDs := make(map[string]uuid.UUID, len(neighborhoods))
 	if len(neighborhoods) > 0 {
 		report(SyncCityProgress{City: cityName, Step: "neighborhoods_upsert_start", Count: len(neighborhoods)})
-		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, mapUpsertNeighborhoodsBulkParams(neighborhoods, cityID))
+		nbParams := mapUpsertNeighborhoodsBulkParams(neighborhoods, cityID)
+		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, nbParams)
 		if err != nil {
 			return fmt.Errorf("bulk upsert neighborhoods for %q: %w", cityName, err)
 		}
@@ -463,7 +469,7 @@ func (s *Service) SyncCityWithProgress(ctx context.Context, cityName string, pro
 		if err != nil {
 			return fmt.Errorf("build transaction params for %q: %w", cityName, err)
 		}
-		if _, err := s.queries.UpsertPricesTransactionsBulk(ctx, params); err != nil {
+		if _, err := s.queries.UpsertPricesTransactionsBulk(ctx, *params); err != nil {
 			return fmt.Errorf("bulk upsert transactions for %q: %w", cityName, err)
 		}
 		report(SyncCityProgress{City: cityName, Step: "transactions_upsert_done", Count: len(transactions), Details: periodIdentifier})
@@ -486,7 +492,7 @@ func parseElevator(val string) (bool, error) {
 }
 
 type LLMMatchResult struct {
-	PostalCodeID   *pgtype.UUID
+	PostalCodeID   *uuid.UUID
 	PostalCodeName string
 	Confidence     string
 	Reasoning      string
@@ -558,8 +564,8 @@ func (s *Service) MatchNeighborhoodsWithLLM(
 				return fmt.Errorf("match neighborhood %q in %q: %w", neighborhood.PricesNeighborhoodName, cityName, err)
 			}
 			if result.PostalCodeID != nil {
-				if err := s.queries.UpdateNeighborhoodPostiPostalCode(ctx, &db.UpdateNeighborhoodPostiPostalCodeParams{
-					PostalCodeID:   *result.PostalCodeID,
+				if err := s.queries.UpdateNeighborhoodPostiPostalCode(ctx, db.UpdateNeighborhoodPostiPostalCodeParams{
+					PostalCodeID:   result.PostalCodeID,
 					NeighborhoodID: neighborhood.PricesNeighborhoodID,
 				}); err != nil {
 					return fmt.Errorf("update neighborhood postal code: %w", err)
@@ -646,12 +652,12 @@ Do not include any text outside the JSON structure.`, neighborhood.PricesNeighbo
 	}
 	content := resp.Choices[0].Message.Content.Text
 	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "```json") {
-		content = strings.TrimPrefix(content, "```json")
+	if after, ok := strings.CutPrefix(content, "```json"); ok {
+		content = after
 		content = strings.TrimSuffix(content, "```")
 		content = strings.TrimSpace(content)
-	} else if strings.HasPrefix(content, "```") {
-		content = strings.TrimPrefix(content, "```")
+	} else if after, ok := strings.CutPrefix(content, "```"); ok {
+		content = after
 		content = strings.TrimSuffix(content, "```")
 		content = strings.TrimSpace(content)
 	}
@@ -670,11 +676,11 @@ Do not include any text outside the JSON structure.`, neighborhood.PricesNeighbo
 		Reasoning:      result.Reasoning,
 	}
 	if result.PostalCodeID != nil && *result.PostalCodeID != "" && *result.PostalCodeID != "null" {
-		var uuid pgtype.UUID
-		if err := uuid.Scan(*result.PostalCodeID); err != nil {
-			return nil, fmt.Errorf("parse postal code UUID: %w", err)
+		parsed, parseErr := uuid.Parse(*result.PostalCodeID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse postal code UUID: %w", parseErr)
 		}
-		llmResult.PostalCodeID = &uuid
+		llmResult.PostalCodeID = &parsed
 	}
 	return llmResult, nil
 }

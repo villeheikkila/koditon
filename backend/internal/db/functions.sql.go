@@ -26,12 +26,12 @@ SELECT task_queue.fnc__register_entities($1::text[], $2::text, $3::text) AS coun
 `
 
 type CallRegisterEntitiesParams struct {
-	Column1 []string `db:"column_1" json:"column_1"`
-	Column2 string   `db:"column_2" json:"column_2"`
-	Column3 string   `db:"column_3" json:"column_3"`
+	Column1 []string `json:"column_1"`
+	Column2 string   `json:"column_2"`
+	Column3 string   `json:"column_3"`
 }
 
-func (q *Queries) CallRegisterEntities(ctx context.Context, arg *CallRegisterEntitiesParams) (int32, error) {
+func (q *Queries) CallRegisterEntities(ctx context.Context, arg CallRegisterEntitiesParams) (int32, error) {
 	row := q.db.QueryRow(ctx, callRegisterEntities, arg.Column1, arg.Column2, arg.Column3)
 	var count int32
 	err := row.Scan(&count)
@@ -43,14 +43,14 @@ SELECT task_queue.fnc__register_entity($1::text, $2::text, $3::text, $4::text, $
 `
 
 type CallRegisterEntityParams struct {
-	Column1 string          `db:"column_1" json:"column_1"`
-	Column2 string          `db:"column_2" json:"column_2"`
-	Column3 string          `db:"column_3" json:"column_3"`
-	Column4 string          `db:"column_4" json:"column_4"`
-	Column5 json.RawMessage `db:"column_5" json:"column_5"`
+	Column1 string          `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Column3 string          `json:"column_3"`
+	Column4 string          `json:"column_4"`
+	Column5 json.RawMessage `json:"column_5"`
 }
 
-func (q *Queries) CallRegisterEntity(ctx context.Context, arg *CallRegisterEntityParams) error {
+func (q *Queries) CallRegisterEntity(ctx context.Context, arg CallRegisterEntityParams) error {
 	_, err := q.db.Exec(ctx, callRegisterEntity,
 		arg.Column1,
 		arg.Column2,

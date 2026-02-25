@@ -3,7 +3,7 @@ package postal
 import (
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 
 	"koditon-go/internal/db"
 	"koditon-go/internal/postal/client"
@@ -92,10 +92,10 @@ func extractMunicipalities(records []*client.PostalCodeRecord) *db.UpsertPostalM
 
 func mapUpsertPostalCodesBulkParams(
 	records []*client.PostalCodeRecord,
-	adAreaIDs map[string]pgtype.UUID,
-	municipalityIDs map[string]pgtype.UUID,
-) *db.UpsertPostalPostalCodesBulkParams {
-	params := &db.UpsertPostalPostalCodesBulkParams{
+	adAreaIDs map[string]uuid.UUID,
+	municipalityIDs map[string]uuid.UUID,
+) db.UpsertPostalPostalCodesBulkParams {
+	params := db.UpsertPostalPostalCodesBulkParams{
 		Dates:           make([]time.Time, 0, len(records)),
 		Codes:           make([]string, 0, len(records)),
 		NamesFi:         make([]string, 0, len(records)),
@@ -105,8 +105,8 @@ func mapUpsertPostalCodesBulkParams(
 		NeighborhoodsFi: make([]string, 0, len(records)),
 		ValidsFrom:      make([]time.Time, 0, len(records)),
 		TypeCodes:       make([]string, 0, len(records)),
-		AdAreaIds:       make([]pgtype.UUID, 0, len(records)),
-		MunicipalityIds: make([]pgtype.UUID, 0, len(records)),
+		AdAreaIds:       make([]uuid.UUID, 0, len(records)),
+		MunicipalityIds: make([]uuid.UUID, 0, len(records)),
 	}
 	for _, r := range records {
 		date := parseDate(r.Date)
@@ -117,11 +117,11 @@ func mapUpsertPostalCodesBulkParams(
 		if validFrom == nil {
 			validFrom = date
 		}
-		var adAreaID pgtype.UUID
+		var adAreaID uuid.UUID
 		if id, ok := adAreaIDs[r.AdAreaCode]; ok {
 			adAreaID = id
 		}
-		var municipalityID pgtype.UUID
+		var municipalityID uuid.UUID
 		if id, ok := municipalityIDs[r.MunicipalCode]; ok {
 			municipalityID = id
 		}
