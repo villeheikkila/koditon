@@ -1,0 +1,4 @@
+node_modules/
+.pulumi/
+ansible/.vault-password
+ansible/group_vars/vps.secrets.yml

@@ -1,0 +1,190 @@
+- name: Validate infra_env is provided
+  ansible.builtin.assert:
+    that:
+      - infra_env is defined
+      - infra_env | length > 0
+    fail_msg: "infra_env must be defined in group_vars/vps.secrets.yml"
+
+- name: Validate required infra env variables
+  ansible.builtin.assert:
+    that:
+      - infra_env[item] is defined
+      - (infra_env[item] | string | trim | length) > 0
+    fail_msg: "Missing infra_env value for {{ item }} in group_vars/vps.secrets.yml"
+  loop: "{{ required_infra_env_vars }}"
+
+- name: Ensure infra directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ koditon_root }}"
+    - "{{ infra_root }}"
+    - "{{ infra_root }}/caddy"
+
+- name: Copy production infra files
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ infra_root }}/{{ item.dest }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - src: "{{ playbook_dir }}/../../docker-compose.prod.yml"
+      dest: docker-compose.prod.yml
+    - src: "{{ playbook_dir }}/../../caddy/Caddyfile"
+      dest: caddy/Caddyfile
+
+- name: Template production env file
+  ansible.builtin.template:
+    src: db.env.j2
+    dest: "{{ infra_env_file }}"
+    mode: "0600"
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Disable host-level Caddy service
+  ansible.builtin.systemd:
+    name: caddy
+    enabled: false
+    state: stopped
+  when:
+    - "'caddy.service' in ansible_facts.services"
+
+- name: Validate GHCR credentials when login is required
+  ansible.builtin.assert:
+    that:
+      - ghcr_username | string | trim | length > 0
+      - ghcr_token | string | trim | length > 0
+    fail_msg: "ghcr_login=true requires ghcr_username and ghcr_token in vars/secrets."
+  when: ghcr_login | bool
+
+- name: GHCR login (optional)
+  ansible.builtin.command: >
+    docker login ghcr.io -u {{ ghcr_username }} --password-stdin
+  args:
+    stdin: "{{ ghcr_token }}"
+  when: ghcr_login
+
+- name: Validate compose config
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - "{{ infra_env_file }}"
+      - -f
+      - "{{ infra_compose_file }}"
+      - config
+      - -q
+  environment:
+    DECRYPTED_ENV_FILE: "{{ infra_env_file }}"
+  changed_when: false
+
+- name: Pull compose images
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - "{{ infra_env_file }}"
+      - -f
+      - "{{ infra_compose_file }}"
+      - pull
+  environment:
+    DECRYPTED_ENV_FILE: "{{ infra_env_file }}"
+  when: infra_compose_pull | bool
+
+- name: Start production services
+  block:
+    - name: Run docker compose up
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - "{{ infra_env_file }}"
+          - -f
+          - "{{ infra_compose_file }}"
+          - up
+          - -d
+          - --remove-orphans
+      environment:
+        DECRYPTED_ENV_FILE: "{{ infra_env_file }}"
+
+    - name: Wait for backend to be ready
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - "{{ infra_env_file }}"
+          - -f
+          - "{{ infra_compose_file }}"
+          - ps
+          - --filter
+          - status=running
+          - backend
+      environment:
+        DECRYPTED_ENV_FILE: "{{ infra_env_file }}"
+      register: backend_check
+      retries: 20
+      delay: 3
+      until: backend_check.rc == 0 and 'backend' in backend_check.stdout
+      changed_when: false
+  rescue:
+    - name: Capture compose ps
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - "{{ infra_env_file }}"
+          - -f
+          - "{{ infra_compose_file }}"
+          - ps
+      register: compose_ps_after_failure
+      changed_when: false
+      failed_when: false
+
+    - name: Capture db logs
+      ansible.builtin.command:
+        argv:
+          - docker
+          - logs
+          - koditon-prod-db-1
+          - --tail
+          - "200"
+      register: db_logs_after_failure
+      changed_when: false
+      failed_when: false
+
+    - name: Capture backend logs
+      ansible.builtin.command:
+        argv:
+          - docker
+          - logs
+          - koditon-prod-backend-1
+          - --tail
+          - "200"
+      register: backend_logs_after_failure
+      changed_when: false
+      failed_when: false
+
+    - name: Show compose ps after failure
+      ansible.builtin.debug:
+        var: compose_ps_after_failure.stdout_lines
+
+    - name: Show db logs after failure
+      ansible.builtin.debug:
+        var: db_logs_after_failure.stdout_lines
+
+    - name: Show backend logs after failure
+      ansible.builtin.debug:
+        var: backend_logs_after_failure.stdout_lines
+
+    - name: Fail with deployment troubleshooting hint
+      ansible.builtin.fail:
+        msg: >-
+          docker compose up failed. Review compose ps and service logs above.
+          Common causes: wrong image architecture (exec format error) or invalid DB credentials.

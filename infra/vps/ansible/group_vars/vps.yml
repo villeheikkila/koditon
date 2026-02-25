@@ -1,0 +1,42 @@
+ansible_user: deploy
+
+# SSH hardening
+ssh_allow_users:
+  - deploy
+
+# Core paths
+koditon_root: /srv/koditon
+infra_root: "{{ koditon_root }}/infra"
+infra_compose_file: "{{ infra_root }}/docker-compose.prod.yml"
+infra_env_file: "{{ infra_root }}/.env.prod"
+infra_compose_pull: true
+
+# GHCR (optional)
+ghcr_login: true
+ghcr_username: ""
+ghcr_token: ""
+
+# Image tags – override with --extra-vars to pin a specific build.
+# e.g. -e backend_image_tag=abc1234
+backend_image_tag: latest
+backend_image: "ghcr.io/villeheikkila/koditon-backend:{{ backend_image_tag }}"
+
+# Required values for infra/docker-compose.prod.yml env interpolation.
+required_infra_env_vars:
+  - CADDY_EMAIL
+  - POSTGRES_PASSWORD
+  - PRICES_BASE_URL
+  - SHORTCUT_BASE_URL
+  - SHORTCUT_DOCS_BASE_URL
+  - SHORTCUT_AD_BASE_URL
+  - SHORTCUT_USER_AGENT
+  - SHORTCUT_SITEMAP_BASE_URL
+  - FRONTDOOR_BASE_URL
+  - FRONTDOOR_USER_AGENT
+  - FRONTDOOR_COOKIE
+  - FRONTDOOR_SITEMAP_BASE_URL
+  - OPENROUTER_API_KEY
+  - TELEGRAM_BOT_TOKEN
+  - TELEGRAM_CHAT_ID
+  - AUTH_JWT_SIGNING_KEY
+  - AUTH_JWT_ISSUER

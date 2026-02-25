@@ -1,0 +1,81 @@
+name: koditon-prod
+
+services:
+  caddy:
+    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
+    platform: linux/amd64
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      CADDY_EMAIL: ${CADDY_EMAIL:?set CADDY_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_started
+
+  backend:
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE}
+    platform: linux/amd64
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8080"
+      APP_ENV: "production"
+      APP_SHUTDOWN_TIMEOUT: "10s"
+      APP_MODE: ${APP_MODE:-consumer,api}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/koditon?sslmode=disable"
+      PRICES_BASE_URL: ${PRICES_BASE_URL:?set PRICES_BASE_URL}
+      SHORTCUT_BASE_URL: ${SHORTCUT_BASE_URL:?set SHORTCUT_BASE_URL}
+      SHORTCUT_DOCS_BASE_URL: ${SHORTCUT_DOCS_BASE_URL:?set SHORTCUT_DOCS_BASE_URL}
+      SHORTCUT_AD_BASE_URL: ${SHORTCUT_AD_BASE_URL:?set SHORTCUT_AD_BASE_URL}
+      SHORTCUT_USER_AGENT: ${SHORTCUT_USER_AGENT:?set SHORTCUT_USER_AGENT}
+      SHORTCUT_SITEMAP_BASE_URL: ${SHORTCUT_SITEMAP_BASE_URL:?set SHORTCUT_SITEMAP_BASE_URL}
+      FRONTDOOR_BASE_URL: ${FRONTDOOR_BASE_URL:?set FRONTDOOR_BASE_URL}
+      FRONTDOOR_USER_AGENT: ${FRONTDOOR_USER_AGENT:?set FRONTDOOR_USER_AGENT}
+      FRONTDOOR_COOKIE: ${FRONTDOOR_COOKIE:?set FRONTDOOR_COOKIE}
+      FRONTDOOR_SITEMAP_BASE_URL: ${FRONTDOOR_SITEMAP_BASE_URL:?set FRONTDOOR_SITEMAP_BASE_URL}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?set TELEGRAM_CHAT_ID}
+      AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:?set AUTH_JWT_SIGNING_KEY}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:?set AUTH_JWT_ISSUER}
+      AUTH_APPLE_BUNDLE_ID: ${AUTH_APPLE_BUNDLE_ID:-}
+      AUTH_APPLE_TEAM_ID: ${AUTH_APPLE_TEAM_ID:-}
+      AUTH_APPLE_PRIVATE_KEY_ID: ${AUTH_APPLE_PRIVATE_KEY_ID:-}
+      AUTH_APPLE_PRIVATE_KEY: ${AUTH_APPLE_PRIVATE_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: supabase/postgres:17.6.1.087
+    platform: linux/amd64
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_SSH_TUNNEL_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: koditon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d koditon"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

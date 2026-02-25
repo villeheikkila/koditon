@@ -1,0 +1,13 @@
+- name: Reload sshd
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded
+
+- name: Reload sudo
+  ansible.builtin.command: /usr/bin/true
+  changed_when: false
+
+- name: Restart fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted

@@ -1,0 +1,10 @@
+version: "3"
+
+includes:
+  pulumi:
+    taskfile: ./Taskfile.pulumi.yml
+    dir: .
+
+  ansible:
+    taskfile: ./Taskfile.ansible.yml
+    dir: .

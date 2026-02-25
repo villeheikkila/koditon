@@ -1,0 +1,5 @@
+name: koditon-vps
+runtime: nodejs
+main: index.ts
+
+description: Koditon VPS infrastructure on Hetzner Cloud + DNS

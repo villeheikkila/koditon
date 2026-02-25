@@ -1,0 +1,35 @@
+version: "3"
+
+tasks:
+  preview:
+    desc: Preview Pulumi VPS changes
+    cmds:
+      - |
+        PASSPHRASE="$(security find-generic-password -a "${USER}" -s "${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}" -w)" || {
+          echo "Missing Keychain item '${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}' for user '${USER}'." >&2
+          echo "Create it with: security add-generic-password -a \"${USER}\" -s \"${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}\" -w '<passphrase>' -U" >&2
+          exit 1
+        }
+        PULUMI_CONFIG_PASSPHRASE="${PASSPHRASE}" pulumi preview
+
+  up:
+    desc: Apply Pulumi VPS changes
+    cmds:
+      - |
+        PASSPHRASE="$(security find-generic-password -a "${USER}" -s "${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}" -w)" || {
+          echo "Missing Keychain item '${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}' for user '${USER}'." >&2
+          echo "Create it with: security add-generic-password -a \"${USER}\" -s \"${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}\" -w '<passphrase>' -U" >&2
+          exit 1
+        }
+        PULUMI_CONFIG_PASSPHRASE="${PASSPHRASE}" pulumi up
+
+  destroy:
+    desc: Destroy Pulumi VPS resources
+    cmds:
+      - |
+        PASSPHRASE="$(security find-generic-password -a "${USER}" -s "${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}" -w)" || {
+          echo "Missing Keychain item '${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}' for user '${USER}'." >&2
+          echo "Create it with: security add-generic-password -a \"${USER}\" -s \"${PULUMI_KEYCHAIN_SERVICE:-pulumi-koditon-vps-passphrase}\" -w '<passphrase>' -U" >&2
+          exit 1
+        }
+        PULUMI_CONFIG_PASSPHRASE="${PASSPHRASE}" pulumi destroy

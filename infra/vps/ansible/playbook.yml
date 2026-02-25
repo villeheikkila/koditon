@@ -1,0 +1,12 @@
+- hosts: vps
+  become: true
+  vars_files:
+    - group_vars/vps.yml
+    - group_vars/vps.secrets.yml
+  roles:
+    - role: base
+      tags: [base]
+    - role: docker
+      tags: [docker]
+    - role: core
+      tags: [core]

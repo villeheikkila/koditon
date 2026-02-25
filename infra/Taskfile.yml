@@ -1,0 +1,73 @@
+version: "3"
+
+tasks:
+  docker:build:
+    desc: Build the backend production image
+    cmds:
+      - docker build --pull -f ../backend/Dockerfile -t ${BACKEND_DOCKER_IMAGE:-koditon-backend:prod} ../backend
+
+  docker:push:
+    desc: Build and push the backend image to GHCR
+    vars:
+      GHCR_USER: '{{.GHCR_USER | default "villeheikkila"}}'
+      TAG: '{{.TAG | default "latest"}}'
+      IMAGE: 'ghcr.io/{{.GHCR_USER}}/koditon-backend:{{.TAG}}'
+    cmds:
+      - docker build --pull --platform linux/amd64 -f ../backend/Dockerfile -t {{.IMAGE}} ../backend
+      - docker push {{.IMAGE}}
+
+  deploy:
+    desc: Build, push, and deploy backend to production
+    vars:
+      GHCR_USER: '{{.GHCR_USER | default "villeheikkila"}}'
+      HEAD_TAG:
+        sh: git -C .. rev-parse --short HEAD
+      BACKEND_TAG:
+        sh: git -C .. log -1 --format=%h -- backend/
+      INFRA_TAG:
+        sh: git -C .. log -1 --format=%h -- infra/
+    cmds:
+      - cmd: |
+          IMAGE="ghcr.io/{{.GHCR_USER}}/koditon-backend:{{.BACKEND_TAG}}"
+
+          if docker manifest inspect "${IMAGE}" >/dev/null 2>&1; then
+            echo "==> Backend image already exists for tag {{.BACKEND_TAG}}, skipping build"
+          else
+            echo "==> Building backend image with tag {{.BACKEND_TAG}}..."
+            docker build --pull --platform linux/amd64 -f ../backend/Dockerfile -t "${IMAGE}" ../backend
+            docker push "${IMAGE}"
+          fi
+
+          if ! docker manifest inspect "${IMAGE}" >/dev/null 2>&1; then
+            echo "ERROR: backend image not found after build: ${IMAGE}" >&2
+            exit 1
+          fi
+      - cmd: |
+          ANSIBLE_TAGS=""
+          if [ "{{.INFRA_TAG}}" != "{{.HEAD_TAG}}" ]; then
+            echo "==> Infra unchanged, running core role only"
+            ANSIBLE_TAGS="--tags core"
+          else
+            echo "==> Infra changed, running all roles"
+          fi
+          ansible-playbook \
+            -i vps/ansible/inventory.ini \
+            vps/ansible/playbook.yml \
+            --vault-password-file vps/scripts/ansible-vault-pass.sh \
+            -e backend_image_tag={{.BACKEND_TAG}} \
+            $ANSIBLE_TAGS
+
+  deploy:compose-up:
+    desc: Run just the docker compose up step on the VPS via Ansible
+    vars:
+      BACKEND_TAG:
+        sh: git -C .. log -1 --format=%h -- backend/
+    cmds:
+      - >-
+        ansible-playbook
+        -i vps/ansible/inventory.ini
+        vps/ansible/playbook.yml
+        --vault-password-file vps/scripts/ansible-vault-pass.sh
+        --tags core
+        --start-at-task "Run docker compose up"
+        -e backend_image_tag={{.BACKEND_TAG}}

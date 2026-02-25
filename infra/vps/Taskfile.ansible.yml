@@ -1,0 +1,64 @@
+version: "3"
+
+tasks:
+  vault:view:
+    desc: View encrypted Ansible vault secrets via Keychain-backed password helper
+    cmds:
+      - ansible-vault view ansible/group_vars/vps.secrets.yml --vault-password-file ./scripts/ansible-vault-pass.sh
+
+  vault:edit:
+    desc: Edit encrypted Ansible vault secrets via Keychain-backed password helper
+    cmds:
+      - ansible-vault edit ansible/group_vars/vps.secrets.yml --vault-password-file ./scripts/ansible-vault-pass.sh
+
+  check:
+    desc: Run Ansible syntax check
+    cmds:
+      - ansible-playbook -i ansible/inventory.ini ansible/playbook.yml --syntax-check --vault-password-file ./scripts/ansible-vault-pass.sh
+
+  apply:
+    desc: Apply Ansible playbook to VPS host
+    cmds:
+      - ansible-playbook -i ansible/inventory.ini ansible/playbook.yml --vault-password-file ./scripts/ansible-vault-pass.sh
+
+  apply:core:
+    desc: Apply only the core Ansible role (compose/config deploy) to VPS host
+    cmds:
+      - ansible-playbook -i ansible/inventory.ini ansible/playbook.yml --vault-password-file ./scripts/ansible-vault-pass.sh --tags core
+
+  apply:caddy:
+    desc: Deploy only Caddy config to VPS and restart caddy service
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m copy -a "src=../caddy/Caddyfile dest=/srv/koditon/infra/caddy/Caddyfile mode=0644"
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "env DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml up -d --no-deps --force-recreate caddy"
+
+  compose:restart:
+    desc: Restart the full production Docker Compose stack on VPS via Ansible
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "env DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml restart"
+
+  compose:ps:
+    desc: Show production Docker Compose service status on VPS via Ansible
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "env DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml ps"
+
+  compose:healthcheck:
+    desc: Verify production stack and public endpoints after reboot/deploy
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "set -e; cd /srv/koditon/infra; export DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod; echo '---- host uptime ----'; uptime -p || true; echo '---- compose ps ----'; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml ps"
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -m uri -a "url=https://api.koditon.bytesized.solutions method=GET status_code=200 return_content=no timeout=15 validate_certs=true"
+
+  compose:logs:db:
+    desc: Show recent production Postgres logs on VPS via Ansible
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "docker logs --tail 200 koditon-prod-db-1"
+
+  compose:logs:backend:
+    desc: Tail production backend logs on VPS via Ansible
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "set -e; cd /srv/koditon/infra; export DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml logs -f --tail=200 backend"
+
+  compose:recreate:volumes:
+    desc: Recreate production Docker Compose stack and volumes on VPS via Ansible (destructive)
+    cmds:
+      - ansible vps -i ansible/inventory.ini --vault-password-file ./scripts/ansible-vault-pass.sh -b -m raw -a "set -e; cd /srv/koditon/infra; export DECRYPTED_ENV_FILE=/srv/koditon/infra/.env.prod; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml down -v --remove-orphans; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml pull; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml up -d --remove-orphans; docker compose --env-file /srv/koditon/infra/.env.prod -f /srv/koditon/infra/docker-compose.prod.yml ps"
