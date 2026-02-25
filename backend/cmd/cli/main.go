@@ -54,7 +54,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  search         Search ads, buildings, and announcements")
-	fmt.Fprintln(os.Stderr, "  detail         Show entity detail by canonical ID")
+	fmt.Fprintln(os.Stderr, "  detail         Show entity detail by canonical ID or URL")
 	fmt.Fprintln(os.Stderr, "  transactions   Search price transactions")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Run 'cli <command> --help' for command-specific flags.")
@@ -99,18 +99,18 @@ func runDetail(ctx context.Context, args []string) error {
 		return err
 	}
 	if fs.NArg() < 1 {
-		return fmt.Errorf("usage: cli detail <canonical-id>\n  example: cli detail shortcut:ad:12345")
+		return fmt.Errorf("usage: cli detail <canonical-id-or-url>\n  example: cli detail shortcut:ad:12345\n  example: cli detail https://example.com/myytavat-asunnot/12345")
 	}
-	canonicalID := fs.Arg(0)
+	input := fs.Arg(0)
 
-	pool, _, err := setup(ctx)
+	pool, cfg, err := setup(ctx)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
 	adsService := ads.NewService(pool)
-	return cli.RunDetail(ctx, adsService, canonicalID)
+	return cli.RunDetail(ctx, adsService, input, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase)
 }
 
 func runTransactions(ctx context.Context, args []string) error {

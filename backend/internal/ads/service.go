@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -292,6 +293,94 @@ func ParseCanonicalID(value string) (string, string, string, error) {
 		return "", "", "", fmt.Errorf("invalid canonical id: %s", value)
 	}
 	return source, kind, nativeID, nil
+}
+
+// shortcutAdPrefixes are URL path prefixes that identify shortcut ad pages.
+var shortcutAdPrefixes = []string{
+	"/myytavat-asunnot/",
+	"/vuokra-asunnot/",
+	"/myytavat-toimitilat/",
+	"/vuokrattavat-toimitilat/",
+	"/myytavat-tontit/",
+	"/myytavat-metsatilat-ja-maatilat/",
+	"/myytavat-autotallit/",
+	"/myytavat-loma-asunnot/",
+	"/vuokrattavat-loma-asunnot/",
+	"/vuokrattavat-autotallit/",
+}
+
+// ResolveInput takes user input that may be a URL or a canonical ID and returns
+// a canonical ID. shortcutBase and frontdoorBase are the base URLs used to
+// distinguish which source a /talo/ URL belongs to.
+func ResolveInput(input, shortcutBase, frontdoorBase string) (string, error) {
+	input = strings.TrimSpace(input)
+	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
+		return resolveURL(input, shortcutBase, frontdoorBase)
+	}
+	_, _, _, err := ParseCanonicalID(input)
+	if err != nil {
+		return "", fmt.Errorf("not a valid URL or canonical ID: %s", input)
+	}
+	return input, nil
+}
+
+func resolveURL(raw, shortcutBase, frontdoorBase string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("parse URL: %w", err)
+	}
+
+	path := strings.TrimRight(u.Path, "/")
+	segments := strings.Split(path, "/")
+	if len(segments) < 3 {
+		return "", fmt.Errorf("URL path too short: %s", path)
+	}
+
+	// Last segment is the ID, second-to-last is the category.
+	id := segments[len(segments)-1]
+	category := "/" + segments[len(segments)-2] + "/"
+
+	// Frontdoor-only path: /kohde/{id}
+	if category == "/kohde/" {
+		return CanonicalID("frontdoor", "ad", id), nil
+	}
+
+	// Shortcut ad paths
+	for _, prefix := range shortcutAdPrefixes {
+		if category == prefix {
+			return CanonicalID("shortcut", "ad", id), nil
+		}
+	}
+
+	// /talo/{uuid} exists on both sources — use host to disambiguate.
+	if category == "/talo/" {
+		host := strings.ToLower(u.Host)
+		scHost := hostFromBase(shortcutBase)
+		fdHost := hostFromBase(frontdoorBase)
+
+		switch {
+		case scHost != "" && strings.Contains(host, scHost):
+			return CanonicalID("shortcut", "building", id), nil
+		case fdHost != "" && strings.Contains(host, fdHost):
+			return CanonicalID("frontdoor", "building", id), nil
+		default:
+			return "", fmt.Errorf("cannot determine source for /talo/ URL (host %q does not match shortcut or frontdoor)", host)
+		}
+	}
+
+	return "", fmt.Errorf("unrecognized URL path: %s", path)
+}
+
+func hostFromBase(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
 }
 
 func normalizeSearchParams(params SearchParams) SearchParams {

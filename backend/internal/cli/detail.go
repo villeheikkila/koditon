@@ -7,7 +7,12 @@ import (
 	"koditon-go/internal/ads"
 )
 
-func RunDetail(ctx context.Context, svc *ads.Service, canonicalID string) error {
+func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, frontdoorBase string) error {
+	canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase)
+	if err != nil {
+		return fmt.Errorf("resolve input: %w", err)
+	}
+
 	detail, err := svc.DetailByCanonicalID(ctx, canonicalID)
 	if err != nil {
 		return fmt.Errorf("detail: %w", err)
