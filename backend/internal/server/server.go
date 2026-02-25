@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"koditon-go/internal/ads"
 	"koditon-go/internal/auth"
 	"koditon-go/internal/config"
 	frontdoorclient "koditon-go/internal/frontdoor/client"
@@ -20,6 +21,7 @@ import (
 	shortcutclient "koditon-go/internal/shortcut/client"
 	shortcutdb "koditon-go/internal/shortcut/db"
 	"koditon-go/internal/taskqueue"
+	"koditon-go/internal/web"
 )
 
 type Server struct {
@@ -32,6 +34,7 @@ type Server struct {
 	shortcutAPI   *shortcutclient.Client
 	frontdoorAPI  *frontdoorclient.Client
 	authService   *auth.Service
+	webHandler    *web.Handler
 }
 
 func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueClient *taskqueue.Client, authService *auth.Service) *Server {
@@ -79,6 +82,8 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		cfg.Frontdoor.Cookie,
 		cfg.Frontdoor.SitemapBase,
 	)
+	adsService := ads.NewService(pool)
+	webHandler := web.NewHandler(adsService, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase, logger)
 	return &Server{
 		logger:        logger.With("component", "server"),
 		cfg:           cfg,
@@ -89,11 +94,13 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		shortcutAPI:   shortcutClient,
 		frontdoorAPI:  frontdoorClient,
 		authService:   authService,
+		webHandler:    webHandler,
 	}
 }
 
 func (s *Server) Handler(mux *http.ServeMux, api huma.API) http.Handler {
 	s.addRoutes(api)
+	s.webHandler.Register(mux)
 	var handler http.Handler = mux
 	handler = s.loggingMiddleware(handler)
 	return handler
