@@ -11,7 +11,6 @@ var (
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
 	labelStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("75"))
 	mutedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	errorStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("203"))
 )
 
 func formatPrice(p *int64) string {

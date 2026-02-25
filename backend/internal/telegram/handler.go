@@ -74,12 +74,12 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 func (h *Handler) sendToTelegram(r slog.Record) {
 	var buf strings.Builder
 	levelEmoji := getLevelEmoji(r.Level)
-	buf.WriteString(fmt.Sprintf("%s *%s*\n\n", levelEmoji, r.Level.String()))
-	buf.WriteString(fmt.Sprintf("`%s`\n", escapeMarkdown(r.Message)))
+	fmt.Fprintf(&buf, "%s *%s*\n\n", levelEmoji, r.Level.String())
+	fmt.Fprintf(&buf, "`%s`\n", escapeMarkdown(r.Message))
 	if r.NumAttrs() > 0 {
 		buf.WriteString("\n*Attributes:*\n")
 		r.Attrs(func(a slog.Attr) bool {
-			buf.WriteString(fmt.Sprintf("• `%s`: %s\n", a.Key, escapeMarkdown(a.Value.String())))
+			fmt.Fprintf(&buf, "• `%s`: %s\n", a.Key, escapeMarkdown(a.Value.String()))
 			return true
 		})
 	}
@@ -102,7 +102,7 @@ func (h *Handler) sendToTelegram(r slog.Record) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }
 
 func getLevelEmoji(level slog.Level) string {

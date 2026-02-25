@@ -35,7 +35,7 @@ func NewAuthMiddleware(api huma.API, authService *Service) func(ctx huma.Context
 		}
 		token := extractBearerToken(ctx)
 		if token == "" {
-			huma.WriteErr(api, ctx, http.StatusUnauthorized, "missing authorization token")
+			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "missing authorization token")
 			return
 		}
 		claims, err := authService.VerifyAccessToken(ctx.Context(), token)
@@ -50,7 +50,7 @@ func NewAuthMiddleware(api huma.API, authService *Service) func(ctx huma.Context
 			case errors.Is(err, ErrInvalidToken):
 				msg = "invalid token"
 			}
-			huma.WriteErr(api, ctx, status, msg)
+			_ = huma.WriteErr(api, ctx, status, msg)
 			return
 		}
 		// store claims in context

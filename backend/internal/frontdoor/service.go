@@ -10,7 +10,6 @@ import (
 
 	"koditon-go/internal/db"
 	"koditon-go/internal/frontdoor/client"
-	"koditon-go/internal/util"
 )
 
 type Service struct {
@@ -127,7 +126,7 @@ func (s *Service) SyncBuilding(ctx context.Context, externalID string) error {
 
 func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (url string, housingCompanyID int64, err error) {
 	if id, parseErr := strconv.ParseInt(externalID, 10, 64); parseErr == nil {
-		idPtr := util.Int64Ptr(id)
+		idPtr := new(id)
 		u, lookupErr := s.queries.GetFrontdoorBuildingURLByHousingCompanyID(ctx, idPtr)
 		if lookupErr != nil {
 			return "", 0, fmt.Errorf("get building url (housing_company_id=%d): %w", id, lookupErr)
@@ -178,7 +177,7 @@ func (s *Service) upsertBuildingAnnouncements(ctx context.Context, housingCompan
 	if len(announcements) == 0 {
 		return nil
 	}
-	idPtr := util.Int64Ptr(housingCompanyID)
+	idPtr := new(housingCompanyID)
 	buildingID, err := s.queries.GetFrontdoorBuildingIDByHousingCompanyID(ctx, idPtr)
 	if err != nil {
 		return fmt.Errorf("get building id: %w", err)

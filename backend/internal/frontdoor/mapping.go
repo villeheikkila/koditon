@@ -43,7 +43,7 @@ func mapAdParams(friendlyID string, ad *client.AdResponse) db.UpdateFrontdoorAdD
 
 func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyResponse) db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {
 	p := db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams{
-		FrontdoorBuildingHousingCompanyID: util.Int64Ptr(housingCompanyID),
+		FrontdoorBuildingHousingCompanyID: new(housingCompanyID),
 	}
 	if page := data.HousingCompanyPage; page != nil && page.Response != nil {
 		if hca := page.Response.HousingCompanyAnnouncement; hca != nil {

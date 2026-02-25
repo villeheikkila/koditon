@@ -56,7 +56,9 @@ func run(ctx context.Context) error {
 		logger.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
-		srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Error("shutdown error", "err", err)
+		}
 	}()
 
 	logger.Info("web server starting", "addr", addr)

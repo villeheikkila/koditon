@@ -161,10 +161,7 @@ func IsRetryable(err error) bool {
 		return true
 	}
 	var permanent *PermanentError
-	if errors.As(err, &permanent) {
-		return false
-	}
-	return true
+	return !errors.As(err, &permanent)
 }
 
 func IsPermanent(err error) bool {

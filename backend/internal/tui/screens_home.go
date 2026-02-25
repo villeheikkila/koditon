@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+
 	tea "charm.land/bubbletea/v2"
 )
 

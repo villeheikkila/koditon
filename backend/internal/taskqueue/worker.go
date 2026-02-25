@@ -59,9 +59,6 @@ type Worker struct {
 
 type TaskHandler func(ctx context.Context, task db.TaskQueueTask) error
 
-func strPtr(s string) *string { return &s }
-func int64Ptr(i int64) *int64 { return &i }
-
 type WorkerConfig struct {
 	VisibilityTimeout time.Duration
 	PollInterval      time.Duration
@@ -172,7 +169,7 @@ func (w *Worker) processNextTask(ctx context.Context) (err error) {
 		"max_attempts", task.MaxAttempts,
 		"priority", task.Priority,
 	)
-	workerID := strPtr(w.workerID)
+	workerID := new(w.workerID)
 	if err := w.queries.UpdateTaskToProcessing(ctx, db.UpdateTaskToProcessingParams{TaskID: task.TaskID, WorkerID: workerID}); err != nil {
 		taskLogger.ErrorContext(ctx, "failed to update task to processing", "error", err)
 		return NewTaskError("Worker.UpdateTaskToProcessing", err).
@@ -265,7 +262,7 @@ func (w *Worker) scheduleRetry(ctx context.Context, logger *slog.Logger, task db
 		logger.ErrorContext(ctx, "failed to enqueue retry", "error", err)
 		return
 	}
-	_ = w.queries.UpdateTaskQueueMessageId(ctx, db.UpdateTaskQueueMessageIdParams{TaskID: task.TaskID, QueueMessageID: int64Ptr(msgID)})
+	_ = w.queries.UpdateTaskQueueMessageId(ctx, db.UpdateTaskQueueMessageIdParams{TaskID: task.TaskID, QueueMessageID: new(msgID)})
 }
 
 func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask, totalAttempts int64, lastErr error, duration time.Duration) {
@@ -291,7 +288,7 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 	if task.LastError != nil {
 		firstError = task.LastError
 	} else {
-		firstError = strPtr(lastErr.Error())
+		firstError = new(lastErr.Error())
 	}
 	var taskMetadata []byte
 	entity, err := w.queries.GetEntity(ctx, task.EntityID)
@@ -318,7 +315,7 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 		logger.ErrorContext(ctx, "failed to insert task into DLQ", "error", dlqErr)
 	}
 	// Mark original task as failed
-	lastErrorText := strPtr(lastErr.Error())
+	lastErrorText := new(lastErr.Error())
 	if err := w.queries.UpdateTaskToFailed(ctx, db.UpdateTaskToFailedParams{TaskID: task.TaskID, LastError: lastErrorText}); err != nil {
 		logger.ErrorContext(ctx, "failed to mark task as failed", "error", err)
 	}

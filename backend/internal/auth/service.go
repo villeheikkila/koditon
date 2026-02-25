@@ -91,7 +91,7 @@ func (s *Service) SignInAnonymous(ctx context.Context, req SignInAnonymousReques
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.queries.WithTx(tx)
 	user, err := qtx.CreateUser(ctx)
 	if err != nil {
@@ -208,7 +208,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.queries.WithTx(tx)
 	var email *string
 	if identity.Email != "" {
@@ -367,7 +367,7 @@ func (s *Service) RefreshTokens(ctx context.Context, req RefreshTokensRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.queries.WithTx(tx)
 	session, err := s.getActiveSessionForUpdate(ctx, tx, claims.SessionID)
 	if err != nil {
@@ -448,7 +448,7 @@ func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.queries.WithTx(tx)
 	if err := qtx.RevokeSession(ctx, sessionID); err != nil {
 		return fmt.Errorf("revoke session: %w", err)
