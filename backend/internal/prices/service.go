@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	openrouter "github.com/revrost/go-openrouter"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/prices/client"
-	"koditon-go/internal/prices/db"
 	"koditon-go/internal/util"
 )
 
@@ -103,9 +103,9 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 		limit = 200
 	}
 	rows, err := s.queries.SearchTransactionsByCityAndAddress(ctx, &db.SearchTransactionsByCityAndAddressParams{
-		CityName:   &cityName,
-		SearchTerm: &searchTerm,
-		LimitCount: pgtype.Int4{Int32: limit, Valid: true},
+		CityName:   cityName,
+		SearchTerm: searchTerm,
+		LimitCount: &limit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("search transactions by city and address: %w", err)
@@ -114,9 +114,9 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 	for _, row := range rows {
 		result = append(result, SearchTransactionsRow{
 			City:             row.PricesCityName,
-			Municipality:     ptrString(row.MunicipalityNameFi),
-			PostalCode:       ptrString(row.PostalCode),
-			PostalArea:       ptrString(row.PostalAreaNameFi),
+			Municipality:     row.MunicipalityNameFi,
+			PostalCode:       row.PostalCode,
+			PostalArea:       row.PostalAreaNameFi,
 			Neighborhood:     row.PricesNeighborhoodName,
 			Description:      row.PricesTransactionDescription,
 			Type:             row.PricesTransactionType,
@@ -591,7 +591,7 @@ func (s *Service) matchNeighborhoodWithLLM(
 	neighborhood db.ListUnmatchedNeighborhoodsBatchRow,
 	cityName string,
 ) (*LLMMatchResult, error) {
-	postalCodes, err := s.queries.GetAvailablePostalCodesForMunicipality(ctx, &cityName)
+	postalCodes, err := s.queries.GetAvailablePostalCodesForMunicipality(ctx, cityName)
 	if err != nil {
 		return nil, fmt.Errorf("get available postal codes: %w", err)
 	}

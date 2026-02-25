@@ -5,8 +5,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/prices/client"
-	"koditon-go/internal/prices/db"
 	"koditon-go/internal/util"
 )
 

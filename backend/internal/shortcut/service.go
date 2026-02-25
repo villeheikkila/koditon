@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/shortcut/client"
-	"koditon-go/internal/shortcut/db"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

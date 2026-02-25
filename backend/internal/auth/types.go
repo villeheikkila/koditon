@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"koditon-go/internal/auth/db"
+	"koditon-go/internal/db"
 )
 
 type AuthProvider = db.AuthAuthProvider

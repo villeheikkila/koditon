@@ -1,8 +1,8 @@
 package shortcut
 
 import (
+	"koditon-go/internal/db"
 	"koditon-go/internal/shortcut/client"
-	"koditon-go/internal/shortcut/db"
 	"koditon-go/internal/util"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -53,9 +53,9 @@ func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *cli
 		ShortcutBuildingBuildingID:              scraped.BuildingID,
 		ShortcutBuildingBuildingType:            scraped.BuildingType,
 		ShortcutBuildingBuildingSubtype:         scraped.BuildingSubtype,
-		ShortcutBuildingConstructionYear:        util.ToInt4(scraped.ConstructionYear),
-		ShortcutBuildingFloorCount:              util.ToInt4(scraped.FloorCount),
-		ShortcutBuildingApartmentCount:          util.ToInt4(scraped.ApartmentCount),
+		ShortcutBuildingConstructionYear:        util.Int32Ptr(scraped.ConstructionYear),
+		ShortcutBuildingFloorCount:              util.Int32Ptr(scraped.FloorCount),
+		ShortcutBuildingApartmentCount:          util.Int32Ptr(scraped.ApartmentCount),
 		ShortcutBuildingHeatingSystem:           scraped.HeatingSystem,
 		ShortcutBuildingBuildingMaterial:        scraped.BuildingMaterial,
 		ShortcutBuildingPlotType:                scraped.PlotType,
@@ -81,7 +81,7 @@ func mapListingParams(buildingID pgtype.UUID, listing *client.BuildingListing) *
 		ShortcutBuildingListingPrice:         util.ToFloat8(listing.Price),
 		ShortcutBuildingListingPricePerSqm:   util.ToFloat8(listing.PricePerSqm),
 		ShortcutBuildingListingMarketingTime: listing.MarketingTime,
-		ShortcutBuildingListingIdx:           util.ToInt4(&listing.Index),
+		ShortcutBuildingListingIdx:           util.Int32Ptr(&listing.Index),
 	}
 }
 
@@ -92,6 +92,6 @@ func mapRentalParams(buildingID pgtype.UUID, rental *client.RentalListing) *db.U
 		ShortcutBuildingRentalSize:          util.ToFloat8(rental.Size),
 		ShortcutBuildingRentalPrice:         util.ToFloat8(rental.Price),
 		ShortcutBuildingRentalMarketingTime: rental.MarketingTime,
-		ShortcutBuildingRentalIdx:           util.ToInt4(&rental.Index),
+		ShortcutBuildingRentalIdx:           util.Int32Ptr(&rental.Index),
 	}
 }

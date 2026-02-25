@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"strconv"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/frontdoor/client"
-	"koditon-go/internal/frontdoor/db"
+
+	"koditon-go/internal/util"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -126,8 +128,8 @@ func (s *Service) SyncBuilding(ctx context.Context, externalID string) error {
 
 func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (url string, housingCompanyID int64, err error) {
 	if id, parseErr := strconv.ParseInt(externalID, 10, 64); parseErr == nil {
-		pgID := pgtype.Int8{Int64: id, Valid: true}
-		u, lookupErr := s.queries.GetFrontdoorBuildingURLByHousingCompanyID(ctx, pgID)
+		idPtr := util.Int64Ptr(id)
+		u, lookupErr := s.queries.GetFrontdoorBuildingURLByHousingCompanyID(ctx, idPtr)
 		if lookupErr != nil {
 			return "", 0, fmt.Errorf("get building url (housing_company_id=%d): %w", id, lookupErr)
 		}
@@ -148,8 +150,8 @@ func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (ur
 		return "", 0, fmt.Errorf("building %s has no URL", externalID)
 	}
 	var hcID int64
-	if building.FrontdoorBuildingHousingCompanyID.Valid {
-		hcID = building.FrontdoorBuildingHousingCompanyID.Int64
+	if building.FrontdoorBuildingHousingCompanyID != nil {
+		hcID = *building.FrontdoorBuildingHousingCompanyID
 	}
 	return *building.FrontdoorBuildingUrl, hcID, nil
 }
@@ -177,8 +179,8 @@ func (s *Service) upsertBuildingAnnouncements(ctx context.Context, housingCompan
 	if len(announcements) == 0 {
 		return nil
 	}
-	housingCompanyIDPg := pgtype.Int8{Int64: housingCompanyID, Valid: true}
-	buildingID, err := s.queries.GetFrontdoorBuildingIDByHousingCompanyID(ctx, housingCompanyIDPg)
+	idPtr := util.Int64Ptr(housingCompanyID)
+	buildingID, err := s.queries.GetFrontdoorBuildingIDByHousingCompanyID(ctx, idPtr)
 	if err != nil {
 		return fmt.Errorf("get building id: %w", err)
 	}

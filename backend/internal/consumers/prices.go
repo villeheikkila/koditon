@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/taskqueue"
-	taskqueuedb "koditon-go/internal/taskqueue/db"
 )
 
 func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger) error {
@@ -30,7 +30,7 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 	return nil
 }
 
-func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
+func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
 	logger.InfoContext(ctx, "syncing prices city", "entity_id", task.EntityID)
 	return c.syncRunner.PricesSyncCityEntity(ctx, task.EntityID)
 }

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"koditon-go/internal/auth/apple"
-	"koditon-go/internal/auth/db"
+	"koditon-go/internal/db"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -435,8 +435,8 @@ func (s *Service) RefreshTokens(ctx context.Context, req RefreshTokensRequest) (
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 	sessionNotAfter := time.Now().Add(RefreshTokenExpiry)
-	if session.SessionNotAfter.Valid {
-		sessionNotAfter = session.SessionNotAfter.Time
+	if session.SessionNotAfter != nil {
+		sessionNotAfter = *session.SessionNotAfter
 	}
 	sessionUUID := pgToUUID(session.SessionID)
 	userUUID := pgToUUID(session.UserID)

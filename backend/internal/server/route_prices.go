@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	pricesdb "koditon-go/internal/prices/db"
+	"koditon-go/internal/db"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -70,7 +70,7 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid postal_code_id")
 	}
-	rows, err := s.pricesQueries.ListTransactionsByPostalSelection(ctx, &pricesdb.ListTransactionsByPostalSelectionParams{
+	rows, err := s.pricesQueries.ListTransactionsByPostalSelection(ctx, &db.ListTransactionsByPostalSelectionParams{
 		MunicipalityID: municipalityID,
 		PostalCodeID:   postalCodeID,
 	})
@@ -130,7 +130,7 @@ type pricesTransactionsFilteredInput struct {
 }
 
 func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *pricesTransactionsFilteredInput) (*pricesTransactionsOutput, error) {
-	params := &pricesdb.ListTransactionsFilteredParams{}
+	params := &db.ListTransactionsFilteredParams{}
 	if input.MunicipalityIDs != "" {
 		ids := strings.Split(input.MunicipalityIDs, ",")
 		uuids := make([]pgtype.UUID, 0, len(ids))
@@ -172,13 +172,13 @@ func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *p
 		params.Types = trimmed
 	}
 	if input.MinArea > 0 {
-		params.MinArea = pgtype.Float8{Float64: input.MinArea, Valid: true}
+		params.MinArea = &input.MinArea
 	}
 	if input.MaxArea > 0 {
-		params.MaxArea = pgtype.Float8{Float64: input.MaxArea, Valid: true}
+		params.MaxArea = &input.MaxArea
 	}
 	if input.Limit > 0 {
-		params.LimitCount = pgtype.Int4{Int32: input.Limit, Valid: true}
+		params.LimitCount = &input.Limit
 	}
 	rows, err := s.pricesQueries.ListTransactionsFiltered(ctx, params)
 	if err != nil {

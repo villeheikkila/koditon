@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"koditon-go/internal/pgmq/db"
+	"koditon-go/internal/db"
 )
 
 type DBTX interface {
@@ -60,7 +60,11 @@ func (c *Client) CreatePartitionedQueue(ctx context.Context, queueName, partitio
 	if err := ValidateQueueName(queueName); err != nil {
 		return fmt.Errorf("create partitioned queue %s: %w", queueName, err)
 	}
-	err := c.queries.CreatePartitionedQueue(ctx, queueName, partitionInterval, retentionInterval)
+	err := c.queries.CreatePartitionedQueue(ctx, &db.CreatePartitionedQueueParams{
+		QueueName:         queueName,
+		PartitionInterval: partitionInterval,
+		RetentionInterval: retentionInterval,
+	})
 	if err != nil {
 		return fmt.Errorf("create partitioned queue %s: %w", queueName, err)
 	}
@@ -118,7 +122,11 @@ func (c *Client) SendWithDelay(ctx context.Context, queueName string, msg json.R
 	if err := ValidateQueueName(queueName); err != nil {
 		return 0, fmt.Errorf("send message to queue %s: %w", queueName, err)
 	}
-	msgID, err := c.queries.Send(ctx, queueName, msg, int32(delaySecs))
+	msgID, err := c.queries.Send(ctx, &db.SendParams{
+		QueueName:    queueName,
+		Message:      msg,
+		DelaySeconds: int32(delaySecs),
+	})
 	if err != nil {
 		return 0, fmt.Errorf("send message to queue %s: %w", queueName, err)
 	}
@@ -133,11 +141,11 @@ func (c *Client) SendBatchWithDelay(ctx context.Context, queueName string, msgs 
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("send batch to queue %s: %w", queueName, err)
 	}
-	rawMsgs := make([][]byte, len(msgs))
-	for i, msg := range msgs {
-		rawMsgs[i] = msg
-	}
-	msgIDs, err := c.queries.SendBatch(ctx, queueName, rawMsgs, int32(delaySecs))
+	msgIDs, err := c.queries.SendBatch(ctx, &db.SendBatchParams{
+		QueueName:    queueName,
+		Messages:     msgs,
+		DelaySeconds: int32(delaySecs),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("send batch to queue %s: %w", queueName, err)
 	}
@@ -149,7 +157,11 @@ func (c *Client) Read(ctx context.Context, queueName string, vtSecs int64) (*Mes
 		return nil, fmt.Errorf("read from queue %s: %w", queueName, err)
 	}
 	vtSecs = withDefaultVT(vtSecs)
-	rows, err := c.queries.Read(ctx, queueName, int32(vtSecs), 1)
+	rows, err := c.queries.Read(ctx, &db.ReadParams{
+		QueueName:   queueName,
+		VtSeconds:   int32(vtSecs),
+		NumMessages: 1,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("read from queue %s: %w", queueName, err)
 	}
@@ -173,7 +185,11 @@ func (c *Client) ReadBatch(ctx context.Context, queueName string, vtSecs int64, 
 		return nil, fmt.Errorf("read batch from queue %s: %w", queueName, err)
 	}
 	vtSecs = withDefaultVT(vtSecs)
-	rows, err := c.queries.Read(ctx, queueName, int32(vtSecs), int32(numMsgs))
+	rows, err := c.queries.Read(ctx, &db.ReadParams{
+		QueueName:   queueName,
+		VtSeconds:   int32(vtSecs),
+		NumMessages: int32(numMsgs),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("read batch from queue %s: %w", queueName, err)
 	}
@@ -218,7 +234,10 @@ func (c *Client) Archive(ctx context.Context, queueName string, msgID int64) (bo
 	if err := ValidateQueueName(queueName); err != nil {
 		return false, fmt.Errorf("archive message %d from queue %s: %w", msgID, queueName, err)
 	}
-	archived, err := c.queries.Archive(ctx, queueName, msgID)
+	archived, err := c.queries.Archive(ctx, &db.ArchiveParams{
+		QueueName: queueName,
+		MsgID:     msgID,
+	})
 	if err != nil {
 		return false, fmt.Errorf("archive message %d from queue %s: %w", msgID, queueName, err)
 	}
@@ -229,7 +248,10 @@ func (c *Client) ArchiveBatch(ctx context.Context, queueName string, msgIDs []in
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("archive batch from queue %s: %w", queueName, err)
 	}
-	archivedIDs, err := c.queries.ArchiveBatch(ctx, queueName, msgIDs)
+	archivedIDs, err := c.queries.ArchiveBatch(ctx, &db.ArchiveBatchParams{
+		QueueName: queueName,
+		MsgIds:    msgIDs,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("archive batch from queue %s: %w", queueName, err)
 	}
@@ -240,7 +262,10 @@ func (c *Client) Delete(ctx context.Context, queueName string, msgID int64) (boo
 	if err := ValidateQueueName(queueName); err != nil {
 		return false, fmt.Errorf("delete message %d from queue %s: %w", msgID, queueName, err)
 	}
-	deleted, err := c.queries.Delete(ctx, queueName, msgID)
+	deleted, err := c.queries.Delete(ctx, &db.DeleteParams{
+		QueueName: queueName,
+		MsgID:     msgID,
+	})
 	if err != nil {
 		return false, fmt.Errorf("delete message %d from queue %s: %w", msgID, queueName, err)
 	}
@@ -251,7 +276,10 @@ func (c *Client) DeleteBatch(ctx context.Context, queueName string, msgIDs []int
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("delete batch from queue %s: %w", queueName, err)
 	}
-	deletedIDs, err := c.queries.DeleteBatch(ctx, queueName, msgIDs)
+	deletedIDs, err := c.queries.DeleteBatch(ctx, &db.DeleteBatchParams{
+		QueueName: queueName,
+		MsgIds:    msgIDs,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("delete batch from queue %s: %w", queueName, err)
 	}
@@ -262,16 +290,17 @@ func (c *Client) SetVisibilityTimeout(ctx context.Context, queueName string, msg
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("set visibility timeout for message %d in queue %s: %w", msgID, queueName, err)
 	}
-
-	rows, err := c.queries.SetVT(ctx, queueName, msgID, int32(vtSecs))
+	rows, err := c.queries.SetVT(ctx, &db.SetVTParams{
+		QueueName: queueName,
+		MsgID:     msgID,
+		VtSeconds: int32(vtSecs),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("set visibility timeout for message %d in queue %s: %w", msgID, queueName, err)
 	}
-
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("set visibility timeout for message %d in queue %s: %w", msgID, queueName, ErrMessageNotFound)
 	}
-
 	row := rows[0]
 	msg := &Message{
 		MsgID:      row.MsgID,
@@ -281,7 +310,6 @@ func (c *Client) SetVisibilityTimeout(ctx context.Context, queueName string, msg
 		Message:    row.Message,
 		Headers:    row.Headers,
 	}
-
 	return msg, nil
 }
 
@@ -289,12 +317,10 @@ func (c *Client) Metrics(ctx context.Context, queueName string) (*QueueMetrics, 
 	if err := ValidateQueueName(queueName); err != nil {
 		return nil, fmt.Errorf("get metrics for queue %s: %w", queueName, err)
 	}
-
 	row, err := c.queries.GetQueueMetrics(ctx, queueName)
 	if err != nil {
 		return nil, fmt.Errorf("get metrics for queue %s: %w", queueName, err)
 	}
-
 	m := &QueueMetrics{
 		QueueName:       row.QueueName,
 		QueueLength:     row.QueueLength,
@@ -303,7 +329,6 @@ func (c *Client) Metrics(ctx context.Context, queueName string) (*QueueMetrics, 
 		TotalMessages:   row.TotalMessages,
 		ScrapeTime:      row.ScrapeTime,
 	}
-
 	return m, nil
 }
 

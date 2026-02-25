@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/pgmq"
-	"koditon-go/internal/taskqueue/db"
 )
 
 type DLQEntry struct {
@@ -194,7 +193,13 @@ type QueueMetrics struct {
 }
 
 func (c *Client) RegisterEntity(ctx context.Context, entityID, entityType, status, schedulingStrategy string) error {
-	err := c.queries.CallRegisterEntity(ctx, entityID, entityType, status, schedulingStrategy, []byte("{}"))
+	err := c.queries.CallRegisterEntity(ctx, &db.CallRegisterEntityParams{
+		Column1: entityID,
+		Column2: entityType,
+		Column3: status,
+		Column4: schedulingStrategy,
+		Column5: []byte("{}"),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to register entity: %w", err)
 	}
@@ -202,7 +207,11 @@ func (c *Client) RegisterEntity(ctx context.Context, entityID, entityType, statu
 }
 
 func (c *Client) RegisterEntities(ctx context.Context, entityIDs []string, entityType, schedulingStrategy string) (int, error) {
-	count, err := c.queries.CallRegisterEntities(ctx, entityIDs, entityType, schedulingStrategy)
+	count, err := c.queries.CallRegisterEntities(ctx, &db.CallRegisterEntitiesParams{
+		Column1: entityIDs,
+		Column2: entityType,
+		Column3: schedulingStrategy,
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to register entities: %w", err)
 	}
@@ -227,11 +236,14 @@ func (c *Client) RequeueStuckTasks(ctx context.Context) (int, error) {
 
 // CreateTaskWithPriority creates a new task with the specified priority
 func (c *Client) CreateTaskWithPriority(ctx context.Context, entityID, taskType string, priority int, maxAttempts int, scheduledFor time.Time, runOn *time.Time) (int64, error) {
-	var runOnDate pgtype.Date
-	if runOn != nil {
-		runOnDate = DateToPgDate(*runOn)
-	}
-	task, err := c.queries.CreateTaskWithPriority(ctx, entityID, taskType, int32(priority), int32(maxAttempts), scheduledFor, runOnDate)
+	task, err := c.queries.CreateTaskWithPriority(ctx, &db.CreateTaskWithPriorityParams{
+		EntityID:     entityID,
+		TaskType:     taskType,
+		Priority:     int32(priority),
+		MaxAttempts:  int32(maxAttempts),
+		ScheduledFor: scheduledFor,
+		RunOn:        runOn,
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create task with priority: %w", err)
 	}
@@ -239,7 +251,7 @@ func (c *Client) CreateTaskWithPriority(ctx context.Context, entityID, taskType 
 }
 
 func (c *Client) UpdateTaskPriority(ctx context.Context, taskID int64, priority int) error {
-	err := c.queries.UpdateTaskPriority(ctx, taskID, int32(priority))
+	err := c.queries.UpdateTaskPriority(ctx, &db.UpdateTaskPriorityParams{TaskID: taskID, Priority: int32(priority)})
 	if err != nil {
 		return fmt.Errorf("failed to update task priority: %w", err)
 	}
@@ -257,7 +269,10 @@ func (c *Client) GetDLQEntry(ctx context.Context, dlqID int64) (*DLQEntry, error
 }
 
 func (c *Client) ListDLQEntries(ctx context.Context, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntries(ctx, int64(limit), int64(offset))
+	entries, err := c.queries.ListDLQEntries(ctx, &db.ListDLQEntriesParams{
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list DLQ entries: %w", err)
 	}
@@ -269,7 +284,10 @@ func (c *Client) ListDLQEntries(ctx context.Context, limit, offset int) ([]DLQEn
 }
 
 func (c *Client) ListDLQEntriesNotRequeued(ctx context.Context, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesNotRequeued(ctx, int64(limit), int64(offset))
+	entries, err := c.queries.ListDLQEntriesNotRequeued(ctx, &db.ListDLQEntriesNotRequeuedParams{
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pending DLQ entries: %w", err)
 	}
@@ -281,7 +299,11 @@ func (c *Client) ListDLQEntriesNotRequeued(ctx context.Context, limit, offset in
 }
 
 func (c *Client) ListDLQEntriesByTaskType(ctx context.Context, taskType string, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesByTaskType(ctx, taskType, int64(limit), int64(offset))
+	entries, err := c.queries.ListDLQEntriesByTaskType(ctx, &db.ListDLQEntriesByTaskTypeParams{
+		TaskType: taskType,
+		Limit:    int64(limit),
+		Offset:   int64(offset),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list DLQ entries by task type: %w", err)
 	}
@@ -293,7 +315,11 @@ func (c *Client) ListDLQEntriesByTaskType(ctx context.Context, taskType string, 
 }
 
 func (c *Client) ListDLQEntriesByEntity(ctx context.Context, entityID string, limit, offset int) ([]DLQEntry, error) {
-	entries, err := c.queries.ListDLQEntriesByEntity(ctx, entityID, int64(limit), int64(offset))
+	entries, err := c.queries.ListDLQEntriesByEntity(ctx, &db.ListDLQEntriesByEntityParams{
+		EntityID: entityID,
+		Limit:    int64(limit),
+		Offset:   int64(offset),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list DLQ entries by entity: %w", err)
 	}
@@ -336,7 +362,11 @@ func (c *Client) RequeueFromDLQ(ctx context.Context, dlqID int64, priority *int,
 	if priority != nil {
 		priorityVal = int64(*priority)
 	}
-	taskID, err := c.queries.CallRequeueFromDLQ(ctx, dlqID, priorityVal, int64(maxAttempts))
+	taskID, err := c.queries.CallRequeueFromDLQ(ctx, &db.CallRequeueFromDLQParams{
+		Column1: dlqID,
+		Column2: int32(priorityVal),
+		Column3: int32(maxAttempts),
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to requeue from DLQ: %w", err)
 	}
@@ -344,8 +374,7 @@ func (c *Client) RequeueFromDLQ(ctx context.Context, dlqID int64, priority *int,
 	if err != nil {
 		return taskID, fmt.Errorf("task created but failed to enqueue: %w", err)
 	}
-	queueMsgID := pgtype.Int8{Int64: msgID, Valid: true}
-	_ = c.queries.UpdateTaskQueueMessageId(ctx, taskID, queueMsgID)
+	_ = c.queries.UpdateTaskQueueMessageId(ctx, &db.UpdateTaskQueueMessageIdParams{TaskID: taskID, QueueMessageID: &msgID})
 	return taskID, nil
 }
 
@@ -371,80 +400,18 @@ func convertDBDLQEntry(e db.TaskQueueDeadLetterQueue) *DLQEntry {
 		OriginalTaskID:    e.OriginalTaskID,
 		EntityID:          e.EntityID,
 		TaskType:          e.TaskType,
-		Priority:          int32(e.Priority),
-		TotalAttempts:     int32(e.TotalAttempts),
+		Priority:          e.Priority,
+		TotalAttempts:     e.TotalAttempts,
 		LastError:         e.LastError,
 		ErrorHistory:      e.ErrorHistory,
 		TaskMetadata:      e.TaskMetadata,
-		OriginalCreatedAt: e.OriginalCreatedAt.Time,
-		LastAttemptedAt:   e.LastAttemptedAt.Time,
-		MovedToDLQAt:      e.MovedToDlqAt.Time,
-		RequeueCount:      int32(e.RequeueCount),
+		OriginalCreatedAt: e.OriginalCreatedAt,
+		LastAttemptedAt:   e.LastAttemptedAt,
+		MovedToDLQAt:      e.MovedToDlqAt,
+		RequeueCount:      e.RequeueCount,
 	}
-	if e.FirstError.Valid {
-		entry.FirstError = &e.FirstError.String
-	}
-	if e.FirstAttemptedAt.Valid {
-		entry.FirstAttemptedAt = &e.FirstAttemptedAt.Time
-	}
-	if e.RequeuedAt.Valid {
-		entry.RequeuedAt = &e.RequeuedAt.Time
-	}
+	entry.FirstError = e.FirstError
+	entry.FirstAttemptedAt = e.FirstAttemptedAt
+	entry.RequeuedAt = e.RequeuedAt
 	return entry
-}
-
-func StringToPgText(s *string) pgtype.Text {
-	if s == nil {
-		return pgtype.Text{Valid: false}
-	}
-	return pgtype.Text{String: *s, Valid: true}
-}
-
-func PgTextToString(t pgtype.Text) *string {
-	if !t.Valid {
-		return nil
-	}
-	return &t.String
-}
-
-func TimeToPgTimestamptz(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{Valid: false}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func PgTimestamptzToTime(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
-func Int64ToPgInt8(i *int64) pgtype.Int8 {
-	if i == nil {
-		return pgtype.Int8{Valid: false}
-	}
-	return pgtype.Int8{Int64: *i, Valid: true}
-}
-
-func PgInt8ToInt64(i pgtype.Int8) *int64 {
-	if !i.Valid {
-		return nil
-	}
-	return &i.Int64
-}
-
-func DateToPgDate(t time.Time) pgtype.Date {
-	return pgtype.Date{
-		Time:  time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC),
-		Valid: true,
-	}
-}
-
-func PgDateToTime(d pgtype.Date) *time.Time {
-	if !d.Valid {
-		return nil
-	}
-	return &d.Time
 }

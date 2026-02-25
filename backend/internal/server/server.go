@@ -14,12 +14,10 @@ import (
 	"koditon-go/internal/ads"
 	"koditon-go/internal/auth"
 	"koditon-go/internal/config"
+	"koditon-go/internal/db"
 	frontdoorclient "koditon-go/internal/frontdoor/client"
-	postaldb "koditon-go/internal/postal/db"
 	pricesclient "koditon-go/internal/prices/client"
-	pricesdb "koditon-go/internal/prices/db"
 	shortcutclient "koditon-go/internal/shortcut/client"
-	shortcutdb "koditon-go/internal/shortcut/db"
 	"koditon-go/internal/taskqueue"
 	"koditon-go/internal/web"
 )
@@ -27,9 +25,9 @@ import (
 type Server struct {
 	logger        *slog.Logger
 	cfg           config.Config
-	pricesQueries *pricesdb.Queries
+	pricesQueries *db.Queries
 	pricesAPI     *pricesclient.Client
-	postalQueries *postaldb.Queries
+	postalQueries *db.Queries
 	taskQueue     *taskqueue.Client
 	shortcutAPI   *shortcutclient.Client
 	frontdoorAPI  *frontdoorclient.Client
@@ -38,9 +36,9 @@ type Server struct {
 }
 
 func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueClient *taskqueue.Client, authService *auth.Service) *Server {
-	pricesQueries := pricesdb.New(pool)
-	postalQueries := postaldb.New(pool)
-	shortcutQueries := shortcutdb.New(pool)
+	pricesQueries := db.New(pool)
+	postalQueries := db.New(pool)
+	shortcutQueries := db.New(pool)
 	pricesClient, _ := pricesclient.NewClient(cfg.Prices.BaseURL)
 	tokenLoad := func(ctx context.Context) (*shortcutclient.Tokens, error) {
 		dbToken, err := shortcutQueries.GetValidShortcutToken(ctx)
@@ -58,7 +56,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		return tokens, nil
 	}
 	tokenStore := func(ctx context.Context, tokens *shortcutclient.Tokens, expiresAt time.Time) error {
-		_, err := shortcutQueries.InsertShortcutToken(ctx, &shortcutdb.InsertShortcutTokenParams{
+		_, err := shortcutQueries.InsertShortcutToken(ctx, &db.InsertShortcutTokenParams{
 			ShortcutTokenCuid:      tokens.CUID,
 			ShortcutTokenToken:     tokens.Token,
 			ShortcutTokenLoaded:    tokens.Loaded,

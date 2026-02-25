@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/postal/client"
-	"koditon-go/internal/postal/db"
 )
 
 type Service struct {

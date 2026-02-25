@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	taskqueuedb "koditon-go/internal/taskqueue/db"
+	"koditon-go/internal/db"
 )
 
 func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger) error {
@@ -34,7 +34,7 @@ func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.L
 	return nil
 }
 
-func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
+func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
 	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
 		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", task.EntityID, "error", err)
 		return err
@@ -43,7 +43,7 @@ func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.L
 	return nil
 }
 
-func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
+func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
 	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
 		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", task.EntityID, "error", err)
 		return err

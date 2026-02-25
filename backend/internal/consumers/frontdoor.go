@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	taskqueuedb "koditon-go/internal/taskqueue/db"
+	"koditon-go/internal/db"
 )
 
 func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger) error {
@@ -34,7 +34,7 @@ func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.
 	return nil
 }
 
-func (c *Consumer) handleFrontdoorSync(ctx context.Context, logger *slog.Logger, task taskqueuedb.TaskQueueTask) error {
+func (c *Consumer) handleFrontdoorSync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
 	if err := c.syncRunner.FrontdoorSyncEntity(ctx, task.EntityID); err != nil {
 		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", task.EntityID, "error", err)
 		return err

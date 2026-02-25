@@ -12,10 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"koditon-go/internal/taskqueue/db"
+	"koditon-go/internal/db"
 )
 
 // Task types
@@ -59,6 +58,9 @@ type Worker struct {
 }
 
 type TaskHandler func(ctx context.Context, task db.TaskQueueTask) error
+
+func strPtr(s string) *string { return &s }
+func int64Ptr(i int64) *int64 { return &i }
 
 type WorkerConfig struct {
 	VisibilityTimeout time.Duration
@@ -170,8 +172,8 @@ func (w *Worker) processNextTask(ctx context.Context) (err error) {
 		"max_attempts", task.MaxAttempts,
 		"priority", task.Priority,
 	)
-	workerIDText := pgtype.Text{String: w.workerID, Valid: true}
-	if err := w.queries.UpdateTaskToProcessing(ctx, task.TaskID, workerIDText); err != nil {
+	workerID := strPtr(w.workerID)
+	if err := w.queries.UpdateTaskToProcessing(ctx, &db.UpdateTaskToProcessingParams{TaskID: task.TaskID, WorkerID: workerID}); err != nil {
 		taskLogger.ErrorContext(ctx, "failed to update task to processing", "error", err)
 		return NewTaskError("Worker.UpdateTaskToProcessing", err).
 			WithTaskID(task.TaskID).
@@ -208,7 +210,7 @@ func (w *Worker) processNextTask(ctx context.Context) (err error) {
 	return nil
 }
 
-func (w *Worker) executeHandler(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) (err error) {
+func (w *Worker) executeHandler(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) (err error) { //nolint:nonamedreturns
 	defer func() {
 		if r := recover(); r != nil {
 			logger.ErrorContext(ctx, "task handler panicked",
@@ -229,9 +231,9 @@ func (w *Worker) executeHandler(ctx context.Context, logger *slog.Logger, task d
 }
 
 func (w *Worker) handleTaskFailure(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask, messageID int64, processingErr error, duration time.Duration) {
-	currentAttempt := task.Attempt + 1
+	currentAttempt := int64(task.Attempt) + 1
 	isPermanent := IsPermanent(processingErr)
-	shouldRetry := !isPermanent && currentAttempt < task.MaxAttempts && IsRetryable(processingErr)
+	shouldRetry := !isPermanent && currentAttempt < int64(task.MaxAttempts) && IsRetryable(processingErr)
 	logger.WarnContext(ctx, "task failed",
 		"error", processingErr,
 		"current_attempt", currentAttempt,
@@ -254,7 +256,7 @@ func (w *Worker) scheduleRetry(ctx context.Context, logger *slog.Logger, task db
 		"retry_delay", retryDelay.String(),
 		"retry_at", retryAt,
 	)
-	if err := w.queries.UpdateTaskToPendingForRetry(ctx, task.TaskID, retryAt); err != nil {
+	if err := w.queries.UpdateTaskToPendingForRetry(ctx, &db.UpdateTaskToPendingForRetryParams{TaskID: task.TaskID, ScheduledFor: retryAt}); err != nil {
 		logger.ErrorContext(ctx, "failed to update task for retry", "error", err)
 		return
 	}
@@ -263,8 +265,7 @@ func (w *Worker) scheduleRetry(ctx context.Context, logger *slog.Logger, task db
 		logger.ErrorContext(ctx, "failed to enqueue retry", "error", err)
 		return
 	}
-	queueMsgID := pgtype.Int8{Int64: msgID, Valid: true}
-	_ = w.queries.UpdateTaskQueueMessageId(ctx, task.TaskID, queueMsgID)
+	_ = w.queries.UpdateTaskQueueMessageId(ctx, &db.UpdateTaskQueueMessageIdParams{TaskID: task.TaskID, QueueMessageID: int64Ptr(msgID)})
 }
 
 func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask, totalAttempts int64, lastErr error, duration time.Duration) {
@@ -272,7 +273,6 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 		"total_attempts", totalAttempts,
 		"reason", w.getDLQReason(task, totalAttempts, lastErr),
 	)
-	// Build error history entry
 	errorEntry := map[string]any{
 		"attempt":     totalAttempts,
 		"error":       lastErr.Error(),
@@ -287,14 +287,12 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 		}
 	}
 	errorHistoryJSON, _ := json.Marshal([]any{errorEntry})
-	// get first error (same as last for single attempt, but we only have the current error)
-	var firstError pgtype.Text
-	if task.LastError.Valid {
+	var firstError *string
+	if task.LastError != nil {
 		firstError = task.LastError
 	} else {
-		firstError = pgtype.Text{String: lastErr.Error(), Valid: true}
+		firstError = strPtr(lastErr.Error())
 	}
-	// get entity metadata for debugging
 	var taskMetadata []byte
 	entity, err := w.queries.GetEntity(ctx, task.EntityID)
 	if err == nil {
@@ -302,35 +300,26 @@ func (w *Worker) moveToDLQ(ctx context.Context, logger *slog.Logger, task db.Tas
 	} else {
 		taskMetadata = []byte("{}")
 	}
-	// insert into DLQ
-	firstAttemptedAt := pgtype.Timestamptz{Valid: false}
-	if task.StartedAt.Valid {
-		firstAttemptedAt = task.StartedAt
-	}
-	originalCreatedAt := time.Now()
-	if task.CreatedAt.Valid {
-		originalCreatedAt = task.CreatedAt.Time
-	}
-	_, dlqErr := w.queries.InsertIntoDLQ(ctx,
-		task.TaskID,
-		task.EntityID,
-		task.TaskType,
-		int32(task.Priority),
-		int32(totalAttempts),
-		firstError,
-		lastErr.Error(),
-		errorHistoryJSON,
-		taskMetadata,
-		originalCreatedAt,
-		firstAttemptedAt,
-		time.Now(),
-	)
+	_, dlqErr := w.queries.InsertIntoDLQ(ctx, &db.InsertIntoDLQParams{
+		OriginalTaskID:    task.TaskID,
+		EntityID:          task.EntityID,
+		TaskType:          task.TaskType,
+		Priority:          task.Priority,
+		TotalAttempts:     int32(totalAttempts),
+		FirstError:        firstError,
+		LastError:         lastErr.Error(),
+		ErrorHistory:      errorHistoryJSON,
+		TaskMetadata:      taskMetadata,
+		OriginalCreatedAt: task.CreatedAt,
+		FirstAttemptedAt:  task.StartedAt,
+		LastAttemptedAt:   time.Now(),
+	})
 	if dlqErr != nil {
 		logger.ErrorContext(ctx, "failed to insert task into DLQ", "error", dlqErr)
 	}
 	// Mark original task as failed
-	lastErrorText := pgtype.Text{String: lastErr.Error(), Valid: true}
-	if err := w.queries.UpdateTaskToFailed(ctx, task.TaskID, lastErrorText); err != nil {
+	lastErrorText := strPtr(lastErr.Error())
+	if err := w.queries.UpdateTaskToFailed(ctx, &db.UpdateTaskToFailedParams{TaskID: task.TaskID, LastError: lastErrorText}); err != nil {
 		logger.ErrorContext(ctx, "failed to mark task as failed", "error", err)
 	}
 }
@@ -343,7 +332,7 @@ func (w *Worker) getDLQReason(task db.TaskQueueTask, totalAttempts int64, lastEr
 		}
 		return "permanent error"
 	}
-	if totalAttempts >= task.MaxAttempts {
+	if totalAttempts >= int64(task.MaxAttempts) {
 		return fmt.Sprintf("exhausted all %d retry attempts", task.MaxAttempts)
 	}
 	return "unknown"

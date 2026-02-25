@@ -8,13 +8,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"koditon-go/internal/db"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/syncflows"
 	"koditon-go/internal/taskqueue"
-	taskqueuedb "koditon-go/internal/taskqueue/db"
 )
 
 type Consumer struct {
@@ -63,7 +63,7 @@ func (c *Consumer) Stop() {
 	}
 }
 
-func (c *Consumer) handleTask(taskCtx context.Context, task taskqueuedb.TaskQueueTask) error {
+func (c *Consumer) handleTask(taskCtx context.Context, task db.TaskQueueTask) error {
 	taskLogger := c.logger.With("task_id", task.TaskID, "task_type", task.TaskType, "entity_id", task.EntityID, "attempt", task.Attempt, "priority", task.Priority)
 	var err error
 	switch task.TaskType {
