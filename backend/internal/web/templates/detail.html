@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Canonical.Headline}} – Koditon</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; line-height: 1.5; }
+        .container { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+        h1 { font-size: 1.5rem; margin-bottom: 8px; }
+        .meta { color: #666; font-size: 0.875rem; margin-bottom: 24px; }
+        .meta a { color: #2563eb; text-decoration: none; }
+        .meta a:hover { text-decoration: underline; }
+        .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+        .card h2 { font-size: 1rem; color: #666; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .field { display: flex; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+        .field:last-child { border-bottom: none; }
+        .field-label { font-weight: 600; min-width: 160px; color: #444; flex-shrink: 0; }
+        .field-value { color: #1a1a1a; word-break: break-word; }
+        .back { display: inline-block; margin-bottom: 16px; color: #2563eb; text-decoration: none; font-size: 0.875rem; }
+        .back:hover { text-decoration: underline; }
+        details { margin-top: 16px; }
+        summary { cursor: pointer; font-weight: 600; color: #666; padding: 8px 0; }
+        pre { background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="back" href="/">← Back</a>
+        <h1>{{.Canonical.Headline}}</h1>
+        <div class="meta">
+            {{.Canonical.Source}} / {{.Canonical.Kind}} · {{.Canonical.CanonicalID}}
+            {{if .Canonical.URL}} · <a href="{{.Canonical.URL}}" target="_blank" rel="noopener">Source ↗</a>{{end}}
+        </div>
+
+        <div class="card">
+            <h2>Overview</h2>
+            {{if .Canonical.Address}}<div class="field"><span class="field-label">Address</span><span class="field-value">{{.Canonical.Address}}</span></div>{{end}}
+            {{if .Canonical.City}}<div class="field"><span class="field-label">City</span><span class="field-value">{{.Canonical.City}}</span></div>{{end}}
+            {{if .Canonical.Postal}}<div class="field"><span class="field-label">Postal</span><span class="field-value">{{.Canonical.Postal}}</span></div>{{end}}
+            <div class="field"><span class="field-label">Price</span><span class="field-value">{{formatPrice .Canonical.Price}}</span></div>
+            <div class="field"><span class="field-label">Area</span><span class="field-value">{{formatArea .Canonical.Area}}</span></div>
+            {{if .Canonical.RoomLayout}}<div class="field"><span class="field-label">Room Layout</span><span class="field-value">{{.Canonical.RoomLayout}}</span></div>{{end}}
+            {{if not .Canonical.LastSeenAt.IsZero}}<div class="field"><span class="field-label">Last Seen</span><span class="field-value">{{.Canonical.LastSeenAt.Format "2006-01-02 15:04"}}</span></div>{{end}}
+        </div>
+
+        {{if .CanonicalExtra}}
+        <div class="card">
+            <h2>Details</h2>
+            {{range .CanonicalExtra}}
+            <div class="field"><span class="field-label">{{.Label}}</span><span class="field-value">{{.Value}}</span></div>
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .SourceSpecific}}
+        <div class="card">
+            <h2>Source Specific</h2>
+            {{range .SourceSpecific}}
+            <div class="field"><span class="field-label">{{.Label}}</span><span class="field-value">{{.Value}}</span></div>
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .Related}}
+        <div class="card">
+            <h2>Related</h2>
+            {{range .Related}}
+            <div class="field"><span class="field-label">{{.Label}}</span><span class="field-value">{{.Value}}</span></div>
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .Raw.Pretty}}
+        <details>
+            <summary>Raw JSON ({{.Raw.OriginalBytes}} bytes)</summary>
+            <pre>{{.Raw.Pretty}}</pre>
+        </details>
+        {{end}}
+    </div>
+</body>
+</html>

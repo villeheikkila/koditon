@@ -11,13 +11,16 @@ import (
 
 type AppOption func(*appConfig)
 
-type appConfig struct{}
+type appConfig struct {
+	webBaseURL string
+}
 
 type appContext struct {
 	runner     *syncflows.Runner
 	styles     styles
 	runtime    *jobRuntime
 	subsystems []subsystem
+	webBaseURL string
 }
 
 type App struct {
@@ -37,6 +40,10 @@ const appLogo = `
 |_|\_\___/ \__,_|_|\__\___/|_| |_|
 `
 
+func WithWebBaseURL(url string) AppOption {
+	return func(cfg *appConfig) { cfg.webBaseURL = url }
+}
+
 func NewApp(runner *syncflows.Runner, opts ...AppOption) *App {
 	cfg := appConfig{}
 	for _, opt := range opts {
@@ -44,8 +51,7 @@ func NewApp(runner *syncflows.Runner, opts ...AppOption) *App {
 			opt(&cfg)
 		}
 	}
-	_ = cfg
-	ctx := &appContext{runner: runner, styles: defaultStyles(), runtime: newJobRuntime(), subsystems: buildSubsystems()}
+	ctx := &appContext{runner: runner, styles: defaultStyles(), runtime: newJobRuntime(), subsystems: buildSubsystems(), webBaseURL: cfg.webBaseURL}
 	home := newHomeScreen(ctx)
 	r := newRouter(home)
 	return &App{root: &rootModel{ctx: ctx, router: r}}

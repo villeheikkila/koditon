@@ -126,6 +126,7 @@ func (s *adsEntityDetailScreen) renderContent(width int) string {
 		renderDetailLine(s.ctx.styles, "Area", float64PtrToString(canonical.Area)),
 		renderDetailLine(s.ctx.styles, "Room Layout", canonical.RoomLayout),
 		renderDetailLine(s.ctx.styles, "URL", canonical.URL),
+		renderDetailLine(s.ctx.styles, "Web", s.webLink()),
 		renderDetailLine(s.ctx.styles, "Last Seen", canonical.LastSeenAt.Format("2006-01-02 15:04:05Z07:00")),
 	)
 	for _, field := range s.detail.CanonicalExtra {
@@ -159,6 +160,15 @@ func (s *adsEntityDetailScreen) renderContent(width int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (s *adsEntityDetailScreen) webLink() string {
+	base := strings.TrimSpace(s.ctx.webBaseURL)
+	id := strings.TrimSpace(s.detail.Canonical.CanonicalID)
+	if base == "" || id == "" {
+		return ""
+	}
+	return strings.TrimRight(base, "/") + "/detail/" + id
 }
 
 func renderDetailLine(st styles, label string, value string) string {

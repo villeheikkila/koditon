@@ -3,11 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"koditon-go/internal/ads"
 )
 
-func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, frontdoorBase string) error {
+func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, frontdoorBase, webBaseURL string) error {
 	canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase)
 	if err != nil {
 		return fmt.Errorf("resolve input: %w", err)
@@ -43,6 +44,9 @@ func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, front
 	if c.URL != "" {
 		fmt.Println(renderKeyValue("URL", c.URL))
 	}
+	if webLink := buildWebLink(webBaseURL, c.CanonicalID); webLink != "" {
+		fmt.Println(renderKeyValue("Web", webLink))
+	}
 	if !c.LastSeenAt.IsZero() {
 		fmt.Println(renderKeyValue("Last Seen", c.LastSeenAt.Format("2006-01-02 15:04")))
 	}
@@ -72,4 +76,13 @@ func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, front
 	}
 
 	return nil
+}
+
+func buildWebLink(base, canonicalID string) string {
+	base = strings.TrimSpace(base)
+	id := strings.TrimSpace(canonicalID)
+	if base == "" || id == "" {
+		return ""
+	}
+	return strings.TrimRight(base, "/") + "/detail/" + id
 }

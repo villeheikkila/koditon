@@ -36,6 +36,7 @@ type Config struct {
 	Frontdoor       FrontdoorConfig
 	OpenRouter      OpenRouterConfig
 	Telegram        TelegramConfig
+	WebBaseURL      string `env:"WEB_BASE_URL" envDefault:""`
 }
 
 func (c Config) SlogLevel() slog.Level {

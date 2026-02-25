@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Status}} – Koditon</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; line-height: 1.5; }
+        .container { max-width: 720px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 8px; color: #dc2626; }
+        p { color: #666; margin-bottom: 24px; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{.Status}}</h1>
+        <p>{{.Message}}</p>
+        <a href="/">← Back to home</a>
+    </div>
+</body>
+</html>

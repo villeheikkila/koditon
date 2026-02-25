@@ -110,7 +110,7 @@ func runDetail(ctx context.Context, args []string) error {
 	defer pool.Close()
 
 	adsService := ads.NewService(pool)
-	return cli.RunDetail(ctx, adsService, input, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase)
+	return cli.RunDetail(ctx, adsService, input, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase, cfg.WebBaseURL)
 }
 
 func runTransactions(ctx context.Context, args []string) error {
