@@ -131,13 +131,7 @@ tasks:
   db:schema:
     desc: Dump concise public schema to db/schema.sql
     cmds:
-      - |
-        if [ -n "{{.DATABASE_URL}}" ]; then
-          CONN="{{.DATABASE_URL}}"
-        else
-          CONN="postgresql://{{.DB_USER}}:{{.DB_PASSWORD}}@{{.DB_HOST}}:{{.DB_PORT}}/{{.DB_NAME}}"
-        fi
-        psql -X -A -t -v ON_ERROR_STOP=1 "${CONN}" -f scripts/schema_dump.sql | perl scripts/schema_inline_constraints.pl > db/schema.sql
+      - ./scripts/schema/dump_concise_public_schema.sh
 
   docker:build:
     desc: Build Docker image for backend (uses DOCKER_IMAGE from .env)
