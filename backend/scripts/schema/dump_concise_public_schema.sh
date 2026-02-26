@@ -3,8 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-BACKEND_DIR="${REPO_ROOT}/backend"
+BACKEND_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DUMP_SQL_FILE="${SCRIPT_DIR}/schema_dump.sql"
 INLINE_CONSTRAINTS_SCRIPT="${SCRIPT_DIR}/schema_inline_constraints.pl"
 OUT_FILE="${BACKEND_DIR}/db/schema.sql"

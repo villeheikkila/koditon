@@ -18,7 +18,7 @@ create table public.frontdoor_ads (
   frontdoor_ad_city text,
   frontdoor_ad_postal text,
   frontdoor_ad_price bigint,
-  frontdoor_ad_area_value float8,
+  frontdoor_ad_area_value double precision,
   frontdoor_ad_address_key text,
   frontdoor_ad_search_text text
 );
@@ -26,6 +26,12 @@ create table public.frontdoor_ads (
 CREATE INDEX idx_frontdoor_ad_page_not_found ON public.frontdoor_ads USING btree (frontdoor_ad_page_not_found);
 CREATE INDEX idx_frontdoor_ad_postal_postal_code_id ON public.frontdoor_ads USING btree (postal_postal_code_id);
 CREATE INDEX idx_frontdoor_ad_processed_at ON public.frontdoor_ads USING btree (frontdoor_ad_processed_at);
+CREATE INDEX idx_frontdoor_ads_address_key ON public.frontdoor_ads USING btree (frontdoor_ad_address_key);
+CREATE INDEX idx_frontdoor_ads_area_value ON public.frontdoor_ads USING btree (frontdoor_ad_area_value);
+CREATE INDEX idx_frontdoor_ads_postal ON public.frontdoor_ads USING btree (frontdoor_ad_postal);
+CREATE INDEX idx_frontdoor_ads_price ON public.frontdoor_ads USING btree (frontdoor_ad_price);
+CREATE INDEX idx_frontdoor_ads_search_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_search_text) gin_trgm_ops);
+CREATE INDEX idx_frontdoor_ads_street_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_street_address) gin_trgm_ops);
 
 create table public.frontdoor_building_announcements (
   frontdoor_building_announcement_id uuid default gen_random_uuid() not null constraint frontdoor_building_announcements_pkey primary key,
@@ -241,12 +247,18 @@ create table public.shortcut_ads (
   shortcut_ad_city text,
   shortcut_ad_postal text,
   shortcut_ad_price bigint,
-  shortcut_ad_area_value float8,
+  shortcut_ad_area_value double precision,
   shortcut_ad_address_key text,
   shortcut_ad_search_text text
 );
 
 CREATE INDEX idx_shortcut_ad_zipcode_name ON public.shortcut_ads USING btree (((((shortcut_ad_data -> 'address'::text) -> 'zipCode'::text) ->> 'name'::text)));
+CREATE INDEX idx_shortcut_ads_address_key ON public.shortcut_ads USING btree (shortcut_ad_address_key);
+CREATE INDEX idx_shortcut_ads_area_value ON public.shortcut_ads USING btree (shortcut_ad_area_value);
+CREATE INDEX idx_shortcut_ads_postal ON public.shortcut_ads USING btree (shortcut_ad_postal);
+CREATE INDEX idx_shortcut_ads_price ON public.shortcut_ads USING btree (shortcut_ad_price);
+CREATE INDEX idx_shortcut_ads_search_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_search_text) gin_trgm_ops);
+CREATE INDEX idx_shortcut_ads_street_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_street_address) gin_trgm_ops);
 
 create table public.shortcut_building_listings (
   shortcut_building_listing_id uuid default gen_random_uuid() not null constraint shortcut_building_listings_pkey primary key,
@@ -324,225 +336,3 @@ create table public.shortcut_tokens (
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
 
--- ============================================================================
--- task_queue schema
--- ============================================================================
-
-CREATE SCHEMA IF NOT EXISTS task_queue;
-
-CREATE TABLE task_queue.entity_registry (
-    entity_id TEXT NOT NULL PRIMARY KEY,
-    entity_type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active'
-        CHECK (status IN ('active', 'stopped')),
-    scheduling_strategy TEXT NOT NULL DEFAULT 'manual'
-        CHECK (scheduling_strategy IN ('daily', 'manual', 'on_demand', 'cron')),
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_entity_registry_status ON task_queue.entity_registry(status);
-CREATE INDEX idx_entity_registry_entity_type ON task_queue.entity_registry(entity_type);
-CREATE INDEX idx_entity_registry_scheduling_strategy ON task_queue.entity_registry(scheduling_strategy);
-CREATE INDEX idx_entity_registry_schedulable ON task_queue.entity_registry(scheduling_strategy, status)
-    WHERE status = 'active' AND scheduling_strategy = 'daily';
-
-CREATE TABLE task_queue.task (
-    task_id BIGSERIAL PRIMARY KEY,
-    entity_id TEXT NOT NULL
-        REFERENCES task_queue.entity_registry(entity_id) ON DELETE CASCADE,
-    task_type TEXT NOT NULL DEFAULT 'frontdoor_sync',
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'stopped')),
-    priority INT NOT NULL DEFAULT 0,
-    attempt INT NOT NULL DEFAULT 0,
-    max_attempts INT NOT NULL DEFAULT 3,
-    last_error TEXT,
-    worker_id TEXT,
-    scheduled_for TIMESTAMPTZ NOT NULL,
-    started_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ,
-    run_on DATE,
-    queue_message_id BIGINT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE UNIQUE INDEX uniq_task_daily
-    ON task_queue.task(entity_id, task_type, run_on)
-    WHERE run_on IS NOT NULL;
-
-CREATE INDEX idx_task_entity ON task_queue.task(entity_id);
-CREATE INDEX idx_task_status ON task_queue.task(status);
-CREATE INDEX idx_task_worker ON task_queue.task(worker_id) WHERE status = 'processing';
-CREATE INDEX idx_task_scheduled ON task_queue.task(scheduled_for) WHERE status = 'pending';
-CREATE INDEX idx_task_priority_scheduled ON task_queue.task(priority DESC, scheduled_for ASC) WHERE status = 'pending';
-CREATE INDEX idx_task_updated ON task_queue.task(updated_at);
-CREATE INDEX idx_task_run_on ON task_queue.task(run_on);
-
-CREATE TABLE task_queue.dead_letter_queue (
-    dlq_id BIGSERIAL PRIMARY KEY,
-    original_task_id BIGINT NOT NULL,
-    entity_id TEXT NOT NULL,
-    task_type TEXT NOT NULL,
-    priority INT NOT NULL DEFAULT 0,
-    total_attempts INT NOT NULL,
-    first_error TEXT,
-    last_error TEXT NOT NULL,
-    error_history JSONB NOT NULL DEFAULT '[]'::jsonb,
-    task_metadata JSONB DEFAULT '{}'::jsonb,
-    original_created_at TIMESTAMPTZ NOT NULL,
-    first_attempted_at TIMESTAMPTZ,
-    last_attempted_at TIMESTAMPTZ NOT NULL,
-    moved_to_dlq_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    requeued_at TIMESTAMPTZ,
-    requeue_count INT NOT NULL DEFAULT 0
-);
-
-CREATE INDEX idx_dlq_entity_id ON task_queue.dead_letter_queue(entity_id);
-CREATE INDEX idx_dlq_task_type ON task_queue.dead_letter_queue(task_type);
-CREATE INDEX idx_dlq_moved_at ON task_queue.dead_letter_queue(moved_to_dlq_at DESC);
-CREATE INDEX idx_dlq_not_requeued ON task_queue.dead_letter_queue(moved_to_dlq_at DESC) WHERE requeued_at IS NULL;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__register_entity(
-    p_entity_id TEXT,
-    p_entity_type TEXT,
-    p_status TEXT DEFAULT 'active',
-    p_scheduling_strategy TEXT DEFAULT 'manual',
-    p_metadata JSONB DEFAULT '{}'::jsonb
-) RETURNS void AS $$ BEGIN END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__register_entities(
-    p_entity_ids TEXT[],
-    p_entity_type TEXT,
-    p_scheduling_strategy TEXT DEFAULT 'daily'
-) RETURNS INT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__enqueue_task(
-    p_task_id BIGINT
-) RETURNS BIGINT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__schedule_daily_syncs(
-    p_task_type TEXT DEFAULT 'frontdoor_sync'
-) RETURNS INT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__requeue_stuck_tasks()
-RETURNS INT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__move_to_dlq(
-    p_task_id BIGINT,
-    p_error_history JSONB DEFAULT '[]'::jsonb
-) RETURNS BIGINT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION task_queue.fnc__requeue_from_dlq(
-    p_dlq_id BIGINT,
-    p_priority INT DEFAULT NULL,
-    p_max_attempts INT DEFAULT 3
-) RETURNS BIGINT AS $$ BEGIN RETURN 0; END; $$ LANGUAGE plpgsql;
-
--- ============================================================================
--- auth schema
--- ============================================================================
-
-CREATE SCHEMA IF NOT EXISTS auth;
-
-CREATE TYPE auth.auth_provider AS ENUM ('apple', 'anonymous');
-
-CREATE TYPE auth.push_token_type AS ENUM ('apns');
-
-CREATE TABLE auth.users (
-    user_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_created_at timestamptz NOT NULL DEFAULT now(),
-    user_updated_at timestamptz NOT NULL DEFAULT now(),
-    user_deleted_at timestamptz
-);
-
-CREATE TABLE auth.identities (
-    identity_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES auth.users(user_id) ON DELETE CASCADE,
-    identity_provider auth.auth_provider NOT NULL,
-    identity_external_id text NOT NULL,
-    identity_email text,
-    identity_email_verified bool DEFAULT false,
-    identity_data jsonb DEFAULT '{}'::jsonb,
-    identity_created_at timestamptz NOT NULL DEFAULT now(),
-    identity_updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT identities_provider_external_id_unique UNIQUE (identity_provider, identity_external_id)
-);
-
-CREATE TABLE auth.devices (
-    device_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES auth.users(user_id) ON DELETE CASCADE,
-    device_name text,
-    device_os text,
-    device_app_version text,
-    device_push_token text,
-    device_push_token_type auth.push_token_type,
-    device_push_token_updated_at timestamptz,
-    device_created_at timestamptz NOT NULL DEFAULT now(),
-    device_updated_at timestamptz NOT NULL DEFAULT now(),
-    device_last_seen_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE auth.sessions (
-    session_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES auth.users(user_id) ON DELETE CASCADE,
-    session_device_id uuid REFERENCES auth.devices(device_id) ON DELETE SET NULL,
-    session_user_agent text,
-    session_ip inet,
-    session_provider auth.auth_provider NOT NULL,
-    session_refresh_token_hmac_key text NOT NULL,
-    session_refresh_token_counter int8 NOT NULL DEFAULT 0,
-    session_created_at timestamptz NOT NULL DEFAULT now(),
-    session_updated_at timestamptz NOT NULL DEFAULT now(),
-    session_refreshed_at timestamptz,
-    session_not_after timestamptz,
-    session_revoked_at timestamptz
-);
-
-CREATE TABLE auth.refresh_tokens (
-    refresh_token_id bigserial PRIMARY KEY,
-    session_id uuid NOT NULL REFERENCES auth.sessions(session_id) ON DELETE CASCADE,
-    refresh_token_token_hash text NOT NULL,
-    refresh_token_counter int8 NOT NULL,
-    refresh_token_revoked bool NOT NULL DEFAULT false,
-    refresh_token_created_at timestamptz NOT NULL DEFAULT now(),
-    refresh_token_updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE auth.roles (
-    role_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    role_name text NOT NULL UNIQUE,
-    role_description text,
-    role_created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE auth.feature_flags (
-    flag_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    flag_name text NOT NULL UNIQUE,
-    flag_description text,
-    flag_default_enabled bool NOT NULL DEFAULT false,
-    flag_created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE auth.role_feature_flags (
-    role_id uuid NOT NULL REFERENCES auth.roles(role_id) ON DELETE CASCADE,
-    flag_id uuid NOT NULL REFERENCES auth.feature_flags(flag_id) ON DELETE CASCADE,
-    PRIMARY KEY (role_id, flag_id)
-);
-
-CREATE TABLE auth.user_roles (
-    user_id uuid NOT NULL REFERENCES auth.users(user_id) ON DELETE CASCADE,
-    role_id uuid NOT NULL REFERENCES auth.roles(role_id) ON DELETE CASCADE,
-    user_role_created_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, role_id)
-);
-
-CREATE TABLE auth.user_feature_flags (
-    user_id uuid NOT NULL REFERENCES auth.users(user_id) ON DELETE CASCADE,
-    flag_id uuid NOT NULL REFERENCES auth.feature_flags(flag_id) ON DELETE CASCADE,
-    user_flag_enabled bool NOT NULL,
-    user_flag_created_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, flag_id)
-);
