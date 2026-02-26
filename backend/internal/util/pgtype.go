@@ -15,7 +15,6 @@ func Int32Ptr(i *int) *int32 {
 	return &v
 }
 
-//go:fix inline
 func Int64Ptr(i int64) *int64 {
 	return new(i)
 }
