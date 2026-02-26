@@ -1,3 +1,30 @@
+create or replace function pg_temp.safe_pg_get_expr(expr pg_node_tree, rel oid)
+returns text language plpgsql as $$
+begin
+  return pg_get_expr(expr, rel);
+exception when others then
+  return null;
+end;
+$$;
+
+create or replace function pg_temp.safe_pg_get_constraintdef(con_oid oid)
+returns text language plpgsql as $$
+begin
+  return pg_get_constraintdef(con_oid);
+exception when others then
+  return null;
+end;
+$$;
+
+create or replace function pg_temp.safe_pg_get_indexdef(idx_oid oid)
+returns text language plpgsql as $$
+begin
+  return pg_get_indexdef(idx_oid);
+exception when others then
+  return null;
+end;
+$$;
+
 with tables as (
   select
     c.oid as table_oid,
@@ -7,6 +34,12 @@ with tables as (
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public'
     and c.relkind in ('r', 'p')
+    and c.relname not like 'supabase_%'
+    and not exists (
+      select 1 from pg_roles r
+      where r.oid = c.relowner
+        and r.rolname like 'supabase_%'
+    )
   order by c.relname
 ),
 columns as (
@@ -15,7 +48,7 @@ columns as (
     a.attnum,
     quote_ident(a.attname) as column_name,
     format_type(a.atttypid, a.atttypmod) as column_type,
-    regexp_replace(pg_get_expr(ad.adbin, ad.adrelid), '\s+', ' ', 'g') as column_expr,
+    regexp_replace(pg_temp.safe_pg_get_expr(ad.adbin, ad.adrelid), '\s+', ' ', 'g') as column_expr,
     a.attnotnull as not_null,
     a.attidentity as identity_type,
     a.attgenerated as generated_type
@@ -33,7 +66,7 @@ constraints as (
     con.conrelid as table_oid,
     con.conname,
     con.contype,
-    pg_get_constraintdef(con.oid) as condef,
+    pg_temp.safe_pg_get_constraintdef(con.oid) as condef,
     case con.contype
       when 'p' then 1
       when 'u' then 2
@@ -51,7 +84,7 @@ indexes as (
   select
     i.indrelid as table_oid,
     ci.relname as index_name,
-    pg_get_indexdef(i.indexrelid) as index_def
+    pg_temp.safe_pg_get_indexdef(i.indexrelid) as index_def
   from pg_index i
   join pg_class c on c.oid = i.indrelid
   join pg_class ci on ci.oid = i.indexrelid

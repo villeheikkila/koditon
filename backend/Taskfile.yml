@@ -17,6 +17,7 @@ tasks:
     desc: Apply all pending migrations to the latest version
     cmds:
       - tern migrate --migrations db/migrations
+      - task: db:schema
 
   db:status:
     desc: Show current migration state
