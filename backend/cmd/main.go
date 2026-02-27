@@ -22,7 +22,6 @@ import (
 	"koditon-go/internal/prices"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
-	"koditon-go/internal/taskqueue"
 	"koditon-go/internal/telegram"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -69,7 +68,6 @@ func run(
 		return fmt.Errorf("ping database: %w", err)
 	}
 	appLogger.Debug("database connection established")
-	taskQueueClient := taskqueue.NewClient(pool)
 	var consumer *consumers.Consumer
 	if cfg.Mode.Consumer {
 		openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
@@ -101,14 +99,14 @@ func run(
 		postalService := postal.NewService(pool)
 		consumer = consumers.New(
 			logger,
-			taskQueueClient,
+			pool,
 			pricesService,
 			shortcutService,
 			frontdoorService,
 			postalService,
 		)
 		consumerConfig := consumers.DefaultConfig()
-		if err := consumer.Start(ctx, consumerConfig, pool); err != nil {
+		if err := consumer.Start(ctx, consumerConfig); err != nil {
 			return fmt.Errorf("start consumer: %w", err)
 		}
 	}
@@ -136,7 +134,7 @@ func run(
 		if err != nil {
 			return fmt.Errorf("create auth service: %w", err)
 		}
-		srv := server.New(logger, cfg, pool, taskQueueClient, authService)
+		srv := server.New(logger, cfg, pool, authService)
 		mux := http.NewServeMux()
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig)

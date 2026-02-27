@@ -2,7 +2,6 @@ package consumers
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -18,10 +17,15 @@ import (
 )
 
 type Consumer struct {
-	logger          *slog.Logger
-	taskQueueClient *taskqueue.Client
-	syncRunner      *syncflows.Runner
-	workerPool      *taskqueue.WorkerPool
+	logger     *slog.Logger
+	syncRunner *syncflows.Runner
+	queries    *db.Queries
+	pool       *pgxpool.Pool
+
+	frontdoorPool *taskqueue.WorkerPool
+	shortcutPool  *taskqueue.WorkerPool
+	pricesPool    *taskqueue.WorkerPool
+	postalPool    *taskqueue.WorkerPool
 }
 
 type Config struct {
@@ -32,66 +36,73 @@ func DefaultConfig() Config {
 	return Config{WorkerCount: 1}
 }
 
-func New(logger *slog.Logger, taskQueueClient *taskqueue.Client, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Consumer {
+func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Consumer {
 	return &Consumer{
-		logger:          logger,
-		taskQueueClient: taskQueueClient,
-		syncRunner:      syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
+		logger:     logger,
+		syncRunner: syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
+		queries:    db.New(pool),
+		pool:       pool,
 	}
 }
 
-func (c *Consumer) Start(ctx context.Context, cfg Config, pool *pgxpool.Pool) error {
-	if err := c.taskQueueClient.EnsureQueue(ctx); err != nil {
-		return fmt.Errorf("ensure task queue: %w", err)
-	}
+func (c *Consumer) Start(ctx context.Context, cfg Config) error {
 	workerConfig := taskqueue.DefaultWorkerConfig()
 	workerConfig.Logger = c.logger
 	workerConfig.TaskTimeout = 30 * time.Minute
 	workerConfig.VisibilityTimeout = 35 * time.Minute
-	c.workerPool = taskqueue.NewWorkerPool(cfg.WorkerCount, pool, c.handleTask, workerConfig)
-	c.workerPool.Start(ctx)
-	c.logger.InfoContext(ctx, "consumer started", "worker_count", cfg.WorkerCount)
+
+	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
+	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
+	pricesQueue := taskqueue.NewQueue(c.pool, "prices")
+	postalQueue := taskqueue.NewQueue(c.pool, "postal")
+
+	c.frontdoorPool = taskqueue.NewWorkerPool(cfg.WorkerCount, frontdoorQueue, c.handleFrontdoorTask, workerConfig)
+	c.shortcutPool = taskqueue.NewWorkerPool(cfg.WorkerCount, shortcutQueue, c.handleShortcutTask, workerConfig)
+	c.pricesPool = taskqueue.NewWorkerPool(cfg.WorkerCount, pricesQueue, c.handlePricesTask, workerConfig)
+	c.postalPool = taskqueue.NewWorkerPool(cfg.WorkerCount, postalQueue, c.handlePostalTask, workerConfig)
+
+	c.frontdoorPool.Start(ctx)
+	c.shortcutPool.Start(ctx)
+	c.pricesPool.Start(ctx)
+	c.postalPool.Start(ctx)
+
+	c.logger.InfoContext(ctx, "consumer started", "worker_count_per_domain", cfg.WorkerCount, "domains", 4)
 	return nil
 }
 
 func (c *Consumer) Stop() {
-	if c.workerPool != nil {
-		c.logger.Info("stopping consumer worker pool")
-		c.workerPool.Stop()
-		c.workerPool.Wait()
-		c.logger.Info("consumer stopped")
+	c.logger.Info("stopping consumer worker pools")
+	if c.frontdoorPool != nil {
+		c.frontdoorPool.Stop()
 	}
+	if c.shortcutPool != nil {
+		c.shortcutPool.Stop()
+	}
+	if c.pricesPool != nil {
+		c.pricesPool.Stop()
+	}
+	if c.postalPool != nil {
+		c.postalPool.Stop()
+	}
+	if c.frontdoorPool != nil {
+		c.frontdoorPool.Wait()
+	}
+	if c.shortcutPool != nil {
+		c.shortcutPool.Wait()
+	}
+	if c.pricesPool != nil {
+		c.pricesPool.Wait()
+	}
+	if c.postalPool != nil {
+		c.postalPool.Wait()
+	}
+	c.logger.Info("consumer stopped")
 }
 
-func (c *Consumer) handleTask(taskCtx context.Context, task db.TaskQueueTask) error {
-	taskLogger := c.logger.With("task_id", task.TaskID, "task_type", task.TaskType, "entity_id", task.EntityID, "attempt", task.Attempt, "priority", task.Priority)
-	var err error
-	switch task.TaskType {
-	case taskqueue.TaskTypeFrontdoorSitemapSync:
-		err = c.handleFrontdoorSitemapSync(taskCtx, taskLogger)
-	case taskqueue.TaskTypeFrontdoorSync:
-		err = c.handleFrontdoorSync(taskCtx, taskLogger, task)
-	case taskqueue.TaskTypeShortcutSitemapSync:
-		err = c.handleShortcutSitemapSync(taskCtx, taskLogger)
-	case taskqueue.TaskTypeShortcutScraperSync:
-		err = c.handleShortcutScraperSync(taskCtx, taskLogger, task)
-	case taskqueue.TaskTypeShortcutAPISync:
-		err = c.handleShortcutAPISync(taskCtx, taskLogger, task)
-	case taskqueue.TaskTypePricesCitiesInit:
-		err = c.handlePricesCitiesInit(taskCtx, taskLogger)
-	case taskqueue.TaskTypePricesSync:
-		err = c.handlePricesSync(taskCtx, taskLogger, task)
-	case taskqueue.TaskTypePricesNeighborhoodPostalCodeSync:
-		err = c.handlePricesNeighborhoodPostalCodeSync(taskCtx, taskLogger)
-	case taskqueue.TaskTypePricesSyncAll:
-		err = c.handlePricesSyncAll(taskCtx, taskLogger)
-	case taskqueue.TaskTypePostalSync:
-		err = c.handlePostalSync(taskCtx, taskLogger)
-	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown task type: %s", task.TaskType), "unrecognized task type")
+func (c *Consumer) deletePendingTask(ctx context.Context, logger *slog.Logger, msg taskqueue.Message, deleteFunc func(context.Context, int64) error) {
+	if msg.Data.PendingTaskID > 0 {
+		if err := deleteFunc(ctx, msg.Data.PendingTaskID); err != nil {
+			logger.WarnContext(ctx, "failed to delete pending task", "error", err, "pending_task_id", msg.Data.PendingTaskID)
+		}
 	}
-	if err != nil {
-		return classifyError(err, task)
-	}
-	return nil
 }

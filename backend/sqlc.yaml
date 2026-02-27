@@ -13,7 +13,6 @@ sql:
       - db/queries/postal
       - db/queries/prices
       - db/queries/shortcut
-      - db/queries/taskqueue
     gen:
       go:
         out: internal/db

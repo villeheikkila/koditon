@@ -18,7 +18,6 @@ import (
 	frontdoorclient "koditon-go/internal/frontdoor/client"
 	pricesclient "koditon-go/internal/prices/client"
 	shortcutclient "koditon-go/internal/shortcut/client"
-	"koditon-go/internal/taskqueue"
 	"koditon-go/internal/web"
 )
 
@@ -28,14 +27,13 @@ type Server struct {
 	pricesQueries *db.Queries
 	pricesAPI     *pricesclient.Client
 	postalQueries *db.Queries
-	taskQueue     *taskqueue.Client
 	shortcutAPI   *shortcutclient.Client
 	frontdoorAPI  *frontdoorclient.Client
 	authService   *auth.Service
 	webHandler    *web.Handler
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueClient *taskqueue.Client, authService *auth.Service) *Server {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service) *Server {
 	pricesQueries := db.New(pool)
 	postalQueries := db.New(pool)
 	shortcutQueries := db.New(pool)
@@ -88,7 +86,6 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, taskQueueCl
 		pricesQueries: pricesQueries,
 		pricesAPI:     pricesClient,
 		postalQueries: postalQueries,
-		taskQueue:     taskQueueClient,
 		shortcutAPI:   shortcutClient,
 		frontdoorAPI:  frontdoorClient,
 		authService:   authService,

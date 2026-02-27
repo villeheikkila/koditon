@@ -6,39 +6,78 @@ import (
 	"log/slog"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/taskqueue"
 )
 
-func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger) error {
+const (
+	TaskTypeFrontdoorSitemapSync = "frontdoor_sitemap_sync"
+	TaskTypeFrontdoorSync        = "frontdoor_sync"
+)
+
+func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Message) error {
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	var err error
+	switch msg.Data.TaskType {
+	case TaskTypeFrontdoorSitemapSync:
+		err = c.handleFrontdoorSitemapSync(ctx, logger, msg)
+	case TaskTypeFrontdoorSync:
+		err = c.handleFrontdoorEntitySync(ctx, logger, msg)
+	default:
+		return taskqueue.NewPermanentError(fmt.Errorf("unknown frontdoor task type: %s", msg.Data.TaskType), "unrecognized task type")
+	}
+	if err != nil {
+		return classifyError(err)
+	}
+	return nil
+}
+
+func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
 	adIDs, buildingIDs, err := c.syncRunner.FrontdoorSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "frontdoor sitemap sync failed", "error", err)
 		return err
 	}
-	var regErrors []error
-	if len(adIDs) > 0 {
-		if _, regErr := c.taskQueueClient.RegisterEntities(ctx, adIDs, "frontdoor_ad", "daily"); regErr != nil {
-			logger.ErrorContext(ctx, "failed to register ad entities", "error", regErr, "count", len(adIDs))
-			regErrors = append(regErrors, fmt.Errorf("register ad entities: %w", regErr))
+	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
+	var enqueueErrors int
+	for _, adID := range adIDs {
+		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, taskqueue.EntityPrefixAd+adID, TaskTypeFrontdoorSync); enqErr != nil {
+			enqueueErrors++
 		}
 	}
-	if len(buildingIDs) > 0 {
-		if _, regErr := c.taskQueueClient.RegisterEntities(ctx, buildingIDs, "frontdoor_building", "daily"); regErr != nil {
-			logger.ErrorContext(ctx, "failed to register building entities", "error", regErr, "count", len(buildingIDs))
-			regErrors = append(regErrors, fmt.Errorf("register building entities: %w", regErr))
+	for _, buildingID := range buildingIDs {
+		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, taskqueue.EntityPrefixBuilding+buildingID, TaskTypeFrontdoorSync); enqErr != nil {
+			enqueueErrors++
 		}
 	}
-	if len(regErrors) > 0 && len(adIDs) == 0 && len(buildingIDs) == 0 {
-		return fmt.Errorf("frontdoor sitemap sync: all entity registrations failed")
-	}
-	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs))
+	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteFrontdoorPendingTask)
+	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors)
 	return nil
 }
 
-func (c *Consumer) handleFrontdoorSync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
-	if err := c.syncRunner.FrontdoorSyncEntity(ctx, task.EntityID); err != nil {
-		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", task.EntityID, "error", err)
+func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	if err := c.syncRunner.FrontdoorSyncEntity(ctx, msg.Data.EntityID); err != nil {
+		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	logger.InfoContext(ctx, "frontdoor entity synced", "entity_id", task.EntityID)
+	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteFrontdoorPendingTask)
+	logger.InfoContext(ctx, "frontdoor entity synced", "entity_id", msg.Data.EntityID)
 	return nil
+}
+
+func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
+	task, err := c.queries.InsertFrontdoorPendingTask(ctx, db.InsertFrontdoorPendingTaskParams{
+		FrontdoorPendingTaskEntityID: entityID,
+		FrontdoorPendingTaskType:     taskType,
+		FrontdoorPendingTaskPriority: int32(taskqueue.PriorityNormal),
+		FrontdoorPendingTaskMaxAttempts: int32(3),
+	})
+	if err != nil {
+		return nil // ON CONFLICT DO NOTHING - task already exists
+	}
+	_, err = queue.Send(ctx, taskqueue.MessageData{
+		PendingTaskID: task.FrontdoorPendingTaskID,
+		EntityID:      entityID,
+		TaskType:      taskType,
+	})
+	return err
 }

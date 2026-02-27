@@ -478,50 +478,38 @@ type ShortcutToken struct {
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
-type TaskQueueDeadLetterQueue struct {
-	DlqID             int64           `json:"dlq_id"`
-	OriginalTaskID    int64           `json:"original_task_id"`
-	EntityID          string          `json:"entity_id"`
-	TaskType          string          `json:"task_type"`
-	Priority          int32           `json:"priority"`
-	TotalAttempts     int32           `json:"total_attempts"`
-	FirstError        *string         `json:"first_error"`
-	LastError         string          `json:"last_error"`
-	ErrorHistory      json.RawMessage `json:"error_history"`
-	TaskMetadata      json.RawMessage `json:"task_metadata"`
-	OriginalCreatedAt time.Time       `json:"original_created_at"`
-	FirstAttemptedAt  *time.Time      `json:"first_attempted_at"`
-	LastAttemptedAt   time.Time       `json:"last_attempted_at"`
-	MovedToDlqAt      time.Time       `json:"moved_to_dlq_at"`
-	RequeuedAt        *time.Time      `json:"requeued_at"`
-	RequeueCount      int32           `json:"requeue_count"`
+type FrontdoorPendingTask struct {
+	FrontdoorPendingTaskID          int64     `json:"frontdoor_pending_task_id"`
+	FrontdoorPendingTaskEntityID    string    `json:"frontdoor_pending_task_entity_id"`
+	FrontdoorPendingTaskType        string    `json:"frontdoor_pending_task_type"`
+	FrontdoorPendingTaskPriority    int32     `json:"frontdoor_pending_task_priority"`
+	FrontdoorPendingTaskMaxAttempts int32     `json:"frontdoor_pending_task_max_attempts"`
+	FrontdoorPendingTaskCreatedAt   time.Time `json:"frontdoor_pending_task_created_at"`
 }
 
-type TaskQueueEntityRegistry struct {
-	EntityID           string          `json:"entity_id"`
-	EntityType         string          `json:"entity_type"`
-	Status             string          `json:"status"`
-	SchedulingStrategy string          `json:"scheduling_strategy"`
-	Metadata           json.RawMessage `json:"metadata"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
+type ShortcutPendingTask struct {
+	ShortcutPendingTaskID          int64     `json:"shortcut_pending_task_id"`
+	ShortcutPendingTaskEntityID    string    `json:"shortcut_pending_task_entity_id"`
+	ShortcutPendingTaskType        string    `json:"shortcut_pending_task_type"`
+	ShortcutPendingTaskPriority    int32     `json:"shortcut_pending_task_priority"`
+	ShortcutPendingTaskMaxAttempts int32     `json:"shortcut_pending_task_max_attempts"`
+	ShortcutPendingTaskCreatedAt   time.Time `json:"shortcut_pending_task_created_at"`
 }
 
-type TaskQueueTask struct {
-	TaskID         int64      `json:"task_id"`
-	EntityID       string     `json:"entity_id"`
-	TaskType       string     `json:"task_type"`
-	Status         string     `json:"status"`
-	Priority       int32      `json:"priority"`
-	Attempt        int32      `json:"attempt"`
-	MaxAttempts    int32      `json:"max_attempts"`
-	LastError      *string    `json:"last_error"`
-	WorkerID       *string    `json:"worker_id"`
-	ScheduledFor   time.Time  `json:"scheduled_for"`
-	StartedAt      *time.Time `json:"started_at"`
-	CompletedAt    *time.Time `json:"completed_at"`
-	RunOn          *time.Time `json:"run_on"`
-	QueueMessageID *int64     `json:"queue_message_id"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+type PricesPendingTask struct {
+	PricesPendingTaskID          int64     `json:"prices_pending_task_id"`
+	PricesPendingTaskEntityID    string    `json:"prices_pending_task_entity_id"`
+	PricesPendingTaskType        string    `json:"prices_pending_task_type"`
+	PricesPendingTaskPriority    int32     `json:"prices_pending_task_priority"`
+	PricesPendingTaskMaxAttempts int32     `json:"prices_pending_task_max_attempts"`
+	PricesPendingTaskCreatedAt   time.Time `json:"prices_pending_task_created_at"`
+}
+
+type PostalPendingTask struct {
+	PostalPendingTaskID          int64     `json:"postal_pending_task_id"`
+	PostalPendingTaskEntityID    string    `json:"postal_pending_task_entity_id"`
+	PostalPendingTaskType        string    `json:"postal_pending_task_type"`
+	PostalPendingTaskPriority    int32     `json:"postal_pending_task_priority"`
+	PostalPendingTaskMaxAttempts int32     `json:"postal_pending_task_max_attempts"`
+	PostalPendingTaskCreatedAt   time.Time `json:"postal_pending_task_created_at"`
 }

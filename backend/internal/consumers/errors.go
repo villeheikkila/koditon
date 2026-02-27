@@ -13,40 +13,9 @@ import (
 	"koditon-go/internal/taskqueue"
 )
 
-type HTTPStatusError struct {
-	StatusCode int
-	Message    string
-	RetryAfter int
-}
-
-func (e *HTTPStatusError) Error() string {
-	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
-}
-
-type EntityParseError struct {
-	EntityID string
-	Reason   string
-	Err      error
-}
-
-func (e *EntityParseError) Error() string {
-	if e.Err != nil {
-		return fmt.Sprintf("parse entity %s: %s: %v", e.EntityID, e.Reason, e.Err)
-	}
-	return fmt.Sprintf("parse entity %s: %s", e.EntityID, e.Reason)
-}
-
-func (e *EntityParseError) Unwrap() error {
-	return e.Err
-}
-
-func classifyError(err error, _ any) error {
+func classifyError(err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return taskqueue.NewRetryableError(err)
-	}
-	var httpErr *HTTPStatusError
-	if errors.As(err, &httpErr) {
-		return classifyHTTPStatus(err, httpErr.StatusCode, httpErr.RetryAfter)
 	}
 	var frontdoorHTTPErr *frontdoorclient.HTTPStatusError
 	if errors.As(err, &frontdoorHTTPErr) {
@@ -59,10 +28,6 @@ func classifyError(err error, _ any) error {
 	var pricesHTTPErr *pricesclient.HTTPStatusError
 	if errors.As(err, &pricesHTTPErr) {
 		return classifyHTTPStatus(err, pricesHTTPErr.StatusCode, 0)
-	}
-	var parseErr *EntityParseError
-	if errors.As(err, &parseErr) {
-		return taskqueue.NewPermanentError(err, "invalid entity format")
 	}
 	var flowParseErr *syncflows.EntityParseError
 	if errors.As(err, &flowParseErr) {

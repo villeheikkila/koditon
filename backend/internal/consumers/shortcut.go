@@ -6,48 +6,91 @@ import (
 	"log/slog"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/taskqueue"
 )
 
-func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger) error {
+const (
+	TaskTypeShortcutSitemapSync = "shortcut_sitemap_sync"
+	TaskTypeShortcutScraperSync = "shortcut_scraper_sync"
+	TaskTypeShortcutAPISync     = "shortcut_api_sync"
+)
+
+func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message) error {
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	var err error
+	switch msg.Data.TaskType {
+	case TaskTypeShortcutSitemapSync:
+		err = c.handleShortcutSitemapSync(ctx, logger, msg)
+	case TaskTypeShortcutScraperSync:
+		err = c.handleShortcutScraperSync(ctx, logger, msg)
+	case TaskTypeShortcutAPISync:
+		err = c.handleShortcutAPISync(ctx, logger, msg)
+	default:
+		return taskqueue.NewPermanentError(fmt.Errorf("unknown shortcut task type: %s", msg.Data.TaskType), "unrecognized task type")
+	}
+	if err != nil {
+		return classifyError(err)
+	}
+	return nil
+}
+
+func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
 	buildingIDs, adIDs, err := c.syncRunner.ShortcutSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "shortcut sitemap sync failed", "error", err)
 		return err
 	}
-	var regErrors []error
-	if len(buildingIDs) > 0 {
-		if _, regErr := c.taskQueueClient.RegisterEntities(ctx, buildingIDs, "shortcut_building", "daily"); regErr != nil {
-			logger.ErrorContext(ctx, "failed to register building entities", "error", regErr, "count", len(buildingIDs))
-			regErrors = append(regErrors, fmt.Errorf("register building entities: %w", regErr))
+	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
+	var enqueueErrors int
+	for _, buildingID := range buildingIDs {
+		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, taskqueue.EntityPrefixBuilding+buildingID, TaskTypeShortcutScraperSync); enqErr != nil {
+			enqueueErrors++
 		}
 	}
-	if len(adIDs) > 0 {
-		if _, regErr := c.taskQueueClient.RegisterEntities(ctx, adIDs, "shortcut_ad", "daily"); regErr != nil {
-			logger.ErrorContext(ctx, "failed to register ad entities", "error", regErr, "count", len(adIDs))
-			regErrors = append(regErrors, fmt.Errorf("register ad entities: %w", regErr))
+	for _, adID := range adIDs {
+		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, taskqueue.EntityPrefixAd+adID, TaskTypeShortcutScraperSync); enqErr != nil {
+			enqueueErrors++
 		}
 	}
-	if len(regErrors) > 0 && len(buildingIDs) == 0 && len(adIDs) == 0 {
-		return fmt.Errorf("shortcut sitemap sync: all entity registrations failed")
-	}
-	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs))
+	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
+	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs), "enqueue_errors", enqueueErrors)
 	return nil
 }
 
-func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
-	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
-		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", task.EntityID, "error", err)
+func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	if err := c.syncRunner.ShortcutSyncEntity(ctx, msg.Data.EntityID); err != nil {
+		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	logger.InfoContext(ctx, "shortcut scraper entity synced", "entity_id", task.EntityID)
+	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
+	logger.InfoContext(ctx, "shortcut scraper entity synced", "entity_id", msg.Data.EntityID)
 	return nil
 }
 
-func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, task db.TaskQueueTask) error {
-	if err := c.syncRunner.ShortcutSyncEntity(ctx, task.EntityID); err != nil {
-		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", task.EntityID, "error", err)
+func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	if err := c.syncRunner.ShortcutSyncEntity(ctx, msg.Data.EntityID); err != nil {
+		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	logger.InfoContext(ctx, "shortcut api entity synced", "entity_id", task.EntityID)
+	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
+	logger.InfoContext(ctx, "shortcut api entity synced", "entity_id", msg.Data.EntityID)
 	return nil
+}
+
+func (c *Consumer) enqueueShortcutTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
+	task, err := c.queries.InsertShortcutPendingTask(ctx, db.InsertShortcutPendingTaskParams{
+		ShortcutPendingTaskEntityID: entityID,
+		ShortcutPendingTaskType:     taskType,
+		ShortcutPendingTaskPriority: int32(taskqueue.PriorityNormal),
+		ShortcutPendingTaskMaxAttempts: int32(3),
+	})
+	if err != nil {
+		return nil // ON CONFLICT DO NOTHING - task already exists
+	}
+	_, err = queue.Send(ctx, taskqueue.MessageData{
+		PendingTaskID: task.ShortcutPendingTaskID,
+		EntityID:      entityID,
+		TaskType:      taskType,
+	})
+	return err
 }
