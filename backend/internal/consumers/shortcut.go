@@ -34,7 +34,7 @@ func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message
 	return nil
 }
 
-func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
 	buildingIDs, adIDs, err := c.syncRunner.ShortcutSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "shortcut sitemap sync failed", "error", err)
@@ -52,7 +52,6 @@ func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.L
 			enqueueErrors++
 		}
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
 	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs), "enqueue_errors", enqueueErrors)
 	return nil
 }
@@ -62,7 +61,6 @@ func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.L
 		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
 	logger.InfoContext(ctx, "shortcut scraper entity synced", "entity_id", msg.Data.EntityID)
 	return nil
 }
@@ -72,20 +70,19 @@ func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logge
 		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteShortcutPendingTask)
 	logger.InfoContext(ctx, "shortcut api entity synced", "entity_id", msg.Data.EntityID)
 	return nil
 }
 
 func (c *Consumer) enqueueShortcutTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.InsertShortcutPendingTask(ctx, db.InsertShortcutPendingTaskParams{
-		ShortcutPendingTaskEntityID: entityID,
-		ShortcutPendingTaskType:     taskType,
-		ShortcutPendingTaskPriority: int32(taskqueue.PriorityNormal),
+	task, err := c.queries.UpsertShortcutPendingTask(ctx, db.UpsertShortcutPendingTaskParams{
+		ShortcutPendingTaskEntityID:    entityID,
+		ShortcutPendingTaskType:        taskType,
+		ShortcutPendingTaskPriority:    int32(taskqueue.PriorityNormal),
 		ShortcutPendingTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
-		return nil // ON CONFLICT DO NOTHING - task already exists
+		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		PendingTaskID: task.ShortcutPendingTaskID,

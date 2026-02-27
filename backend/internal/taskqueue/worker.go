@@ -14,6 +14,15 @@ import (
 
 type TaskHandler func(ctx context.Context, msg Message) error
 
+// StatusCallbacks allows the consumer to hook into task lifecycle events
+// to update the pending_tasks table status accordingly.
+type StatusCallbacks struct {
+	OnProcessing func(ctx context.Context, pendingTaskID int64) error
+	OnCompleted  func(ctx context.Context, pendingTaskID int64) error
+	OnFailed     func(ctx context.Context, pendingTaskID int64, errMsg string) error
+	OnRetry      func(ctx context.Context, pendingTaskID int64, errMsg string) error
+}
+
 type WorkerConfig struct {
 	VisibilityTimeout time.Duration
 	PollInterval      time.Duration
@@ -22,6 +31,7 @@ type WorkerConfig struct {
 	MaxRetryDelay     time.Duration
 	MaxAttempts       int32
 	Logger            *slog.Logger
+	Callbacks         *StatusCallbacks
 }
 
 func DefaultWorkerConfig() WorkerConfig {
@@ -120,6 +130,13 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	)
 	taskLogger.InfoContext(ctx, "received task")
 
+	// Mark pending task as processing
+	if cb := w.config.Callbacks; cb != nil && cb.OnProcessing != nil && msg.Data.PendingTaskID > 0 {
+		if err := cb.OnProcessing(ctx, msg.Data.PendingTaskID); err != nil {
+			taskLogger.WarnContext(ctx, "failed to mark task as processing", "error", err)
+		}
+	}
+
 	taskCtx, cancel := context.WithTimeout(ctx, w.config.TaskTimeout)
 	startTime := time.Now()
 	processingErr := w.executeHandler(taskCtx, taskLogger, *msg)
@@ -137,6 +154,14 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
 		taskLogger.ErrorContext(ctx, "failed to delete message from queue", "error", err)
 	}
+
+	// Mark pending task as completed
+	if cb := w.config.Callbacks; cb != nil && cb.OnCompleted != nil && msg.Data.PendingTaskID > 0 {
+		if err := cb.OnCompleted(ctx, msg.Data.PendingTaskID); err != nil {
+			taskLogger.WarnContext(ctx, "failed to mark task as completed", "error", err)
+		}
+	}
+
 	return nil
 }
 
@@ -154,10 +179,6 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 	nextAttempt := msg.Data.Attempt + 1
 	isPermanent := IsPermanent(processingErr)
 	maxAttempts := w.config.MaxAttempts
-	if msg.Data.Attempt == 0 {
-		// Use max attempts from message data if set (comes from dedup table)
-		maxAttempts = w.config.MaxAttempts
-	}
 	shouldRetry := !isPermanent && nextAttempt < maxAttempts && IsRetryable(processingErr)
 
 	logger.WarnContext(ctx, "task failed",
@@ -168,12 +189,23 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 		"will_retry", shouldRetry,
 	)
 
-	// Always delete the current message
+	// Always delete the current message from pgmq
 	_ = w.queue.Delete(ctx, msg.MessageID)
+
+	errMsg := processingErr.Error()
+	cb := w.config.Callbacks
 
 	if shouldRetry {
 		retryDelay := w.calculateRetryDelay(int(nextAttempt), processingErr)
 		logger.InfoContext(ctx, "scheduling retry", "retry_delay", retryDelay.String())
+
+		// Reset pending task to pending so it remains the source of truth
+		if cb != nil && cb.OnRetry != nil && msg.Data.PendingTaskID > 0 {
+			if err := cb.OnRetry(ctx, msg.Data.PendingTaskID, errMsg); err != nil {
+				logger.WarnContext(ctx, "failed to reset task to pending", "error", err)
+			}
+		}
+
 		retryData := msg.Data
 		retryData.Attempt = nextAttempt
 		if _, err := w.queue.SendWithDelay(ctx, retryData, retryDelay); err != nil {
@@ -181,6 +213,13 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 		}
 	} else {
 		logger.ErrorContext(ctx, "task permanently failed, not retrying")
+
+		// Mark pending task as failed
+		if cb != nil && cb.OnFailed != nil && msg.Data.PendingTaskID > 0 {
+			if err := cb.OnFailed(ctx, msg.Data.PendingTaskID, errMsg); err != nil {
+				logger.WarnContext(ctx, "failed to mark task as failed", "error", err)
+			}
+		}
 	}
 }
 

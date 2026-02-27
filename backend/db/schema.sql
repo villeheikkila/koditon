@@ -340,9 +340,14 @@ create table public.frontdoor_pending_tasks (
   frontdoor_pending_task_id bigserial not null constraint frontdoor_pending_tasks_pkey primary key,
   frontdoor_pending_task_entity_id text not null,
   frontdoor_pending_task_type text not null,
+  frontdoor_pending_task_status text not null default 'pending',
   frontdoor_pending_task_priority integer not null default 0,
   frontdoor_pending_task_max_attempts integer not null default 3,
+  frontdoor_pending_task_attempts integer not null default 0,
+  frontdoor_pending_task_last_error text,
   frontdoor_pending_task_created_at timestamp with time zone not null default now(),
+  frontdoor_pending_task_started_at timestamp with time zone,
+  frontdoor_pending_task_completed_at timestamp with time zone,
   constraint frontdoor_pending_tasks_entity_type_key unique (frontdoor_pending_task_entity_id, frontdoor_pending_task_type)
 );
 
@@ -350,9 +355,14 @@ create table public.shortcut_pending_tasks (
   shortcut_pending_task_id bigserial not null constraint shortcut_pending_tasks_pkey primary key,
   shortcut_pending_task_entity_id text not null,
   shortcut_pending_task_type text not null,
+  shortcut_pending_task_status text not null default 'pending',
   shortcut_pending_task_priority integer not null default 0,
   shortcut_pending_task_max_attempts integer not null default 3,
+  shortcut_pending_task_attempts integer not null default 0,
+  shortcut_pending_task_last_error text,
   shortcut_pending_task_created_at timestamp with time zone not null default now(),
+  shortcut_pending_task_started_at timestamp with time zone,
+  shortcut_pending_task_completed_at timestamp with time zone,
   constraint shortcut_pending_tasks_entity_type_key unique (shortcut_pending_task_entity_id, shortcut_pending_task_type)
 );
 
@@ -360,9 +370,14 @@ create table public.prices_pending_tasks (
   prices_pending_task_id bigserial not null constraint prices_pending_tasks_pkey primary key,
   prices_pending_task_entity_id text not null,
   prices_pending_task_type text not null,
+  prices_pending_task_status text not null default 'pending',
   prices_pending_task_priority integer not null default 0,
   prices_pending_task_max_attempts integer not null default 3,
+  prices_pending_task_attempts integer not null default 0,
+  prices_pending_task_last_error text,
   prices_pending_task_created_at timestamp with time zone not null default now(),
+  prices_pending_task_started_at timestamp with time zone,
+  prices_pending_task_completed_at timestamp with time zone,
   constraint prices_pending_tasks_entity_type_key unique (prices_pending_task_entity_id, prices_pending_task_type)
 );
 
@@ -370,9 +385,14 @@ create table public.postal_pending_tasks (
   postal_pending_task_id bigserial not null constraint postal_pending_tasks_pkey primary key,
   postal_pending_task_entity_id text not null,
   postal_pending_task_type text not null,
+  postal_pending_task_status text not null default 'pending',
   postal_pending_task_priority integer not null default 0,
   postal_pending_task_max_attempts integer not null default 3,
+  postal_pending_task_attempts integer not null default 0,
+  postal_pending_task_last_error text,
   postal_pending_task_created_at timestamp with time zone not null default now(),
+  postal_pending_task_started_at timestamp with time zone,
+  postal_pending_task_completed_at timestamp with time zone,
   constraint postal_pending_tasks_entity_type_key unique (postal_pending_task_entity_id, postal_pending_task_type)
 );
 

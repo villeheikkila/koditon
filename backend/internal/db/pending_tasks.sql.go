@@ -11,26 +11,34 @@ import (
 
 // Frontdoor
 
-const insertFrontdoorPendingTask = `-- name: InsertFrontdoorPendingTask :one
+const upsertFrontdoorPendingTask = `-- name: UpsertFrontdoorPendingTask :one
 INSERT INTO public.frontdoor_pending_tasks (
     frontdoor_pending_task_entity_id,
     frontdoor_pending_task_type,
     frontdoor_pending_task_priority,
     frontdoor_pending_task_max_attempts
 ) VALUES ($1, $2, $3, $4)
-ON CONFLICT (frontdoor_pending_task_entity_id, frontdoor_pending_task_type) DO NOTHING
-RETURNING frontdoor_pending_task_id, frontdoor_pending_task_entity_id, frontdoor_pending_task_type, frontdoor_pending_task_priority, frontdoor_pending_task_max_attempts, frontdoor_pending_task_created_at
+ON CONFLICT (frontdoor_pending_task_entity_id, frontdoor_pending_task_type) DO UPDATE
+SET frontdoor_pending_task_status = 'pending',
+    frontdoor_pending_task_priority = EXCLUDED.frontdoor_pending_task_priority,
+    frontdoor_pending_task_max_attempts = EXCLUDED.frontdoor_pending_task_max_attempts,
+    frontdoor_pending_task_attempts = 0,
+    frontdoor_pending_task_last_error = NULL,
+    frontdoor_pending_task_started_at = NULL,
+    frontdoor_pending_task_completed_at = NULL
+WHERE frontdoor_pending_tasks.frontdoor_pending_task_status IN ('completed', 'failed')
+RETURNING frontdoor_pending_task_id, frontdoor_pending_task_entity_id, frontdoor_pending_task_type, frontdoor_pending_task_status, frontdoor_pending_task_priority, frontdoor_pending_task_max_attempts, frontdoor_pending_task_attempts, frontdoor_pending_task_last_error, frontdoor_pending_task_created_at, frontdoor_pending_task_started_at, frontdoor_pending_task_completed_at
 `
 
-type InsertFrontdoorPendingTaskParams struct {
+type UpsertFrontdoorPendingTaskParams struct {
 	FrontdoorPendingTaskEntityID    string `json:"frontdoor_pending_task_entity_id"`
 	FrontdoorPendingTaskType        string `json:"frontdoor_pending_task_type"`
 	FrontdoorPendingTaskPriority    int32  `json:"frontdoor_pending_task_priority"`
 	FrontdoorPendingTaskMaxAttempts int32  `json:"frontdoor_pending_task_max_attempts"`
 }
 
-func (q *Queries) InsertFrontdoorPendingTask(ctx context.Context, arg InsertFrontdoorPendingTaskParams) (FrontdoorPendingTask, error) {
-	row := q.db.QueryRow(ctx, insertFrontdoorPendingTask,
+func (q *Queries) UpsertFrontdoorPendingTask(ctx context.Context, arg UpsertFrontdoorPendingTaskParams) (FrontdoorPendingTask, error) {
+	row := q.db.QueryRow(ctx, upsertFrontdoorPendingTask,
 		arg.FrontdoorPendingTaskEntityID,
 		arg.FrontdoorPendingTaskType,
 		arg.FrontdoorPendingTaskPriority,
@@ -41,15 +49,20 @@ func (q *Queries) InsertFrontdoorPendingTask(ctx context.Context, arg InsertFron
 		&i.FrontdoorPendingTaskID,
 		&i.FrontdoorPendingTaskEntityID,
 		&i.FrontdoorPendingTaskType,
+		&i.FrontdoorPendingTaskStatus,
 		&i.FrontdoorPendingTaskPriority,
 		&i.FrontdoorPendingTaskMaxAttempts,
+		&i.FrontdoorPendingTaskAttempts,
+		&i.FrontdoorPendingTaskLastError,
 		&i.FrontdoorPendingTaskCreatedAt,
+		&i.FrontdoorPendingTaskStartedAt,
+		&i.FrontdoorPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
 const getFrontdoorPendingTask = `-- name: GetFrontdoorPendingTask :one
-SELECT frontdoor_pending_task_id, frontdoor_pending_task_entity_id, frontdoor_pending_task_type, frontdoor_pending_task_priority, frontdoor_pending_task_max_attempts, frontdoor_pending_task_created_at
+SELECT frontdoor_pending_task_id, frontdoor_pending_task_entity_id, frontdoor_pending_task_type, frontdoor_pending_task_status, frontdoor_pending_task_priority, frontdoor_pending_task_max_attempts, frontdoor_pending_task_attempts, frontdoor_pending_task_last_error, frontdoor_pending_task_created_at, frontdoor_pending_task_started_at, frontdoor_pending_task_completed_at
 FROM public.frontdoor_pending_tasks
 WHERE frontdoor_pending_task_id = $1
 `
@@ -61,45 +74,108 @@ func (q *Queries) GetFrontdoorPendingTask(ctx context.Context, id int64) (Frontd
 		&i.FrontdoorPendingTaskID,
 		&i.FrontdoorPendingTaskEntityID,
 		&i.FrontdoorPendingTaskType,
+		&i.FrontdoorPendingTaskStatus,
 		&i.FrontdoorPendingTaskPriority,
 		&i.FrontdoorPendingTaskMaxAttempts,
+		&i.FrontdoorPendingTaskAttempts,
+		&i.FrontdoorPendingTaskLastError,
 		&i.FrontdoorPendingTaskCreatedAt,
+		&i.FrontdoorPendingTaskStartedAt,
+		&i.FrontdoorPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
-const deleteFrontdoorPendingTask = `-- name: DeleteFrontdoorPendingTask :exec
-DELETE FROM public.frontdoor_pending_tasks
+const updateFrontdoorPendingTaskToProcessing = `-- name: UpdateFrontdoorPendingTaskToProcessing :exec
+UPDATE public.frontdoor_pending_tasks
+SET frontdoor_pending_task_status = 'processing',
+    frontdoor_pending_task_started_at = NOW(),
+    frontdoor_pending_task_attempts = frontdoor_pending_task_attempts + 1
 WHERE frontdoor_pending_task_id = $1
 `
 
-func (q *Queries) DeleteFrontdoorPendingTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteFrontdoorPendingTask, id)
+func (q *Queries) UpdateFrontdoorPendingTaskToProcessing(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateFrontdoorPendingTaskToProcessing, id)
+	return err
+}
+
+const updateFrontdoorPendingTaskToCompleted = `-- name: UpdateFrontdoorPendingTaskToCompleted :exec
+UPDATE public.frontdoor_pending_tasks
+SET frontdoor_pending_task_status = 'completed',
+    frontdoor_pending_task_completed_at = NOW()
+WHERE frontdoor_pending_task_id = $1
+`
+
+func (q *Queries) UpdateFrontdoorPendingTaskToCompleted(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateFrontdoorPendingTaskToCompleted, id)
+	return err
+}
+
+const updateFrontdoorPendingTaskToFailed = `-- name: UpdateFrontdoorPendingTaskToFailed :exec
+UPDATE public.frontdoor_pending_tasks
+SET frontdoor_pending_task_status = 'failed',
+    frontdoor_pending_task_completed_at = NOW(),
+    frontdoor_pending_task_last_error = $2
+WHERE frontdoor_pending_task_id = $1
+`
+
+type UpdateFrontdoorPendingTaskToFailedParams struct {
+	FrontdoorPendingTaskID        int64   `json:"frontdoor_pending_task_id"`
+	FrontdoorPendingTaskLastError *string `json:"frontdoor_pending_task_last_error"`
+}
+
+func (q *Queries) UpdateFrontdoorPendingTaskToFailed(ctx context.Context, arg UpdateFrontdoorPendingTaskToFailedParams) error {
+	_, err := q.db.Exec(ctx, updateFrontdoorPendingTaskToFailed, arg.FrontdoorPendingTaskID, arg.FrontdoorPendingTaskLastError)
+	return err
+}
+
+const resetFrontdoorPendingTaskToPending = `-- name: ResetFrontdoorPendingTaskToPending :exec
+UPDATE public.frontdoor_pending_tasks
+SET frontdoor_pending_task_status = 'pending',
+    frontdoor_pending_task_last_error = $2
+WHERE frontdoor_pending_task_id = $1
+`
+
+type ResetFrontdoorPendingTaskToPendingParams struct {
+	FrontdoorPendingTaskID        int64   `json:"frontdoor_pending_task_id"`
+	FrontdoorPendingTaskLastError *string `json:"frontdoor_pending_task_last_error"`
+}
+
+func (q *Queries) ResetFrontdoorPendingTaskToPending(ctx context.Context, arg ResetFrontdoorPendingTaskToPendingParams) error {
+	_, err := q.db.Exec(ctx, resetFrontdoorPendingTaskToPending, arg.FrontdoorPendingTaskID, arg.FrontdoorPendingTaskLastError)
 	return err
 }
 
 // Shortcut
 
-const insertShortcutPendingTask = `-- name: InsertShortcutPendingTask :one
+const upsertShortcutPendingTask = `-- name: UpsertShortcutPendingTask :one
 INSERT INTO public.shortcut_pending_tasks (
     shortcut_pending_task_entity_id,
     shortcut_pending_task_type,
     shortcut_pending_task_priority,
     shortcut_pending_task_max_attempts
 ) VALUES ($1, $2, $3, $4)
-ON CONFLICT (shortcut_pending_task_entity_id, shortcut_pending_task_type) DO NOTHING
-RETURNING shortcut_pending_task_id, shortcut_pending_task_entity_id, shortcut_pending_task_type, shortcut_pending_task_priority, shortcut_pending_task_max_attempts, shortcut_pending_task_created_at
+ON CONFLICT (shortcut_pending_task_entity_id, shortcut_pending_task_type) DO UPDATE
+SET shortcut_pending_task_status = 'pending',
+    shortcut_pending_task_priority = EXCLUDED.shortcut_pending_task_priority,
+    shortcut_pending_task_max_attempts = EXCLUDED.shortcut_pending_task_max_attempts,
+    shortcut_pending_task_attempts = 0,
+    shortcut_pending_task_last_error = NULL,
+    shortcut_pending_task_started_at = NULL,
+    shortcut_pending_task_completed_at = NULL
+WHERE shortcut_pending_tasks.shortcut_pending_task_status IN ('completed', 'failed')
+RETURNING shortcut_pending_task_id, shortcut_pending_task_entity_id, shortcut_pending_task_type, shortcut_pending_task_status, shortcut_pending_task_priority, shortcut_pending_task_max_attempts, shortcut_pending_task_attempts, shortcut_pending_task_last_error, shortcut_pending_task_created_at, shortcut_pending_task_started_at, shortcut_pending_task_completed_at
 `
 
-type InsertShortcutPendingTaskParams struct {
+type UpsertShortcutPendingTaskParams struct {
 	ShortcutPendingTaskEntityID    string `json:"shortcut_pending_task_entity_id"`
 	ShortcutPendingTaskType        string `json:"shortcut_pending_task_type"`
 	ShortcutPendingTaskPriority    int32  `json:"shortcut_pending_task_priority"`
 	ShortcutPendingTaskMaxAttempts int32  `json:"shortcut_pending_task_max_attempts"`
 }
 
-func (q *Queries) InsertShortcutPendingTask(ctx context.Context, arg InsertShortcutPendingTaskParams) (ShortcutPendingTask, error) {
-	row := q.db.QueryRow(ctx, insertShortcutPendingTask,
+func (q *Queries) UpsertShortcutPendingTask(ctx context.Context, arg UpsertShortcutPendingTaskParams) (ShortcutPendingTask, error) {
+	row := q.db.QueryRow(ctx, upsertShortcutPendingTask,
 		arg.ShortcutPendingTaskEntityID,
 		arg.ShortcutPendingTaskType,
 		arg.ShortcutPendingTaskPriority,
@@ -110,15 +186,20 @@ func (q *Queries) InsertShortcutPendingTask(ctx context.Context, arg InsertShort
 		&i.ShortcutPendingTaskID,
 		&i.ShortcutPendingTaskEntityID,
 		&i.ShortcutPendingTaskType,
+		&i.ShortcutPendingTaskStatus,
 		&i.ShortcutPendingTaskPriority,
 		&i.ShortcutPendingTaskMaxAttempts,
+		&i.ShortcutPendingTaskAttempts,
+		&i.ShortcutPendingTaskLastError,
 		&i.ShortcutPendingTaskCreatedAt,
+		&i.ShortcutPendingTaskStartedAt,
+		&i.ShortcutPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
 const getShortcutPendingTask = `-- name: GetShortcutPendingTask :one
-SELECT shortcut_pending_task_id, shortcut_pending_task_entity_id, shortcut_pending_task_type, shortcut_pending_task_priority, shortcut_pending_task_max_attempts, shortcut_pending_task_created_at
+SELECT shortcut_pending_task_id, shortcut_pending_task_entity_id, shortcut_pending_task_type, shortcut_pending_task_status, shortcut_pending_task_priority, shortcut_pending_task_max_attempts, shortcut_pending_task_attempts, shortcut_pending_task_last_error, shortcut_pending_task_created_at, shortcut_pending_task_started_at, shortcut_pending_task_completed_at
 FROM public.shortcut_pending_tasks
 WHERE shortcut_pending_task_id = $1
 `
@@ -130,45 +211,108 @@ func (q *Queries) GetShortcutPendingTask(ctx context.Context, id int64) (Shortcu
 		&i.ShortcutPendingTaskID,
 		&i.ShortcutPendingTaskEntityID,
 		&i.ShortcutPendingTaskType,
+		&i.ShortcutPendingTaskStatus,
 		&i.ShortcutPendingTaskPriority,
 		&i.ShortcutPendingTaskMaxAttempts,
+		&i.ShortcutPendingTaskAttempts,
+		&i.ShortcutPendingTaskLastError,
 		&i.ShortcutPendingTaskCreatedAt,
+		&i.ShortcutPendingTaskStartedAt,
+		&i.ShortcutPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
-const deleteShortcutPendingTask = `-- name: DeleteShortcutPendingTask :exec
-DELETE FROM public.shortcut_pending_tasks
+const updateShortcutPendingTaskToProcessing = `-- name: UpdateShortcutPendingTaskToProcessing :exec
+UPDATE public.shortcut_pending_tasks
+SET shortcut_pending_task_status = 'processing',
+    shortcut_pending_task_started_at = NOW(),
+    shortcut_pending_task_attempts = shortcut_pending_task_attempts + 1
 WHERE shortcut_pending_task_id = $1
 `
 
-func (q *Queries) DeleteShortcutPendingTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteShortcutPendingTask, id)
+func (q *Queries) UpdateShortcutPendingTaskToProcessing(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateShortcutPendingTaskToProcessing, id)
+	return err
+}
+
+const updateShortcutPendingTaskToCompleted = `-- name: UpdateShortcutPendingTaskToCompleted :exec
+UPDATE public.shortcut_pending_tasks
+SET shortcut_pending_task_status = 'completed',
+    shortcut_pending_task_completed_at = NOW()
+WHERE shortcut_pending_task_id = $1
+`
+
+func (q *Queries) UpdateShortcutPendingTaskToCompleted(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateShortcutPendingTaskToCompleted, id)
+	return err
+}
+
+const updateShortcutPendingTaskToFailed = `-- name: UpdateShortcutPendingTaskToFailed :exec
+UPDATE public.shortcut_pending_tasks
+SET shortcut_pending_task_status = 'failed',
+    shortcut_pending_task_completed_at = NOW(),
+    shortcut_pending_task_last_error = $2
+WHERE shortcut_pending_task_id = $1
+`
+
+type UpdateShortcutPendingTaskToFailedParams struct {
+	ShortcutPendingTaskID        int64   `json:"shortcut_pending_task_id"`
+	ShortcutPendingTaskLastError *string `json:"shortcut_pending_task_last_error"`
+}
+
+func (q *Queries) UpdateShortcutPendingTaskToFailed(ctx context.Context, arg UpdateShortcutPendingTaskToFailedParams) error {
+	_, err := q.db.Exec(ctx, updateShortcutPendingTaskToFailed, arg.ShortcutPendingTaskID, arg.ShortcutPendingTaskLastError)
+	return err
+}
+
+const resetShortcutPendingTaskToPending = `-- name: ResetShortcutPendingTaskToPending :exec
+UPDATE public.shortcut_pending_tasks
+SET shortcut_pending_task_status = 'pending',
+    shortcut_pending_task_last_error = $2
+WHERE shortcut_pending_task_id = $1
+`
+
+type ResetShortcutPendingTaskToPendingParams struct {
+	ShortcutPendingTaskID        int64   `json:"shortcut_pending_task_id"`
+	ShortcutPendingTaskLastError *string `json:"shortcut_pending_task_last_error"`
+}
+
+func (q *Queries) ResetShortcutPendingTaskToPending(ctx context.Context, arg ResetShortcutPendingTaskToPendingParams) error {
+	_, err := q.db.Exec(ctx, resetShortcutPendingTaskToPending, arg.ShortcutPendingTaskID, arg.ShortcutPendingTaskLastError)
 	return err
 }
 
 // Prices
 
-const insertPricesPendingTask = `-- name: InsertPricesPendingTask :one
+const upsertPricesPendingTask = `-- name: UpsertPricesPendingTask :one
 INSERT INTO public.prices_pending_tasks (
     prices_pending_task_entity_id,
     prices_pending_task_type,
     prices_pending_task_priority,
     prices_pending_task_max_attempts
 ) VALUES ($1, $2, $3, $4)
-ON CONFLICT (prices_pending_task_entity_id, prices_pending_task_type) DO NOTHING
-RETURNING prices_pending_task_id, prices_pending_task_entity_id, prices_pending_task_type, prices_pending_task_priority, prices_pending_task_max_attempts, prices_pending_task_created_at
+ON CONFLICT (prices_pending_task_entity_id, prices_pending_task_type) DO UPDATE
+SET prices_pending_task_status = 'pending',
+    prices_pending_task_priority = EXCLUDED.prices_pending_task_priority,
+    prices_pending_task_max_attempts = EXCLUDED.prices_pending_task_max_attempts,
+    prices_pending_task_attempts = 0,
+    prices_pending_task_last_error = NULL,
+    prices_pending_task_started_at = NULL,
+    prices_pending_task_completed_at = NULL
+WHERE prices_pending_tasks.prices_pending_task_status IN ('completed', 'failed')
+RETURNING prices_pending_task_id, prices_pending_task_entity_id, prices_pending_task_type, prices_pending_task_status, prices_pending_task_priority, prices_pending_task_max_attempts, prices_pending_task_attempts, prices_pending_task_last_error, prices_pending_task_created_at, prices_pending_task_started_at, prices_pending_task_completed_at
 `
 
-type InsertPricesPendingTaskParams struct {
+type UpsertPricesPendingTaskParams struct {
 	PricesPendingTaskEntityID    string `json:"prices_pending_task_entity_id"`
 	PricesPendingTaskType        string `json:"prices_pending_task_type"`
 	PricesPendingTaskPriority    int32  `json:"prices_pending_task_priority"`
 	PricesPendingTaskMaxAttempts int32  `json:"prices_pending_task_max_attempts"`
 }
 
-func (q *Queries) InsertPricesPendingTask(ctx context.Context, arg InsertPricesPendingTaskParams) (PricesPendingTask, error) {
-	row := q.db.QueryRow(ctx, insertPricesPendingTask,
+func (q *Queries) UpsertPricesPendingTask(ctx context.Context, arg UpsertPricesPendingTaskParams) (PricesPendingTask, error) {
+	row := q.db.QueryRow(ctx, upsertPricesPendingTask,
 		arg.PricesPendingTaskEntityID,
 		arg.PricesPendingTaskType,
 		arg.PricesPendingTaskPriority,
@@ -179,15 +323,20 @@ func (q *Queries) InsertPricesPendingTask(ctx context.Context, arg InsertPricesP
 		&i.PricesPendingTaskID,
 		&i.PricesPendingTaskEntityID,
 		&i.PricesPendingTaskType,
+		&i.PricesPendingTaskStatus,
 		&i.PricesPendingTaskPriority,
 		&i.PricesPendingTaskMaxAttempts,
+		&i.PricesPendingTaskAttempts,
+		&i.PricesPendingTaskLastError,
 		&i.PricesPendingTaskCreatedAt,
+		&i.PricesPendingTaskStartedAt,
+		&i.PricesPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
 const getPricesPendingTask = `-- name: GetPricesPendingTask :one
-SELECT prices_pending_task_id, prices_pending_task_entity_id, prices_pending_task_type, prices_pending_task_priority, prices_pending_task_max_attempts, prices_pending_task_created_at
+SELECT prices_pending_task_id, prices_pending_task_entity_id, prices_pending_task_type, prices_pending_task_status, prices_pending_task_priority, prices_pending_task_max_attempts, prices_pending_task_attempts, prices_pending_task_last_error, prices_pending_task_created_at, prices_pending_task_started_at, prices_pending_task_completed_at
 FROM public.prices_pending_tasks
 WHERE prices_pending_task_id = $1
 `
@@ -199,45 +348,108 @@ func (q *Queries) GetPricesPendingTask(ctx context.Context, id int64) (PricesPen
 		&i.PricesPendingTaskID,
 		&i.PricesPendingTaskEntityID,
 		&i.PricesPendingTaskType,
+		&i.PricesPendingTaskStatus,
 		&i.PricesPendingTaskPriority,
 		&i.PricesPendingTaskMaxAttempts,
+		&i.PricesPendingTaskAttempts,
+		&i.PricesPendingTaskLastError,
 		&i.PricesPendingTaskCreatedAt,
+		&i.PricesPendingTaskStartedAt,
+		&i.PricesPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
-const deletePricesPendingTask = `-- name: DeletePricesPendingTask :exec
-DELETE FROM public.prices_pending_tasks
+const updatePricesPendingTaskToProcessing = `-- name: UpdatePricesPendingTaskToProcessing :exec
+UPDATE public.prices_pending_tasks
+SET prices_pending_task_status = 'processing',
+    prices_pending_task_started_at = NOW(),
+    prices_pending_task_attempts = prices_pending_task_attempts + 1
 WHERE prices_pending_task_id = $1
 `
 
-func (q *Queries) DeletePricesPendingTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deletePricesPendingTask, id)
+func (q *Queries) UpdatePricesPendingTaskToProcessing(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updatePricesPendingTaskToProcessing, id)
+	return err
+}
+
+const updatePricesPendingTaskToCompleted = `-- name: UpdatePricesPendingTaskToCompleted :exec
+UPDATE public.prices_pending_tasks
+SET prices_pending_task_status = 'completed',
+    prices_pending_task_completed_at = NOW()
+WHERE prices_pending_task_id = $1
+`
+
+func (q *Queries) UpdatePricesPendingTaskToCompleted(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updatePricesPendingTaskToCompleted, id)
+	return err
+}
+
+const updatePricesPendingTaskToFailed = `-- name: UpdatePricesPendingTaskToFailed :exec
+UPDATE public.prices_pending_tasks
+SET prices_pending_task_status = 'failed',
+    prices_pending_task_completed_at = NOW(),
+    prices_pending_task_last_error = $2
+WHERE prices_pending_task_id = $1
+`
+
+type UpdatePricesPendingTaskToFailedParams struct {
+	PricesPendingTaskID        int64   `json:"prices_pending_task_id"`
+	PricesPendingTaskLastError *string `json:"prices_pending_task_last_error"`
+}
+
+func (q *Queries) UpdatePricesPendingTaskToFailed(ctx context.Context, arg UpdatePricesPendingTaskToFailedParams) error {
+	_, err := q.db.Exec(ctx, updatePricesPendingTaskToFailed, arg.PricesPendingTaskID, arg.PricesPendingTaskLastError)
+	return err
+}
+
+const resetPricesPendingTaskToPending = `-- name: ResetPricesPendingTaskToPending :exec
+UPDATE public.prices_pending_tasks
+SET prices_pending_task_status = 'pending',
+    prices_pending_task_last_error = $2
+WHERE prices_pending_task_id = $1
+`
+
+type ResetPricesPendingTaskToPendingParams struct {
+	PricesPendingTaskID        int64   `json:"prices_pending_task_id"`
+	PricesPendingTaskLastError *string `json:"prices_pending_task_last_error"`
+}
+
+func (q *Queries) ResetPricesPendingTaskToPending(ctx context.Context, arg ResetPricesPendingTaskToPendingParams) error {
+	_, err := q.db.Exec(ctx, resetPricesPendingTaskToPending, arg.PricesPendingTaskID, arg.PricesPendingTaskLastError)
 	return err
 }
 
 // Postal
 
-const insertPostalPendingTask = `-- name: InsertPostalPendingTask :one
+const upsertPostalPendingTask = `-- name: UpsertPostalPendingTask :one
 INSERT INTO public.postal_pending_tasks (
     postal_pending_task_entity_id,
     postal_pending_task_type,
     postal_pending_task_priority,
     postal_pending_task_max_attempts
 ) VALUES ($1, $2, $3, $4)
-ON CONFLICT (postal_pending_task_entity_id, postal_pending_task_type) DO NOTHING
-RETURNING postal_pending_task_id, postal_pending_task_entity_id, postal_pending_task_type, postal_pending_task_priority, postal_pending_task_max_attempts, postal_pending_task_created_at
+ON CONFLICT (postal_pending_task_entity_id, postal_pending_task_type) DO UPDATE
+SET postal_pending_task_status = 'pending',
+    postal_pending_task_priority = EXCLUDED.postal_pending_task_priority,
+    postal_pending_task_max_attempts = EXCLUDED.postal_pending_task_max_attempts,
+    postal_pending_task_attempts = 0,
+    postal_pending_task_last_error = NULL,
+    postal_pending_task_started_at = NULL,
+    postal_pending_task_completed_at = NULL
+WHERE postal_pending_tasks.postal_pending_task_status IN ('completed', 'failed')
+RETURNING postal_pending_task_id, postal_pending_task_entity_id, postal_pending_task_type, postal_pending_task_status, postal_pending_task_priority, postal_pending_task_max_attempts, postal_pending_task_attempts, postal_pending_task_last_error, postal_pending_task_created_at, postal_pending_task_started_at, postal_pending_task_completed_at
 `
 
-type InsertPostalPendingTaskParams struct {
+type UpsertPostalPendingTaskParams struct {
 	PostalPendingTaskEntityID    string `json:"postal_pending_task_entity_id"`
 	PostalPendingTaskType        string `json:"postal_pending_task_type"`
 	PostalPendingTaskPriority    int32  `json:"postal_pending_task_priority"`
 	PostalPendingTaskMaxAttempts int32  `json:"postal_pending_task_max_attempts"`
 }
 
-func (q *Queries) InsertPostalPendingTask(ctx context.Context, arg InsertPostalPendingTaskParams) (PostalPendingTask, error) {
-	row := q.db.QueryRow(ctx, insertPostalPendingTask,
+func (q *Queries) UpsertPostalPendingTask(ctx context.Context, arg UpsertPostalPendingTaskParams) (PostalPendingTask, error) {
+	row := q.db.QueryRow(ctx, upsertPostalPendingTask,
 		arg.PostalPendingTaskEntityID,
 		arg.PostalPendingTaskType,
 		arg.PostalPendingTaskPriority,
@@ -248,15 +460,20 @@ func (q *Queries) InsertPostalPendingTask(ctx context.Context, arg InsertPostalP
 		&i.PostalPendingTaskID,
 		&i.PostalPendingTaskEntityID,
 		&i.PostalPendingTaskType,
+		&i.PostalPendingTaskStatus,
 		&i.PostalPendingTaskPriority,
 		&i.PostalPendingTaskMaxAttempts,
+		&i.PostalPendingTaskAttempts,
+		&i.PostalPendingTaskLastError,
 		&i.PostalPendingTaskCreatedAt,
+		&i.PostalPendingTaskStartedAt,
+		&i.PostalPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
 const getPostalPendingTask = `-- name: GetPostalPendingTask :one
-SELECT postal_pending_task_id, postal_pending_task_entity_id, postal_pending_task_type, postal_pending_task_priority, postal_pending_task_max_attempts, postal_pending_task_created_at
+SELECT postal_pending_task_id, postal_pending_task_entity_id, postal_pending_task_type, postal_pending_task_status, postal_pending_task_priority, postal_pending_task_max_attempts, postal_pending_task_attempts, postal_pending_task_last_error, postal_pending_task_created_at, postal_pending_task_started_at, postal_pending_task_completed_at
 FROM public.postal_pending_tasks
 WHERE postal_pending_task_id = $1
 `
@@ -268,20 +485,74 @@ func (q *Queries) GetPostalPendingTask(ctx context.Context, id int64) (PostalPen
 		&i.PostalPendingTaskID,
 		&i.PostalPendingTaskEntityID,
 		&i.PostalPendingTaskType,
+		&i.PostalPendingTaskStatus,
 		&i.PostalPendingTaskPriority,
 		&i.PostalPendingTaskMaxAttempts,
+		&i.PostalPendingTaskAttempts,
+		&i.PostalPendingTaskLastError,
 		&i.PostalPendingTaskCreatedAt,
+		&i.PostalPendingTaskStartedAt,
+		&i.PostalPendingTaskCompletedAt,
 	)
 	return i, err
 }
 
-const deletePostalPendingTask = `-- name: DeletePostalPendingTask :exec
-DELETE FROM public.postal_pending_tasks
+const updatePostalPendingTaskToProcessing = `-- name: UpdatePostalPendingTaskToProcessing :exec
+UPDATE public.postal_pending_tasks
+SET postal_pending_task_status = 'processing',
+    postal_pending_task_started_at = NOW(),
+    postal_pending_task_attempts = postal_pending_task_attempts + 1
 WHERE postal_pending_task_id = $1
 `
 
-func (q *Queries) DeletePostalPendingTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deletePostalPendingTask, id)
+func (q *Queries) UpdatePostalPendingTaskToProcessing(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updatePostalPendingTaskToProcessing, id)
 	return err
 }
 
+const updatePostalPendingTaskToCompleted = `-- name: UpdatePostalPendingTaskToCompleted :exec
+UPDATE public.postal_pending_tasks
+SET postal_pending_task_status = 'completed',
+    postal_pending_task_completed_at = NOW()
+WHERE postal_pending_task_id = $1
+`
+
+func (q *Queries) UpdatePostalPendingTaskToCompleted(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updatePostalPendingTaskToCompleted, id)
+	return err
+}
+
+const updatePostalPendingTaskToFailed = `-- name: UpdatePostalPendingTaskToFailed :exec
+UPDATE public.postal_pending_tasks
+SET postal_pending_task_status = 'failed',
+    postal_pending_task_completed_at = NOW(),
+    postal_pending_task_last_error = $2
+WHERE postal_pending_task_id = $1
+`
+
+type UpdatePostalPendingTaskToFailedParams struct {
+	PostalPendingTaskID        int64   `json:"postal_pending_task_id"`
+	PostalPendingTaskLastError *string `json:"postal_pending_task_last_error"`
+}
+
+func (q *Queries) UpdatePostalPendingTaskToFailed(ctx context.Context, arg UpdatePostalPendingTaskToFailedParams) error {
+	_, err := q.db.Exec(ctx, updatePostalPendingTaskToFailed, arg.PostalPendingTaskID, arg.PostalPendingTaskLastError)
+	return err
+}
+
+const resetPostalPendingTaskToPending = `-- name: ResetPostalPendingTaskToPending :exec
+UPDATE public.postal_pending_tasks
+SET postal_pending_task_status = 'pending',
+    postal_pending_task_last_error = $2
+WHERE postal_pending_task_id = $1
+`
+
+type ResetPostalPendingTaskToPendingParams struct {
+	PostalPendingTaskID        int64   `json:"postal_pending_task_id"`
+	PostalPendingTaskLastError *string `json:"postal_pending_task_last_error"`
+}
+
+func (q *Queries) ResetPostalPendingTaskToPending(ctx context.Context, arg ResetPostalPendingTaskToPendingParams) error {
+	_, err := q.db.Exec(ctx, resetPostalPendingTaskToPending, arg.PostalPendingTaskID, arg.PostalPendingTaskLastError)
+	return err
+}

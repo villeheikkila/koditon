@@ -22,13 +22,13 @@ func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) 
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypePricesCitiesInit:
-		err = c.handlePricesCitiesInit(ctx, logger, msg)
+		err = c.handlePricesCitiesInit(ctx, logger)
 	case TaskTypePricesSync:
 		err = c.handlePricesSync(ctx, logger, msg)
 	case TaskTypePricesNeighborhoodPostalCodeSync:
-		err = c.handlePricesNeighborhoodPostalCodeSync(ctx, logger, msg)
+		err = c.handlePricesNeighborhoodPostalCodeSync(ctx, logger)
 	case TaskTypePricesSyncAll:
-		err = c.handlePricesSyncAll(ctx, logger, msg)
+		err = c.handlePricesSyncAll(ctx, logger)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown prices task type: %s", msg.Data.TaskType), "unrecognized task type")
 	}
@@ -38,7 +38,7 @@ func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) 
 	return nil
 }
 
-func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger) error {
 	logger.InfoContext(ctx, "processing prices cities initialization task")
 	cities, err := c.syncRunner.PricesFetchCities(ctx)
 	if err != nil {
@@ -54,7 +54,6 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 		}
 		logger.InfoContext(ctx, "city entities enqueued", "count", len(cities), "enqueue_errors", enqueueErrors)
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeletePricesPendingTask)
 	return nil
 }
 
@@ -63,11 +62,10 @@ func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, ms
 	if err := c.syncRunner.PricesSyncCityEntity(ctx, msg.Data.EntityID); err != nil {
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeletePricesPendingTask)
 	return nil
 }
 
-func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, logger *slog.Logger) error {
 	logger.InfoContext(ctx, "processing prices neighborhood postal code sync task")
 	err := c.syncRunner.PricesSyncNeighborhoodPostalCodes(ctx, func(p prices.SyncNeighborhoodPostalCodesProgress) {
 		if p.Page > 0 {
@@ -79,12 +77,11 @@ func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, l
 	if err != nil {
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeletePricesPendingTask)
 	logger.InfoContext(ctx, "completed prices neighborhood postal code sync")
 	return nil
 }
 
-func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger) error {
 	logger.InfoContext(ctx, "processing prices sync all task")
 	cfg := prices.DefaultSyncAllConfig()
 	cfg.Logger = logger
@@ -93,20 +90,19 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger,
 	if err != nil {
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeletePricesPendingTask)
 	logger.InfoContext(ctx, "completed prices sync all", "cities", result.CitiesProcessed, "postal_codes", result.PostalCodesProcessed, "neighborhoods", result.NeighborhoodsUpdated, "transactions", result.TransactionsProcessed, "errors", len(result.Errors))
 	return nil
 }
 
 func (c *Consumer) enqueuePricesTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.InsertPricesPendingTask(ctx, db.InsertPricesPendingTaskParams{
-		PricesPendingTaskEntityID: entityID,
-		PricesPendingTaskType:     taskType,
-		PricesPendingTaskPriority: int32(taskqueue.PriorityNormal),
+	task, err := c.queries.UpsertPricesPendingTask(ctx, db.UpsertPricesPendingTaskParams{
+		PricesPendingTaskEntityID:    entityID,
+		PricesPendingTaskType:        taskType,
+		PricesPendingTaskPriority:    int32(taskqueue.PriorityNormal),
 		PricesPendingTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
-		return nil // ON CONFLICT DO NOTHING - task already exists
+		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		PendingTaskID: task.PricesPendingTaskID,

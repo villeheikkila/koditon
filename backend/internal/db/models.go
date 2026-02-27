@@ -479,37 +479,57 @@ type ShortcutToken struct {
 }
 
 type FrontdoorPendingTask struct {
-	FrontdoorPendingTaskID          int64     `json:"frontdoor_pending_task_id"`
-	FrontdoorPendingTaskEntityID    string    `json:"frontdoor_pending_task_entity_id"`
-	FrontdoorPendingTaskType        string    `json:"frontdoor_pending_task_type"`
-	FrontdoorPendingTaskPriority    int32     `json:"frontdoor_pending_task_priority"`
-	FrontdoorPendingTaskMaxAttempts int32     `json:"frontdoor_pending_task_max_attempts"`
-	FrontdoorPendingTaskCreatedAt   time.Time `json:"frontdoor_pending_task_created_at"`
+	FrontdoorPendingTaskID          int64      `json:"frontdoor_pending_task_id"`
+	FrontdoorPendingTaskEntityID    string     `json:"frontdoor_pending_task_entity_id"`
+	FrontdoorPendingTaskType        string     `json:"frontdoor_pending_task_type"`
+	FrontdoorPendingTaskStatus      string     `json:"frontdoor_pending_task_status"`
+	FrontdoorPendingTaskPriority    int32      `json:"frontdoor_pending_task_priority"`
+	FrontdoorPendingTaskMaxAttempts int32      `json:"frontdoor_pending_task_max_attempts"`
+	FrontdoorPendingTaskAttempts    int32      `json:"frontdoor_pending_task_attempts"`
+	FrontdoorPendingTaskLastError   *string    `json:"frontdoor_pending_task_last_error"`
+	FrontdoorPendingTaskCreatedAt   time.Time  `json:"frontdoor_pending_task_created_at"`
+	FrontdoorPendingTaskStartedAt   *time.Time `json:"frontdoor_pending_task_started_at"`
+	FrontdoorPendingTaskCompletedAt *time.Time `json:"frontdoor_pending_task_completed_at"`
 }
 
 type ShortcutPendingTask struct {
-	ShortcutPendingTaskID          int64     `json:"shortcut_pending_task_id"`
-	ShortcutPendingTaskEntityID    string    `json:"shortcut_pending_task_entity_id"`
-	ShortcutPendingTaskType        string    `json:"shortcut_pending_task_type"`
-	ShortcutPendingTaskPriority    int32     `json:"shortcut_pending_task_priority"`
-	ShortcutPendingTaskMaxAttempts int32     `json:"shortcut_pending_task_max_attempts"`
-	ShortcutPendingTaskCreatedAt   time.Time `json:"shortcut_pending_task_created_at"`
+	ShortcutPendingTaskID          int64      `json:"shortcut_pending_task_id"`
+	ShortcutPendingTaskEntityID    string     `json:"shortcut_pending_task_entity_id"`
+	ShortcutPendingTaskType        string     `json:"shortcut_pending_task_type"`
+	ShortcutPendingTaskStatus      string     `json:"shortcut_pending_task_status"`
+	ShortcutPendingTaskPriority    int32      `json:"shortcut_pending_task_priority"`
+	ShortcutPendingTaskMaxAttempts int32      `json:"shortcut_pending_task_max_attempts"`
+	ShortcutPendingTaskAttempts    int32      `json:"shortcut_pending_task_attempts"`
+	ShortcutPendingTaskLastError   *string    `json:"shortcut_pending_task_last_error"`
+	ShortcutPendingTaskCreatedAt   time.Time  `json:"shortcut_pending_task_created_at"`
+	ShortcutPendingTaskStartedAt   *time.Time `json:"shortcut_pending_task_started_at"`
+	ShortcutPendingTaskCompletedAt *time.Time `json:"shortcut_pending_task_completed_at"`
 }
 
 type PricesPendingTask struct {
-	PricesPendingTaskID          int64     `json:"prices_pending_task_id"`
-	PricesPendingTaskEntityID    string    `json:"prices_pending_task_entity_id"`
-	PricesPendingTaskType        string    `json:"prices_pending_task_type"`
-	PricesPendingTaskPriority    int32     `json:"prices_pending_task_priority"`
-	PricesPendingTaskMaxAttempts int32     `json:"prices_pending_task_max_attempts"`
-	PricesPendingTaskCreatedAt   time.Time `json:"prices_pending_task_created_at"`
+	PricesPendingTaskID          int64      `json:"prices_pending_task_id"`
+	PricesPendingTaskEntityID    string     `json:"prices_pending_task_entity_id"`
+	PricesPendingTaskType        string     `json:"prices_pending_task_type"`
+	PricesPendingTaskStatus      string     `json:"prices_pending_task_status"`
+	PricesPendingTaskPriority    int32      `json:"prices_pending_task_priority"`
+	PricesPendingTaskMaxAttempts int32      `json:"prices_pending_task_max_attempts"`
+	PricesPendingTaskAttempts    int32      `json:"prices_pending_task_attempts"`
+	PricesPendingTaskLastError   *string    `json:"prices_pending_task_last_error"`
+	PricesPendingTaskCreatedAt   time.Time  `json:"prices_pending_task_created_at"`
+	PricesPendingTaskStartedAt   *time.Time `json:"prices_pending_task_started_at"`
+	PricesPendingTaskCompletedAt *time.Time `json:"prices_pending_task_completed_at"`
 }
 
 type PostalPendingTask struct {
-	PostalPendingTaskID          int64     `json:"postal_pending_task_id"`
-	PostalPendingTaskEntityID    string    `json:"postal_pending_task_entity_id"`
-	PostalPendingTaskType        string    `json:"postal_pending_task_type"`
-	PostalPendingTaskPriority    int32     `json:"postal_pending_task_priority"`
-	PostalPendingTaskMaxAttempts int32     `json:"postal_pending_task_max_attempts"`
-	PostalPendingTaskCreatedAt   time.Time `json:"postal_pending_task_created_at"`
+	PostalPendingTaskID          int64      `json:"postal_pending_task_id"`
+	PostalPendingTaskEntityID    string     `json:"postal_pending_task_entity_id"`
+	PostalPendingTaskType        string     `json:"postal_pending_task_type"`
+	PostalPendingTaskStatus      string     `json:"postal_pending_task_status"`
+	PostalPendingTaskPriority    int32      `json:"postal_pending_task_priority"`
+	PostalPendingTaskMaxAttempts int32      `json:"postal_pending_task_max_attempts"`
+	PostalPendingTaskAttempts    int32      `json:"postal_pending_task_attempts"`
+	PostalPendingTaskLastError   *string    `json:"postal_pending_task_last_error"`
+	PostalPendingTaskCreatedAt   time.Time  `json:"postal_pending_task_created_at"`
+	PostalPendingTaskStartedAt   *time.Time `json:"postal_pending_task_started_at"`
+	PostalPendingTaskCompletedAt *time.Time `json:"postal_pending_task_completed_at"`
 }

@@ -31,7 +31,7 @@ func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Messag
 	return nil
 }
 
-func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
 	adIDs, buildingIDs, err := c.syncRunner.FrontdoorSitemap(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "frontdoor sitemap sync failed", "error", err)
@@ -49,7 +49,6 @@ func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.
 			enqueueErrors++
 		}
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteFrontdoorPendingTask)
 	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors)
 	return nil
 }
@@ -59,20 +58,19 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", msg.Data.EntityID, "error", err)
 		return err
 	}
-	c.deletePendingTask(ctx, logger, msg, c.queries.DeleteFrontdoorPendingTask)
 	logger.InfoContext(ctx, "frontdoor entity synced", "entity_id", msg.Data.EntityID)
 	return nil
 }
 
 func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.InsertFrontdoorPendingTask(ctx, db.InsertFrontdoorPendingTaskParams{
-		FrontdoorPendingTaskEntityID: entityID,
-		FrontdoorPendingTaskType:     taskType,
-		FrontdoorPendingTaskPriority: int32(taskqueue.PriorityNormal),
+	task, err := c.queries.UpsertFrontdoorPendingTask(ctx, db.UpsertFrontdoorPendingTaskParams{
+		FrontdoorPendingTaskEntityID:    entityID,
+		FrontdoorPendingTaskType:        taskType,
+		FrontdoorPendingTaskPriority:    int32(taskqueue.PriorityNormal),
 		FrontdoorPendingTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
-		return nil // ON CONFLICT DO NOTHING - task already exists
+		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		PendingTaskID: task.FrontdoorPendingTaskID,
