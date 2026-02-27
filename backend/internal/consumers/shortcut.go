@@ -16,7 +16,7 @@ const (
 )
 
 func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypeShortcutSitemapSync:
@@ -75,17 +75,17 @@ func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logge
 }
 
 func (c *Consumer) enqueueShortcutTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.UpsertShortcutPendingTask(ctx, db.UpsertShortcutPendingTaskParams{
-		ShortcutPendingTaskEntityID:    entityID,
-		ShortcutPendingTaskType:        taskType,
-		ShortcutPendingTaskPriority:    int32(taskqueue.PriorityNormal),
-		ShortcutPendingTaskMaxAttempts: int32(3),
+	task, err := c.queries.UpsertShortcutSyncTask(ctx, db.UpsertShortcutSyncTaskParams{
+		ShortcutSyncTaskEntityID:    entityID,
+		ShortcutSyncTaskType:        taskType,
+		ShortcutSyncTaskPriority:    int32(taskqueue.PriorityNormal),
+		ShortcutSyncTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
 		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
-		PendingTaskID: task.ShortcutPendingTaskID,
+		SyncTaskID: task.ShortcutSyncTaskID,
 		EntityID:      entityID,
 		TaskType:      taskType,
 	})

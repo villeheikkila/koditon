@@ -15,7 +15,7 @@ import (
 type TaskHandler func(ctx context.Context, msg Message) error
 
 // StatusCallbacks allows the consumer to hook into task lifecycle events
-// to update the pending_tasks table status accordingly.
+// to update the sync_tasks table status accordingly.
 type StatusCallbacks struct {
 	OnProcessing func(ctx context.Context, pendingTaskID int64) error
 	OnCompleted  func(ctx context.Context, pendingTaskID int64) error
@@ -122,7 +122,7 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 		return nil
 	}
 	taskLogger := w.logger.With(
-		"pending_task_id", msg.Data.PendingTaskID,
+		"sync_task_id", msg.Data.SyncTaskID,
 		"entity_id", msg.Data.EntityID,
 		"task_type", msg.Data.TaskType,
 		"attempt", msg.Data.Attempt,
@@ -131,8 +131,8 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	taskLogger.InfoContext(ctx, "received task")
 
 	// Mark pending task as processing
-	if cb := w.config.Callbacks; cb != nil && cb.OnProcessing != nil && msg.Data.PendingTaskID > 0 {
-		if err := cb.OnProcessing(ctx, msg.Data.PendingTaskID); err != nil {
+	if cb := w.config.Callbacks; cb != nil && cb.OnProcessing != nil && msg.Data.SyncTaskID > 0 {
+		if err := cb.OnProcessing(ctx, msg.Data.SyncTaskID); err != nil {
 			taskLogger.WarnContext(ctx, "failed to mark task as processing", "error", err)
 		}
 	}
@@ -156,8 +156,8 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	}
 
 	// Mark pending task as completed
-	if cb := w.config.Callbacks; cb != nil && cb.OnCompleted != nil && msg.Data.PendingTaskID > 0 {
-		if err := cb.OnCompleted(ctx, msg.Data.PendingTaskID); err != nil {
+	if cb := w.config.Callbacks; cb != nil && cb.OnCompleted != nil && msg.Data.SyncTaskID > 0 {
+		if err := cb.OnCompleted(ctx, msg.Data.SyncTaskID); err != nil {
 			taskLogger.WarnContext(ctx, "failed to mark task as completed", "error", err)
 		}
 	}
@@ -200,8 +200,8 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 		logger.InfoContext(ctx, "scheduling retry", "retry_delay", retryDelay.String())
 
 		// Reset pending task to pending so it remains the source of truth
-		if cb != nil && cb.OnRetry != nil && msg.Data.PendingTaskID > 0 {
-			if err := cb.OnRetry(ctx, msg.Data.PendingTaskID, errMsg); err != nil {
+		if cb != nil && cb.OnRetry != nil && msg.Data.SyncTaskID > 0 {
+			if err := cb.OnRetry(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
 				logger.WarnContext(ctx, "failed to reset task to pending", "error", err)
 			}
 		}
@@ -215,8 +215,8 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 		logger.ErrorContext(ctx, "task permanently failed, not retrying")
 
 		// Mark pending task as failed
-		if cb != nil && cb.OnFailed != nil && msg.Data.PendingTaskID > 0 {
-			if err := cb.OnFailed(ctx, msg.Data.PendingTaskID, errMsg); err != nil {
+		if cb != nil && cb.OnFailed != nil && msg.Data.SyncTaskID > 0 {
+			if err := cb.OnFailed(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
 				logger.WarnContext(ctx, "failed to mark task as failed", "error", err)
 			}
 		}

@@ -1,5 +1,5 @@
--- Migration: Replace monolithic task_queue schema with per-domain pgmq queues + pending_tasks tables
--- Each domain gets its own pgmq queue and a pending_tasks table that is the definitive source
+-- Migration: Replace monolithic task_queue schema with per-domain pgmq queues + sync_tasks tables
+-- Each domain gets its own pgmq queue and a sync_tasks table that is the definitive source
 -- of entity sync status. One row per (entity_id, task_type) — reused across sync cycles.
 
 -- Step 1: Create per-domain pgmq queues
@@ -8,69 +8,69 @@ SELECT pgmq.create('shortcut');
 SELECT pgmq.create('prices');
 SELECT pgmq.create('postal');
 
--- Step 2: Create per-domain pending_tasks tables
+-- Step 2: Create per-domain sync_tasks tables
 -- Key design: UNIQUE (entity_id, task_type) — one row per entity, reused across cycles.
 -- The upsert resets completed/failed rows to pending; skips already-active rows.
 -- Table size is bounded by number of entities, not number of sync runs.
 
-CREATE TABLE public.frontdoor_pending_tasks (
-    frontdoor_pending_task_id BIGSERIAL PRIMARY KEY,
-    frontdoor_pending_task_entity_id TEXT NOT NULL,
-    frontdoor_pending_task_type TEXT NOT NULL,
-    frontdoor_pending_task_status TEXT NOT NULL DEFAULT 'pending',
-    frontdoor_pending_task_priority INT NOT NULL DEFAULT 0,
-    frontdoor_pending_task_max_attempts INT NOT NULL DEFAULT 3,
-    frontdoor_pending_task_attempts INT NOT NULL DEFAULT 0,
-    frontdoor_pending_task_last_error TEXT,
-    frontdoor_pending_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    frontdoor_pending_task_started_at TIMESTAMPTZ,
-    frontdoor_pending_task_completed_at TIMESTAMPTZ,
-    UNIQUE (frontdoor_pending_task_entity_id, frontdoor_pending_task_type)
+CREATE TABLE public.frontdoor_sync_tasks (
+    frontdoor_sync_task_id BIGSERIAL PRIMARY KEY,
+    frontdoor_sync_task_entity_id TEXT NOT NULL,
+    frontdoor_sync_task_type TEXT NOT NULL,
+    frontdoor_sync_task_status TEXT NOT NULL DEFAULT 'pending',
+    frontdoor_sync_task_priority INT NOT NULL DEFAULT 0,
+    frontdoor_sync_task_max_attempts INT NOT NULL DEFAULT 3,
+    frontdoor_sync_task_attempts INT NOT NULL DEFAULT 0,
+    frontdoor_sync_task_last_error TEXT,
+    frontdoor_sync_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    frontdoor_sync_task_started_at TIMESTAMPTZ,
+    frontdoor_sync_task_completed_at TIMESTAMPTZ,
+    UNIQUE (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
 );
 
-CREATE TABLE public.shortcut_pending_tasks (
-    shortcut_pending_task_id BIGSERIAL PRIMARY KEY,
-    shortcut_pending_task_entity_id TEXT NOT NULL,
-    shortcut_pending_task_type TEXT NOT NULL,
-    shortcut_pending_task_status TEXT NOT NULL DEFAULT 'pending',
-    shortcut_pending_task_priority INT NOT NULL DEFAULT 0,
-    shortcut_pending_task_max_attempts INT NOT NULL DEFAULT 3,
-    shortcut_pending_task_attempts INT NOT NULL DEFAULT 0,
-    shortcut_pending_task_last_error TEXT,
-    shortcut_pending_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    shortcut_pending_task_started_at TIMESTAMPTZ,
-    shortcut_pending_task_completed_at TIMESTAMPTZ,
-    UNIQUE (shortcut_pending_task_entity_id, shortcut_pending_task_type)
+CREATE TABLE public.shortcut_sync_tasks (
+    shortcut_sync_task_id BIGSERIAL PRIMARY KEY,
+    shortcut_sync_task_entity_id TEXT NOT NULL,
+    shortcut_sync_task_type TEXT NOT NULL,
+    shortcut_sync_task_status TEXT NOT NULL DEFAULT 'pending',
+    shortcut_sync_task_priority INT NOT NULL DEFAULT 0,
+    shortcut_sync_task_max_attempts INT NOT NULL DEFAULT 3,
+    shortcut_sync_task_attempts INT NOT NULL DEFAULT 0,
+    shortcut_sync_task_last_error TEXT,
+    shortcut_sync_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    shortcut_sync_task_started_at TIMESTAMPTZ,
+    shortcut_sync_task_completed_at TIMESTAMPTZ,
+    UNIQUE (shortcut_sync_task_entity_id, shortcut_sync_task_type)
 );
 
-CREATE TABLE public.prices_pending_tasks (
-    prices_pending_task_id BIGSERIAL PRIMARY KEY,
-    prices_pending_task_entity_id TEXT NOT NULL,
-    prices_pending_task_type TEXT NOT NULL,
-    prices_pending_task_status TEXT NOT NULL DEFAULT 'pending',
-    prices_pending_task_priority INT NOT NULL DEFAULT 0,
-    prices_pending_task_max_attempts INT NOT NULL DEFAULT 3,
-    prices_pending_task_attempts INT NOT NULL DEFAULT 0,
-    prices_pending_task_last_error TEXT,
-    prices_pending_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    prices_pending_task_started_at TIMESTAMPTZ,
-    prices_pending_task_completed_at TIMESTAMPTZ,
-    UNIQUE (prices_pending_task_entity_id, prices_pending_task_type)
+CREATE TABLE public.prices_sync_tasks (
+    prices_sync_task_id BIGSERIAL PRIMARY KEY,
+    prices_sync_task_entity_id TEXT NOT NULL,
+    prices_sync_task_type TEXT NOT NULL,
+    prices_sync_task_status TEXT NOT NULL DEFAULT 'pending',
+    prices_sync_task_priority INT NOT NULL DEFAULT 0,
+    prices_sync_task_max_attempts INT NOT NULL DEFAULT 3,
+    prices_sync_task_attempts INT NOT NULL DEFAULT 0,
+    prices_sync_task_last_error TEXT,
+    prices_sync_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    prices_sync_task_started_at TIMESTAMPTZ,
+    prices_sync_task_completed_at TIMESTAMPTZ,
+    UNIQUE (prices_sync_task_entity_id, prices_sync_task_type)
 );
 
-CREATE TABLE public.postal_pending_tasks (
-    postal_pending_task_id BIGSERIAL PRIMARY KEY,
-    postal_pending_task_entity_id TEXT NOT NULL,
-    postal_pending_task_type TEXT NOT NULL,
-    postal_pending_task_status TEXT NOT NULL DEFAULT 'pending',
-    postal_pending_task_priority INT NOT NULL DEFAULT 0,
-    postal_pending_task_max_attempts INT NOT NULL DEFAULT 3,
-    postal_pending_task_attempts INT NOT NULL DEFAULT 0,
-    postal_pending_task_last_error TEXT,
-    postal_pending_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    postal_pending_task_started_at TIMESTAMPTZ,
-    postal_pending_task_completed_at TIMESTAMPTZ,
-    UNIQUE (postal_pending_task_entity_id, postal_pending_task_type)
+CREATE TABLE public.postal_sync_tasks (
+    postal_sync_task_id BIGSERIAL PRIMARY KEY,
+    postal_sync_task_entity_id TEXT NOT NULL,
+    postal_sync_task_type TEXT NOT NULL,
+    postal_sync_task_status TEXT NOT NULL DEFAULT 'pending',
+    postal_sync_task_priority INT NOT NULL DEFAULT 0,
+    postal_sync_task_max_attempts INT NOT NULL DEFAULT 3,
+    postal_sync_task_attempts INT NOT NULL DEFAULT 0,
+    postal_sync_task_last_error TEXT,
+    postal_sync_task_created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    postal_sync_task_started_at TIMESTAMPTZ,
+    postal_sync_task_completed_at TIMESTAMPTZ,
+    UNIQUE (postal_sync_task_entity_id, postal_sync_task_type)
 );
 
 -- Step 3: Remove old cron jobs

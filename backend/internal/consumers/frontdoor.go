@@ -15,7 +15,7 @@ const (
 )
 
 func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypeFrontdoorSitemapSync:
@@ -63,17 +63,17 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 }
 
 func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.UpsertFrontdoorPendingTask(ctx, db.UpsertFrontdoorPendingTaskParams{
-		FrontdoorPendingTaskEntityID:    entityID,
-		FrontdoorPendingTaskType:        taskType,
-		FrontdoorPendingTaskPriority:    int32(taskqueue.PriorityNormal),
-		FrontdoorPendingTaskMaxAttempts: int32(3),
+	task, err := c.queries.UpsertFrontdoorSyncTask(ctx, db.UpsertFrontdoorSyncTaskParams{
+		FrontdoorSyncTaskEntityID:    entityID,
+		FrontdoorSyncTaskType:        taskType,
+		FrontdoorSyncTaskPriority:    int32(taskqueue.PriorityNormal),
+		FrontdoorSyncTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
 		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
-		PendingTaskID: task.FrontdoorPendingTaskID,
+		SyncTaskID: task.FrontdoorSyncTaskID,
 		EntityID:      entityID,
 		TaskType:      taskType,
 	})

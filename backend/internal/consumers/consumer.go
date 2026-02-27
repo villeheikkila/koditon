@@ -117,21 +117,21 @@ func (c *Consumer) baseWorkerConfig() taskqueue.WorkerConfig {
 func (c *Consumer) frontdoorCallbacks() *taskqueue.StatusCallbacks {
 	return &taskqueue.StatusCallbacks{
 		OnProcessing: func(ctx context.Context, id int64) error {
-			return c.queries.UpdateFrontdoorPendingTaskToProcessing(ctx, id)
+			return c.queries.UpdateFrontdoorSyncTaskToProcessing(ctx, id)
 		},
 		OnCompleted: func(ctx context.Context, id int64) error {
-			return c.queries.UpdateFrontdoorPendingTaskToCompleted(ctx, id)
+			return c.queries.UpdateFrontdoorSyncTaskToCompleted(ctx, id)
 		},
 		OnFailed: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.UpdateFrontdoorPendingTaskToFailed(ctx, db.UpdateFrontdoorPendingTaskToFailedParams{
-				FrontdoorPendingTaskID:        id,
-				FrontdoorPendingTaskLastError: &errMsg,
+			return c.queries.UpdateFrontdoorSyncTaskToFailed(ctx, db.UpdateFrontdoorSyncTaskToFailedParams{
+				FrontdoorSyncTaskID:        id,
+				FrontdoorSyncTaskLastError: &errMsg,
 			})
 		},
 		OnRetry: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.ResetFrontdoorPendingTaskToPending(ctx, db.ResetFrontdoorPendingTaskToPendingParams{
-				FrontdoorPendingTaskID:        id,
-				FrontdoorPendingTaskLastError: &errMsg,
+			return c.queries.ResetFrontdoorSyncTaskToPending(ctx, db.ResetFrontdoorSyncTaskToPendingParams{
+				FrontdoorSyncTaskID:        id,
+				FrontdoorSyncTaskLastError: &errMsg,
 			})
 		},
 	}
@@ -140,21 +140,21 @@ func (c *Consumer) frontdoorCallbacks() *taskqueue.StatusCallbacks {
 func (c *Consumer) shortcutCallbacks() *taskqueue.StatusCallbacks {
 	return &taskqueue.StatusCallbacks{
 		OnProcessing: func(ctx context.Context, id int64) error {
-			return c.queries.UpdateShortcutPendingTaskToProcessing(ctx, id)
+			return c.queries.UpdateShortcutSyncTaskToProcessing(ctx, id)
 		},
 		OnCompleted: func(ctx context.Context, id int64) error {
-			return c.queries.UpdateShortcutPendingTaskToCompleted(ctx, id)
+			return c.queries.UpdateShortcutSyncTaskToCompleted(ctx, id)
 		},
 		OnFailed: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.UpdateShortcutPendingTaskToFailed(ctx, db.UpdateShortcutPendingTaskToFailedParams{
-				ShortcutPendingTaskID:        id,
-				ShortcutPendingTaskLastError: &errMsg,
+			return c.queries.UpdateShortcutSyncTaskToFailed(ctx, db.UpdateShortcutSyncTaskToFailedParams{
+				ShortcutSyncTaskID:        id,
+				ShortcutSyncTaskLastError: &errMsg,
 			})
 		},
 		OnRetry: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.ResetShortcutPendingTaskToPending(ctx, db.ResetShortcutPendingTaskToPendingParams{
-				ShortcutPendingTaskID:        id,
-				ShortcutPendingTaskLastError: &errMsg,
+			return c.queries.ResetShortcutSyncTaskToPending(ctx, db.ResetShortcutSyncTaskToPendingParams{
+				ShortcutSyncTaskID:        id,
+				ShortcutSyncTaskLastError: &errMsg,
 			})
 		},
 	}
@@ -163,21 +163,21 @@ func (c *Consumer) shortcutCallbacks() *taskqueue.StatusCallbacks {
 func (c *Consumer) pricesCallbacks() *taskqueue.StatusCallbacks {
 	return &taskqueue.StatusCallbacks{
 		OnProcessing: func(ctx context.Context, id int64) error {
-			return c.queries.UpdatePricesPendingTaskToProcessing(ctx, id)
+			return c.queries.UpdatePricesSyncTaskToProcessing(ctx, id)
 		},
 		OnCompleted: func(ctx context.Context, id int64) error {
-			return c.queries.UpdatePricesPendingTaskToCompleted(ctx, id)
+			return c.queries.UpdatePricesSyncTaskToCompleted(ctx, id)
 		},
 		OnFailed: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.UpdatePricesPendingTaskToFailed(ctx, db.UpdatePricesPendingTaskToFailedParams{
-				PricesPendingTaskID:        id,
-				PricesPendingTaskLastError: &errMsg,
+			return c.queries.UpdatePricesSyncTaskToFailed(ctx, db.UpdatePricesSyncTaskToFailedParams{
+				PricesSyncTaskID:        id,
+				PricesSyncTaskLastError: &errMsg,
 			})
 		},
 		OnRetry: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.ResetPricesPendingTaskToPending(ctx, db.ResetPricesPendingTaskToPendingParams{
-				PricesPendingTaskID:        id,
-				PricesPendingTaskLastError: &errMsg,
+			return c.queries.ResetPricesSyncTaskToPending(ctx, db.ResetPricesSyncTaskToPendingParams{
+				PricesSyncTaskID:        id,
+				PricesSyncTaskLastError: &errMsg,
 			})
 		},
 	}
@@ -186,21 +186,21 @@ func (c *Consumer) pricesCallbacks() *taskqueue.StatusCallbacks {
 func (c *Consumer) postalCallbacks() *taskqueue.StatusCallbacks {
 	return &taskqueue.StatusCallbacks{
 		OnProcessing: func(ctx context.Context, id int64) error {
-			return c.queries.UpdatePostalPendingTaskToProcessing(ctx, id)
+			return c.queries.UpdatePostalSyncTaskToProcessing(ctx, id)
 		},
 		OnCompleted: func(ctx context.Context, id int64) error {
-			return c.queries.UpdatePostalPendingTaskToCompleted(ctx, id)
+			return c.queries.UpdatePostalSyncTaskToCompleted(ctx, id)
 		},
 		OnFailed: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.UpdatePostalPendingTaskToFailed(ctx, db.UpdatePostalPendingTaskToFailedParams{
-				PostalPendingTaskID:        id,
-				PostalPendingTaskLastError: &errMsg,
+			return c.queries.UpdatePostalSyncTaskToFailed(ctx, db.UpdatePostalSyncTaskToFailedParams{
+				PostalSyncTaskID:        id,
+				PostalSyncTaskLastError: &errMsg,
 			})
 		},
 		OnRetry: func(ctx context.Context, id int64, errMsg string) error {
-			return c.queries.ResetPostalPendingTaskToPending(ctx, db.ResetPostalPendingTaskToPendingParams{
-				PostalPendingTaskID:        id,
-				PostalPendingTaskLastError: &errMsg,
+			return c.queries.ResetPostalSyncTaskToPending(ctx, db.ResetPostalSyncTaskToPendingParams{
+				PostalSyncTaskID:        id,
+				PostalSyncTaskLastError: &errMsg,
 			})
 		},
 	}

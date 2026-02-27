@@ -18,7 +18,7 @@ const (
 )
 
 func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypePricesCitiesInit:
@@ -95,17 +95,17 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger)
 }
 
 func (c *Consumer) enqueuePricesTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.UpsertPricesPendingTask(ctx, db.UpsertPricesPendingTaskParams{
-		PricesPendingTaskEntityID:    entityID,
-		PricesPendingTaskType:        taskType,
-		PricesPendingTaskPriority:    int32(taskqueue.PriorityNormal),
-		PricesPendingTaskMaxAttempts: int32(3),
+	task, err := c.queries.UpsertPricesSyncTask(ctx, db.UpsertPricesSyncTaskParams{
+		PricesSyncTaskEntityID:    entityID,
+		PricesSyncTaskType:        taskType,
+		PricesSyncTaskPriority:    int32(taskqueue.PriorityNormal),
+		PricesSyncTaskMaxAttempts: int32(3),
 	})
 	if err != nil {
 		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
-		PendingTaskID: task.PricesPendingTaskID,
+		SyncTaskID: task.PricesSyncTaskID,
 		EntityID:      entityID,
 		TaskType:      taskType,
 	})

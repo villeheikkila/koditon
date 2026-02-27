@@ -27,7 +27,7 @@ const (
 var ErrNoRows = pgmq.ErrNoRows
 
 type MessageData struct {
-	PendingTaskID int64  `json:"pending_task_id"`
+	SyncTaskID int64  `json:"sync_task_id"`
 	EntityID      string `json:"entity_id"`
 	TaskType      string `json:"task_type"`
 	Attempt       int32  `json:"attempt"`

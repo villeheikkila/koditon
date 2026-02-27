@@ -13,7 +13,7 @@ const (
 )
 
 func (c *Consumer) handlePostalTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "pending_task_id", msg.Data.PendingTaskID)
+	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypePostalSync:
