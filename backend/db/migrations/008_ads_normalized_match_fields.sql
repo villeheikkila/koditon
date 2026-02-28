@@ -1,22 +1,28 @@
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+        CREATE EXTENSION pg_trgm;
+    END IF;
+END;
+$$;
 
 ALTER TABLE public.shortcut_ads
-ADD COLUMN shortcut_ad_street_address text,
-ADD COLUMN shortcut_ad_city text,
-ADD COLUMN shortcut_ad_postal text,
-ADD COLUMN shortcut_ad_price int8,
-ADD COLUMN shortcut_ad_area_value float8,
-ADD COLUMN shortcut_ad_address_key text,
-ADD COLUMN shortcut_ad_search_text text;
+ADD COLUMN IF NOT EXISTS shortcut_ad_street_address text,
+ADD COLUMN IF NOT EXISTS shortcut_ad_city text,
+ADD COLUMN IF NOT EXISTS shortcut_ad_postal text,
+ADD COLUMN IF NOT EXISTS shortcut_ad_price int8,
+ADD COLUMN IF NOT EXISTS shortcut_ad_area_value float8,
+ADD COLUMN IF NOT EXISTS shortcut_ad_address_key text,
+ADD COLUMN IF NOT EXISTS shortcut_ad_search_text text;
 
 ALTER TABLE public.frontdoor_ads
-ADD COLUMN frontdoor_ad_street_address text,
-ADD COLUMN frontdoor_ad_city text,
-ADD COLUMN frontdoor_ad_postal text,
-ADD COLUMN frontdoor_ad_price int8,
-ADD COLUMN frontdoor_ad_area_value float8,
-ADD COLUMN frontdoor_ad_address_key text,
-ADD COLUMN frontdoor_ad_search_text text;
+ADD COLUMN IF NOT EXISTS frontdoor_ad_street_address text,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_city text,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_postal text,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_price int8,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_area_value float8,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_address_key text,
+ADD COLUMN IF NOT EXISTS frontdoor_ad_search_text text;
 
 CREATE OR REPLACE FUNCTION public.fnc__normalize_match_text(value text)
 RETURNS text
@@ -251,16 +257,16 @@ FROM (
 ) src
 WHERE fa.frontdoor_ad_id = src.frontdoor_ad_id;
 
-CREATE INDEX idx_shortcut_ads_address_key ON public.shortcut_ads(shortcut_ad_address_key);
-CREATE INDEX idx_shortcut_ads_postal ON public.shortcut_ads(shortcut_ad_postal);
-CREATE INDEX idx_shortcut_ads_price ON public.shortcut_ads(shortcut_ad_price);
-CREATE INDEX idx_shortcut_ads_area_value ON public.shortcut_ads(shortcut_ad_area_value);
-CREATE INDEX idx_shortcut_ads_street_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_street_address) gin_trgm_ops);
-CREATE INDEX idx_shortcut_ads_search_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_search_text) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_address_key ON public.shortcut_ads(shortcut_ad_address_key);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_postal ON public.shortcut_ads(shortcut_ad_postal);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_price ON public.shortcut_ads(shortcut_ad_price);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_area_value ON public.shortcut_ads(shortcut_ad_area_value);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_street_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_street_address) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_shortcut_ads_search_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_search_text) gin_trgm_ops);
 
-CREATE INDEX idx_frontdoor_ads_address_key ON public.frontdoor_ads(frontdoor_ad_address_key);
-CREATE INDEX idx_frontdoor_ads_postal ON public.frontdoor_ads(frontdoor_ad_postal);
-CREATE INDEX idx_frontdoor_ads_price ON public.frontdoor_ads(frontdoor_ad_price);
-CREATE INDEX idx_frontdoor_ads_area_value ON public.frontdoor_ads(frontdoor_ad_area_value);
-CREATE INDEX idx_frontdoor_ads_street_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_street_address) gin_trgm_ops);
-CREATE INDEX idx_frontdoor_ads_search_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_search_text) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_address_key ON public.frontdoor_ads(frontdoor_ad_address_key);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_postal ON public.frontdoor_ads(frontdoor_ad_postal);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_price ON public.frontdoor_ads(frontdoor_ad_price);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_area_value ON public.frontdoor_ads(frontdoor_ad_area_value);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_street_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_street_address) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_frontdoor_ads_search_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_search_text) gin_trgm_ops);

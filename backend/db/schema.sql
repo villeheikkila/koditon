@@ -1,3 +1,6 @@
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
 create table public.frontdoor_ads (
   frontdoor_ad_id uuid default gen_random_uuid() not null constraint frontdoor_ads_pkey primary key,
   frontdoor_ad_external_id text not null constraint frontdoor_ads_frontdoor_ads_external_id_key unique,
@@ -131,6 +134,21 @@ CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings
 CREATE INDEX idx_frontdoor_building_business_id ON public.frontdoor_buildings USING btree (frontdoor_building_business_id);
 CREATE INDEX idx_frontdoor_building_processed_at ON public.frontdoor_buildings USING btree (frontdoor_building_processed_at);
 
+create table public.frontdoor_sync_tasks (
+  frontdoor_sync_task_id bigint default nextval('frontdoor_sync_tasks_frontdoor_sync_task_id_seq'::regclass) not null constraint frontdoor_sync_tasks_pkey primary key,
+  frontdoor_sync_task_entity_id text not null,
+  frontdoor_sync_task_type text not null,
+  frontdoor_sync_task_status text default 'pending'::text not null,
+  frontdoor_sync_task_priority integer default 0 not null,
+  frontdoor_sync_task_max_attempts integer default 3 not null,
+  frontdoor_sync_task_attempts integer default 0 not null,
+  frontdoor_sync_task_last_error text,
+  frontdoor_sync_task_created_at timestamp with time zone default now() not null,
+  frontdoor_sync_task_started_at timestamp with time zone,
+  frontdoor_sync_task_completed_at timestamp with time zone,
+  constraint frontdoor_sync_tasks_frontdoor_sync_task_entity_id_frontdoo_key UNIQUE (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
+);
+
 create table public.postal_ad_areas (
   postal_ad_area_id uuid default uuid_generate_v4() not null constraint postal_ad_areas_pkey primary key,
   postal_ad_area_code text not null constraint postal_ad_areas_postal_ad_areas_code_key unique,
@@ -174,6 +192,21 @@ CREATE INDEX idx_postal_postal_code_municipality_id ON public.postal_postal_code
 CREATE INDEX idx_postal_postal_code_name_fi ON public.postal_postal_codes USING btree (postal_postal_code_name_fi);
 CREATE INDEX idx_postal_postal_code_neighborhood_fi ON public.postal_postal_codes USING btree (postal_postal_code_neighborhood_fi);
 
+create table public.postal_sync_tasks (
+  postal_sync_task_id bigint default nextval('postal_sync_tasks_postal_sync_task_id_seq'::regclass) not null constraint postal_sync_tasks_pkey primary key,
+  postal_sync_task_entity_id text not null,
+  postal_sync_task_type text not null,
+  postal_sync_task_status text default 'pending'::text not null,
+  postal_sync_task_priority integer default 0 not null,
+  postal_sync_task_max_attempts integer default 3 not null,
+  postal_sync_task_attempts integer default 0 not null,
+  postal_sync_task_last_error text,
+  postal_sync_task_created_at timestamp with time zone default now() not null,
+  postal_sync_task_started_at timestamp with time zone,
+  postal_sync_task_completed_at timestamp with time zone,
+  constraint postal_sync_tasks_postal_sync_task_entity_id_postal_sync_ta_key UNIQUE (postal_sync_task_entity_id, postal_sync_task_type)
+);
+
 create table public.prices_cities (
   prices_city_id uuid default uuid_generate_v4() not null constraint prices_cities_pkey primary key,
   prices_city_name text not null constraint prices_cities_prices_cities_name_key unique,
@@ -200,6 +233,21 @@ create table public.prices_postal_codes (
   prices_city_id uuid not null constraint prices_postal_codes_prices_postal_codes_city_id_fkey references prices_cities(prices_city_id),
   prices_postal_code_created_at timestamp with time zone default now() not null,
   prices_postal_code_updated_at timestamp with time zone default now() not null
+);
+
+create table public.prices_sync_tasks (
+  prices_sync_task_id bigint default nextval('prices_sync_tasks_prices_sync_task_id_seq'::regclass) not null constraint prices_sync_tasks_pkey primary key,
+  prices_sync_task_entity_id text not null,
+  prices_sync_task_type text not null,
+  prices_sync_task_status text default 'pending'::text not null,
+  prices_sync_task_priority integer default 0 not null,
+  prices_sync_task_max_attempts integer default 3 not null,
+  prices_sync_task_attempts integer default 0 not null,
+  prices_sync_task_last_error text,
+  prices_sync_task_created_at timestamp with time zone default now() not null,
+  prices_sync_task_started_at timestamp with time zone,
+  prices_sync_task_completed_at timestamp with time zone,
+  constraint prices_sync_tasks_prices_sync_task_entity_id_prices_sync_ta_key UNIQUE (prices_sync_task_entity_id, prices_sync_task_type)
 );
 
 create table public.prices_transactions (
@@ -323,6 +371,21 @@ create table public.shortcut_buildings (
 
 CREATE INDEX shortcut_building_geom_idx ON public.shortcut_buildings USING gist (shortcut_building_geom);
 
+create table public.shortcut_sync_tasks (
+  shortcut_sync_task_id bigint default nextval('shortcut_sync_tasks_shortcut_sync_task_id_seq'::regclass) not null constraint shortcut_sync_tasks_pkey primary key,
+  shortcut_sync_task_entity_id text not null,
+  shortcut_sync_task_type text not null,
+  shortcut_sync_task_status text default 'pending'::text not null,
+  shortcut_sync_task_priority integer default 0 not null,
+  shortcut_sync_task_max_attempts integer default 3 not null,
+  shortcut_sync_task_attempts integer default 0 not null,
+  shortcut_sync_task_last_error text,
+  shortcut_sync_task_created_at timestamp with time zone default now() not null,
+  shortcut_sync_task_started_at timestamp with time zone,
+  shortcut_sync_task_completed_at timestamp with time zone,
+  constraint shortcut_sync_tasks_shortcut_sync_task_entity_id_shortcut_s_key UNIQUE (shortcut_sync_task_entity_id, shortcut_sync_task_type)
+);
+
 create table public.shortcut_tokens (
   shortcut_token_id uuid default gen_random_uuid() not null constraint shortcut_tokens_pkey primary key,
   shortcut_token_cuid text not null constraint shortcut_token_cuid_key unique,
@@ -335,64 +398,4 @@ create table public.shortcut_tokens (
 
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
-
-create table public.frontdoor_sync_tasks (
-  frontdoor_sync_task_id bigserial not null constraint frontdoor_sync_tasks_pkey primary key,
-  frontdoor_sync_task_entity_id text not null,
-  frontdoor_sync_task_type text not null,
-  frontdoor_sync_task_status text not null default 'pending',
-  frontdoor_sync_task_priority integer not null default 0,
-  frontdoor_sync_task_max_attempts integer not null default 3,
-  frontdoor_sync_task_attempts integer not null default 0,
-  frontdoor_sync_task_last_error text,
-  frontdoor_sync_task_created_at timestamp with time zone not null default now(),
-  frontdoor_sync_task_started_at timestamp with time zone,
-  frontdoor_sync_task_completed_at timestamp with time zone,
-  constraint frontdoor_sync_tasks_entity_type_key unique (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
-);
-
-create table public.shortcut_sync_tasks (
-  shortcut_sync_task_id bigserial not null constraint shortcut_sync_tasks_pkey primary key,
-  shortcut_sync_task_entity_id text not null,
-  shortcut_sync_task_type text not null,
-  shortcut_sync_task_status text not null default 'pending',
-  shortcut_sync_task_priority integer not null default 0,
-  shortcut_sync_task_max_attempts integer not null default 3,
-  shortcut_sync_task_attempts integer not null default 0,
-  shortcut_sync_task_last_error text,
-  shortcut_sync_task_created_at timestamp with time zone not null default now(),
-  shortcut_sync_task_started_at timestamp with time zone,
-  shortcut_sync_task_completed_at timestamp with time zone,
-  constraint shortcut_sync_tasks_entity_type_key unique (shortcut_sync_task_entity_id, shortcut_sync_task_type)
-);
-
-create table public.prices_sync_tasks (
-  prices_sync_task_id bigserial not null constraint prices_sync_tasks_pkey primary key,
-  prices_sync_task_entity_id text not null,
-  prices_sync_task_type text not null,
-  prices_sync_task_status text not null default 'pending',
-  prices_sync_task_priority integer not null default 0,
-  prices_sync_task_max_attempts integer not null default 3,
-  prices_sync_task_attempts integer not null default 0,
-  prices_sync_task_last_error text,
-  prices_sync_task_created_at timestamp with time zone not null default now(),
-  prices_sync_task_started_at timestamp with time zone,
-  prices_sync_task_completed_at timestamp with time zone,
-  constraint prices_sync_tasks_entity_type_key unique (prices_sync_task_entity_id, prices_sync_task_type)
-);
-
-create table public.postal_sync_tasks (
-  postal_sync_task_id bigserial not null constraint postal_sync_tasks_pkey primary key,
-  postal_sync_task_entity_id text not null,
-  postal_sync_task_type text not null,
-  postal_sync_task_status text not null default 'pending',
-  postal_sync_task_priority integer not null default 0,
-  postal_sync_task_max_attempts integer not null default 3,
-  postal_sync_task_attempts integer not null default 0,
-  postal_sync_task_last_error text,
-  postal_sync_task_created_at timestamp with time zone not null default now(),
-  postal_sync_task_started_at timestamp with time zone,
-  postal_sync_task_completed_at timestamp with time zone,
-  constraint postal_sync_tasks_entity_type_key unique (postal_sync_task_entity_id, postal_sync_task_type)
-);
 

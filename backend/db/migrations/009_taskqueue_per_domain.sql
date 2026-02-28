@@ -3,17 +3,29 @@
 -- of entity sync status. One row per (entity_id, task_type) — reused across sync cycles.
 
 -- Step 1: Create per-domain pgmq queues
-SELECT pgmq.create('frontdoor');
-SELECT pgmq.create('shortcut');
-SELECT pgmq.create('prices');
-SELECT pgmq.create('postal');
+DO $$
+BEGIN
+    IF to_regclass('pgmq.q_frontdoor') IS NULL THEN
+        PERFORM pgmq.create('frontdoor');
+    END IF;
+    IF to_regclass('pgmq.q_shortcut') IS NULL THEN
+        PERFORM pgmq.create('shortcut');
+    END IF;
+    IF to_regclass('pgmq.q_prices') IS NULL THEN
+        PERFORM pgmq.create('prices');
+    END IF;
+    IF to_regclass('pgmq.q_postal') IS NULL THEN
+        PERFORM pgmq.create('postal');
+    END IF;
+END;
+$$;
 
 -- Step 2: Create per-domain sync_tasks tables
 -- Key design: UNIQUE (entity_id, task_type) — one row per entity, reused across cycles.
 -- The upsert resets completed/failed rows to pending; skips already-active rows.
 -- Table size is bounded by number of entities, not number of sync runs.
 
-CREATE TABLE public.frontdoor_sync_tasks (
+CREATE TABLE IF NOT EXISTS public.frontdoor_sync_tasks (
     frontdoor_sync_task_id BIGSERIAL PRIMARY KEY,
     frontdoor_sync_task_entity_id TEXT NOT NULL,
     frontdoor_sync_task_type TEXT NOT NULL,
@@ -28,7 +40,7 @@ CREATE TABLE public.frontdoor_sync_tasks (
     UNIQUE (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
 );
 
-CREATE TABLE public.shortcut_sync_tasks (
+CREATE TABLE IF NOT EXISTS public.shortcut_sync_tasks (
     shortcut_sync_task_id BIGSERIAL PRIMARY KEY,
     shortcut_sync_task_entity_id TEXT NOT NULL,
     shortcut_sync_task_type TEXT NOT NULL,
@@ -43,7 +55,7 @@ CREATE TABLE public.shortcut_sync_tasks (
     UNIQUE (shortcut_sync_task_entity_id, shortcut_sync_task_type)
 );
 
-CREATE TABLE public.prices_sync_tasks (
+CREATE TABLE IF NOT EXISTS public.prices_sync_tasks (
     prices_sync_task_id BIGSERIAL PRIMARY KEY,
     prices_sync_task_entity_id TEXT NOT NULL,
     prices_sync_task_type TEXT NOT NULL,
@@ -58,7 +70,7 @@ CREATE TABLE public.prices_sync_tasks (
     UNIQUE (prices_sync_task_entity_id, prices_sync_task_type)
 );
 
-CREATE TABLE public.postal_sync_tasks (
+CREATE TABLE IF NOT EXISTS public.postal_sync_tasks (
     postal_sync_task_id BIGSERIAL PRIMARY KEY,
     postal_sync_task_entity_id TEXT NOT NULL,
     postal_sync_task_type TEXT NOT NULL,
@@ -74,21 +86,27 @@ CREATE TABLE public.postal_sync_tasks (
 );
 
 -- Step 3: Remove old cron jobs
-SELECT cron.unschedule(jobname)
-FROM cron.job
-WHERE jobname IN (
-    'trigger-frontdoor-sitemap-sync',
-    'trigger-frontdoor-daily-syncs',
-    'cleanup-old-completed-tasks',
-    'requeue-stuck-tasks',
-    'trigger-shortcut-sitemap-sync',
-    'trigger-shortcut-daily-scraper-syncs',
-    'trigger-shortcut-daily-api-syncs',
-    'trigger-prices-cities-init',
-    'trigger-prices-daily-syncs',
-    'trigger-prices-sync-all',
-    'trigger-prices-neighborhood-postal-code-sync'
-);
+DO $$
+BEGIN
+    IF to_regclass('cron.job') IS NOT NULL AND to_regprocedure('cron.unschedule(text)') IS NOT NULL THEN
+        PERFORM cron.unschedule(jobname)
+        FROM cron.job
+        WHERE jobname IN (
+            'trigger-frontdoor-sitemap-sync',
+            'trigger-frontdoor-daily-syncs',
+            'cleanup-old-completed-tasks',
+            'requeue-stuck-tasks',
+            'trigger-shortcut-sitemap-sync',
+            'trigger-shortcut-daily-scraper-syncs',
+            'trigger-shortcut-daily-api-syncs',
+            'trigger-prices-cities-init',
+            'trigger-prices-daily-syncs',
+            'trigger-prices-sync-all',
+            'trigger-prices-neighborhood-postal-code-sync'
+        );
+    END IF;
+END;
+$$;
 
 -- Step 4: Drop old task_queue views first (views depend on tables)
 DROP VIEW IF EXISTS task_queue.vw_entity_sync_health CASCADE;
@@ -122,7 +140,13 @@ DROP TABLE IF EXISTS task_queue.task_type_entity_type_mapping CASCADE;
 DROP TABLE IF EXISTS task_queue.entity_registry CASCADE;
 
 -- Step 7: Drop old pgmq queues
-SELECT pgmq.drop_queue('tasks');
+DO $$
+BEGIN
+    IF to_regclass('pgmq.q_tasks') IS NOT NULL THEN
+        PERFORM pgmq.drop_queue('tasks');
+    END IF;
+END;
+$$;
 
 -- Step 8: Drop old schema
 DROP SCHEMA IF EXISTS task_queue CASCADE;
