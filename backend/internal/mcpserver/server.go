@@ -16,6 +16,7 @@ import (
 
 type Server struct {
 	mcpServer  *server.MCPServer
+	pool       *pgxpool.Pool
 	adsSvc     *ads.Service
 	queries    *db.Queries
 	cfg        config.Config
@@ -25,6 +26,7 @@ type Server struct {
 
 func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) *Server {
 	s := &Server{
+		pool:    pool,
 		adsSvc:  ads.NewService(pool),
 		queries: db.New(pool),
 		cfg:     cfg,
@@ -106,6 +108,47 @@ func (s *Server) registerTools() {
 			mcp.WithNumber("limit", mcp.Description("Maximum results (default 200)")),
 		),
 		s.handleSearchTransactions,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool("search_transactions_advanced",
+			mcp.WithDescription("Advanced prices transaction search with exact filters and flexible free-text"),
+			mcp.WithString("city", mcp.Description("Optional city filter (partial match)")),
+			mcp.WithString("query", mcp.Description("Optional free-text filter over address/neighborhood/postal/category/type")),
+			mcp.WithArray("municipality_ids", mcp.Description("Optional municipality UUID filters"), mcp.WithStringItems()),
+			mcp.WithArray("postal_code_ids", mcp.Description("Optional postal code UUID filters"), mcp.WithStringItems()),
+			mcp.WithArray("postal_codes", mcp.Description("Optional postal code text filters"), mcp.WithStringItems()),
+			mcp.WithArray("categories", mcp.Description("Optional transaction category filters"), mcp.WithStringItems()),
+			mcp.WithArray("types", mcp.Description("Optional transaction type filters"), mcp.WithStringItems()),
+			mcp.WithNumber("min_price", mcp.Description("Minimum toteutunut hinta in euros")),
+			mcp.WithNumber("max_price", mcp.Description("Maximum toteutunut hinta in euros")),
+			mcp.WithNumber("min_area", mcp.Description("Minimum area in square meters")),
+			mcp.WithNumber("max_area", mcp.Description("Maximum area in square meters")),
+			mcp.WithString("sort", mcp.Description("Sort mode: date_desc, date_asc, price_desc, price_asc, area_desc, area_asc")),
+			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default 200, max 5000)")),
+		),
+		s.handleSearchTransactionsAdvanced,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool("match_ads_from_transaction",
+			mcp.WithDescription("Find matching shortcut/frontdoor ads/buildings for a prices transaction using postal code, area and flexible room-layout hints"),
+			mcp.WithString("transaction_id", mcp.Description("Optional prices_transaction_id UUID; when set, transaction context is loaded automatically")),
+			mcp.WithString("city", mcp.Description("Optional city override/filter")),
+			mcp.WithString("postal_code", mcp.Description("Optional postal code override/filter")),
+			mcp.WithNumber("area", mcp.Description("Optional target area in square meters")),
+			mcp.WithNumber("price", mcp.Description("Optional target toteutunut hinta in euros")),
+			mcp.WithString("room_hint", mcp.Description("Optional room layout hint, supports partial/truncated values")),
+			mcp.WithString("query", mcp.Description("Optional extra text query for listing search")),
+			mcp.WithString("source", mcp.Description("Source filter: shortcut, frontdoor, all")),
+			mcp.WithString("kind", mcp.Description("Kind filter: ad, building, announcement, all")),
+			mcp.WithString("listing_type", mcp.Description("Listing type filter: listing, rental, all")),
+			mcp.WithNumber("area_tolerance", mcp.Description("Area tolerance in square meters around target area (default 8.0)")),
+			mcp.WithNumber("price_tolerance_pct", mcp.Description("Price tolerance percentage around target price (default 0.35 = 35%)")),
+			mcp.WithNumber("max_candidates", mcp.Description("Ads search candidate window: 25, 50, 100 (default 100)")),
+			mcp.WithNumber("max_results", mcp.Description("Final ranked matches to return (default 20, max 100)")),
+		),
+		s.handleMatchAdsFromTransaction,
 	)
 
 	s.mcpServer.AddTool(

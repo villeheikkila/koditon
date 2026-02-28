@@ -97,6 +97,8 @@ type Service struct {
 	queries *db.Queries
 }
 
+var ErrNotFound = errors.New("ads detail not found")
+
 func NewService(dbtx db.DBTX) *Service {
 	return &Service{queries: db.New(dbtx)}
 }
@@ -187,7 +189,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, adID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return UnifiedEntityDetail{}, fmt.Errorf("shortcut ad not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("%w: shortcut ad", ErrNotFound)
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
@@ -205,7 +207,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, buildingID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return UnifiedEntityDetail{}, fmt.Errorf("shortcut building not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("%w: shortcut building", ErrNotFound)
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut building detail: %w", err)
 			}
@@ -224,7 +226,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			row, err := s.queries.GetFrontdoorAdUnifiedDetail(ctx, nativeID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor ad not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("%w: frontdoor ad", ErrNotFound)
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
 			}
@@ -241,7 +243,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, announcementID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor announcement not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("%w: frontdoor announcement", ErrNotFound)
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor announcement detail: %w", err)
 			}
@@ -259,7 +261,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, buildingID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					return UnifiedEntityDetail{}, fmt.Errorf("frontdoor building not found")
+					return UnifiedEntityDetail{}, fmt.Errorf("%w: frontdoor building", ErrNotFound)
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor building detail: %w", err)
 			}
