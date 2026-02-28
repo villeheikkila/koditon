@@ -23,7 +23,28 @@ create table public.frontdoor_ads (
   frontdoor_ad_price bigint,
   frontdoor_ad_area_value double precision,
   frontdoor_ad_address_key text,
-  frontdoor_ad_search_text text
+  frontdoor_ad_search_text text,
+  frontdoor_ad_description_text text,
+  frontdoor_ad_availability_text text,
+  frontdoor_ad_renovations_done_text text,
+  frontdoor_ad_renovations_planned_text text,
+  frontdoor_ad_additional_info_text text,
+  frontdoor_ad_charges_text text,
+  frontdoor_ad_maintenance_charge_monthly double precision,
+  frontdoor_ad_total_charge_monthly double precision,
+  frontdoor_ad_water_charge double precision,
+  frontdoor_ad_debt_free_price bigint,
+  frontdoor_ad_debt_share_amount bigint,
+  frontdoor_ad_price_per_m2 double precision,
+  frontdoor_ad_floor_level integer,
+  frontdoor_ad_total_floors integer,
+  frontdoor_ad_build_year integer,
+  frontdoor_ad_condition text,
+  frontdoor_ad_energy_class text,
+  frontdoor_ad_plot_type text,
+  frontdoor_ad_elevator boolean,
+  frontdoor_ad_sauna boolean,
+  frontdoor_ad_rooms_count integer
 );
 
 CREATE INDEX idx_frontdoor_ad_page_not_found ON public.frontdoor_ads USING btree (frontdoor_ad_page_not_found);
@@ -31,6 +52,9 @@ CREATE INDEX idx_frontdoor_ad_postal_postal_code_id ON public.frontdoor_ads USIN
 CREATE INDEX idx_frontdoor_ad_processed_at ON public.frontdoor_ads USING btree (frontdoor_ad_processed_at);
 CREATE INDEX idx_frontdoor_ads_address_key ON public.frontdoor_ads USING btree (frontdoor_ad_address_key);
 CREATE INDEX idx_frontdoor_ads_area_value ON public.frontdoor_ads USING btree (frontdoor_ad_area_value);
+CREATE INDEX idx_frontdoor_ads_build_year ON public.frontdoor_ads USING btree (frontdoor_ad_build_year);
+CREATE INDEX idx_frontdoor_ads_floor_level ON public.frontdoor_ads USING btree (frontdoor_ad_floor_level);
+CREATE INDEX idx_frontdoor_ads_maintenance_charge ON public.frontdoor_ads USING btree (frontdoor_ad_maintenance_charge_monthly);
 CREATE INDEX idx_frontdoor_ads_postal ON public.frontdoor_ads USING btree (frontdoor_ad_postal);
 CREATE INDEX idx_frontdoor_ads_price ON public.frontdoor_ads USING btree (frontdoor_ad_price);
 CREATE INDEX idx_frontdoor_ads_search_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_search_text) gin_trgm_ops);
@@ -297,12 +321,36 @@ create table public.shortcut_ads (
   shortcut_ad_price bigint,
   shortcut_ad_area_value double precision,
   shortcut_ad_address_key text,
-  shortcut_ad_search_text text
+  shortcut_ad_search_text text,
+  shortcut_ad_description_text text,
+  shortcut_ad_availability_text text,
+  shortcut_ad_renovations_done_text text,
+  shortcut_ad_renovations_planned_text text,
+  shortcut_ad_additional_info_text text,
+  shortcut_ad_charges_text text,
+  shortcut_ad_maintenance_charge_monthly double precision,
+  shortcut_ad_total_charge_monthly double precision,
+  shortcut_ad_water_charge double precision,
+  shortcut_ad_debt_free_price bigint,
+  shortcut_ad_debt_share_amount bigint,
+  shortcut_ad_price_per_m2 double precision,
+  shortcut_ad_floor_level integer,
+  shortcut_ad_total_floors integer,
+  shortcut_ad_build_year integer,
+  shortcut_ad_condition text,
+  shortcut_ad_energy_class text,
+  shortcut_ad_plot_type text,
+  shortcut_ad_elevator boolean,
+  shortcut_ad_sauna boolean,
+  shortcut_ad_rooms_count integer
 );
 
 CREATE INDEX idx_shortcut_ad_zipcode_name ON public.shortcut_ads USING btree (((((shortcut_ad_data -> 'address'::text) -> 'zipCode'::text) ->> 'name'::text)));
 CREATE INDEX idx_shortcut_ads_address_key ON public.shortcut_ads USING btree (shortcut_ad_address_key);
 CREATE INDEX idx_shortcut_ads_area_value ON public.shortcut_ads USING btree (shortcut_ad_area_value);
+CREATE INDEX idx_shortcut_ads_build_year ON public.shortcut_ads USING btree (shortcut_ad_build_year);
+CREATE INDEX idx_shortcut_ads_floor_level ON public.shortcut_ads USING btree (shortcut_ad_floor_level);
+CREATE INDEX idx_shortcut_ads_maintenance_charge ON public.shortcut_ads USING btree (shortcut_ad_maintenance_charge_monthly);
 CREATE INDEX idx_shortcut_ads_postal ON public.shortcut_ads USING btree (shortcut_ad_postal);
 CREATE INDEX idx_shortcut_ads_price ON public.shortcut_ads USING btree (shortcut_ad_price);
 CREATE INDEX idx_shortcut_ads_search_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_search_text) gin_trgm_ops);

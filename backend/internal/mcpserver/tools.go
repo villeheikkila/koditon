@@ -115,8 +115,8 @@ func (s *Server) handleGetListingDetail(ctx context.Context, request mcp.CallToo
 		}
 		return nil, fmt.Errorf("get listing detail: %w", err)
 	}
-
-	return jsonResult(buildDetailResult(detail))
+	includeRawJSON := boolArg(args, "include_raw_json")
+	return jsonResult(buildDetailResult(detail, includeRawJSON))
 }
 
 func (s *Server) handleSearchTransactions(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -706,17 +706,20 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-func buildDetailResult(detail ads.UnifiedEntityDetail) any {
+func buildDetailResult(detail ads.UnifiedEntityDetail, includeRawJSON bool) any {
 	result := map[string]any{
 		"canonical":       detail.Canonical,
 		"canonical_extra": detail.CanonicalExtra,
 		"source_specific": detail.SourceSpecific,
 		"related":         detail.Related,
+		"normalized":      detail.Normalized,
 		"raw":             detail.Raw,
 	}
-	rawJSON := parseJSON(detail.Raw.Pretty)
-	if rawJSON != nil {
-		result["raw_json"] = rawJSON
+	if includeRawJSON {
+		rawJSON := parseJSON(detail.Raw.Pretty)
+		if rawJSON != nil {
+			result["raw_json"] = rawJSON
+		}
 	}
 	return result
 }
@@ -1091,6 +1094,14 @@ func uuidArrayArg(args map[string]any, key string) ([]uuid.UUID, error) {
 func numberArg(args map[string]any, key string) (float64, bool) {
 	v, ok := args[key].(float64)
 	return v, ok
+}
+
+func boolArg(args map[string]any, key string) bool {
+	v, ok := args[key].(bool)
+	if !ok {
+		return false
+	}
+	return v
 }
 
 func int32Arg(args map[string]any, key string, min, max int64) (int32, bool, error) {

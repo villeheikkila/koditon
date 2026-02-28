@@ -1,6 +1,11 @@
 package mcpserver
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"koditon-go/internal/ads"
+)
 
 func TestInt32Arg(t *testing.T) {
 	t.Parallel()
@@ -75,5 +80,50 @@ func TestInt64Arg(t *testing.T) {
 				t.Fatalf("value mismatch: got %d want %d", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildDetailResultOmitsRawJSONByDefault(t *testing.T) {
+	t.Parallel()
+	detail := ads.UnifiedEntityDetail{
+		Canonical: ads.UnifiedCanonicalFields{
+			CanonicalID: "frontdoor:ad:1",
+			Source:      "frontdoor",
+			Kind:        "ad",
+			NativeID:    "1",
+			LastSeenAt:  time.Now(),
+		},
+		Raw: ads.RawPayload{Pretty: `{"foo":"bar"}`},
+	}
+	result, ok := buildDetailResult(detail, false).(map[string]any)
+	if !ok {
+		t.Fatalf("expected map result")
+	}
+	if _, exists := result["raw_json"]; exists {
+		t.Fatalf("expected raw_json to be omitted")
+	}
+	if _, exists := result["normalized"]; !exists {
+		t.Fatalf("expected normalized field")
+	}
+}
+
+func TestBuildDetailResultIncludesRawJSONWhenRequested(t *testing.T) {
+	t.Parallel()
+	detail := ads.UnifiedEntityDetail{
+		Canonical: ads.UnifiedCanonicalFields{
+			CanonicalID: "frontdoor:ad:1",
+			Source:      "frontdoor",
+			Kind:        "ad",
+			NativeID:    "1",
+			LastSeenAt:  time.Now(),
+		},
+		Raw: ads.RawPayload{Pretty: `{"foo":"bar"}`},
+	}
+	result, ok := buildDetailResult(detail, true).(map[string]any)
+	if !ok {
+		t.Fatalf("expected map result")
+	}
+	if _, exists := result["raw_json"]; !exists {
+		t.Fatalf("expected raw_json to be present")
 	}
 }

@@ -88,7 +88,7 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool("get_listing_detail",
-			mcp.WithDescription("Get full listing detail by canonical ID, URL, or address text. Returns structured raw_json with the full JSONB payload when available"),
+			mcp.WithDescription("Get full listing detail by canonical ID, URL, or address text. Returns normalized fields for valuation and optional raw_json payload"),
 			mcp.WithString("id", mcp.Description("Canonical ID or listing URL (backward-compatible alias of input)")),
 			mcp.WithString("input", mcp.Description("Canonical ID, listing URL, or address text (partial or exact)")),
 			mcp.WithString("source", mcp.Description("Optional source filter when resolving address text: shortcut, frontdoor, or all")),
@@ -96,6 +96,7 @@ func (s *Server) registerTools() {
 			mcp.WithString("city", mcp.Description("Optional city filter when resolving address text")),
 			mcp.WithString("postal", mcp.Description("Optional postal code filter when resolving address text")),
 			mcp.WithNumber("max_candidates", mcp.Description("Maximum candidates to scan for text resolution (default 25, allowed: 25, 50, 100)")),
+			mcp.WithBoolean("include_raw_json", mcp.Description("Include raw_json payload (default false)")),
 		),
 		s.handleGetListingDetail,
 	)

@@ -90,7 +90,42 @@ type UnifiedEntityDetail struct {
 	CanonicalExtra []DetailField
 	SourceSpecific []DetailField
 	Related        []DetailField
+	Normalized     NormalizedDetailFields
 	Raw            RawPayload
+}
+
+type NormalizedDetailFields struct {
+	CanonicalID              string   `json:"canonical_id"`
+	Source                   string   `json:"source"`
+	Kind                     string   `json:"kind"`
+	URL                      string   `json:"url"`
+	StreetAddress            string   `json:"street_address,omitempty"`
+	City                     string   `json:"city,omitempty"`
+	Postal                   string   `json:"postal,omitempty"`
+	AskingPrice              *int64   `json:"asking_price,omitempty"`
+	DebtFreePrice            *int64   `json:"debt_free_price,omitempty"`
+	DebtShareAmount          *int64   `json:"debt_share_amount,omitempty"`
+	PricePerSquareMeter      *float64 `json:"price_per_m2,omitempty"`
+	AreaM2                   *float64 `json:"area_m2,omitempty"`
+	RoomLayout               string   `json:"room_layout,omitempty"`
+	RoomsCount               *int32   `json:"rooms_count,omitempty"`
+	FloorLevel               *int32   `json:"floor_level,omitempty"`
+	TotalFloors              *int32   `json:"total_floors,omitempty"`
+	BuildYear                *int32   `json:"build_year,omitempty"`
+	Condition                string   `json:"condition,omitempty"`
+	EnergyClass              string   `json:"energy_class,omitempty"`
+	PlotType                 string   `json:"plot_type,omitempty"`
+	Elevator                 *bool    `json:"elevator,omitempty"`
+	Sauna                    *bool    `json:"sauna,omitempty"`
+	MaintenanceChargeMonthly *float64 `json:"maintenance_charge_monthly,omitempty"`
+	TotalChargeMonthly       *float64 `json:"total_charge_monthly,omitempty"`
+	WaterCharge              *float64 `json:"water_charge,omitempty"`
+	DescriptionText          string   `json:"description_text,omitempty"`
+	AvailabilityText         string   `json:"availability_text,omitempty"`
+	RenovationsDoneText      string   `json:"renovations_done_text,omitempty"`
+	RenovationsPlannedText   string   `json:"renovations_planned_text,omitempty"`
+	AdditionalInfoText       string   `json:"additional_info_text,omitempty"`
+	ChargesText              string   `json:"charges_text,omitempty"`
 }
 
 type Service struct {
@@ -194,6 +229,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
 			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt}}
+			detail.Normalized = normalizedFromShortcutAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: ptrUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
 			detail.Raw = buildRawPayload(row.ShortcutAdData)
@@ -231,6 +267,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
 			}
 			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), LastSeenAt: row.FrontdoorAdLastSeenAt}}
+			detail.Normalized = normalizedFromFrontdoorAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: valueOrEmpty(row.AdPropertyType)}, {Label: "Condition", Value: valueOrEmpty(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
 			detail.Raw = buildRawPayload(row.FrontdoorAdData)
 			detail = promoteCanonicalFields(detail, "External ID", "Property Type", "Condition")
@@ -508,6 +545,223 @@ func buildRawPayload(payload []byte) RawPayload {
 		pretty = buf.Bytes()
 	}
 	return RawPayload{Pretty: string(pretty), OriginalBytes: len(pretty)}
+}
+
+func normalizedFromShortcutAdDetail(canonicalID, source, kind string, canonical UnifiedCanonicalFields, row db.GetShortcutAdUnifiedDetailRow) NormalizedDetailFields {
+	payload := parseJSONMap(row.ShortcutAdData)
+	return NormalizedDetailFields{
+		CanonicalID:              canonicalID,
+		Source:                   source,
+		Kind:                     kind,
+		URL:                      canonical.URL,
+		StreetAddress:            canonical.Address,
+		City:                     canonical.City,
+		Postal:                   canonical.Postal,
+		AskingPrice:              row.AdPrice,
+		DebtFreePrice:            int64Path(payload, "priceData", "priceDebtFree"),
+		DebtShareAmount:          int64Path(payload, "priceData", "debtShare"),
+		PricePerSquareMeter:      float64Path(payload, "priceData", "pricePerSqm"),
+		AreaM2:                   canonical.Area,
+		RoomLayout:               canonical.RoomLayout,
+		RoomsCount:               int32Path(payload, "adData", "rooms"),
+		FloorLevel:               int32Path(payload, "adData", "floor"),
+		TotalFloors:              firstInt32(int32Path(payload, "adData", "totalFloors"), int32Path(payload, "buildingData", "floors")),
+		BuildYear:                firstInt32(int32Path(payload, "adData", "constructionYear"), int32Path(payload, "buildingData", "year")),
+		Condition:                firstNonEmpty(valueAtPath(payload, "adData", "condition"), valueAtPath(payload, "property", "condition")),
+		EnergyClass:              firstNonEmpty(valueAtPath(payload, "adData", "energyClass"), valueAtPath(payload, "property", "energyClass")),
+		PlotType:                 firstNonEmpty(valueAtPath(payload, "adData", "plotType"), valueAtPath(payload, "property", "plotType")),
+		Elevator:                 boolPath(payload, "adData", "hasElevator"),
+		Sauna:                    boolPath(payload, "adData", "hasSauna"),
+		MaintenanceChargeMonthly: firstFloat64(float64Path(payload, "priceData", "maintenanceCharge"), float64Path(payload, "priceData", "monthlyFee")),
+		TotalChargeMonthly:       firstFloat64(float64Path(payload, "priceData", "totalCharge"), float64Path(payload, "priceData", "monthlyFee")),
+		WaterCharge:              float64Path(payload, "priceData", "waterFee"),
+		DescriptionText:          firstNonEmpty(valueAtPath(payload, "adData", "description"), valueAtPath(payload, "description"), valueAtPath(payload, "text")),
+		AvailabilityText:         firstNonEmpty(valueAtPath(payload, "adData", "availabilityDescription"), valueAtPath(payload, "availabilityDescription"), valueAtPath(payload, "adData", "availableFrom")),
+		RenovationsDoneText:      firstNonEmpty(valueAtPath(payload, "adData", "renovationsDoneDescription"), valueAtPath(payload, "property", "renovationsDoneDescription")),
+		RenovationsPlannedText:   firstNonEmpty(valueAtPath(payload, "adData", "renovationsPlannedDescription"), valueAtPath(payload, "property", "renovationsPlannedDescription")),
+		AdditionalInfoText:       firstNonEmpty(valueAtPath(payload, "adData", "additionalInfo"), valueAtPath(payload, "moreInformationAvailableFrom"), valueAtPath(payload, "property", "otherInfo")),
+		ChargesText:              firstNonEmpty(valueAtPath(payload, "priceData", "chargesText"), valueAtPath(payload, "priceData", "additionalInfo"), valueAtPath(payload, "property", "periodicChargesAdditionalInfo"), valueAtPath(payload, "property", "managementChargesAdditionalInfo")),
+	}
+}
+
+func normalizedFromFrontdoorAdDetail(canonicalID, source, kind string, canonical UnifiedCanonicalFields, row db.GetFrontdoorAdUnifiedDetailRow) NormalizedDetailFields {
+	payload := parseJSONMap(row.FrontdoorAdData)
+	return NormalizedDetailFields{
+		CanonicalID:              canonicalID,
+		Source:                   source,
+		Kind:                     kind,
+		URL:                      canonical.URL,
+		StreetAddress:            canonical.Address,
+		City:                     canonical.City,
+		Postal:                   canonical.Postal,
+		AskingPrice:              row.AdPrice,
+		DebtFreePrice:            int64Path(payload, "debfFreePrice"),
+		DebtShareAmount:          int64Path(payload, "debtShareAmount"),
+		PricePerSquareMeter:      float64Path(payload, "pricePerSquareMeter"),
+		AreaM2:                   canonical.Area,
+		RoomLayout:               canonical.RoomLayout,
+		RoomsCount:               int32Path(payload, "residenceDetailsDTO", "totalRoomCount"),
+		FloorLevel:               int32Path(payload, "residenceDetailsDTO", "housingCompanyApartmentInformationDTO", "floorLevel"),
+		TotalFloors:              firstInt32(int32Path(payload, "property", "housingCompany", "floorCount"), int32Path(payload, "residenceDetailsDTO", "floorCount")),
+		BuildYear:                firstInt32(int32Path(payload, "residenceDetailsDTO", "constructionFinishedYear"), int32Path(payload, "property", "housingCompany", "usageStartYear")),
+		Condition:                firstNonEmpty(valueAtPath(payload, "residenceDetailsDTO", "inspection", "overallCondition"), valueOrEmpty(row.AdCondition), valueAtPath(payload, "property", "condition")),
+		EnergyClass:              firstNonEmpty(valueAtPath(payload, "property", "housingCompany", "energyCertificate", "energyCertificateType"), valueAtPath(payload, "property", "energyCertificate", "energyCertificateType")),
+		PlotType:                 firstNonEmpty(valueAtPath(payload, "property", "plot", "plotType"), valueAtPath(payload, "property", "plot", "holdingType")),
+		Elevator:                 boolPath(payload, "property", "housingCompany", "hasElevator"),
+		Sauna:                    boolPath(payload, "property", "housingCompany", "hasSauna"),
+		MaintenanceChargeMonthly: periodicCharge(payload, "HOUSING_COMPANY_MAINTENANCE_CHARGE"),
+		TotalChargeMonthly:       periodicCharge(payload, "HOUSING_COMPANY_TOTAL_CHARGE"),
+		WaterCharge:              periodicCharge(payload, "WATER"),
+		DescriptionText:          firstNonEmpty(valueAtPath(payload, "text"), valueAtPath(payload, "property", "description")),
+		AvailabilityText:         valueAtPath(payload, "availabilityDescription"),
+		RenovationsDoneText:      firstNonEmpty(valueAtPath(payload, "property", "renovationsDoneDescription"), valueAtPath(payload, "property", "housingCompany", "renovationsDoneDescription")),
+		RenovationsPlannedText:   firstNonEmpty(valueAtPath(payload, "property", "renovationsPlannedDescription"), valueAtPath(payload, "property", "housingCompany", "renovationsPlannedDescription")),
+		AdditionalInfoText:       firstNonEmpty(valueAtPath(payload, "moreInformationAvailableFrom"), valueAtPath(payload, "property", "housingCompany", "otherInfo"), valueAtPath(payload, "additionalItemsIncludedInSale")),
+		ChargesText:              firstNonEmpty(valueAtPath(payload, "property", "periodicChargesAdditionalInfo"), valueAtPath(payload, "property", "managementChargesAdditionalInfo")),
+	}
+}
+
+func parseJSONMap(payload []byte) map[string]any {
+	if len(payload) == 0 {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal(payload, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func valueAtPath(value any, path ...string) string {
+	current := value
+	for _, part := range path {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		next, ok := m[part]
+		if !ok {
+			return ""
+		}
+		current = next
+	}
+	switch v := current.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	default:
+		return ""
+	}
+}
+
+func float64Path(value any, path ...string) *float64 {
+	raw := valueAtPath(value, path...)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
+func int64Path(value any, path ...string) *int64 {
+	raw := valueAtPath(value, path...)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil
+	}
+	v := int64(parsed)
+	return &v
+}
+
+func int32Path(value any, path ...string) *int32 {
+	raw := valueAtPath(value, path...)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil
+	}
+	v := int32(parsed)
+	return &v
+}
+
+func boolPath(value any, path ...string) *bool {
+	raw := strings.ToLower(strings.TrimSpace(valueAtPath(value, path...)))
+	if raw == "" {
+		return nil
+	}
+	switch raw {
+	case "true", "1", "yes", "on", "kylla", "kyllä":
+		v := true
+		return &v
+	case "false", "0", "no", "off", "ei":
+		v := false
+		return &v
+	default:
+		return nil
+	}
+}
+
+func periodicCharge(value any, charge string) *float64 {
+	root, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	property, ok := root["property"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	items, ok := property["periodicCharges"].([]any)
+	if !ok {
+		return nil
+	}
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		key, ok := m["periodicCharge"].(string)
+		if !ok || key != charge {
+			continue
+		}
+		price, ok := m["price"].(float64)
+		if !ok {
+			continue
+		}
+		return &price
+	}
+	return nil
+}
+
+func firstFloat64(values ...*float64) *float64 {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func firstInt32(values ...*int32) *int32 {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func valueOrEmpty(value *string) string {
