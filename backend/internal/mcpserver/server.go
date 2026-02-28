@@ -20,7 +20,7 @@ type Server struct {
 	queries    *db.Queries
 	cfg        config.Config
 	logger     *slog.Logger
-	sseServer  *server.SSEServer
+	httpServer *server.StreamableHTTPServer
 }
 
 func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) *Server {
@@ -39,12 +39,12 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) *Server {
 
 	s.mcpServer = mcpSrv
 	s.registerTools()
-	s.sseServer = server.NewSSEServer(mcpSrv, server.WithStaticBasePath("/mcp"))
+	s.httpServer = server.NewStreamableHTTPServer(mcpSrv)
 	return s
 }
 
 func (s *Server) Handler() http.Handler {
-	var handler http.Handler = s.sseServer
+	var handler http.Handler = s.httpServer
 	if s.cfg.MCPAuthToken != "" {
 		handler = authMiddleware(s.cfg.MCPAuthToken, handler)
 	}
@@ -67,6 +67,7 @@ func (s *Server) registerTools() {
 		mcp.NewTool("search_listings",
 			mcp.WithDescription("Search property listings (ads, buildings, announcements) with filters"),
 			mcp.WithString("query", mcp.Description("Free-text search query")),
+			mcp.WithString("address", mcp.Description("Address search alias for query (partial or exact)")),
 			mcp.WithString("source", mcp.Description("Source filter: shortcut, frontdoor, or all")),
 			mcp.WithString("kind", mcp.Description("Entity kind: ad, building, announcement, or all")),
 			mcp.WithString("listing_type", mcp.Description("Listing type: listing, rental, or all")),
@@ -85,8 +86,14 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool("get_listing_detail",
-			mcp.WithDescription("Get full details for a listing by canonical ID (e.g. shortcut:ad:12345) or URL"),
-			mcp.WithString("id", mcp.Description("Canonical ID or listing URL"), mcp.Required()),
+			mcp.WithDescription("Get full listing detail by canonical ID, URL, or address text. Returns structured raw_json with the full JSONB payload when available"),
+			mcp.WithString("id", mcp.Description("Canonical ID or listing URL (backward-compatible alias of input)")),
+			mcp.WithString("input", mcp.Description("Canonical ID, listing URL, or address text (partial or exact)")),
+			mcp.WithString("source", mcp.Description("Optional source filter when resolving address text: shortcut, frontdoor, or all")),
+			mcp.WithString("kind", mcp.Description("Optional kind filter when resolving address text: ad, building, announcement, or all (default ad for text input)")),
+			mcp.WithString("city", mcp.Description("Optional city filter when resolving address text")),
+			mcp.WithString("postal", mcp.Description("Optional postal code filter when resolving address text")),
+			mcp.WithNumber("max_candidates", mcp.Description("Maximum candidates to scan for text resolution (default 25, allowed: 25, 50, 100)")),
 		),
 		s.handleGetListingDetail,
 	)
