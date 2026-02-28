@@ -37,6 +37,7 @@ type Config struct {
 	OpenRouter      OpenRouterConfig
 	Telegram        TelegramConfig
 	WebBaseURL      string `env:"WEB_BASE_URL" envDefault:""`
+	MCPAuthToken    string `env:"MCP_AUTH_TOKEN" envDefault:""`
 }
 
 func (c Config) SlogLevel() slog.Level {

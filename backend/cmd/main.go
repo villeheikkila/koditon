@@ -18,6 +18,7 @@ import (
 	"koditon-go/internal/config"
 	"koditon-go/internal/consumers"
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/mcpserver"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/server"
@@ -136,6 +137,10 @@ func run(
 		}
 		srv := server.New(logger, cfg, pool, authService)
 		mux := http.NewServeMux()
+		mcpSrv := mcpserver.New(pool, cfg, logger)
+		mcpHandler := mcpSrv.Handler()
+		mux.Handle("GET /mcp/", mcpHandler)
+		mux.Handle("POST /mcp/", mcpHandler)
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig)
 		api := humago.New(mux, apiConfig)
