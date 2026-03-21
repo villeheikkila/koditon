@@ -94,7 +94,7 @@ services:
         condition: service_healthy
 
   db:
-    image: supabase/postgres:17.6.1.087
+    image: supabase/postgres:17.6.1.095
     platform: linux/amd64
     pull_policy: always
     restart: unless-stopped

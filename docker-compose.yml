@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: supabase/postgres:17.6.1.087
+    image: supabase/postgres:17.6.1.095
     container_name: koditon-postgres
     restart: unless-stopped
     environment:
