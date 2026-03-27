@@ -1,8 +1,8 @@
 version: "2"
 sql:
   - engine: postgresql
-    database:
-      uri: "${DATABASE_URL}"
+    # database:
+    #   uri: "${DATABASE_URL}"
     schema:
       - db/schema.sql
     queries:

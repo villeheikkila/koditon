@@ -38,6 +38,8 @@ type Config struct {
 	Telegram        TelegramConfig
 	WebBaseURL      string `env:"WEB_BASE_URL" envDefault:""`
 	MCPAuthToken    string `env:"MCP_AUTH_TOKEN" envDefault:""`
+	APIPublicBaseURL string `env:"API_PUBLIC_BASE_URL" envDefault:""`
+	Redis           RedisConfig
 }
 
 func (c Config) SlogLevel() slog.Level {
@@ -130,9 +132,16 @@ type TelegramConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSigningKey string `env:"AUTH_JWT_SIGNING_KEY,required"`
-	JWTIssuer     string `env:"AUTH_JWT_ISSUER,required"`
-	Apple         AppleAuthConfig
+	JWTSigningKey    string        `env:"AUTH_JWT_SIGNING_KEY,required"`
+	JWTIssuer        string        `env:"AUTH_JWT_ISSUER,required"`
+	JWTUIDHashSalt   string        `env:"AUTH_UID_HASH_SALT" envDefault:""`
+	OAuthCookieKey   string        `env:"AUTH_OAUTH_COOKIE_SIGNING_KEY" envDefault:""`
+	OAuthATTL        time.Duration `env:"AUTH_OAUTH_ACCESS_TOKEN_TTL" envDefault:"15m"`
+	OAuthRTTL        time.Duration `env:"AUTH_OAUTH_REFRESH_TOKEN_TTL" envDefault:"8760h"`
+	PasskeyRPName    string        `env:"AUTH_PASSKEY_RP_DISPLAY_NAME" envDefault:"Koditon"`
+	PasskeyRPID      string        `env:"AUTH_PASSKEY_RP_ID" envDefault:"localhost"`
+	PasskeyRPOrigins string        `env:"AUTH_PASSKEY_RP_ORIGINS" envDefault:"http://localhost:3000"`
+	Apple            AppleAuthConfig
 }
 
 type AppleAuthConfig struct {
@@ -144,6 +153,10 @@ type AppleAuthConfig struct {
 
 func (c AppleAuthConfig) IsConfigured() bool {
 	return c.BundleID != "" && c.TeamID != "" && c.PrivateKeyID != "" && c.PrivateKey != ""
+}
+
+type RedisConfig struct {
+	Addr string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 }
 
 func Load() (Config, error) {

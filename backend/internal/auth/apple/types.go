@@ -1,10 +1,14 @@
 package apple
 
+import "github.com/redis/go-redis/v9"
+
 type Config struct {
 	BundleID     string
 	TeamID       string
 	PrivateKeyID string
-	PrivateKey   string // PEM format
+	PrivateKey   string
+	RedisClient  *redis.Client
+	RedisKey     string
 }
 
 type TokenResponse struct {
@@ -16,7 +20,8 @@ type TokenResponse struct {
 }
 
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
 }
 
 type IdentityToken struct {

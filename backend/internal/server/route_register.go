@@ -9,9 +9,7 @@ import (
 func (s *Server) addRoutes(api huma.API) {
 	var authMiddleware func(huma.Context, func(huma.Context))
 	if s.authService != nil {
-		authHandlers := auth.NewHandlers(s.authService)
 		authMiddleware = auth.AuthMiddlewareFactory(api, s.authService)
-		authHandlers.RegisterRoutes(api, authMiddleware)
 	}
 	huma.Get(api, "/healthz", s.healthHandler, func(op *huma.Operation) {
 		op.OperationID = "healthz"

@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maku OAuth Consent</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 20px; }
+    .actions { margin-top: 16px; display: flex; gap: 10px; }
+    button { border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    .deny { background: #eee; }
+    .allow { background: #111; color: white; }
+  </style>
+</head>
+<body>
+  <h1>Authorize client</h1>
+  <div class="card">
+    <p><strong>Client:</strong> {{.ClientID}}</p>
+    <p><strong>Scope:</strong> {{.Scope}}</p>
+    <form method="post" action="/oauth/authorize/decision">
+      <input type="hidden" name="client_id" value="{{.ClientID}}" />
+      <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}" />
+      <input type="hidden" name="resource" value="{{.Resource}}" />
+      <input type="hidden" name="state" value="{{.State}}" />
+      <input type="hidden" name="scope" value="{{.Scope}}" />
+      <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
+      <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}" />
+      <div class="actions">
+        <button class="deny" name="decision" value="deny" type="submit">Deny</button>
+        <button class="allow" name="decision" value="allow" type="submit">Allow</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

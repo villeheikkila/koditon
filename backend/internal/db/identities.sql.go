@@ -7,155 +7,215 @@ package db
 
 import (
 	"context"
-	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createIdentity = `-- name: CreateIdentity :one
-INSERT INTO auth.identities (
-    user_id,
-    identity_provider,
-    identity_external_id,
-    identity_email,
-    identity_email_verified,
-    identity_data
-) VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING identity_id, user_id, identity_provider, identity_external_id, identity_email, identity_email_verified, identity_data, identity_created_at, identity_updated_at
+insert into user_identities (user_id, user_identity_provider, user_identity_external_id, user_identity_email, user_identity_email_verified, user_identity_data)
+  values ((
+      select
+        user_id
+      from
+        users u
+      where
+        u.user_uuid = $1),
+      $2,
+      $3,
+      $4,
+      $5,
+      $6)
+returning
+  user_identity_uuid,
+  (
+    select
+      user_uuid
+    from
+      users u
+    where
+      u.user_id = user_identities.user_id) as user_uuid,
+  user_identity_provider,
+  user_identity_external_id,
+  user_identity_email,
+  user_identity_email_verified,
+  user_identity_data,
+  user_identity_created_at,
+  user_identity_updated_at
 `
 
 type CreateIdentityParams struct {
-	UserID                uuid.UUID        `json:"user_id"`
-	IdentityProvider      AuthAuthProvider `json:"identity_provider"`
-	IdentityExternalID    string           `json:"identity_external_id"`
-	IdentityEmail         *string          `json:"identity_email"`
-	IdentityEmailVerified *bool            `json:"identity_email_verified"`
-	IdentityData          json.RawMessage  `json:"identity_data"`
+	UserUuid                  pgtype.UUID `json:"user_uuid"`
+	UserIdentityProvider      *string     `json:"user_identity_provider"`
+	UserIdentityExternalID    *string     `json:"user_identity_external_id"`
+	UserIdentityEmail         *string     `json:"user_identity_email"`
+	UserIdentityEmailVerified *bool       `json:"user_identity_email_verified"`
+	UserIdentityData          []byte      `json:"user_identity_data"`
 }
 
-func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) (AuthIdentity, error) {
+type CreateIdentityRow struct {
+	UserIdentityUuid          uuid.UUID   `json:"user_identity_uuid"`
+	UserUuid                  pgtype.UUID `json:"user_uuid"`
+	UserIdentityProvider      string      `json:"user_identity_provider"`
+	UserIdentityExternalID    string      `json:"user_identity_external_id"`
+	UserIdentityEmail         *string     `json:"user_identity_email"`
+	UserIdentityEmailVerified bool        `json:"user_identity_email_verified"`
+	UserIdentityData          []byte      `json:"user_identity_data"`
+	UserIdentityCreatedAt     time.Time   `json:"user_identity_created_at"`
+	UserIdentityUpdatedAt     time.Time   `json:"user_identity_updated_at"`
+}
+
+func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) (CreateIdentityRow, error) {
 	row := q.db.QueryRow(ctx, createIdentity,
-		arg.UserID,
-		arg.IdentityProvider,
-		arg.IdentityExternalID,
-		arg.IdentityEmail,
-		arg.IdentityEmailVerified,
-		arg.IdentityData,
+		arg.UserUuid,
+		arg.UserIdentityProvider,
+		arg.UserIdentityExternalID,
+		arg.UserIdentityEmail,
+		arg.UserIdentityEmailVerified,
+		arg.UserIdentityData,
 	)
-	var i AuthIdentity
+	var i CreateIdentityRow
 	err := row.Scan(
-		&i.IdentityID,
-		&i.UserID,
-		&i.IdentityProvider,
-		&i.IdentityExternalID,
-		&i.IdentityEmail,
-		&i.IdentityEmailVerified,
-		&i.IdentityData,
-		&i.IdentityCreatedAt,
-		&i.IdentityUpdatedAt,
+		&i.UserIdentityUuid,
+		&i.UserUuid,
+		&i.UserIdentityProvider,
+		&i.UserIdentityExternalID,
+		&i.UserIdentityEmail,
+		&i.UserIdentityEmailVerified,
+		&i.UserIdentityData,
+		&i.UserIdentityCreatedAt,
+		&i.UserIdentityUpdatedAt,
 	)
 	return i, err
 }
 
-const getIdentitiesByUserID = `-- name: GetIdentitiesByUserID :many
-SELECT identity_id, user_id, identity_provider, identity_external_id, identity_email, identity_email_verified, identity_data, identity_created_at, identity_updated_at FROM auth.identities
-WHERE user_id = $1
-ORDER BY identity_created_at ASC
-`
-
-func (q *Queries) GetIdentitiesByUserID(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error) {
-	rows, err := q.db.Query(ctx, getIdentitiesByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AuthIdentity{}
-	for rows.Next() {
-		var i AuthIdentity
-		if err := rows.Scan(
-			&i.IdentityID,
-			&i.UserID,
-			&i.IdentityProvider,
-			&i.IdentityExternalID,
-			&i.IdentityEmail,
-			&i.IdentityEmailVerified,
-			&i.IdentityData,
-			&i.IdentityCreatedAt,
-			&i.IdentityUpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getIdentityByProviderAndExternalID = `-- name: GetIdentityByProviderAndExternalID :one
-SELECT identity_id, user_id, identity_provider, identity_external_id, identity_email, identity_email_verified, identity_data, identity_created_at, identity_updated_at FROM auth.identities
-WHERE identity_provider = $1 AND identity_external_id = $2
+select
+  user_identity_uuid,
+  user_id as user_id_bigint,
+  (
+    select
+      user_uuid
+    from
+      users u
+    where
+      u.user_id = user_identities.user_id) as user_uuid,
+  user_identity_provider,
+  user_identity_external_id,
+  user_identity_email,
+  user_identity_email_verified,
+  user_identity_data,
+  user_identity_created_at,
+  user_identity_updated_at
+from
+  user_identities
+where
+  user_identity_provider = $1
+  and user_identity_external_id = $2
 `
 
 type GetIdentityByProviderAndExternalIDParams struct {
-	IdentityProvider   AuthAuthProvider `json:"identity_provider"`
-	IdentityExternalID string           `json:"identity_external_id"`
+	UserIdentityProvider   *string `json:"user_identity_provider"`
+	UserIdentityExternalID *string `json:"user_identity_external_id"`
 }
 
-func (q *Queries) GetIdentityByProviderAndExternalID(ctx context.Context, arg GetIdentityByProviderAndExternalIDParams) (AuthIdentity, error) {
-	row := q.db.QueryRow(ctx, getIdentityByProviderAndExternalID, arg.IdentityProvider, arg.IdentityExternalID)
-	var i AuthIdentity
+type GetIdentityByProviderAndExternalIDRow struct {
+	UserIdentityUuid          uuid.UUID   `json:"user_identity_uuid"`
+	UserIDBigint              int64       `json:"user_id_bigint"`
+	UserUuid                  pgtype.UUID `json:"user_uuid"`
+	UserIdentityProvider      string      `json:"user_identity_provider"`
+	UserIdentityExternalID    string      `json:"user_identity_external_id"`
+	UserIdentityEmail         *string     `json:"user_identity_email"`
+	UserIdentityEmailVerified bool        `json:"user_identity_email_verified"`
+	UserIdentityData          []byte      `json:"user_identity_data"`
+	UserIdentityCreatedAt     time.Time   `json:"user_identity_created_at"`
+	UserIdentityUpdatedAt     time.Time   `json:"user_identity_updated_at"`
+}
+
+func (q *Queries) GetIdentityByProviderAndExternalID(ctx context.Context, arg GetIdentityByProviderAndExternalIDParams) (GetIdentityByProviderAndExternalIDRow, error) {
+	row := q.db.QueryRow(ctx, getIdentityByProviderAndExternalID, arg.UserIdentityProvider, arg.UserIdentityExternalID)
+	var i GetIdentityByProviderAndExternalIDRow
 	err := row.Scan(
-		&i.IdentityID,
-		&i.UserID,
-		&i.IdentityProvider,
-		&i.IdentityExternalID,
-		&i.IdentityEmail,
-		&i.IdentityEmailVerified,
-		&i.IdentityData,
-		&i.IdentityCreatedAt,
-		&i.IdentityUpdatedAt,
+		&i.UserIdentityUuid,
+		&i.UserIDBigint,
+		&i.UserUuid,
+		&i.UserIdentityProvider,
+		&i.UserIdentityExternalID,
+		&i.UserIdentityEmail,
+		&i.UserIdentityEmailVerified,
+		&i.UserIdentityData,
+		&i.UserIdentityCreatedAt,
+		&i.UserIdentityUpdatedAt,
 	)
 	return i, err
 }
 
 const updateIdentity = `-- name: UpdateIdentity :one
-UPDATE auth.identities
-SET
-    identity_email = COALESCE($2, identity_email),
-    identity_email_verified = COALESCE($3, identity_email_verified),
-    identity_data = COALESCE($4, identity_data),
-    identity_updated_at = now()
-WHERE identity_id = $1
-RETURNING identity_id, user_id, identity_provider, identity_external_id, identity_email, identity_email_verified, identity_data, identity_created_at, identity_updated_at
+update
+  user_identities
+set
+  user_identity_email = COALESCE($1, user_identity_email),
+  user_identity_email_verified = COALESCE($2, user_identity_email_verified),
+  user_identity_data = COALESCE($3, user_identity_data),
+  user_identity_updated_at = now()
+where
+  user_identity_uuid = $4
+returning
+  user_identity_uuid,
+  (
+    select
+      user_uuid
+    from
+      users u
+    where
+      u.user_id = user_identities.user_id) as user_uuid,
+  user_identity_provider,
+  user_identity_external_id,
+  user_identity_email,
+  user_identity_email_verified,
+  user_identity_data,
+  user_identity_created_at,
+  user_identity_updated_at
 `
 
 type UpdateIdentityParams struct {
-	IdentityID            uuid.UUID       `json:"identity_id"`
-	IdentityEmail         *string         `json:"identity_email"`
-	IdentityEmailVerified *bool           `json:"identity_email_verified"`
-	IdentityData          json.RawMessage `json:"identity_data"`
+	UserIdentityEmail         *string     `json:"user_identity_email"`
+	UserIdentityEmailVerified *bool       `json:"user_identity_email_verified"`
+	UserIdentityData          []byte      `json:"user_identity_data"`
+	UserIdentityUuid          pgtype.UUID `json:"user_identity_uuid"`
 }
 
-func (q *Queries) UpdateIdentity(ctx context.Context, arg UpdateIdentityParams) (AuthIdentity, error) {
+type UpdateIdentityRow struct {
+	UserIdentityUuid          uuid.UUID   `json:"user_identity_uuid"`
+	UserUuid                  pgtype.UUID `json:"user_uuid"`
+	UserIdentityProvider      string      `json:"user_identity_provider"`
+	UserIdentityExternalID    string      `json:"user_identity_external_id"`
+	UserIdentityEmail         *string     `json:"user_identity_email"`
+	UserIdentityEmailVerified bool        `json:"user_identity_email_verified"`
+	UserIdentityData          []byte      `json:"user_identity_data"`
+	UserIdentityCreatedAt     time.Time   `json:"user_identity_created_at"`
+	UserIdentityUpdatedAt     time.Time   `json:"user_identity_updated_at"`
+}
+
+func (q *Queries) UpdateIdentity(ctx context.Context, arg UpdateIdentityParams) (UpdateIdentityRow, error) {
 	row := q.db.QueryRow(ctx, updateIdentity,
-		arg.IdentityID,
-		arg.IdentityEmail,
-		arg.IdentityEmailVerified,
-		arg.IdentityData,
+		arg.UserIdentityEmail,
+		arg.UserIdentityEmailVerified,
+		arg.UserIdentityData,
+		arg.UserIdentityUuid,
 	)
-	var i AuthIdentity
+	var i UpdateIdentityRow
 	err := row.Scan(
-		&i.IdentityID,
-		&i.UserID,
-		&i.IdentityProvider,
-		&i.IdentityExternalID,
-		&i.IdentityEmail,
-		&i.IdentityEmailVerified,
-		&i.IdentityData,
-		&i.IdentityCreatedAt,
-		&i.IdentityUpdatedAt,
+		&i.UserIdentityUuid,
+		&i.UserUuid,
+		&i.UserIdentityProvider,
+		&i.UserIdentityExternalID,
+		&i.UserIdentityEmail,
+		&i.UserIdentityEmailVerified,
+		&i.UserIdentityData,
+		&i.UserIdentityCreatedAt,
+		&i.UserIdentityUpdatedAt,
 	)
 	return i, err
 }

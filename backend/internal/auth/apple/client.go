@@ -3,6 +3,7 @@ package apple
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,19 +11,22 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
-	tokenURL          = "https://appleid.apple.com/auth/token"
-	jwksURL           = "https://appleid.apple.com/auth/keys"
-	issuer            = "https://appleid.apple.com"
-	clientSecretExp   = 180 * 24 * time.Hour // 6 months
-	jwkRefreshMinutes = 10
+	tokenURL        = "https://appleid.apple.com/auth/token"
+	jwksURL         = "https://appleid.apple.com/auth/keys"
+	issuer          = "https://appleid.apple.com"
+	clientSecretExp = 180 * 24 * time.Hour
+	defaultRedisKey = "koditon:auth:apple:jwks"
+	redisJWKSMaxAge = 24 * time.Hour
 )
 
 type Client struct {
@@ -31,7 +35,10 @@ type Client struct {
 	teamID           string
 	privateKeyID     string
 	privateKey       jwk.Key
-	jwkCache         *jwk.Cache
+	redisClient      *redis.Client
+	redisKey         string
+	keySetMu         sync.RWMutex
+	keySet           jwk.Set
 	clientSecretFunc func() (string, error)
 }
 
@@ -43,17 +50,8 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	if err := privateKey.Set(jwk.KeyIDKey, cfg.PrivateKeyID); err != nil {
 		return nil, fmt.Errorf("set key id: %w", err)
 	}
-	if err := privateKey.Set(jwk.AlgorithmKey, jwa.ES256); err != nil {
+	if err := privateKey.Set(jwk.AlgorithmKey, jwa.ES256()); err != nil {
 		return nil, fmt.Errorf("set algorithm: %w", err)
-	}
-	jwkCache := jwk.NewCache(ctx)
-	if err := jwkCache.Register(jwksURL, jwk.WithMinRefreshInterval(jwkRefreshMinutes*time.Minute)); err != nil {
-		return nil, fmt.Errorf("register jwks cache: %w", err)
-	}
-	refreshCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if _, err := jwkCache.Refresh(refreshCtx, jwksURL); err != nil {
-		return nil, fmt.Errorf("initial jwks fetch: %w", err)
 	}
 	client := &Client{
 		httpClient:   &http.Client{Timeout: 30 * time.Second},
@@ -61,9 +59,16 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		teamID:       cfg.TeamID,
 		privateKeyID: cfg.PrivateKeyID,
 		privateKey:   privateKey,
-		jwkCache:     jwkCache,
+		redisClient:  cfg.RedisClient,
+		redisKey:     strings.TrimSpace(cfg.RedisKey),
+	}
+	if client.redisKey == "" {
+		client.redisKey = defaultRedisKey
 	}
 	client.clientSecretFunc = client.generateClientSecret
+	if _, err := client.loadKeySetFromRedis(ctx); err != nil {
+		return nil, fmt.Errorf("load apple jwks from redis: %w", err)
+	}
 	return client, nil
 }
 
@@ -79,7 +84,7 @@ func (c *Client) generateClientSecret() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("build client secret jwt: %w", err)
 	}
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256, c.privateKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), c.privateKey))
 	if err != nil {
 		return "", fmt.Errorf("sign client secret: %w", err)
 	}
@@ -122,7 +127,9 @@ func (c *Client) sendTokenRequest(ctx context.Context, form url.Values) (*TokenR
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
@@ -130,9 +137,13 @@ func (c *Client) sendTokenRequest(ctx context.Context, form url.Values) (*TokenR
 	if resp.StatusCode != http.StatusOK {
 		var errResp ErrorResponse
 		if json.Unmarshal(body, &errResp) == nil && errResp.Error != "" {
-			return nil, fmt.Errorf("%w: %s", ErrTokenExchange, errResp.Error)
+			return nil, &TokenExchangeError{
+				StatusCode:       resp.StatusCode,
+				ErrorCode:        errResp.Error,
+				ErrorDescription: strings.TrimSpace(errResp.ErrorDescription),
+			}
 		}
-		return nil, fmt.Errorf("%w: status %d", ErrTokenExchange, resp.StatusCode)
+		return nil, &TokenExchangeError{StatusCode: resp.StatusCode}
 	}
 	var tokenResp TokenResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
@@ -142,59 +153,199 @@ func (c *Client) sendTokenRequest(ctx context.Context, form url.Values) (*TokenR
 }
 
 func (c *Client) VerifyIDToken(ctx context.Context, idToken string, nonce string) (*IdentityToken, error) {
-	keySet, err := c.jwkCache.Get(ctx, jwksURL)
+	keySet, err := c.currentKeySet(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get apple jwks: %w", err)
 	}
-	parsed, err := jwt.Parse([]byte(idToken),
+	parsed, err := c.parseIDToken(idToken, keySet)
+	if err != nil {
+		refreshedKeySet, refreshErr := c.refreshKeySet(ctx)
+		if refreshErr != nil {
+			return nil, fmt.Errorf("%w: %v (refresh failed: %v)", ErrInvalidToken, err, refreshErr)
+		}
+		parsed, err = c.parseIDToken(idToken, refreshedKeySet)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		}
+	}
+	issuerValue, ok := parsed.Issuer()
+	if !ok {
+		return nil, fmt.Errorf("%w: missing issuer", ErrInvalidToken)
+	}
+	subjectValue, ok := parsed.Subject()
+	if !ok {
+		return nil, fmt.Errorf("%w: missing subject", ErrInvalidToken)
+	}
+	issuedAtValue, ok := parsed.IssuedAt()
+	if !ok {
+		return nil, fmt.Errorf("%w: missing issued at", ErrInvalidToken)
+	}
+	expiresAtValue, ok := parsed.Expiration()
+	if !ok {
+		return nil, fmt.Errorf("%w: missing expiration", ErrInvalidToken)
+	}
+	identity := &IdentityToken{
+		Issuer:    issuerValue,
+		Subject:   subjectValue,
+		Audience:  c.bundleID,
+		IssuedAt:  issuedAtValue.Unix(),
+		ExpiresAt: expiresAtValue.Unix(),
+	}
+	var nonceClaim string
+	if err := parsed.Get("nonce", &nonceClaim); err == nil {
+		identity.Nonce = nonceClaim
+	}
+	var nonceSupported bool
+	if err := parsed.Get("nonce_supported", &nonceSupported); err == nil {
+		identity.NonceSupported = nonceSupported
+	}
+	var emailClaim string
+	if err := parsed.Get("email", &emailClaim); err == nil {
+		identity.Email = emailClaim
+	}
+	var emailVerified string
+	if err := parsed.Get("email_verified", &emailVerified); err == nil {
+		identity.EmailVerified = emailVerified
+	}
+	var isPrivateEmail string
+	if err := parsed.Get("is_private_email", &isPrivateEmail); err == nil {
+		identity.IsPrivateEmail = isPrivateEmail
+	}
+	var realUserStatus int
+	if err := parsed.Get("real_user_status", &realUserStatus); err == nil {
+		identity.RealUserStatus = realUserStatus
+	} else {
+		var realUserStatusFloat float64
+		if err := parsed.Get("real_user_status", &realUserStatusFloat); err == nil {
+			identity.RealUserStatus = int(realUserStatusFloat)
+		}
+	}
+	var authTime int64
+	if err := parsed.Get("auth_time", &authTime); err == nil {
+		identity.AuthTime = authTime
+	} else {
+		var authTimeFloat float64
+		if err := parsed.Get("auth_time", &authTimeFloat); err == nil {
+			identity.AuthTime = int64(authTimeFloat)
+		}
+	}
+	var transferSub string
+	if err := parsed.Get("transfer_sub", &transferSub); err == nil {
+		identity.TransferSub = transferSub
+	}
+	if nonce != "" {
+		if identity.Nonce != nonce && identity.Nonce != hashNonceHex(nonce) && identity.Nonce != hashNonceBase64URL(nonce) {
+			return nil, ErrInvalidNonce
+		}
+	}
+	return identity, nil
+}
+
+func (c *Client) parseIDToken(idToken string, keySet jwk.Set) (jwt.Token, error) {
+	return jwt.Parse([]byte(idToken),
 		jwt.WithKeySet(keySet),
 		jwt.WithValidate(true),
 		jwt.WithIssuer(issuer),
 		jwt.WithAudience(c.bundleID),
 	)
+}
+
+func (c *Client) currentKeySet(ctx context.Context) (jwk.Set, error) {
+	if keySet := c.cachedKeySet(); keySet != nil {
+		return keySet, nil
+	}
+	if keySet, err := c.loadKeySetFromRedis(ctx); err != nil {
+		return nil, err
+	} else if keySet != nil {
+		return keySet, nil
+	}
+	return c.refreshKeySet(ctx)
+}
+
+func (c *Client) cachedKeySet() jwk.Set {
+	c.keySetMu.RLock()
+	defer c.keySetMu.RUnlock()
+	return c.keySet
+}
+
+func (c *Client) setCachedKeySet(keySet jwk.Set) {
+	c.keySetMu.Lock()
+	defer c.keySetMu.Unlock()
+	c.keySet = keySet
+}
+
+func (c *Client) loadKeySetFromRedis(ctx context.Context) (jwk.Set, error) {
+	if c.redisClient == nil {
+		return nil, nil
+	}
+	payload, err := c.redisClient.Get(ctx, c.redisKey).Bytes()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
 	}
-	claims := parsed.PrivateClaims()
-	identity := &IdentityToken{
-		Issuer:    parsed.Issuer(),
-		Subject:   parsed.Subject(),
-		Audience:  c.bundleID,
-		IssuedAt:  parsed.IssuedAt().Unix(),
-		ExpiresAt: parsed.Expiration().Unix(),
+	return c.parseAndCacheKeySet(payload)
+}
+
+func (c *Client) refreshKeySet(ctx context.Context) (jwk.Set, error) {
+	payload, err := c.fetchJWKS(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if v, ok := claims["nonce"].(string); ok {
-		identity.Nonce = v
+	keySet, err := c.parseAndCacheKeySet(payload)
+	if err != nil {
+		return nil, err
 	}
-	if v, ok := claims["nonce_supported"].(bool); ok {
-		identity.NonceSupported = v
-	}
-	if v, ok := claims["email"].(string); ok {
-		identity.Email = v
-	}
-	if v, ok := claims["email_verified"].(string); ok {
-		identity.EmailVerified = v
-	}
-	if v, ok := claims["is_private_email"].(string); ok {
-		identity.IsPrivateEmail = v
-	}
-	if v, ok := claims["real_user_status"].(float64); ok {
-		identity.RealUserStatus = int(v)
-	}
-	if v, ok := claims["auth_time"].(float64); ok {
-		identity.AuthTime = int64(v)
-	}
-	if v, ok := claims["transfer_sub"].(string); ok {
-		identity.TransferSub = v
-	}
-	if nonce != "" {
-		hashedNonce := sha256.Sum256([]byte(nonce))
-		hashedNonceHex := hex.EncodeToString(hashedNonce[:])
-		if identity.Nonce != hashedNonceHex {
-			return nil, ErrInvalidNonce
+	if c.redisClient != nil {
+		if err := c.redisClient.Set(ctx, c.redisKey, payload, redisJWKSMaxAge).Err(); err != nil {
+			return nil, err
 		}
 	}
-	return identity, nil
+	return keySet, nil
+}
+
+func (c *Client) fetchJWKS(ctx context.Context) ([]byte, error) {
+	refreshCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(refreshCtx, http.MethodGet, jwksURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %q: %w", jwksURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch %q: status %d", jwksURL, resp.StatusCode)
+	}
+	return body, nil
+}
+
+func (c *Client) parseAndCacheKeySet(payload []byte) (jwk.Set, error) {
+	keySet, err := jwk.Parse(payload)
+	if err != nil {
+		return nil, fmt.Errorf("parse apple jwks: %w", err)
+	}
+	c.setCachedKeySet(keySet)
+	return keySet, nil
+}
+
+func hashNonceHex(nonce string) string {
+	hashed := sha256.Sum256([]byte(nonce))
+	return hex.EncodeToString(hashed[:])
+}
+
+func hashNonceBase64URL(nonce string) string {
+	hashed := sha256.Sum256([]byte(nonce))
+	return base64.RawURLEncoding.EncodeToString(hashed[:])
 }
 
 func (c *Client) BundleID() string {

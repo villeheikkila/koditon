@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maku Device Verification</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 20px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 28px; letter-spacing: 2px; margin: 4px 0 14px; }
+    .muted { color: #666; font-size: 14px; }
+    .ok { color: #146c2e; }
+    .warn { color: #8a5a00; }
+    a.button { display: inline-block; margin-top: 12px; background: #111; color: #fff; text-decoration: none; border-radius: 10px; padding: 10px 14px; }
+  </style>
+</head>
+<body>
+  <h1>Approve Device Login</h1>
+  <div class="card">
+    <p>Code to approve:</p>
+    <div class="code">{{.UserCode}}</div>
+    {{if eq .Result "approved"}}
+      <p class="ok">Approved. You can return to your CLI.</p>
+      {{if .AuthorizationCode}}
+        <p class="muted">Manual authorization code (if CLI asks):</p>
+        <div class="code" id="auth-code">{{.AuthorizationCode}}</div>
+      {{end}}
+    {{else if eq .Result "error"}}
+      <p class="warn">Approval failed in app. Try opening Maku again.</p>
+    {{else}}
+      <p class="muted">Open Maku and confirm this request from the Notifications tab.</p>
+    {{end}}
+    <a id="open-app" class="button" href="{{.NativeURL}}">Open Maku</a>
+  </div>
+  <script>
+    if ({{printf "%q" .Result}} === "") {
+      const nativeURL = document.getElementById('open-app').href;
+      window.location.href = nativeURL;
+    }
+    const authCode = document.getElementById('auth-code');
+    if (authCode && navigator.clipboard) {
+      authCode.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(authCode.textContent || ''); } catch (_) {}
+      });
+    }
+  </script>
+</body>
+</html>

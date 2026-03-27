@@ -1,66 +1,50 @@
--- name: CreateDevice :one
-INSERT INTO auth.devices (
-    user_id,
-    device_name,
-    device_os,
-    device_app_version,
-    device_push_token,
-    device_push_token_type,
-    device_push_token_updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING *;
-
 -- name: UpsertDevice :one
-INSERT INTO auth.devices (
-    device_id,
-    user_id,
-    device_name,
-    device_os,
-    device_app_version
-) VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (device_id) DO UPDATE SET
-    device_last_seen_at = now(),
-    device_updated_at = now()
-RETURNING *;
+insert into user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
+values
+  (sqlc.arg (user_device_id),
+    (
+      select
+        user_id
+      from
+        users u
+      where
+        u.user_uuid = sqlc.arg (user_uuid)),
+      sqlc.arg (user_device_name),
+      sqlc.arg (user_device_os),
+      sqlc.arg (user_device_app_version))
+on conflict (user_device_uuid)
+  do update set
+    user_device_last_seen_at = now(),
+    user_device_updated_at = now()
+  returning
+    user_device_uuid,
+    (
+      select
+        user_uuid
+      from
+        users u
+      where
+        u.user_id = user_devices.user_id) as user_uuid,
+    user_device_name,
+    user_device_os,
+    user_device_app_version,
+    user_device_push_token,
+    user_device_push_token_type,
+    user_device_push_token_updated_at,
+    user_device_created_at,
+    user_device_updated_at,
+    user_device_last_seen_at;
 
--- name: GetDeviceByID :one
-SELECT * FROM auth.devices
-WHERE device_id = $1;
-
--- name: GetDevicesByUserID :many
-SELECT * FROM auth.devices
-WHERE user_id = $1
-ORDER BY device_last_seen_at DESC;
-
--- name: UpdateDevice :one
-UPDATE auth.devices
-SET
-    device_name = COALESCE($2, device_name),
-    device_os = COALESCE($3, device_os),
-    device_app_version = COALESCE($4, device_app_version),
-    device_updated_at = now()
-WHERE device_id = $1
-RETURNING *;
-
--- name: UpdateDevicePushToken :one
-UPDATE auth.devices
-SET
-    device_push_token = $2,
-    device_push_token_type = $3,
-    device_push_token_updated_at = now(),
-    device_updated_at = now()
-WHERE device_id = $1
-RETURNING *;
-
--- name: UpdateDeviceLastSeen :exec
-UPDATE auth.devices
-SET device_last_seen_at = now()
-WHERE device_id = $1;
-
--- name: DeleteDevice :exec
-DELETE FROM auth.devices
-WHERE device_id = $1;
-
--- name: DeleteDevicesByUserID :exec
-DELETE FROM auth.devices
-WHERE user_id = $1;
+-- name: UpdateDeviceMetadata :exec
+update user_devices
+set
+  user_device_name = coalesce(nullif(sqlc.narg(user_device_name), ''), user_device_name),
+  user_device_os = coalesce(nullif(sqlc.narg(user_device_os), ''), user_device_os),
+  user_device_model = coalesce(nullif(sqlc.narg(user_device_model), ''), user_device_model),
+  user_device_locale = coalesce(nullif(sqlc.narg(user_device_locale), ''), user_device_locale),
+  user_device_time_zone = coalesce(nullif(sqlc.narg(user_device_time_zone), ''), user_device_time_zone),
+  user_device_app_version = coalesce(nullif(sqlc.narg(user_device_app_version), ''), user_device_app_version),
+  user_device_updated_at = now(),
+  user_device_last_seen_at = now()
+where
+  user_device_uuid = sqlc.arg(user_device_uuid);

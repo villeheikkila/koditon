@@ -1,22 +1,12 @@
 package auth
 
-import (
-	"koditon-go/internal/db"
-)
-
-type AuthProvider = db.AuthAuthProvider
+type AuthProvider = string
 
 const (
-	AuthProviderApple     = db.AuthAuthProviderApple
-	AuthProviderAnonymous = db.AuthAuthProviderAnonymous
+	AuthProviderEmail   AuthProvider = "email"
+	AuthProviderApple   AuthProvider = "apple"
+	AuthProviderPasskey AuthProvider = "passkey"
 )
-
-type TokenPair struct {
-	AccessToken           string
-	AccessTokenExpiresAt  int64
-	RefreshToken          string
-	RefreshTokenExpiresAt int64
-}
 
 type UserInfo struct {
 	UserID    string `json:"user_id"`

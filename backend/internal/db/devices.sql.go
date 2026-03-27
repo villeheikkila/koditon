@@ -10,272 +10,128 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createDevice = `-- name: CreateDevice :one
-INSERT INTO auth.devices (
-    user_id,
-    device_name,
-    device_os,
-    device_app_version,
-    device_push_token,
-    device_push_token_type,
-    device_push_token_updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at
+const updateDeviceMetadata = `-- name: UpdateDeviceMetadata :exec
+update user_devices
+set
+  user_device_name = coalesce(nullif($1, ''), user_device_name),
+  user_device_os = coalesce(nullif($2, ''), user_device_os),
+  user_device_model = coalesce(nullif($3, ''), user_device_model),
+  user_device_locale = coalesce(nullif($4, ''), user_device_locale),
+  user_device_time_zone = coalesce(nullif($5, ''), user_device_time_zone),
+  user_device_app_version = coalesce(nullif($6, ''), user_device_app_version),
+  user_device_updated_at = now(),
+  user_device_last_seen_at = now()
+where
+  user_device_uuid = $7
 `
 
-type CreateDeviceParams struct {
-	UserID                   uuid.UUID             `json:"user_id"`
-	DeviceName               *string               `json:"device_name"`
-	DeviceOs                 *string               `json:"device_os"`
-	DeviceAppVersion         *string               `json:"device_app_version"`
-	DevicePushToken          *string               `json:"device_push_token"`
-	DevicePushTokenType      NullAuthPushTokenType `json:"device_push_token_type"`
-	DevicePushTokenUpdatedAt *time.Time            `json:"device_push_token_updated_at"`
+type UpdateDeviceMetadataParams struct {
+	UserDeviceName       *string     `json:"user_device_name"`
+	UserDeviceOs         *string     `json:"user_device_os"`
+	UserDeviceModel      *string     `json:"user_device_model"`
+	UserDeviceLocale     *string     `json:"user_device_locale"`
+	UserDeviceTimeZone   *string     `json:"user_device_time_zone"`
+	UserDeviceAppVersion *string     `json:"user_device_app_version"`
+	UserDeviceUuid       pgtype.UUID `json:"user_device_uuid"`
 }
 
-func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (AuthDevice, error) {
-	row := q.db.QueryRow(ctx, createDevice,
-		arg.UserID,
-		arg.DeviceName,
-		arg.DeviceOs,
-		arg.DeviceAppVersion,
-		arg.DevicePushToken,
-		arg.DevicePushTokenType,
-		arg.DevicePushTokenUpdatedAt,
+func (q *Queries) UpdateDeviceMetadata(ctx context.Context, arg UpdateDeviceMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateDeviceMetadata,
+		arg.UserDeviceName,
+		arg.UserDeviceOs,
+		arg.UserDeviceModel,
+		arg.UserDeviceLocale,
+		arg.UserDeviceTimeZone,
+		arg.UserDeviceAppVersion,
+		arg.UserDeviceUuid,
 	)
-	var i AuthDevice
-	err := row.Scan(
-		&i.DeviceID,
-		&i.UserID,
-		&i.DeviceName,
-		&i.DeviceOs,
-		&i.DeviceAppVersion,
-		&i.DevicePushToken,
-		&i.DevicePushTokenType,
-		&i.DevicePushTokenUpdatedAt,
-		&i.DeviceCreatedAt,
-		&i.DeviceUpdatedAt,
-		&i.DeviceLastSeenAt,
-	)
-	return i, err
-}
-
-const deleteDevice = `-- name: DeleteDevice :exec
-DELETE FROM auth.devices
-WHERE device_id = $1
-`
-
-func (q *Queries) DeleteDevice(ctx context.Context, deviceID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteDevice, deviceID)
 	return err
-}
-
-const deleteDevicesByUserID = `-- name: DeleteDevicesByUserID :exec
-DELETE FROM auth.devices
-WHERE user_id = $1
-`
-
-func (q *Queries) DeleteDevicesByUserID(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteDevicesByUserID, userID)
-	return err
-}
-
-const getDeviceByID = `-- name: GetDeviceByID :one
-SELECT device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at FROM auth.devices
-WHERE device_id = $1
-`
-
-func (q *Queries) GetDeviceByID(ctx context.Context, deviceID uuid.UUID) (AuthDevice, error) {
-	row := q.db.QueryRow(ctx, getDeviceByID, deviceID)
-	var i AuthDevice
-	err := row.Scan(
-		&i.DeviceID,
-		&i.UserID,
-		&i.DeviceName,
-		&i.DeviceOs,
-		&i.DeviceAppVersion,
-		&i.DevicePushToken,
-		&i.DevicePushTokenType,
-		&i.DevicePushTokenUpdatedAt,
-		&i.DeviceCreatedAt,
-		&i.DeviceUpdatedAt,
-		&i.DeviceLastSeenAt,
-	)
-	return i, err
-}
-
-const getDevicesByUserID = `-- name: GetDevicesByUserID :many
-SELECT device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at FROM auth.devices
-WHERE user_id = $1
-ORDER BY device_last_seen_at DESC
-`
-
-func (q *Queries) GetDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]AuthDevice, error) {
-	rows, err := q.db.Query(ctx, getDevicesByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AuthDevice{}
-	for rows.Next() {
-		var i AuthDevice
-		if err := rows.Scan(
-			&i.DeviceID,
-			&i.UserID,
-			&i.DeviceName,
-			&i.DeviceOs,
-			&i.DeviceAppVersion,
-			&i.DevicePushToken,
-			&i.DevicePushTokenType,
-			&i.DevicePushTokenUpdatedAt,
-			&i.DeviceCreatedAt,
-			&i.DeviceUpdatedAt,
-			&i.DeviceLastSeenAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const updateDevice = `-- name: UpdateDevice :one
-UPDATE auth.devices
-SET
-    device_name = COALESCE($2, device_name),
-    device_os = COALESCE($3, device_os),
-    device_app_version = COALESCE($4, device_app_version),
-    device_updated_at = now()
-WHERE device_id = $1
-RETURNING device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at
-`
-
-type UpdateDeviceParams struct {
-	DeviceID         uuid.UUID `json:"device_id"`
-	DeviceName       *string   `json:"device_name"`
-	DeviceOs         *string   `json:"device_os"`
-	DeviceAppVersion *string   `json:"device_app_version"`
-}
-
-func (q *Queries) UpdateDevice(ctx context.Context, arg UpdateDeviceParams) (AuthDevice, error) {
-	row := q.db.QueryRow(ctx, updateDevice,
-		arg.DeviceID,
-		arg.DeviceName,
-		arg.DeviceOs,
-		arg.DeviceAppVersion,
-	)
-	var i AuthDevice
-	err := row.Scan(
-		&i.DeviceID,
-		&i.UserID,
-		&i.DeviceName,
-		&i.DeviceOs,
-		&i.DeviceAppVersion,
-		&i.DevicePushToken,
-		&i.DevicePushTokenType,
-		&i.DevicePushTokenUpdatedAt,
-		&i.DeviceCreatedAt,
-		&i.DeviceUpdatedAt,
-		&i.DeviceLastSeenAt,
-	)
-	return i, err
-}
-
-const updateDeviceLastSeen = `-- name: UpdateDeviceLastSeen :exec
-UPDATE auth.devices
-SET device_last_seen_at = now()
-WHERE device_id = $1
-`
-
-func (q *Queries) UpdateDeviceLastSeen(ctx context.Context, deviceID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, updateDeviceLastSeen, deviceID)
-	return err
-}
-
-const updateDevicePushToken = `-- name: UpdateDevicePushToken :one
-UPDATE auth.devices
-SET
-    device_push_token = $2,
-    device_push_token_type = $3,
-    device_push_token_updated_at = now(),
-    device_updated_at = now()
-WHERE device_id = $1
-RETURNING device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at
-`
-
-type UpdateDevicePushTokenParams struct {
-	DeviceID            uuid.UUID             `json:"device_id"`
-	DevicePushToken     *string               `json:"device_push_token"`
-	DevicePushTokenType NullAuthPushTokenType `json:"device_push_token_type"`
-}
-
-func (q *Queries) UpdateDevicePushToken(ctx context.Context, arg UpdateDevicePushTokenParams) (AuthDevice, error) {
-	row := q.db.QueryRow(ctx, updateDevicePushToken, arg.DeviceID, arg.DevicePushToken, arg.DevicePushTokenType)
-	var i AuthDevice
-	err := row.Scan(
-		&i.DeviceID,
-		&i.UserID,
-		&i.DeviceName,
-		&i.DeviceOs,
-		&i.DeviceAppVersion,
-		&i.DevicePushToken,
-		&i.DevicePushTokenType,
-		&i.DevicePushTokenUpdatedAt,
-		&i.DeviceCreatedAt,
-		&i.DeviceUpdatedAt,
-		&i.DeviceLastSeenAt,
-	)
-	return i, err
 }
 
 const upsertDevice = `-- name: UpsertDevice :one
-INSERT INTO auth.devices (
-    device_id,
-    user_id,
-    device_name,
-    device_os,
-    device_app_version
-) VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (device_id) DO UPDATE SET
-    device_last_seen_at = now(),
-    device_updated_at = now()
-RETURNING device_id, user_id, device_name, device_os, device_app_version, device_push_token, device_push_token_type, device_push_token_updated_at, device_created_at, device_updated_at, device_last_seen_at
+insert into user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
+values
+  ($1,
+    (
+      select
+        user_id
+      from
+        users u
+      where
+        u.user_uuid = $2),
+      $3,
+      $4,
+      $5)
+on conflict (user_device_uuid)
+  do update set
+    user_device_last_seen_at = now(),
+    user_device_updated_at = now()
+  returning
+    user_device_uuid,
+    (
+      select
+        user_uuid
+      from
+        users u
+      where
+        u.user_id = user_devices.user_id) as user_uuid,
+    user_device_name,
+    user_device_os,
+    user_device_app_version,
+    user_device_push_token,
+    user_device_push_token_type,
+    user_device_push_token_updated_at,
+    user_device_created_at,
+    user_device_updated_at,
+    user_device_last_seen_at
 `
 
 type UpsertDeviceParams struct {
-	DeviceID         uuid.UUID `json:"device_id"`
-	UserID           uuid.UUID `json:"user_id"`
-	DeviceName       *string   `json:"device_name"`
-	DeviceOs         *string   `json:"device_os"`
-	DeviceAppVersion *string   `json:"device_app_version"`
+	UserDeviceID         pgtype.UUID `json:"user_device_id"`
+	UserUuid             pgtype.UUID `json:"user_uuid"`
+	UserDeviceName       *string     `json:"user_device_name"`
+	UserDeviceOs         *string     `json:"user_device_os"`
+	UserDeviceAppVersion *string     `json:"user_device_app_version"`
 }
 
-func (q *Queries) UpsertDevice(ctx context.Context, arg UpsertDeviceParams) (AuthDevice, error) {
+type UpsertDeviceRow struct {
+	UserDeviceUuid               uuid.UUID          `json:"user_device_uuid"`
+	UserUuid                     pgtype.UUID        `json:"user_uuid"`
+	UserDeviceName               *string            `json:"user_device_name"`
+	UserDeviceOs                 *string            `json:"user_device_os"`
+	UserDeviceAppVersion         *string            `json:"user_device_app_version"`
+	UserDevicePushToken          *string            `json:"user_device_push_token"`
+	UserDevicePushTokenType      *string            `json:"user_device_push_token_type"`
+	UserDevicePushTokenUpdatedAt pgtype.Timestamptz `json:"user_device_push_token_updated_at"`
+	UserDeviceCreatedAt          time.Time          `json:"user_device_created_at"`
+	UserDeviceUpdatedAt          time.Time          `json:"user_device_updated_at"`
+	UserDeviceLastSeenAt         time.Time          `json:"user_device_last_seen_at"`
+}
+
+func (q *Queries) UpsertDevice(ctx context.Context, arg UpsertDeviceParams) (UpsertDeviceRow, error) {
 	row := q.db.QueryRow(ctx, upsertDevice,
-		arg.DeviceID,
-		arg.UserID,
-		arg.DeviceName,
-		arg.DeviceOs,
-		arg.DeviceAppVersion,
+		arg.UserDeviceID,
+		arg.UserUuid,
+		arg.UserDeviceName,
+		arg.UserDeviceOs,
+		arg.UserDeviceAppVersion,
 	)
-	var i AuthDevice
+	var i UpsertDeviceRow
 	err := row.Scan(
-		&i.DeviceID,
-		&i.UserID,
-		&i.DeviceName,
-		&i.DeviceOs,
-		&i.DeviceAppVersion,
-		&i.DevicePushToken,
-		&i.DevicePushTokenType,
-		&i.DevicePushTokenUpdatedAt,
-		&i.DeviceCreatedAt,
-		&i.DeviceUpdatedAt,
-		&i.DeviceLastSeenAt,
+		&i.UserDeviceUuid,
+		&i.UserUuid,
+		&i.UserDeviceName,
+		&i.UserDeviceOs,
+		&i.UserDeviceAppVersion,
+		&i.UserDevicePushToken,
+		&i.UserDevicePushTokenType,
+		&i.UserDevicePushTokenUpdatedAt,
+		&i.UserDeviceCreatedAt,
+		&i.UserDeviceUpdatedAt,
+		&i.UserDeviceLastSeenAt,
 	)
 	return i, err
 }

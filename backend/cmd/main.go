@@ -10,12 +10,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"koditon-go/internal/auth"
-	"koditon-go/internal/auth/apple"
 	"koditon-go/internal/config"
+	db "koditon-go/internal/db"
+	"koditon-go/internal/oauthapi"
+	"koditon-go/internal/runtimecfg"
 	"koditon-go/internal/consumers"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/mcpserver"
@@ -29,6 +32,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
+	"github.com/redis/go-redis/v9"
 	openrouter "github.com/revrost/go-openrouter"
 )
 
@@ -114,29 +118,63 @@ func run(
 	var httpServer *http.Server
 	var errCh chan error
 	if cfg.Mode.API {
-		var appleConfig *apple.Config
-		if cfg.Auth.Apple.IsConfigured() {
-			appleConfig = &apple.Config{
+		redisClient := redis.NewClient(&redis.Options{
+			Addr: cfg.Redis.Addr,
+		})
+		authCfg := &runtimecfg.AuthConfig{
+			JWT: runtimecfg.JWTAuthConfig{
+				PrivateKey:  cfg.Auth.JWTSigningKey,
+				Issuer:      cfg.Auth.JWTIssuer,
+				UIDHashSalt: cfg.Auth.JWTUIDHashSalt,
+			},
+			Apple: runtimecfg.AppleAuthConfig{
 				BundleID:     cfg.Auth.Apple.BundleID,
 				TeamID:       cfg.Auth.Apple.TeamID,
 				PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
 				PrivateKey:   cfg.Auth.Apple.PrivateKey,
+			},
+		}
+		if cfg.Auth.OAuthCookieKey != "" {
+			authCfg.OAuth = &runtimecfg.OAuthConfig{
+				CookieSigningKey: cfg.Auth.OAuthCookieKey,
+				AccessTokenTTL:   cfg.Auth.OAuthATTL,
+				RefreshTokenTTL:  cfg.Auth.OAuthRTTL,
+			}
+		}
+		if cfg.Auth.PasskeyRPID != "" {
+			origins := strings.Split(cfg.Auth.PasskeyRPOrigins, ",")
+			authCfg.Passkey = &runtimecfg.PasskeyConfig{
+				RPDisplayName: cfg.Auth.PasskeyRPName,
+				RPID:          cfg.Auth.PasskeyRPID,
+				RPOrigins:     origins,
 			}
 		}
 		authService, err := auth.NewService(ctx, auth.ServiceConfig{
-			Pool: pool,
-			JWT: auth.JWTConfig{
-				SigningKey: cfg.Auth.JWTSigningKey,
-				Issuer:     cfg.Auth.JWTIssuer,
-			},
-			Apple:  appleConfig,
-			Logger: logger,
+			Pool:        pool,
+			Auth:        authCfg,
+			RedisClient: redisClient,
+			Logger:      logger,
 		})
 		if err != nil {
 			return fmt.Errorf("create auth service: %w", err)
 		}
 		srv := server.New(logger, cfg, pool, authService)
 		mux := http.NewServeMux()
+		if cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != "" {
+			oauthHandler, err := oauthapi.New(logger, oauthapi.Config{
+				HTTP: runtimecfg.HTTPConfig{
+					APIPublicBaseURL:      cfg.APIPublicBaseURL,
+					WebBaseURL:            cfg.WebBaseURL,
+					OAuthCookieSigningKey: cfg.Auth.OAuthCookieKey,
+				},
+				Queries: db.New(pool),
+			}, authService, nil)
+			if err != nil {
+				return fmt.Errorf("create oauth handler: %w", err)
+			}
+			mux.Handle("/oauth/", oauthHandler)
+			mux.Handle("/.well-known/", oauthHandler)
+		}
 		mcpSrv := mcpserver.New(pool, cfg, logger)
 		mcpHandler := mcpSrv.Handler()
 		mux.Handle("GET /mcp", mcpHandler)
@@ -146,7 +184,7 @@ func run(
 		mux.Handle("POST /mcp/", mcpHandler)
 		mux.Handle("DELETE /mcp/", mcpHandler)
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
-		auth.RegisterSecurityScheme(&apiConfig)
+		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)
 		httpServer = &http.Server{
 			Addr:              net.JoinHostPort(cfg.Host, cfg.Port),

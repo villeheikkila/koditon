@@ -9,49 +9,189 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO auth.users DEFAULT VALUES
-RETURNING user_id, user_created_at, user_updated_at, user_deleted_at
+insert into users (user_uuid, user_email)
+  values (gen_random_uuid (), $1)
+returning
+  user_uuid, user_id as user_id_bigint
 `
 
-func (q *Queries) CreateUser(ctx context.Context) (AuthUser, error) {
-	row := q.db.QueryRow(ctx, createUser)
-	var i AuthUser
-	err := row.Scan(
-		&i.UserID,
-		&i.UserCreatedAt,
-		&i.UserUpdatedAt,
-		&i.UserDeletedAt,
-	)
+type CreateUserRow struct {
+	UserUuid     uuid.UUID `json:"user_uuid"`
+	UserIDBigint int64     `json:"user_id_bigint"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, userEmail *string) (CreateUserRow, error) {
+	row := q.db.QueryRow(ctx, createUser, userEmail)
+	var i CreateUserRow
+	err := row.Scan(&i.UserUuid, &i.UserIDBigint)
 	return i, err
 }
 
-const deleteUser = `-- name: DeleteUser :exec
-UPDATE auth.users
-SET user_deleted_at = now(), user_updated_at = now()
-WHERE user_id = $1
+const emailExists = `-- name: EmailExists :one
+select
+  exists (
+    select
+      1
+    from
+      users
+    where
+      lower(btrim(user_email)) = lower(btrim($1))) as email_exists
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteUser, userID)
-	return err
+func (q *Queries) EmailExists(ctx context.Context, userEmail *string) (bool, error) {
+	row := q.db.QueryRow(ctx, emailExists, userEmail)
+	var email_exists bool
+	err := row.Scan(&email_exists)
+	return email_exists, err
+}
+
+const emailExistsForAnotherUser = `-- name: EmailExistsForAnotherUser :one
+select
+  exists (
+    select
+      1
+    from
+      users
+    where
+      user_id != $1
+      and lower(btrim(user_email)) = lower(btrim($2))) as email_exists
+`
+
+type EmailExistsForAnotherUserParams struct {
+	UserID    *int64  `json:"user_id"`
+	UserEmail *string `json:"user_email"`
+}
+
+func (q *Queries) EmailExistsForAnotherUser(ctx context.Context, arg EmailExistsForAnotherUserParams) (bool, error) {
+	row := q.db.QueryRow(ctx, emailExistsForAnotherUser, arg.UserID, arg.UserEmail)
+	var email_exists bool
+	err := row.Scan(&email_exists)
+	return email_exists, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+select
+  user_uuid,
+  user_id as user_id_bigint
+from
+  users
+where
+  lower(btrim(user_email)) = lower(btrim($1))
+`
+
+type GetUserByEmailRow struct {
+	UserUuid     uuid.UUID `json:"user_uuid"`
+	UserIDBigint int64     `json:"user_id_bigint"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, userEmail *string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, userEmail)
+	var i GetUserByEmailRow
+	err := row.Scan(&i.UserUuid, &i.UserIDBigint)
+	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, user_created_at, user_updated_at, user_deleted_at FROM auth.users
-WHERE user_id = $1 AND user_deleted_at IS NULL
+select
+  user_uuid,
+  user_id as user_id_bigint
+from
+  users
+where
+  user_uuid = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, userID uuid.UUID) (AuthUser, error) {
-	row := q.db.QueryRow(ctx, getUserByID, userID)
-	var i AuthUser
-	err := row.Scan(
-		&i.UserID,
-		&i.UserCreatedAt,
-		&i.UserUpdatedAt,
-		&i.UserDeletedAt,
-	)
+type GetUserByIDRow struct {
+	UserUuid     uuid.UUID `json:"user_uuid"`
+	UserIDBigint int64     `json:"user_id_bigint"`
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, userUuid pgtype.UUID) (GetUserByIDRow, error) {
+	row := q.db.QueryRow(ctx, getUserByID, userUuid)
+	var i GetUserByIDRow
+	err := row.Scan(&i.UserUuid, &i.UserIDBigint)
 	return i, err
+}
+
+const getUserEmailByIDBigint = `-- name: GetUserEmailByIDBigint :one
+select
+  user_email
+from
+  users
+where
+  user_id = $1
+`
+
+func (q *Queries) GetUserEmailByIDBigint(ctx context.Context, userID *int64) (*string, error) {
+	row := q.db.QueryRow(ctx, getUserEmailByIDBigint, userID)
+	var user_email *string
+	err := row.Scan(&user_email)
+	return user_email, err
+}
+
+const getUserEmailByUUID = `-- name: GetUserEmailByUUID :one
+select
+  user_email
+from
+  users
+where
+  user_uuid = $1
+`
+
+func (q *Queries) GetUserEmailByUUID(ctx context.Context, userUuid pgtype.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, getUserEmailByUUID, userUuid)
+	var user_email *string
+	err := row.Scan(&user_email)
+	return user_email, err
+}
+
+const updateUserEmailByIDBigint = `-- name: UpdateUserEmailByIDBigint :one
+update
+  users
+set
+  user_email = $1
+where
+  user_id = $2
+returning
+  user_email
+`
+
+type UpdateUserEmailByIDBigintParams struct {
+	UserEmail *string `json:"user_email"`
+	UserID    *int64  `json:"user_id"`
+}
+
+func (q *Queries) UpdateUserEmailByIDBigint(ctx context.Context, arg UpdateUserEmailByIDBigintParams) (*string, error) {
+	row := q.db.QueryRow(ctx, updateUserEmailByIDBigint, arg.UserEmail, arg.UserID)
+	var user_email *string
+	err := row.Scan(&user_email)
+	return user_email, err
+}
+
+const updateUserEmailIfEmptyByIDBigint = `-- name: UpdateUserEmailIfEmptyByIDBigint :one
+update
+  users
+set
+  user_email = COALESCE($1::text, user_email)
+where
+  user_id = $2
+  and user_email is null
+returning
+  user_email
+`
+
+type UpdateUserEmailIfEmptyByIDBigintParams struct {
+	UserEmail *string `json:"user_email"`
+	UserID    *int64  `json:"user_id"`
+}
+
+func (q *Queries) UpdateUserEmailIfEmptyByIDBigint(ctx context.Context, arg UpdateUserEmailIfEmptyByIDBigintParams) (*string, error) {
+	row := q.db.QueryRow(ctx, updateUserEmailIfEmptyByIDBigint, arg.UserEmail, arg.UserID)
+	var user_email *string
+	err := row.Scan(&user_email)
+	return user_email, err
 }

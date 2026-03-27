@@ -7,243 +7,336 @@ package db
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cleanupExpiredSessions = `-- name: CleanupExpiredSessions :exec
-UPDATE auth.sessions
-SET session_revoked_at = now(), session_updated_at = now()
-WHERE session_not_after < now() AND session_revoked_at IS NULL
-`
-
-func (q *Queries) CleanupExpiredSessions(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, cleanupExpiredSessions)
-	return err
-}
-
-const cleanupRevokedRefreshTokens = `-- name: CleanupRevokedRefreshTokens :exec
-DELETE FROM auth.refresh_tokens
-WHERE refresh_token_revoked = true AND refresh_token_updated_at < now() - interval '30 days'
-`
-
-func (q *Queries) CleanupRevokedRefreshTokens(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, cleanupRevokedRefreshTokens)
-	return err
-}
-
-const createRefreshToken = `-- name: CreateRefreshToken :one
-INSERT INTO auth.refresh_tokens (
-    session_id,
-    refresh_token_token_hash,
-    refresh_token_counter
-) VALUES ($1, $2, $3)
-RETURNING refresh_token_id, session_id, refresh_token_token_hash, refresh_token_counter, refresh_token_revoked, refresh_token_created_at, refresh_token_updated_at
-`
-
-type CreateRefreshTokenParams struct {
-	SessionID             uuid.UUID `json:"session_id"`
-	RefreshTokenTokenHash string    `json:"refresh_token_token_hash"`
-	RefreshTokenCounter   int64     `json:"refresh_token_counter"`
-}
-
-func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (AuthRefreshToken, error) {
-	row := q.db.QueryRow(ctx, createRefreshToken, arg.SessionID, arg.RefreshTokenTokenHash, arg.RefreshTokenCounter)
-	var i AuthRefreshToken
-	err := row.Scan(
-		&i.RefreshTokenID,
-		&i.SessionID,
-		&i.RefreshTokenTokenHash,
-		&i.RefreshTokenCounter,
-		&i.RefreshTokenRevoked,
-		&i.RefreshTokenCreatedAt,
-		&i.RefreshTokenUpdatedAt,
-	)
-	return i, err
-}
-
 const createSession = `-- name: CreateSession :one
-INSERT INTO auth.sessions (
-    user_id,
-    session_device_id,
-    session_user_agent,
-    session_ip,
-    session_provider,
-    session_refresh_token_hmac_key,
-    session_not_after
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at
+insert into device_sessions (user_id, device_session_user_device_id, device_session_user_agent, device_session_ip, device_session_provider)
+values
+  ((
+      select
+        user_id
+      from
+        users u
+      where
+        u.user_uuid = $1),
+      (
+        select
+          user_device_id
+        from
+          user_devices d
+        where
+          d.user_device_uuid = $2),
+        $3,
+        $4,
+        $5)
+  returning
+    device_session_uuid,
+    (
+      select
+        user_uuid
+      from
+        users u
+      where
+        u.user_id = device_sessions.user_id) as user_uuid,
+    (
+      select
+        user_device_uuid
+      from
+        user_devices d
+      where
+        d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
+    device_session_user_agent,
+    device_session_ip,
+    device_session_provider,
+    device_session_created_at,
+    device_session_updated_at,
+    device_session_refreshed_at,
+    device_session_not_after,
+    device_session_revoked_at
 `
 
 type CreateSessionParams struct {
-	UserID                     uuid.UUID        `json:"user_id"`
-	SessionDeviceID            *uuid.UUID       `json:"session_device_id"`
-	SessionUserAgent           *string          `json:"session_user_agent"`
-	SessionIp                  *string          `json:"session_ip"`
-	SessionProvider            AuthAuthProvider `json:"session_provider"`
-	SessionRefreshTokenHmacKey string           `json:"session_refresh_token_hmac_key"`
-	SessionNotAfter            *time.Time       `json:"session_not_after"`
+	UserUuid                    pgtype.UUID `json:"user_uuid"`
+	DeviceSessionUserDeviceUuid pgtype.UUID `json:"device_session_user_device_uuid"`
+	DeviceSessionUserAgent      *string     `json:"device_session_user_agent"`
+	DeviceSessionIp             *netip.Addr `json:"device_session_ip"`
+	DeviceSessionProvider       *string     `json:"device_session_provider"`
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (AuthSession, error) {
+type CreateSessionRow struct {
+	DeviceSessionUuid           uuid.UUID          `json:"device_session_uuid"`
+	UserUuid                    pgtype.UUID        `json:"user_uuid"`
+	DeviceSessionUserDeviceUuid pgtype.UUID        `json:"device_session_user_device_uuid"`
+	DeviceSessionUserAgent      *string            `json:"device_session_user_agent"`
+	DeviceSessionIp             *netip.Addr        `json:"device_session_ip"`
+	DeviceSessionProvider       string             `json:"device_session_provider"`
+	DeviceSessionCreatedAt      time.Time          `json:"device_session_created_at"`
+	DeviceSessionUpdatedAt      time.Time          `json:"device_session_updated_at"`
+	DeviceSessionRefreshedAt    pgtype.Timestamptz `json:"device_session_refreshed_at"`
+	DeviceSessionNotAfter       pgtype.Timestamptz `json:"device_session_not_after"`
+	DeviceSessionRevokedAt      pgtype.Timestamptz `json:"device_session_revoked_at"`
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (CreateSessionRow, error) {
 	row := q.db.QueryRow(ctx, createSession,
-		arg.UserID,
-		arg.SessionDeviceID,
-		arg.SessionUserAgent,
-		arg.SessionIp,
-		arg.SessionProvider,
-		arg.SessionRefreshTokenHmacKey,
-		arg.SessionNotAfter,
+		arg.UserUuid,
+		arg.DeviceSessionUserDeviceUuid,
+		arg.DeviceSessionUserAgent,
+		arg.DeviceSessionIp,
+		arg.DeviceSessionProvider,
 	)
-	var i AuthSession
+	var i CreateSessionRow
 	err := row.Scan(
-		&i.SessionID,
-		&i.UserID,
-		&i.SessionDeviceID,
-		&i.SessionUserAgent,
-		&i.SessionIp,
-		&i.SessionProvider,
-		&i.SessionRefreshTokenHmacKey,
-		&i.SessionRefreshTokenCounter,
-		&i.SessionCreatedAt,
-		&i.SessionUpdatedAt,
-		&i.SessionRefreshedAt,
-		&i.SessionNotAfter,
-		&i.SessionRevokedAt,
+		&i.DeviceSessionUuid,
+		&i.UserUuid,
+		&i.DeviceSessionUserDeviceUuid,
+		&i.DeviceSessionUserAgent,
+		&i.DeviceSessionIp,
+		&i.DeviceSessionProvider,
+		&i.DeviceSessionCreatedAt,
+		&i.DeviceSessionUpdatedAt,
+		&i.DeviceSessionRefreshedAt,
+		&i.DeviceSessionNotAfter,
+		&i.DeviceSessionRevokedAt,
 	)
 	return i, err
 }
 
 const getActiveSessionByID = `-- name: GetActiveSessionByID :one
-SELECT session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at FROM auth.sessions
-WHERE session_id = $1
-  AND session_revoked_at IS NULL
-  AND (session_not_after IS NULL OR session_not_after > now())
+select
+  device_session_uuid,
+  (
+    select
+      user_uuid
+    from
+      users u
+    where
+      u.user_id = device_sessions.user_id) as user_uuid,
+  (
+    select
+      user_device_uuid
+    from
+      user_devices d
+    where
+      d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
+  device_session_user_agent,
+  device_session_ip,
+  device_session_provider,
+  device_session_created_at,
+  device_session_updated_at,
+  device_session_refreshed_at,
+  device_session_not_after,
+  device_session_revoked_at
+from
+  device_sessions
+where
+  device_session_uuid = $1
+  and device_session_revoked_at is null
+  and (device_session_not_after is null
+    or device_session_not_after > now())
 `
 
-func (q *Queries) GetActiveSessionByID(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
-	row := q.db.QueryRow(ctx, getActiveSessionByID, sessionID)
-	var i AuthSession
-	err := row.Scan(
-		&i.SessionID,
-		&i.UserID,
-		&i.SessionDeviceID,
-		&i.SessionUserAgent,
-		&i.SessionIp,
-		&i.SessionProvider,
-		&i.SessionRefreshTokenHmacKey,
-		&i.SessionRefreshTokenCounter,
-		&i.SessionCreatedAt,
-		&i.SessionUpdatedAt,
-		&i.SessionRefreshedAt,
-		&i.SessionNotAfter,
-		&i.SessionRevokedAt,
-	)
-	return i, err
+type GetActiveSessionByIDRow struct {
+	DeviceSessionUuid           uuid.UUID          `json:"device_session_uuid"`
+	UserUuid                    pgtype.UUID        `json:"user_uuid"`
+	DeviceSessionUserDeviceUuid pgtype.UUID        `json:"device_session_user_device_uuid"`
+	DeviceSessionUserAgent      *string            `json:"device_session_user_agent"`
+	DeviceSessionIp             *netip.Addr        `json:"device_session_ip"`
+	DeviceSessionProvider       string             `json:"device_session_provider"`
+	DeviceSessionCreatedAt      time.Time          `json:"device_session_created_at"`
+	DeviceSessionUpdatedAt      time.Time          `json:"device_session_updated_at"`
+	DeviceSessionRefreshedAt    pgtype.Timestamptz `json:"device_session_refreshed_at"`
+	DeviceSessionNotAfter       pgtype.Timestamptz `json:"device_session_not_after"`
+	DeviceSessionRevokedAt      pgtype.Timestamptz `json:"device_session_revoked_at"`
 }
 
-const getRefreshTokenByHash = `-- name: GetRefreshTokenByHash :one
-SELECT refresh_token_id, session_id, refresh_token_token_hash, refresh_token_counter, refresh_token_revoked, refresh_token_created_at, refresh_token_updated_at FROM auth.refresh_tokens
-WHERE refresh_token_token_hash = $1
-`
-
-func (q *Queries) GetRefreshTokenByHash(ctx context.Context, refreshTokenTokenHash string) (AuthRefreshToken, error) {
-	row := q.db.QueryRow(ctx, getRefreshTokenByHash, refreshTokenTokenHash)
-	var i AuthRefreshToken
+func (q *Queries) GetActiveSessionByID(ctx context.Context, deviceSessionUuid pgtype.UUID) (GetActiveSessionByIDRow, error) {
+	row := q.db.QueryRow(ctx, getActiveSessionByID, deviceSessionUuid)
+	var i GetActiveSessionByIDRow
 	err := row.Scan(
-		&i.RefreshTokenID,
-		&i.SessionID,
-		&i.RefreshTokenTokenHash,
-		&i.RefreshTokenCounter,
-		&i.RefreshTokenRevoked,
-		&i.RefreshTokenCreatedAt,
-		&i.RefreshTokenUpdatedAt,
-	)
-	return i, err
-}
-
-const getRefreshTokenBySessionAndCounter = `-- name: GetRefreshTokenBySessionAndCounter :one
-SELECT refresh_token_id, session_id, refresh_token_token_hash, refresh_token_counter, refresh_token_revoked, refresh_token_created_at, refresh_token_updated_at FROM auth.refresh_tokens
-WHERE session_id = $1 AND refresh_token_counter = $2
-`
-
-type GetRefreshTokenBySessionAndCounterParams struct {
-	SessionID           uuid.UUID `json:"session_id"`
-	RefreshTokenCounter int64     `json:"refresh_token_counter"`
-}
-
-func (q *Queries) GetRefreshTokenBySessionAndCounter(ctx context.Context, arg GetRefreshTokenBySessionAndCounterParams) (AuthRefreshToken, error) {
-	row := q.db.QueryRow(ctx, getRefreshTokenBySessionAndCounter, arg.SessionID, arg.RefreshTokenCounter)
-	var i AuthRefreshToken
-	err := row.Scan(
-		&i.RefreshTokenID,
-		&i.SessionID,
-		&i.RefreshTokenTokenHash,
-		&i.RefreshTokenCounter,
-		&i.RefreshTokenRevoked,
-		&i.RefreshTokenCreatedAt,
-		&i.RefreshTokenUpdatedAt,
+		&i.DeviceSessionUuid,
+		&i.UserUuid,
+		&i.DeviceSessionUserDeviceUuid,
+		&i.DeviceSessionUserAgent,
+		&i.DeviceSessionIp,
+		&i.DeviceSessionProvider,
+		&i.DeviceSessionCreatedAt,
+		&i.DeviceSessionUpdatedAt,
+		&i.DeviceSessionRefreshedAt,
+		&i.DeviceSessionNotAfter,
+		&i.DeviceSessionRevokedAt,
 	)
 	return i, err
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at FROM auth.sessions
-WHERE session_id = $1
+select
+  device_session_uuid,
+  (
+    select
+      user_uuid
+    from
+      users u
+    where
+      u.user_id = device_sessions.user_id) as user_uuid,
+  (
+    select
+      user_device_uuid
+    from
+      user_devices d
+    where
+      d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
+  device_session_user_agent,
+  device_session_ip,
+  device_session_provider,
+  device_session_created_at,
+  device_session_updated_at,
+  device_session_refreshed_at,
+  device_session_not_after,
+  device_session_revoked_at
+from
+  device_sessions
+where
+  device_session_uuid = $1
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
-	row := q.db.QueryRow(ctx, getSessionByID, sessionID)
-	var i AuthSession
+type GetSessionByIDRow struct {
+	DeviceSessionUuid           uuid.UUID          `json:"device_session_uuid"`
+	UserUuid                    pgtype.UUID        `json:"user_uuid"`
+	DeviceSessionUserDeviceUuid pgtype.UUID        `json:"device_session_user_device_uuid"`
+	DeviceSessionUserAgent      *string            `json:"device_session_user_agent"`
+	DeviceSessionIp             *netip.Addr        `json:"device_session_ip"`
+	DeviceSessionProvider       string             `json:"device_session_provider"`
+	DeviceSessionCreatedAt      time.Time          `json:"device_session_created_at"`
+	DeviceSessionUpdatedAt      time.Time          `json:"device_session_updated_at"`
+	DeviceSessionRefreshedAt    pgtype.Timestamptz `json:"device_session_refreshed_at"`
+	DeviceSessionNotAfter       pgtype.Timestamptz `json:"device_session_not_after"`
+	DeviceSessionRevokedAt      pgtype.Timestamptz `json:"device_session_revoked_at"`
+}
+
+func (q *Queries) GetSessionByID(ctx context.Context, deviceSessionUuid pgtype.UUID) (GetSessionByIDRow, error) {
+	row := q.db.QueryRow(ctx, getSessionByID, deviceSessionUuid)
+	var i GetSessionByIDRow
 	err := row.Scan(
-		&i.SessionID,
-		&i.UserID,
-		&i.SessionDeviceID,
-		&i.SessionUserAgent,
-		&i.SessionIp,
-		&i.SessionProvider,
-		&i.SessionRefreshTokenHmacKey,
-		&i.SessionRefreshTokenCounter,
-		&i.SessionCreatedAt,
-		&i.SessionUpdatedAt,
-		&i.SessionRefreshedAt,
-		&i.SessionNotAfter,
-		&i.SessionRevokedAt,
+		&i.DeviceSessionUuid,
+		&i.UserUuid,
+		&i.DeviceSessionUserDeviceUuid,
+		&i.DeviceSessionUserAgent,
+		&i.DeviceSessionIp,
+		&i.DeviceSessionProvider,
+		&i.DeviceSessionCreatedAt,
+		&i.DeviceSessionUpdatedAt,
+		&i.DeviceSessionRefreshedAt,
+		&i.DeviceSessionNotAfter,
+		&i.DeviceSessionRevokedAt,
 	)
 	return i, err
 }
 
 const getSessionsByUserID = `-- name: GetSessionsByUserID :many
-SELECT session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at FROM auth.sessions
-WHERE user_id = $1
-  AND session_revoked_at IS NULL
-ORDER BY session_created_at DESC
+select
+  ds.device_session_uuid,
+  u.user_uuid,
+  d.user_device_uuid as device_session_user_device_uuid,
+  ds.device_session_user_agent,
+  ds.device_session_ip,
+  ds.device_session_provider,
+  ds.device_session_created_at,
+  ds.device_session_updated_at,
+  ds.device_session_refreshed_at,
+  ds.device_session_not_after,
+  ds.device_session_revoked_at,
+  coalesce(ds.device_session_device_name, d.user_device_name) as device_name,
+  coalesce(ds.device_session_device_os, d.user_device_os) as device_os,
+  coalesce(ds.device_session_device_model, d.user_device_model) as device_model,
+  coalesce(ds.device_session_locale, d.user_device_locale) as device_locale,
+  coalesce(ds.device_session_time_zone, d.user_device_time_zone) as device_time_zone,
+  coalesce(ds.device_session_app_version, d.user_device_app_version) as device_app_version,
+  ds.device_session_location_city,
+  ds.device_session_location_region,
+  ds.device_session_location_country_code,
+  ds.device_session_location_source,
+  d.user_device_last_seen_at
+from
+  device_sessions ds
+  join users u on u.user_id = ds.user_id
+  join user_devices d on d.user_device_id = ds.device_session_user_device_id
+where
+  ds.user_id = (
+    select
+      user_id
+    from
+      users u
+    where
+      u.user_uuid = $1)
+  and ds.device_session_revoked_at is null
+order by
+  coalesce(ds.device_session_refreshed_at, ds.device_session_created_at) desc,
+  ds.device_session_created_at desc
 `
 
-func (q *Queries) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]AuthSession, error) {
-	rows, err := q.db.Query(ctx, getSessionsByUserID, userID)
+type GetSessionsByUserIDRow struct {
+	DeviceSessionUuid                uuid.UUID          `json:"device_session_uuid"`
+	UserUuid                         uuid.UUID          `json:"user_uuid"`
+	DeviceSessionUserDeviceUuid      uuid.UUID          `json:"device_session_user_device_uuid"`
+	DeviceSessionUserAgent           *string            `json:"device_session_user_agent"`
+	DeviceSessionIp                  *netip.Addr        `json:"device_session_ip"`
+	DeviceSessionProvider            string             `json:"device_session_provider"`
+	DeviceSessionCreatedAt           time.Time          `json:"device_session_created_at"`
+	DeviceSessionUpdatedAt           time.Time          `json:"device_session_updated_at"`
+	DeviceSessionRefreshedAt         pgtype.Timestamptz `json:"device_session_refreshed_at"`
+	DeviceSessionNotAfter            pgtype.Timestamptz `json:"device_session_not_after"`
+	DeviceSessionRevokedAt           pgtype.Timestamptz `json:"device_session_revoked_at"`
+	DeviceName                       *string            `json:"device_name"`
+	DeviceOs                         *string            `json:"device_os"`
+	DeviceModel                      *string            `json:"device_model"`
+	DeviceLocale                     *string            `json:"device_locale"`
+	DeviceTimeZone                   *string            `json:"device_time_zone"`
+	DeviceAppVersion                 *string            `json:"device_app_version"`
+	DeviceSessionLocationCity        *string            `json:"device_session_location_city"`
+	DeviceSessionLocationRegion      *string            `json:"device_session_location_region"`
+	DeviceSessionLocationCountryCode *string            `json:"device_session_location_country_code"`
+	DeviceSessionLocationSource      *string            `json:"device_session_location_source"`
+	UserDeviceLastSeenAt             time.Time          `json:"user_device_last_seen_at"`
+}
+
+func (q *Queries) GetSessionsByUserID(ctx context.Context, userUuid pgtype.UUID) ([]GetSessionsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, getSessionsByUserID, userUuid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AuthSession{}
+	items := []GetSessionsByUserIDRow{}
 	for rows.Next() {
-		var i AuthSession
+		var i GetSessionsByUserIDRow
 		if err := rows.Scan(
-			&i.SessionID,
-			&i.UserID,
-			&i.SessionDeviceID,
-			&i.SessionUserAgent,
-			&i.SessionIp,
-			&i.SessionProvider,
-			&i.SessionRefreshTokenHmacKey,
-			&i.SessionRefreshTokenCounter,
-			&i.SessionCreatedAt,
-			&i.SessionUpdatedAt,
-			&i.SessionRefreshedAt,
-			&i.SessionNotAfter,
-			&i.SessionRevokedAt,
+			&i.DeviceSessionUuid,
+			&i.UserUuid,
+			&i.DeviceSessionUserDeviceUuid,
+			&i.DeviceSessionUserAgent,
+			&i.DeviceSessionIp,
+			&i.DeviceSessionProvider,
+			&i.DeviceSessionCreatedAt,
+			&i.DeviceSessionUpdatedAt,
+			&i.DeviceSessionRefreshedAt,
+			&i.DeviceSessionNotAfter,
+			&i.DeviceSessionRevokedAt,
+			&i.DeviceName,
+			&i.DeviceOs,
+			&i.DeviceModel,
+			&i.DeviceLocale,
+			&i.DeviceTimeZone,
+			&i.DeviceAppVersion,
+			&i.DeviceSessionLocationCity,
+			&i.DeviceSessionLocationRegion,
+			&i.DeviceSessionLocationCountryCode,
+			&i.DeviceSessionLocationSource,
+			&i.UserDeviceLastSeenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -255,93 +348,103 @@ func (q *Queries) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]
 	return items, nil
 }
 
-const revokeAllSessionRefreshTokens = `-- name: RevokeAllSessionRefreshTokens :exec
-UPDATE auth.refresh_tokens
-SET refresh_token_revoked = true, refresh_token_updated_at = now()
-WHERE session_id = $1 AND refresh_token_revoked = false
-`
-
-func (q *Queries) RevokeAllSessionRefreshTokens(ctx context.Context, sessionID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, revokeAllSessionRefreshTokens, sessionID)
-	return err
-}
-
 const revokeAllUserSessions = `-- name: RevokeAllUserSessions :exec
-UPDATE auth.sessions
-SET session_revoked_at = now(), session_updated_at = now()
-WHERE user_id = $1 AND session_revoked_at IS NULL
+update
+  device_sessions
+set
+  device_session_revoked_at = now(),
+  device_session_updated_at = now()
+where
+  user_id = (
+    select
+      user_id
+    from
+      users u
+    where
+      u.user_uuid = $1)
+  and device_session_revoked_at is null
 `
 
-func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, revokeAllUserSessions, userID)
-	return err
-}
-
-const revokeAllUserSessionsExcept = `-- name: RevokeAllUserSessionsExcept :exec
-UPDATE auth.sessions
-SET session_revoked_at = now(), session_updated_at = now()
-WHERE user_id = $1 AND session_id != $2 AND session_revoked_at IS NULL
-`
-
-type RevokeAllUserSessionsExceptParams struct {
-	UserID    uuid.UUID `json:"user_id"`
-	SessionID uuid.UUID `json:"session_id"`
-}
-
-func (q *Queries) RevokeAllUserSessionsExcept(ctx context.Context, arg RevokeAllUserSessionsExceptParams) error {
-	_, err := q.db.Exec(ctx, revokeAllUserSessionsExcept, arg.UserID, arg.SessionID)
-	return err
-}
-
-const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
-UPDATE auth.refresh_tokens
-SET refresh_token_revoked = true, refresh_token_updated_at = now()
-WHERE refresh_token_id = $1
-`
-
-func (q *Queries) RevokeRefreshToken(ctx context.Context, refreshTokenID int64) error {
-	_, err := q.db.Exec(ctx, revokeRefreshToken, refreshTokenID)
+func (q *Queries) RevokeAllUserSessions(ctx context.Context, userUuid pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, revokeAllUserSessions, userUuid)
 	return err
 }
 
 const revokeSession = `-- name: RevokeSession :exec
-UPDATE auth.sessions
-SET session_revoked_at = now(), session_updated_at = now()
-WHERE session_id = $1
+update
+  device_sessions
+set
+  device_session_revoked_at = now(),
+  device_session_updated_at = now()
+where
+  device_session_uuid = $1
 `
 
-func (q *Queries) RevokeSession(ctx context.Context, sessionID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, revokeSession, sessionID)
+func (q *Queries) RevokeSession(ctx context.Context, deviceSessionUuid pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, revokeSession, deviceSessionUuid)
 	return err
 }
 
-const updateSessionRefreshed = `-- name: UpdateSessionRefreshed :one
-UPDATE auth.sessions
-SET
-    session_refreshed_at = now(),
-    session_updated_at = now(),
-    session_refresh_token_counter = session_refresh_token_counter + 1
-WHERE session_id = $1
-RETURNING session_id, user_id, session_device_id, session_user_agent, session_ip, session_provider, session_refresh_token_hmac_key, session_refresh_token_counter, session_created_at, session_updated_at, session_refreshed_at, session_not_after, session_revoked_at
+const updateSessionMetadata = `-- name: UpdateSessionMetadata :exec
+update device_sessions
+set
+  device_session_device_name = nullif($1, ''),
+  device_session_device_os = nullif($2, ''),
+  device_session_device_model = nullif($3, ''),
+  device_session_app_version = nullif($4, ''),
+  device_session_locale = nullif($5, ''),
+  device_session_time_zone = nullif($6, ''),
+  device_session_location_city = nullif($7, ''),
+  device_session_location_region = nullif($8, ''),
+  device_session_location_country_code = nullif($9, ''),
+  device_session_location_source = nullif($10, ''),
+  device_session_updated_at = now()
+where
+  device_session_uuid = $11
 `
 
-func (q *Queries) UpdateSessionRefreshed(ctx context.Context, sessionID uuid.UUID) (AuthSession, error) {
-	row := q.db.QueryRow(ctx, updateSessionRefreshed, sessionID)
-	var i AuthSession
-	err := row.Scan(
-		&i.SessionID,
-		&i.UserID,
-		&i.SessionDeviceID,
-		&i.SessionUserAgent,
-		&i.SessionIp,
-		&i.SessionProvider,
-		&i.SessionRefreshTokenHmacKey,
-		&i.SessionRefreshTokenCounter,
-		&i.SessionCreatedAt,
-		&i.SessionUpdatedAt,
-		&i.SessionRefreshedAt,
-		&i.SessionNotAfter,
-		&i.SessionRevokedAt,
+type UpdateSessionMetadataParams struct {
+	DeviceSessionDeviceName          *string     `json:"device_session_device_name"`
+	DeviceSessionDeviceOs            *string     `json:"device_session_device_os"`
+	DeviceSessionDeviceModel         *string     `json:"device_session_device_model"`
+	DeviceSessionAppVersion          *string     `json:"device_session_app_version"`
+	DeviceSessionLocale              *string     `json:"device_session_locale"`
+	DeviceSessionTimeZone            *string     `json:"device_session_time_zone"`
+	DeviceSessionLocationCity        *string     `json:"device_session_location_city"`
+	DeviceSessionLocationRegion      *string     `json:"device_session_location_region"`
+	DeviceSessionLocationCountryCode *string     `json:"device_session_location_country_code"`
+	DeviceSessionLocationSource      *string     `json:"device_session_location_source"`
+	DeviceSessionUuid                pgtype.UUID `json:"device_session_uuid"`
+}
+
+func (q *Queries) UpdateSessionMetadata(ctx context.Context, arg UpdateSessionMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateSessionMetadata,
+		arg.DeviceSessionDeviceName,
+		arg.DeviceSessionDeviceOs,
+		arg.DeviceSessionDeviceModel,
+		arg.DeviceSessionAppVersion,
+		arg.DeviceSessionLocale,
+		arg.DeviceSessionTimeZone,
+		arg.DeviceSessionLocationCity,
+		arg.DeviceSessionLocationRegion,
+		arg.DeviceSessionLocationCountryCode,
+		arg.DeviceSessionLocationSource,
+		arg.DeviceSessionUuid,
 	)
-	return i, err
+	return err
+}
+
+const updateSessionRefreshed = `-- name: UpdateSessionRefreshed :exec
+update
+  device_sessions
+set
+  device_session_refreshed_at = now(),
+  device_session_updated_at = now()
+where
+  device_session_uuid = $1
+`
+
+func (q *Queries) UpdateSessionRefreshed(ctx context.Context, deviceSessionUuid pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateSessionRefreshed, deviceSessionUuid)
+	return err
 }

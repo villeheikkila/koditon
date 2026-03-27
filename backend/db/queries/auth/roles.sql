@@ -1,54 +1,90 @@
 -- name: GetUserRoles :many
-SELECT r.* FROM auth.roles r
-JOIN auth.user_roles ur ON ur.role_id = r.role_id
-WHERE ur.user_id = $1
-ORDER BY r.role_name;
+select
+  r.role_uuid,
+  r.role_name,
+  r.role_description,
+  r.role_created_at
+from
+  roles r
+  join user_roles ur on ur.role_id = r.role_id
+where
+  ur.user_id = (
+    select
+      user_id
+    from
+      users u
+    where
+      u.user_uuid = $1)
+order by
+  r.role_name;
 
 -- name: GetActiveFeatureFlags :many
-SELECT DISTINCT f.flag_name
-FROM auth.feature_flags f
-WHERE (
+with u as (
+  select
+    user_id
+  from
+    users
+  where
+    user_uuid = $1
+),
+enabled as (
+  select
+    f.flag_id
+  from
+    feature_flags f
+  where
     f.flag_default_enabled = true
-    OR EXISTS (
-        SELECT 1 FROM auth.role_feature_flags rff
-        JOIN auth.user_roles ur ON ur.role_id = rff.role_id
-        WHERE rff.flag_id = f.flag_id AND ur.user_id = $1
-    )
-    OR EXISTS (
-        SELECT 1 FROM auth.user_feature_flags uff
-        WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = true
-    )
+  union
+  select
+    rff.flag_id
+  from
+    role_feature_flags rff
+    join user_roles ur on ur.role_id = rff.role_id
+    join u on u.user_id = ur.user_id
+union
+select
+  uff.flag_id
+from
+  user_feature_flags uff
+  join u on u.user_id = uff.user_id
+  where
+    uff.user_flag_enabled = true
+),
+disabled as (
+  select
+    uff.flag_id
+  from
+    user_feature_flags uff
+    join u on u.user_id = uff.user_id
+  where
+    uff.user_flag_enabled = false
 )
-AND NOT EXISTS (
-    SELECT 1 FROM auth.user_feature_flags uff
-    WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = false
-);
-
--- name: HasFeatureFlag :one
-SELECT EXISTS (
-    SELECT 1 FROM auth.feature_flags f
-    WHERE f.flag_name = $2
-    AND (
-        f.flag_default_enabled = true
-        OR EXISTS (
-            SELECT 1 FROM auth.role_feature_flags rff
-            JOIN auth.user_roles ur ON ur.role_id = rff.role_id
-            WHERE rff.flag_id = f.flag_id AND ur.user_id = $1
-        )
-        OR EXISTS (
-            SELECT 1 FROM auth.user_feature_flags uff
-            WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = true
-        )
-    )
-    AND NOT EXISTS (
-        SELECT 1 FROM auth.user_feature_flags uff
-        WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = false
-    )
-) AS has_flag;
+select
+  f.flag_name
+from
+  enabled e
+  join feature_flags f on f.flag_id = e.flag_id
+  left join disabled d on d.flag_id = e.flag_id
+where
+  d.flag_id is null
+order by
+  f.flag_name;
 
 -- name: HasRole :one
-SELECT EXISTS (
-    SELECT 1 FROM auth.user_roles ur
-    JOIN auth.roles r ON r.role_id = ur.role_id
-    WHERE ur.user_id = $1 AND r.role_name = $2
-) AS has_role;
+select
+  exists (
+    select
+      1
+    from
+      user_roles ur
+      join roles r on r.role_id = ur.role_id
+    where
+      ur.user_id = (
+        select
+          user_id
+        from
+          users u
+        where
+          u.user_uuid = $1)
+        and r.role_name = $2) as has_role;
+

@@ -7,33 +7,67 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getActiveFeatureFlags = `-- name: GetActiveFeatureFlags :many
-SELECT DISTINCT f.flag_name
-FROM auth.feature_flags f
-WHERE (
+with u as (
+  select
+    user_id
+  from
+    users
+  where
+    user_uuid = $1
+),
+enabled as (
+  select
+    f.flag_id
+  from
+    feature_flags f
+  where
     f.flag_default_enabled = true
-    OR EXISTS (
-        SELECT 1 FROM auth.role_feature_flags rff
-        JOIN auth.user_roles ur ON ur.role_id = rff.role_id
-        WHERE rff.flag_id = f.flag_id AND ur.user_id = $1
-    )
-    OR EXISTS (
-        SELECT 1 FROM auth.user_feature_flags uff
-        WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = true
-    )
+  union
+  select
+    rff.flag_id
+  from
+    role_feature_flags rff
+    join user_roles ur on ur.role_id = rff.role_id
+    join u on u.user_id = ur.user_id
+union
+select
+  uff.flag_id
+from
+  user_feature_flags uff
+  join u on u.user_id = uff.user_id
+  where
+    uff.user_flag_enabled = true
+),
+disabled as (
+  select
+    uff.flag_id
+  from
+    user_feature_flags uff
+    join u on u.user_id = uff.user_id
+  where
+    uff.user_flag_enabled = false
 )
-AND NOT EXISTS (
-    SELECT 1 FROM auth.user_feature_flags uff
-    WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = false
-)
+select
+  f.flag_name
+from
+  enabled e
+  join feature_flags f on f.flag_id = e.flag_id
+  left join disabled d on d.flag_id = e.flag_id
+where
+  d.flag_id is null
+order by
+  f.flag_name
 `
 
-func (q *Queries) GetActiveFeatureFlags(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	rows, err := q.db.Query(ctx, getActiveFeatureFlags, userID)
+func (q *Queries) GetActiveFeatureFlags(ctx context.Context, dollar_1 pgtype.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, getActiveFeatureFlags, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -53,23 +87,44 @@ func (q *Queries) GetActiveFeatureFlags(ctx context.Context, userID uuid.UUID) (
 }
 
 const getUserRoles = `-- name: GetUserRoles :many
-SELECT r.role_id, r.role_name, r.role_description, r.role_created_at FROM auth.roles r
-JOIN auth.user_roles ur ON ur.role_id = r.role_id
-WHERE ur.user_id = $1
-ORDER BY r.role_name
+select
+  r.role_uuid,
+  r.role_name,
+  r.role_description,
+  r.role_created_at
+from
+  roles r
+  join user_roles ur on ur.role_id = r.role_id
+where
+  ur.user_id = (
+    select
+      user_id
+    from
+      users u
+    where
+      u.user_uuid = $1)
+order by
+  r.role_name
 `
 
-func (q *Queries) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]AuthRole, error) {
-	rows, err := q.db.Query(ctx, getUserRoles, userID)
+type GetUserRolesRow struct {
+	RoleUuid        uuid.UUID `json:"role_uuid"`
+	RoleName        string    `json:"role_name"`
+	RoleDescription *string   `json:"role_description"`
+	RoleCreatedAt   time.Time `json:"role_created_at"`
+}
+
+func (q *Queries) GetUserRoles(ctx context.Context, dollar_1 pgtype.UUID) ([]GetUserRolesRow, error) {
+	rows, err := q.db.Query(ctx, getUserRoles, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AuthRole{}
+	items := []GetUserRolesRow{}
 	for rows.Next() {
-		var i AuthRole
+		var i GetUserRolesRow
 		if err := rows.Scan(
-			&i.RoleID,
+			&i.RoleUuid,
 			&i.RoleName,
 			&i.RoleDescription,
 			&i.RoleCreatedAt,
@@ -84,56 +139,32 @@ func (q *Queries) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]AuthRol
 	return items, nil
 }
 
-const hasFeatureFlag = `-- name: HasFeatureFlag :one
-SELECT EXISTS (
-    SELECT 1 FROM auth.feature_flags f
-    WHERE f.flag_name = $2
-    AND (
-        f.flag_default_enabled = true
-        OR EXISTS (
-            SELECT 1 FROM auth.role_feature_flags rff
-            JOIN auth.user_roles ur ON ur.role_id = rff.role_id
-            WHERE rff.flag_id = f.flag_id AND ur.user_id = $1
-        )
-        OR EXISTS (
-            SELECT 1 FROM auth.user_feature_flags uff
-            WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = true
-        )
-    )
-    AND NOT EXISTS (
-        SELECT 1 FROM auth.user_feature_flags uff
-        WHERE uff.flag_id = f.flag_id AND uff.user_id = $1 AND uff.user_flag_enabled = false
-    )
-) AS has_flag
-`
-
-type HasFeatureFlagParams struct {
-	UserID   uuid.UUID `json:"user_id"`
-	FlagName string    `json:"flag_name"`
-}
-
-func (q *Queries) HasFeatureFlag(ctx context.Context, arg HasFeatureFlagParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasFeatureFlag, arg.UserID, arg.FlagName)
-	var has_flag bool
-	err := row.Scan(&has_flag)
-	return has_flag, err
-}
-
 const hasRole = `-- name: HasRole :one
-SELECT EXISTS (
-    SELECT 1 FROM auth.user_roles ur
-    JOIN auth.roles r ON r.role_id = ur.role_id
-    WHERE ur.user_id = $1 AND r.role_name = $2
-) AS has_role
+select
+  exists (
+    select
+      1
+    from
+      user_roles ur
+      join roles r on r.role_id = ur.role_id
+    where
+      ur.user_id = (
+        select
+          user_id
+        from
+          users u
+        where
+          u.user_uuid = $1)
+        and r.role_name = $2) as has_role
 `
 
 type HasRoleParams struct {
-	UserID   uuid.UUID `json:"user_id"`
-	RoleName string    `json:"role_name"`
+	Column1 pgtype.UUID `json:"column_1"`
+	Column2 *string     `json:"column_2"`
 }
 
 func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasRole, arg.UserID, arg.RoleName)
+	row := q.db.QueryRow(ctx, hasRole, arg.Column1, arg.Column2)
 	var has_role bool
 	err := row.Scan(&has_role)
 	return has_role, err

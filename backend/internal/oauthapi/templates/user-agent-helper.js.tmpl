@@ -1,0 +1,16 @@
+{{define "userAgentHelper"}}
+function detectMakuUserAgentContext() {
+  const uaDataPlatform = navigator.userAgentData && navigator.userAgentData.platform ? navigator.userAgentData.platform : '';
+  const platform = uaDataPlatform || navigator.platform || '';
+  const userAgent = navigator.userAgent || '';
+  const isLikelyIOS = /iPhone|iPad|iPod/i.test(userAgent) ||
+    /iPhone|iPad|iPod/i.test(platform) ||
+    (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  return {
+    userAgent,
+    platform,
+    isLikelyIOS,
+  };
+}
+{{end}}

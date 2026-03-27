@@ -1,6 +1,3 @@
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
 create table public.frontdoor_ads (
   frontdoor_ad_id uuid default gen_random_uuid() not null constraint frontdoor_ads_pkey primary key,
   frontdoor_ad_external_id text not null constraint frontdoor_ads_frontdoor_ads_external_id_key unique,
@@ -447,3 +444,354 @@ create table public.shortcut_tokens (
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
 
+
+-- ============================================================
+-- Auth Schema (maku-based)
+-- ============================================================
+
+CREATE TYPE public.enum__name_display AS ENUM (
+    'full_name',
+    'username'
+);
+
+CREATE TABLE public.users (
+    user_uuid uuid NOT NULL,
+    user_first_name text,
+    user_last_name text,
+    user_username text,
+    user_name_display public.enum__name_display DEFAULT 'username'::public.enum__name_display,
+    user_is_private boolean DEFAULT false NOT NULL,
+    user_is_onboarded boolean DEFAULT false NOT NULL,
+    user_joined_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_search text GENERATED ALWAYS AS (((user_username || COALESCE(user_first_name, ''::text)) || COALESCE(user_last_name, ''::text))) STORED,
+    user_preferred_name text GENERATED ALWAYS AS (
+CASE
+    WHEN ((user_name_display = 'full_name'::public.enum__name_display) AND (user_first_name IS NOT NULL) AND (user_last_name IS NOT NULL)) THEN ((user_first_name || ' '::text) || user_last_name)
+    ELSE user_username
+END) STORED,
+    user_id bigint NOT NULL,
+    user_email text,
+    user_has_seen_passkey_onboarding boolean DEFAULT false NOT NULL,
+    CONSTRAINT users_pkey PRIMARY KEY (user_id),
+    CONSTRAINT users_uuid_key UNIQUE (user_uuid)
+);
+
+CREATE TABLE public.user_identities (
+    user_identity_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_identity_external_id text NOT NULL,
+    user_identity_email text,
+    user_identity_email_verified boolean DEFAULT false NOT NULL,
+    user_identity_data jsonb DEFAULT '{}'::jsonb,
+    user_identity_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_identity_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_identity_provider text NOT NULL,
+    user_identity_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    CONSTRAINT user_identities_pkey PRIMARY KEY (user_identity_id),
+    CONSTRAINT user_identities_uuid_key UNIQUE (user_identity_uuid),
+    CONSTRAINT user_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.user_devices (
+    user_device_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_device_name text,
+    user_device_os text,
+    user_device_app_version text,
+    user_device_push_token text,
+    user_device_push_token_updated_at timestamp with time zone,
+    user_device_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_device_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_device_last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_device_push_token_type text,
+    user_device_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    user_device_push_is_development boolean DEFAULT false NOT NULL,
+    user_device_push_token_invalidated_at timestamp with time zone,
+    user_device_push_token_invalidated_reason text,
+    user_device_model text,
+    user_device_locale text,
+    user_device_time_zone text,
+    CONSTRAINT user_devices_pkey PRIMARY KEY (user_device_id),
+    CONSTRAINT user_devices_uuid_key UNIQUE (user_device_uuid),
+    CONSTRAINT user_devices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.device_sessions (
+    device_session_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    device_session_user_agent text,
+    device_session_ip inet,
+    device_session_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    device_session_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    device_session_refreshed_at timestamp with time zone,
+    device_session_not_after timestamp with time zone,
+    device_session_revoked_at timestamp with time zone,
+    device_session_provider text NOT NULL,
+    device_session_id bigint NOT NULL,
+    device_session_user_device_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    device_session_device_name text,
+    device_session_device_os text,
+    device_session_device_model text,
+    device_session_app_version text,
+    device_session_locale text,
+    device_session_time_zone text,
+    device_session_location_city text,
+    device_session_location_region text,
+    device_session_location_country_code text,
+    device_session_location_source text,
+    CONSTRAINT device_sessions_pkey PRIMARY KEY (device_session_id),
+    CONSTRAINT device_sessions_uuid_key UNIQUE (device_session_uuid),
+    CONSTRAINT device_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
+    CONSTRAINT device_sessions_device_session_user_device_id_fkey FOREIGN KEY (device_session_user_device_id) REFERENCES public.user_devices(user_device_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.feature_flags (
+    flag_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    flag_name text NOT NULL,
+    flag_description text,
+    flag_default_enabled boolean DEFAULT false NOT NULL,
+    flag_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    flag_id bigint NOT NULL,
+    CONSTRAINT feature_flags_pkey PRIMARY KEY (flag_id),
+    CONSTRAINT feature_flags_flag_name_key UNIQUE (flag_name)
+);
+
+CREATE TABLE public.roles (
+    role_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    role_name text NOT NULL,
+    role_description text,
+    role_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    role_id bigint NOT NULL,
+    CONSTRAINT roles_pkey PRIMARY KEY (role_id),
+    CONSTRAINT roles_role_name_key UNIQUE (role_name)
+);
+
+CREATE TABLE public.user_roles (
+    user_role_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    role_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    CONSTRAINT user_roles_pkey PRIMARY KEY (user_id, role_id),
+    CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
+    CONSTRAINT user_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(role_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.role_feature_flags (
+    flag_id bigint NOT NULL,
+    role_id bigint NOT NULL,
+    CONSTRAINT role_feature_flags_pkey PRIMARY KEY (role_id, flag_id),
+    CONSTRAINT role_feature_flags_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.feature_flags(flag_id) ON DELETE CASCADE,
+    CONSTRAINT role_feature_flags_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(role_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.user_feature_flags (
+    user_flag_enabled boolean NOT NULL,
+    user_flag_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    flag_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    CONSTRAINT user_feature_flags_pkey PRIMARY KEY (user_id, flag_id),
+    CONSTRAINT user_feature_flags_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.feature_flags(flag_id) ON DELETE CASCADE,
+    CONSTRAINT user_feature_flags_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.personal_access_tokens (
+    personal_access_token_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    personal_access_token_name text NOT NULL,
+    personal_access_token_prefix text NOT NULL,
+    personal_access_token_token_hash text NOT NULL,
+    personal_access_token_scopes text[],
+    personal_access_token_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    personal_access_token_last_used_at timestamp with time zone,
+    personal_access_token_expires_at timestamp with time zone,
+    personal_access_token_revoked_at timestamp with time zone,
+    user_id bigint NOT NULL,
+    CONSTRAINT personal_access_tokens_pkey PRIMARY KEY (personal_access_token_id),
+    CONSTRAINT personal_access_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.user_email_change_tokens (
+    user_email_change_token_id bigint NOT NULL,
+    user_email_change_token_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id bigint NOT NULL,
+    user_email_change_target_email text NOT NULL,
+    user_email_change_token_hash text NOT NULL,
+    user_email_change_expires_at timestamp with time zone NOT NULL,
+    user_email_change_consumed_at timestamp with time zone,
+    user_email_change_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT user_email_change_tokens_pkey PRIMARY KEY (user_email_change_token_id),
+    CONSTRAINT user_email_change_tokens_uuid_key UNIQUE (user_email_change_token_uuid),
+    CONSTRAINT user_email_change_tokens_token_hash_key UNIQUE (user_email_change_token_hash),
+    CONSTRAINT user_email_change_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.user_passkeys (
+    user_passkey_id bigint NOT NULL,
+    user_passkey_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id bigint NOT NULL,
+    user_identity_id bigint NOT NULL,
+    user_passkey_credential_id bytea NOT NULL,
+    user_passkey_credential_id_b64url text NOT NULL,
+    user_passkey_public_key bytea NOT NULL,
+    user_passkey_attestation_type text NOT NULL,
+    user_passkey_transports text[] NOT NULL DEFAULT '{}',
+    user_passkey_user_handle bytea NOT NULL,
+    user_passkey_sign_count bigint NOT NULL DEFAULT 0,
+    user_passkey_flags integer,
+    user_passkey_aaguid uuid,
+    user_passkey_name text,
+    user_passkey_backup_eligible boolean,
+    user_passkey_backup_state boolean,
+    user_passkey_last_used_at timestamptz,
+    user_passkey_created_at timestamptz NOT NULL DEFAULT now(),
+    user_passkey_updated_at timestamptz NOT NULL DEFAULT now(),
+    user_passkey_revoked_at timestamptz,
+    CONSTRAINT user_passkeys_pkey PRIMARY KEY (user_passkey_id),
+    CONSTRAINT user_passkeys_uuid_key UNIQUE (user_passkey_uuid),
+    CONSTRAINT user_passkeys_credential_id_key UNIQUE (user_passkey_credential_id),
+    CONSTRAINT user_passkeys_credential_id_b64url_key UNIQUE (user_passkey_credential_id_b64url),
+    CONSTRAINT user_passkeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
+    CONSTRAINT user_passkeys_user_identity_id_fkey FOREIGN KEY (user_identity_id) REFERENCES public.user_identities(user_identity_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.auth_webauthn_challenges (
+    auth_webauthn_challenge_id bigint NOT NULL,
+    auth_webauthn_challenge_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
+    auth_webauthn_challenge_flow text NOT NULL,
+    auth_webauthn_challenge_session jsonb NOT NULL,
+    auth_webauthn_challenge_expires_at timestamptz NOT NULL,
+    auth_webauthn_challenge_user_handle bytea,
+    auth_webauthn_challenge_user_display_name text,
+    auth_webauthn_challenge_device_id uuid,
+    auth_webauthn_challenge_consumed_at timestamptz,
+    auth_webauthn_challenge_created_at timestamptz NOT NULL DEFAULT now(),
+    auth_webauthn_challenge_verified_email text,
+    user_id bigint,
+    CONSTRAINT auth_webauthn_challenges_pkey PRIMARY KEY (auth_webauthn_challenge_id),
+    CONSTRAINT auth_webauthn_challenges_uuid_key UNIQUE (auth_webauthn_challenge_uuid),
+    CONSTRAINT auth_webauthn_challenges_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.auth_signup_email_tokens (
+    auth_signup_email_token_id bigint NOT NULL,
+    auth_signup_email_token_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    auth_signup_email_target_email text NOT NULL,
+    auth_signup_email_token_hash text NOT NULL,
+    auth_signup_email_expires_at timestamp with time zone NOT NULL,
+    auth_signup_email_consumed_at timestamp with time zone,
+    auth_signup_email_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT auth_signup_email_tokens_pkey PRIMARY KEY (auth_signup_email_token_id),
+    CONSTRAINT auth_signup_email_tokens_uuid_key UNIQUE (auth_signup_email_token_uuid),
+    CONSTRAINT auth_signup_email_tokens_token_hash_key UNIQUE (auth_signup_email_token_hash)
+);
+
+CREATE TABLE public.auth_signup_tickets (
+    auth_signup_ticket_id bigint NOT NULL,
+    auth_signup_ticket_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    auth_signup_ticket_target_email text NOT NULL,
+    auth_signup_ticket_hash text NOT NULL,
+    auth_signup_ticket_expires_at timestamp with time zone NOT NULL,
+    auth_signup_ticket_consumed_at timestamp with time zone,
+    auth_signup_ticket_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT auth_signup_tickets_pkey PRIMARY KEY (auth_signup_ticket_id),
+    CONSTRAINT auth_signup_tickets_uuid_key UNIQUE (auth_signup_ticket_uuid),
+    CONSTRAINT auth_signup_tickets_hash_key UNIQUE (auth_signup_ticket_hash)
+);
+
+CREATE TABLE public.oauth_authorization_codes (
+    oauth_authorization_code_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    oauth_authorization_code_code_hash text NOT NULL UNIQUE,
+    oauth_client_id text NOT NULL,
+    user_uuid uuid NOT NULL,
+    oauth_authorization_code_redirect_uri text NOT NULL,
+    oauth_authorization_code_scopes text[] NOT NULL DEFAULT '{}',
+    oauth_authorization_code_code_challenge text NOT NULL,
+    oauth_authorization_code_code_challenge_method text NOT NULL,
+    oauth_authorization_code_audience text NOT NULL DEFAULT '',
+    oauth_authorization_code_expires_at timestamptz NOT NULL,
+    oauth_authorization_code_consumed_at timestamptz,
+    oauth_authorization_code_created_at timestamptz NOT NULL DEFAULT now(),
+    oauth_authorization_code_updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT oauth_authorization_codes_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES public.users(user_uuid) ON DELETE CASCADE
+);
+
+CREATE TABLE public.oauth_refresh_tokens (
+    oauth_refresh_token_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    oauth_refresh_token_token_hash text NOT NULL UNIQUE,
+    oauth_client_id text NOT NULL,
+    user_uuid uuid NOT NULL,
+    oauth_refresh_token_scopes text[] NOT NULL DEFAULT '{}',
+    oauth_refresh_token_audience text NOT NULL DEFAULT '',
+    oauth_refresh_token_expires_at timestamptz NOT NULL,
+    oauth_refresh_token_revoked_at timestamptz,
+    oauth_refresh_token_rotated_from uuid,
+    oauth_refresh_token_created_at timestamptz NOT NULL DEFAULT now(),
+    oauth_refresh_token_updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT oauth_refresh_tokens_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES public.users(user_uuid) ON DELETE CASCADE
+);
+
+CREATE TABLE public.oauth_device_authorizations (
+    oauth_device_authorization_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    oauth_device_authorization_device_code_hash text NOT NULL UNIQUE,
+    oauth_client_id text NOT NULL,
+    oauth_device_authorization_user_code text NOT NULL UNIQUE,
+    oauth_device_authorization_scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    oauth_device_authorization_audience text NOT NULL DEFAULT '',
+    user_uuid uuid,
+    oauth_device_authorization_expires_at timestamp with time zone NOT NULL,
+    oauth_device_authorization_approved_at timestamp with time zone,
+    oauth_device_authorization_denied_at timestamp with time zone,
+    oauth_device_authorization_consumed_at timestamp with time zone,
+    oauth_device_authorization_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    oauth_device_authorization_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT oauth_device_authorizations_pkey PRIMARY KEY (oauth_device_authorization_id)
+);
+
+CREATE TABLE public.oauth_dynamic_clients (
+    oauth_dynamic_client_id text PRIMARY KEY,
+    oauth_dynamic_client_type text NOT NULL DEFAULT 'public',
+    oauth_dynamic_client_redirect_uris text[] NOT NULL DEFAULT '{}',
+    oauth_dynamic_client_scopes text[] NOT NULL DEFAULT '{}',
+    oauth_dynamic_client_token_endpoint_auth_method text NOT NULL DEFAULT 'none',
+    oauth_dynamic_client_name text,
+    oauth_dynamic_client_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    oauth_dynamic_client_issued_at timestamptz NOT NULL DEFAULT now(),
+    oauth_dynamic_client_disabled_at timestamptz,
+    oauth_dynamic_client_created_at timestamptz NOT NULL DEFAULT now(),
+    oauth_dynamic_client_updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.oauth_authorization_handoffs (
+    oauth_authorization_handoff_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    oauth_authorization_handoff_token_hash text NOT NULL UNIQUE,
+    oauth_authorization_handoff_user_code text NOT NULL UNIQUE,
+    oauth_client_id text NOT NULL,
+    oauth_authorization_handoff_redirect_uri text NOT NULL,
+    oauth_authorization_handoff_scopes text[] NOT NULL DEFAULT '{}',
+    oauth_authorization_handoff_audience text NOT NULL DEFAULT '',
+    oauth_authorization_handoff_state text NOT NULL DEFAULT '',
+    oauth_authorization_handoff_code_challenge text NOT NULL,
+    oauth_authorization_handoff_code_challenge_method text NOT NULL,
+    user_uuid uuid,
+    oauth_authorization_handoff_authorization_code text,
+    oauth_authorization_handoff_redirect_url text,
+    oauth_authorization_handoff_denied_at timestamptz,
+    oauth_authorization_handoff_completed_at timestamptz,
+    oauth_authorization_handoff_expires_at timestamptz NOT NULL,
+    oauth_authorization_handoff_created_at timestamptz NOT NULL DEFAULT now(),
+    oauth_authorization_handoff_updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE SCHEMA IF NOT EXISTS runtime;
+
+CREATE TABLE runtime.idempotency_keys (
+    scope text NOT NULL,
+    actor text NOT NULL,
+    idempotency_key text NOT NULL,
+    request_hash text NOT NULL,
+    response_payload bytea,
+    lock_expires_at timestamptz NOT NULL,
+    result_expires_at timestamptz NOT NULL,
+    completed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (scope, actor, idempotency_key)
+);

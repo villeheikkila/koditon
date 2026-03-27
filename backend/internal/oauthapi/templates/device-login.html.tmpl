@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maku OAuth Login</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 32px; letter-spacing: 2px; margin: 6px 0 12px; }
+    .muted { color: #666; font-size: 14px; }
+    .status { font-size: 14px; margin-top: 8px; }
+    a.button { display: inline-block; margin-top: 10px; background: #111; color: #fff; text-decoration: none; border-radius: 10px; padding: 10px 14px; }
+    .qr { width: 220px; height: 220px; border: 1px solid #eee; border-radius: 8px; display: inline-block; }
+    .qr svg { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Approve Sign-in on Your Phone</h1>
+  <div class="card">
+    <p>Open Maku app on your phone and approve this code:</p>
+    <div class="code">{{.UserCode}}</div>
+    <p class="muted">Code expires in <span id="ttl">{{.ExpiresIn}}</span>s.</p>
+    <a class="button" id="open-maku" href="{{.AppOpenURL}}" hidden>Open Maku</a>
+    <p class="muted">If your phone is separate, scan this QR:</p>
+    <div class="qr" aria-label="QR code for verification page">{{.QRCodeSVG}}</div>
+    <div id="status" class="status muted">Waiting for approval...</div>
+  </div>
+
+  <script>
+    {{template "userAgentHelper" .}}
+    const userCode = {{printf "%q" .UserCode}};
+    const pollIntervalMs = Math.max(2, Number({{.Interval}})) * 1000;
+    let remaining = Math.max(0, Number({{.ExpiresIn}}));
+    const ttl = document.getElementById('ttl');
+    const status = document.getElementById('status');
+    const openMaku = document.getElementById('open-maku');
+    const context = detectMakuUserAgentContext();
+
+    openMaku.hidden = false;
+
+    if (context.isLikelyIOS) {
+      openMaku.textContent = 'Open Maku';
+    }
+
+    setInterval(() => {
+      remaining = Math.max(0, remaining - 1);
+      ttl.textContent = String(remaining);
+    }, 1000);
+
+    async function poll() {
+      if (remaining <= 0) {
+        status.textContent = 'Code expired. Reload to generate a new code.';
+        return;
+      }
+      try {
+        const res = await fetch('/oauth/login/device/poll', {
+          method: 'POST',
+          headers: {'content-type': 'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({
+            user_code: userCode,
+          }).toString(),
+        });
+        if (!res.ok) throw new Error('poll_failed');
+        const data = await res.json();
+        if (data.status === 'approved') {
+          status.textContent = 'Approved in Maku. Return to your terminal to finish signing in.';
+          return;
+        }
+        if (data.status === 'denied') {
+          status.textContent = 'Approval was denied. Reload to try again.';
+          return;
+        }
+        if (data.status === 'expired' || data.status === 'invalid') {
+          status.textContent = 'Code is no longer valid. Reload to try again.';
+          return;
+        }
+        setTimeout(poll, pollIntervalMs);
+      } catch (err) {
+        setTimeout(poll, pollIntervalMs);
+      }
+    }
+    setTimeout(poll, pollIntervalMs);
+  </script>
+</body>
+</html>

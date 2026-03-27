@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Continue In Maku</title>
+  <style>
+    :root {
+      --page-bg: #f5f5f7;
+      --text-primary: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-tertiary: #8d8d92;
+      --card-bg: rgba(255, 255, 255, 0.86);
+      --card-border: rgba(255, 255, 255, 0.72);
+      --surface-bg: rgba(255, 255, 255, 0.74);
+      --surface-border: rgba(0, 0, 0, 0.06);
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+      --site-gradient:
+        radial-gradient(1000px 560px at 0% 0%, rgba(255, 255, 255, 0.72), transparent 62%),
+        radial-gradient(900px 540px at 100% 0%, rgba(237, 242, 255, 0.72), transparent 64%),
+        linear-gradient(180deg, #f8f8fa 0%, #f3f4f7 48%, #f5f6f8 100%);
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+    }
+
+    html { background: var(--page-bg); }
+
+    body {
+      font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      color: var(--text-primary);
+      line-height: 1.45;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-image: var(--site-gradient);
+      background-repeat: no-repeat;
+      background-size: cover;
+      pointer-events: none;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.35s ease-out;
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 820px;
+      border-radius: 28px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px) saturate(1.02);
+      padding: 0.9rem;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.8fr);
+      gap: 0.85rem;
+    }
+
+    .panel {
+      border-radius: 22px;
+      background: var(--surface-bg);
+      border: 1px solid var(--surface-border);
+      padding: 1.25rem;
+    }
+
+    .client-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    .client-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(17, 24, 39, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .client-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .client-kicker {
+      margin: 0;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(15, 23, 42, 0.6);
+    }
+
+    .client-name {
+      margin: 0.18rem 0 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    h1 {
+      margin: 0 0 0.7rem;
+      font-size: clamp(2rem, 4.5vw, 3.2rem);
+      line-height: 1;
+      letter-spacing: -0.045em;
+      max-width: 11ch;
+    }
+
+    .lede {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: clamp(1rem, 1.8vw, 1.06rem);
+      max-width: 44ch;
+    }
+
+    .lede strong {
+      color: var(--text-primary);
+      font-weight: 650;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .open-app-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      min-height: 44px;
+      padding: 0.58rem 0.95rem 0.58rem 0.72rem;
+      border-radius: 999px;
+      text-decoration: none;
+      color: #274374;
+      background:
+        radial-gradient(120% 140% at 0% 0%, rgba(255, 233, 242, 0.88), transparent 52%),
+        radial-gradient(120% 140% at 100% 0%, rgba(225, 235, 255, 0.92), transparent 54%),
+        linear-gradient(180deg, rgba(239, 244, 255, 0.98), rgba(228, 236, 252, 0.96));
+      border: 1px solid rgba(167, 173, 241, 0.34);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      box-shadow: 0 8px 18px rgba(131, 136, 239, 0.14);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    }
+
+    .open-app-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(131, 136, 239, 0.18);
+      filter: saturate(1.03) brightness(1.01);
+    }
+
+    .open-app-button img {
+      width: 20px;
+      height: 20px;
+      display: block;
+      border-radius: 5px;
+      flex: 0 0 auto;
+    }
+
+    .hint {
+      color: var(--text-tertiary);
+      font-size: 0.9rem;
+    }
+
+    .qr-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .qr-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 248px;
+      border-radius: 22px;
+      padding: 0.9rem;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .qr-frame svg {
+      width: min(100%, 240px);
+      height: auto;
+      display: block;
+    }
+
+    .qr-caption {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      text-align: center;
+    }
+
+    .code-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    .code-label {
+      margin: 0;
+      color: var(--text-tertiary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .code-value {
+      margin: 0;
+      padding: 0.42rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.86rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-primary);
+    }
+
+    .status {
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      color: var(--text-secondary);
+      font-size: 0.94rem;
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        padding: 1rem 0.75rem calc(1.25rem + env(safe-area-inset-bottom));
+        align-items: stretch;
+      }
+
+      .shell {
+        padding: 0.65rem;
+        border-radius: 24px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        padding: 1rem;
+        border-radius: 20px;
+      }
+
+      h1 {
+        max-width: none;
+        font-size: clamp(1.75rem, 9vw, 2.35rem);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="shell" aria-labelledby="title">
+      <div class="hero">
+        <div class="panel">
+          <div class="client-brand">
+            {{if .ClientLogoURL}}
+            <div class="client-logo">
+              <img src="{{.ClientLogoURL}}" alt="" aria-hidden="true" />
+            </div>
+            {{end}}
+            <div>
+              <p class="client-kicker">Authorizing App</p>
+              <p class="client-name">{{.ClientName}}</p>
+            </div>
+          </div>
+          <h1 id="title">Continue in Maku</h1>
+          <p class="lede">
+            Confirm the request for <strong>{{.ClientName}}</strong> in the app. This page will finish automatically when you're done.
+          </p>
+          <div class="action-row">
+            <a class="open-app-button" id="open-maku" href="{{.AppOpenURL}}" hidden>
+              <img src="/maku.svg" alt="" aria-hidden="true" />
+              <span>Sign in with Maku</span>
+            </a>
+            <span class="hint">On desktop, scan the QR code to continue in the Maku app.</span>
+          </div>
+          <div class="status" id="status" aria-live="polite"></div>
+        </div>
+        <aside class="panel qr-panel" aria-label="Scan to continue in Maku">
+          <div class="qr-frame">{{.QRCodeSVG}}</div>
+          <div class="code-stack">
+            <p class="qr-caption">Scan with your phone camera to open Maku instantly.</p>
+            <p class="code-label">Or enter this code</p>
+            <p class="code-value">{{.UserCode}}</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <script>
+    {{template "userAgentHelper" .}}
+    const statusURL = {{printf "%q" .StatusURL}};
+    let remaining = Math.max(0, Number({{.ExpiresIn}}));
+    const status = document.getElementById('status');
+    const openMaku = document.getElementById('open-maku');
+    const context = detectMakuUserAgentContext();
+    let attemptedAutoRefresh = false;
+
+    openMaku.hidden = false;
+
+    if (context.isLikelyIOS) {
+      openMaku.querySelector('span').textContent = 'Open Maku';
+    }
+
+    function showStatus(message) {
+      status.textContent = message;
+      status.style.display = 'block';
+    }
+
+    setInterval(() => {
+      remaining = Math.max(0, remaining - 1);
+    }, 1000);
+
+    async function poll() {
+      if (remaining <= 0) {
+        if (!attemptedAutoRefresh && window.location.pathname === '/oauth/authorize') {
+          attemptedAutoRefresh = true;
+          showStatus('Refreshing sign-in request...');
+          window.location.reload();
+          return;
+        }
+        showStatus('This request expired. Refresh to generate a new code.');
+        return;
+      }
+      try {
+        const res = await fetch(statusURL, { method: 'GET' });
+        if (!res.ok) throw new Error('poll_failed');
+        const data = await res.json();
+        if (data.redirect_url) {
+          showStatus('Approved in Maku. Finishing sign-in...');
+          window.location.href = data.redirect_url;
+          return;
+        }
+        if (data.status === 'denied') {
+          showStatus('This request was denied in Maku.');
+          return;
+        }
+        if (data.status === 'expired') {
+          if (!attemptedAutoRefresh && window.location.pathname === '/oauth/authorize') {
+            attemptedAutoRefresh = true;
+            showStatus('Refreshing sign-in request...');
+            window.location.reload();
+            return;
+          }
+          showStatus('This request expired. Refresh to generate a new code.');
+          return;
+        }
+      } catch (_) {}
+      setTimeout(poll, 2000);
+    }
+
+    setTimeout(poll, 2000);
+  </script>
+</body>
+</html>

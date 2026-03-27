@@ -1,0 +1,682 @@
+package auth
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/netip"
+	"time"
+
+	"koditon-go/internal/auth/passkey"
+	db "koditon-go/internal/db"
+	"koditon-go/internal/telemetry"
+	"koditon-go/internal/useragent"
+	"koditon-go/internal/util"
+
+	"github.com/go-webauthn/webauthn/protocol"
+	wbauthn "github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+const (
+	passkeyFlowAuthenticate = "authenticate"
+	passkeyFlowRegister     = "register"
+	passkeyChallengeTTL     = 5 * time.Minute
+)
+
+type BeginPasskeyAuthenticateResponse struct {
+	ChallengeID uuid.UUID
+	Options     json.RawMessage
+}
+
+type FinishPasskeyAuthenticateRequest struct {
+	ChallengeID      uuid.UUID
+	Credential       json.RawMessage
+	DeviceID         uuid.UUID
+	DeviceName       string
+	DeviceOS         string
+	DeviceModel      string
+	DeviceLocale     string
+	DeviceTimeZone   string
+	DeviceAppVersion string
+	UserAgent        string
+	IP               string
+}
+
+type FinishPasskeyAuthenticateResponse struct {
+	UserID    uuid.UUID
+	IsNewUser bool
+	SessionID uuid.UUID
+}
+
+type BeginPasskeyRegistrationRequest struct {
+	UserID    uuid.UUID
+	DeviceID  uuid.UUID
+	UserLabel string
+}
+
+type BeginPasskeyRegistrationResponse struct {
+	ChallengeID uuid.UUID
+	Options     json.RawMessage
+}
+
+type FinishPasskeyRegistrationRequest struct {
+	UserID      uuid.UUID
+	ChallengeID uuid.UUID
+	Credential  json.RawMessage
+}
+
+type FinishPasskeyRegistrationResponse struct {
+	CredentialID string
+}
+
+type ListPasskeyItem struct {
+	CredentialID   string
+	Name           string
+	AAGUID         *uuid.UUID
+	BackupEligible *bool
+	BackupState    *bool
+	CreatedAt      time.Time
+	LastUsedAt     *time.Time
+}
+
+type PasskeyAccountUser struct {
+	userID      uuid.UUID
+	handle      []byte
+	displayName string
+	credentials []wbauthn.Credential
+}
+
+func (u PasskeyAccountUser) WebAuthnID() []byte {
+	return u.handle
+}
+
+func (u PasskeyAccountUser) WebAuthnName() string {
+	if u.displayName == "" {
+		return u.userID.String()
+	}
+	return u.displayName
+}
+
+func (u PasskeyAccountUser) WebAuthnDisplayName() string {
+	if u.displayName == "" {
+		return u.userID.String()
+	}
+	return u.displayName
+}
+
+func (u PasskeyAccountUser) WebAuthnCredentials() []wbauthn.Credential {
+	return u.credentials
+}
+
+func (s *Service) BeginPasskeyAuthentication(ctx context.Context) (*BeginPasskeyAuthenticateResponse, error) {
+	if s.passkeyService == nil {
+		return nil, ErrPasskeyConfig
+	}
+	assertion, session, err := s.passkeyService.BeginDiscoverableAuthentication()
+	if err != nil {
+		return nil, fmt.Errorf("begin discoverable login: %w", err)
+	}
+	return s.createPasskeyAuthenticationChallenge(ctx, assertion.Response, session, uuid.Nil, nil, nil)
+}
+
+func (s *Service) beginPasskeyAuthenticationForUser(
+	ctx context.Context,
+	userID uuid.UUID,
+	displayName string,
+	verifiedEmail string,
+	passkeys []db.ListPasskeysByUserIDRow,
+) (*BeginPasskeyAuthenticateResponse, error) {
+	if s.passkeyService == nil {
+		return nil, ErrPasskeyConfig
+	}
+	if len(passkeys) == 0 {
+		return nil, ErrPasskeyNotFound
+	}
+
+	handle := passkeys[0].UserPasskeyUserHandle
+	credentials := make([]wbauthn.Credential, 0, len(passkeys))
+	for _, row := range passkeys {
+		credentials = append(credentials, passkeyListRowToCredential(row))
+	}
+	assertion, session, err := s.passkeyService.BeginAuthentication(passkey.User{
+		ID:          handle,
+		Name:        displayName,
+		DisplayName: displayName,
+		Credentials: credentials,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("begin scoped login: %w", err)
+	}
+	return s.createPasskeyAuthenticationChallenge(ctx, assertion.Response, session, userID, handle, stringPtr(verifiedEmail))
+}
+
+func (s *Service) createPasskeyAuthenticationChallenge(
+	ctx context.Context,
+	assertion protocol.PublicKeyCredentialRequestOptions,
+	session *wbauthn.SessionData,
+	userID uuid.UUID,
+	userHandle []byte,
+	verifiedEmail *string,
+) (*BeginPasskeyAuthenticateResponse, error) {
+	sessionJSON, err := passkey.MarshalSessionData(session)
+	if err != nil {
+		return nil, fmt.Errorf("marshal session: %w", err)
+	}
+	displayName := (*string)(nil)
+	userUUID := pgtype.UUID{}
+	if userID != uuid.Nil {
+		display := userID.String()
+		displayName = &display
+		userUUID = util.UUIDToPg(userID)
+	}
+	challenge, err := s.queries.CreateWebauthnChallenge(ctx, db.CreateWebauthnChallengeParams{
+		AuthWebauthnChallengeFlow:            stringPtr(passkeyFlowAuthenticate),
+		AuthWebauthnChallengeSession:         sessionJSON,
+		AuthWebauthnChallengeExpiresAt:       util.TimeToPg(time.Now().Add(passkeyChallengeTTL)),
+		AuthWebauthnChallengeUserHandle:      userHandle,
+		AuthWebauthnChallengeUserDisplayName: displayName,
+		AuthWebauthnChallengeVerifiedEmail:   verifiedEmail,
+		AuthWebauthnChallengeDeviceID:        pgtype.UUID{},
+		UserUuid:                             userUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create challenge: %w", err)
+	}
+	optionsJSON, err := json.Marshal(assertion)
+	if err != nil {
+		return nil, fmt.Errorf("marshal assertion options: %w", err)
+	}
+	return &BeginPasskeyAuthenticateResponse{
+		ChallengeID: challenge.AuthWebauthnChallengeUuid,
+		Options:     optionsJSON,
+	}, nil
+}
+
+func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPasskeyAuthenticateRequest) (*FinishPasskeyAuthenticateResponse, error) {
+	if s.passkeyService == nil {
+		return nil, ErrPasskeyConfig
+	}
+	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
+		AuthWebauthnChallengeUuid: util.UUIDToPg(req.ChallengeID),
+		AuthWebauthnChallengeFlow: stringPtr(passkeyFlowAuthenticate),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPasskeyChallenge
+		}
+		return nil, fmt.Errorf("consume challenge: %w", err)
+	}
+	sessionData, err := passkey.UnmarshalSessionData(challenge.AuthWebauthnChallengeSession)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal challenge session: %w", err)
+	}
+	var resolvedUserID uuid.UUID
+	var resolvedPasskey db.GetPasskeyByUserHandleAndCredentialIDRow
+	lookupHandler := func(rawID, userHandle []byte) (wbauthn.User, error) {
+		row, getErr := s.queries.GetPasskeyByUserHandleAndCredentialID(ctx, db.GetPasskeyByUserHandleAndCredentialIDParams{
+			UserPasskeyUserHandle:   userHandle,
+			UserPasskeyCredentialID: rawID,
+		})
+		if getErr != nil {
+			return nil, getErr
+		}
+		resolvedUserID = util.PgUUIDToUUID(row.UserUuid)
+		resolvedPasskey = row
+		return PasskeyAccountUser{
+			userID:      util.PgUUIDToUUID(row.UserUuid),
+			handle:      row.UserPasskeyUserHandle,
+			displayName: util.PgUUIDToUUID(row.UserUuid).String(),
+			credentials: []wbauthn.Credential{passkeyRowToCredential(row)},
+		}, nil
+	}
+
+	_, parsedCredential, err := s.passkeyService.FinishPasskeyLogin(ctx, sessionData, req.Credential, lookupHandler)
+	if err != nil {
+		return nil, fmt.Errorf("finish passkey login: %w", err)
+	}
+	if resolvedUserID == uuid.Nil {
+		return nil, ErrPasskeyNotFound
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer rollbackTx(ctx, s.logger, tx)
+	qtx := s.queries.WithTx(tx)
+
+	if err := qtx.UpdatePasskeyUsage(ctx, db.UpdatePasskeyUsageParams{
+		UserPasskeySignCount:    int64Ptr(int64(parsedCredential.Authenticator.SignCount)),
+		UserPasskeyCredentialID: resolvedPasskey.UserPasskeyCredentialID,
+		UserPasskeyBackupState:  boolPtr(parsedCredential.Flags.BackupState),
+	}); err != nil {
+		return nil, fmt.Errorf("update passkey usage: %w", err)
+	}
+
+	sessionID, err := s.createSessionWithProvider(ctx, tx, createSessionParams{
+		UserID:           resolvedUserID,
+		Provider:         AuthProviderPasskey,
+		DeviceID:         req.DeviceID,
+		DeviceName:       req.DeviceName,
+		DeviceOS:         req.DeviceOS,
+		DeviceModel:      req.DeviceModel,
+		DeviceLocale:     req.DeviceLocale,
+		DeviceTimeZone:   req.DeviceTimeZone,
+		DeviceAppVersion: req.DeviceAppVersion,
+		UserAgent:        req.UserAgent,
+		IP:               req.IP,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	return &FinishPasskeyAuthenticateResponse{UserID: resolvedUserID, SessionID: sessionID}, nil
+}
+
+func (s *Service) BeginPasskeyRegistration(ctx context.Context, req BeginPasskeyRegistrationRequest) (*BeginPasskeyRegistrationResponse, error) {
+	if s.passkeyService == nil {
+		return nil, ErrPasskeyConfig
+	}
+	passkeys, err := s.queries.ListPasskeysByUserID(ctx, util.UUIDToPg(req.UserID))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("list existing passkeys: %w", err)
+	}
+	handle := req.UserID[:]
+	if len(passkeys) > 0 && len(passkeys[0].UserPasskeyUserHandle) > 0 {
+		handle = passkeys[0].UserPasskeyUserHandle
+	}
+	existingCreds := make([]wbauthn.Credential, 0, len(passkeys))
+	exclude := make([]protocol.CredentialDescriptor, 0, len(passkeys))
+	for _, row := range passkeys {
+		cred := passkeyListRowToCredential(row)
+		existingCreds = append(existingCreds, cred)
+		exclude = append(exclude, cred.Descriptor())
+	}
+	label := req.UserLabel
+	if label == "" {
+		label = req.UserID.String()
+	}
+	creation, session, err := s.passkeyService.BeginRegistration(passkey.User{
+		ID:          handle,
+		Name:        label,
+		DisplayName: label,
+		Credentials: existingCreds,
+	}, exclude)
+	if err != nil {
+		return nil, fmt.Errorf("begin add-passkey registration: %w", err)
+	}
+	sessionJSON, err := passkey.MarshalSessionData(session)
+	if err != nil {
+		return nil, fmt.Errorf("marshal session: %w", err)
+	}
+	challenge, err := s.queries.CreateWebauthnChallenge(ctx, db.CreateWebauthnChallengeParams{
+		AuthWebauthnChallengeFlow:            stringPtr(passkeyFlowRegister),
+		AuthWebauthnChallengeSession:         sessionJSON,
+		AuthWebauthnChallengeExpiresAt:       util.TimeToPg(time.Now().Add(passkeyChallengeTTL)),
+		AuthWebauthnChallengeUserHandle:      handle,
+		AuthWebauthnChallengeUserDisplayName: &label,
+		AuthWebauthnChallengeDeviceID:        util.UUIDToPg(req.DeviceID),
+		UserUuid:                             util.UUIDToPg(req.UserID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create challenge: %w", err)
+	}
+	optionsJSON, err := json.Marshal(creation.Response)
+	if err != nil {
+		return nil, fmt.Errorf("marshal creation options: %w", err)
+	}
+	return &BeginPasskeyRegistrationResponse{ChallengeID: challenge.AuthWebauthnChallengeUuid, Options: optionsJSON}, nil
+}
+
+func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPasskeyRegistrationRequest) (*FinishPasskeyRegistrationResponse, error) {
+	if s.passkeyService == nil {
+		return nil, ErrPasskeyConfig
+	}
+	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
+		AuthWebauthnChallengeUuid: util.UUIDToPg(req.ChallengeID),
+		AuthWebauthnChallengeFlow: stringPtr(passkeyFlowRegister),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPasskeyChallenge
+		}
+		return nil, fmt.Errorf("consume challenge: %w", err)
+	}
+	if challenge.UserUuid.Valid && util.PgUUIDToUUID(challenge.UserUuid) != req.UserID {
+		return nil, ErrUnauthorized
+	}
+	sessionData, err := passkey.UnmarshalSessionData(challenge.AuthWebauthnChallengeSession)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal challenge: %w", err)
+	}
+	passkeys, err := s.queries.ListPasskeysByUserID(ctx, util.UUIDToPg(req.UserID))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("load user passkeys: %w", err)
+	}
+	existing := make([]wbauthn.Credential, 0, len(passkeys))
+	for _, row := range passkeys {
+		existing = append(existing, passkeyListRowToCredential(row))
+	}
+	label := req.UserID.String()
+	if challenge.AuthWebauthnChallengeUserDisplayName != nil {
+		label = *challenge.AuthWebauthnChallengeUserDisplayName
+	}
+	credential, err := s.passkeyService.FinishRegistration(ctx, passkey.User{
+		ID:          challenge.AuthWebauthnChallengeUserHandle,
+		Name:        label,
+		DisplayName: label,
+		Credentials: existing,
+	}, sessionData, req.Credential)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "passkey finish registration failed", "error", err, "user_id", req.UserID)
+		return nil, fmt.Errorf("finish registration: %w", err)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer rollbackTx(ctx, s.logger, tx)
+	qtx := s.queries.WithTx(tx)
+
+	userEmail, err := qtx.GetUserEmailByUUID(ctx, util.UUIDToPg(req.UserID))
+	if err != nil {
+		return nil, fmt.Errorf("get user email: %w", err)
+	}
+
+	credentialID := base64.RawURLEncoding.EncodeToString(credential.ID)
+	provider := AuthProviderPasskey
+	identityData, _ := json.Marshal(map[string]any{
+		"credential_id": credentialID,
+		"aaguid":        uuidFromBytes(credential.Authenticator.AAGUID),
+		"transports":    credentialTransports(credential.Transport),
+		"backup": map[string]bool{
+			"eligible": credential.Flags.BackupEligible,
+			"state":    credential.Flags.BackupState,
+		},
+	})
+	identity, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
+		UserUuid:                  util.UUIDToPg(req.UserID),
+		UserIdentityProvider:      &provider,
+		UserIdentityExternalID:    &credentialID,
+		UserIdentityEmail:         userEmail,
+		UserIdentityEmailVerified: boolPtr(userEmail != nil),
+		UserIdentityData:          identityData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create passkey identity: %w", err)
+	}
+
+	if _, err := qtx.CreatePasskey(ctx, db.CreatePasskeyParams{
+		UserUuid:                      util.UUIDToPg(req.UserID),
+		UserIdentityUuid:              util.UUIDToPg(identity.UserIdentityUuid),
+		UserPasskeyCredentialID:       credential.ID,
+		UserPasskeyCredentialIDB64url: stringPtr(credentialID),
+		UserPasskeyPublicKey:          credential.PublicKey,
+		UserPasskeyAttestationType:    stringPtr(credential.AttestationType),
+		UserPasskeyTransports:         credentialTransports(credential.Transport),
+		UserPasskeyUserHandle:         challenge.AuthWebauthnChallengeUserHandle,
+		UserPasskeySignCount:          int64Ptr(int64(credential.Authenticator.SignCount)),
+		UserPasskeyFlags:              int32Ptr(int32(credential.Flags.ProtocolValue())),
+		UserPasskeyAaguid:             util.UUIDPtrToPg(uuidPtrFromBytes(credential.Authenticator.AAGUID)),
+		UserPasskeyName:               &label,
+		UserPasskeyBackupEligible:     boolPtr(credential.Flags.BackupEligible),
+		UserPasskeyBackupState:        boolPtr(credential.Flags.BackupState),
+		UserPasskeyLastUsedAt:         pgtype.Timestamptz{},
+	}); err != nil {
+		return nil, fmt.Errorf("create passkey: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	return &FinishPasskeyRegistrationResponse{CredentialID: credentialID}, nil
+}
+
+func (s *Service) ListPasskeys(ctx context.Context, userID uuid.UUID) ([]ListPasskeyItem, error) {
+	rows, err := s.queries.ListPasskeysByUserID(ctx, util.UUIDToPg(userID))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("list passkeys: %w", err)
+	}
+	items := make([]ListPasskeyItem, 0, len(rows))
+	for _, row := range rows {
+		name := "Passkey"
+		if row.UserPasskeyName != nil && *row.UserPasskeyName != "" {
+			name = *row.UserPasskeyName
+		}
+		var lastUsedAt *time.Time
+		if row.UserPasskeyLastUsedAt.Valid {
+			lastUsedAt = &row.UserPasskeyLastUsedAt.Time
+		}
+		items = append(items, ListPasskeyItem{
+			CredentialID:   row.UserPasskeyCredentialIDB64url,
+			Name:           name,
+			AAGUID:         uuidPtrFromBytes(bytesFromPgUUID(row.UserPasskeyAaguid)),
+			BackupEligible: row.UserPasskeyBackupEligible,
+			BackupState:    row.UserPasskeyBackupState,
+			CreatedAt:      row.UserPasskeyCreatedAt,
+			LastUsedAt:     lastUsedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *Service) DeletePasskey(ctx context.Context, userID uuid.UUID, credentialID string) error {
+	ctx, span := startSpan(ctx, "auth.passkey.delete", telemetry.Attrs.AuthProvider("passkey"))
+	defer span.End()
+
+	outcome, err := s.queries.RevokePasskeyByCredentialB64ForUser(ctx, db.RevokePasskeyByCredentialB64ForUserParams{
+		UserUuid:                      util.UUIDToPg(userID),
+		UserPasskeyCredentialIDB64url: stringPtr(credentialID),
+	})
+	if err != nil {
+		telemetry.RecordSpanError(span, err, "revoke passkey")
+		return fmt.Errorf("revoke passkey: %w", err)
+	}
+	span.SetAttributes(attribute.String("auth.passkey.delete.outcome", outcome))
+
+	switch outcome {
+	case "deleted":
+		s.logger.InfoContext(ctx, "passkey deleted", "user_id", userID, "outcome", outcome)
+		return nil
+	case "last_passkey":
+		telemetry.RecordSpanError(span, ErrPasskeyLast, "passkey delete blocked: last passkey")
+		s.logger.WarnContext(ctx, "passkey delete blocked: last passkey", "user_id", userID, "outcome", outcome)
+		return ErrPasskeyLast
+	case "not_found":
+		telemetry.RecordSpanError(span, ErrPasskeyNotFound, "passkey delete failed: passkey not found")
+		s.logger.WarnContext(ctx, "passkey delete failed: passkey not found", "user_id", userID, "outcome", outcome)
+		return ErrPasskeyNotFound
+	default:
+		return fmt.Errorf("unexpected passkey delete outcome: %s", outcome)
+	}
+}
+
+type createSessionParams struct {
+	UserID           uuid.UUID
+	Provider         AuthProvider
+	DeviceID         uuid.UUID
+	DeviceName       string
+	DeviceOS         string
+	DeviceModel      string
+	DeviceLocale     string
+	DeviceTimeZone   string
+	DeviceAppVersion string
+	UserAgent        string
+	IP               string
+}
+
+func (s *Service) createSessionWithProvider(ctx context.Context, tx pgx.Tx, params createSessionParams) (uuid.UUID, error) {
+	qtx := s.queries.WithTx(tx)
+	var ip *netip.Addr
+	if params.IP != "" {
+		if parsed, parseErr := netip.ParseAddr(params.IP); parseErr == nil {
+			ip = &parsed
+		}
+	}
+	var userAgent *string
+	normalizedUserAgent := useragent.Normalize(params.UserAgent)
+	if normalizedUserAgent != "" {
+		userAgent = &normalizedUserAgent
+	}
+	deviceID := params.DeviceID
+	if deviceID != uuid.Nil {
+		var deviceName *string
+		if params.DeviceName != "" {
+			deviceName = &params.DeviceName
+		}
+		var deviceOS *string
+		if params.DeviceOS != "" {
+			deviceOS = &params.DeviceOS
+		}
+		var deviceAppVersion *string
+		if params.DeviceAppVersion != "" {
+			deviceAppVersion = &params.DeviceAppVersion
+		}
+		if _, err := qtx.UpsertDevice(ctx, db.UpsertDeviceParams{
+			UserDeviceID:         util.UUIDToPg(deviceID),
+			UserUuid:             util.UUIDToPg(params.UserID),
+			UserDeviceName:       deviceName,
+			UserDeviceOs:         deviceOS,
+			UserDeviceAppVersion: deviceAppVersion,
+		}); err != nil {
+			return uuid.Nil, fmt.Errorf("upsert device: %w", err)
+		}
+		if err := s.updateDeviceMetadata(ctx, tx, deviceID, params); err != nil {
+			return uuid.Nil, err
+		}
+	}
+	provider := string(params.Provider)
+	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
+		UserUuid:                    util.UUIDToPg(params.UserID),
+		DeviceSessionUserDeviceUuid: util.UUIDToPg(deviceID),
+		DeviceSessionUserAgent:      userAgent,
+		DeviceSessionIp:             ip,
+		DeviceSessionProvider:       &provider,
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("create session: %w", err)
+	}
+	if err := s.updateSessionMetadata(ctx, tx, session.DeviceSessionUuid, params); err != nil {
+		return uuid.Nil, err
+	}
+	s.emitTokenEvent(ctx, tokenEvent{
+		Name:      tokenEventIssued,
+		AuthType:  params.Provider,
+		SessionID: session.DeviceSessionUuid,
+		UserID:    params.UserID,
+		TokenType: "session",
+	})
+	return session.DeviceSessionUuid, nil
+}
+
+func passkeyRowToCredential(row db.GetPasskeyByUserHandleAndCredentialIDRow) wbauthn.Credential {
+	transports := make([]protocol.AuthenticatorTransport, 0, len(row.UserPasskeyTransports))
+	for _, t := range row.UserPasskeyTransports {
+		transports = append(transports, protocol.AuthenticatorTransport(t))
+	}
+	flags := protocol.AuthenticatorFlags(0)
+	if row.UserPasskeyFlags != nil {
+		flags = protocol.AuthenticatorFlags(*row.UserPasskeyFlags)
+	}
+	return wbauthn.Credential{
+		ID:              row.UserPasskeyCredentialID,
+		PublicKey:       row.UserPasskeyPublicKey,
+		AttestationType: row.UserPasskeyAttestationType,
+		Transport:       transports,
+		Flags:           wbauthn.NewCredentialFlags(flags),
+		Authenticator: wbauthn.Authenticator{
+			AAGUID:    bytesFromPgUUID(row.UserPasskeyAaguid),
+			SignCount: uint32(row.UserPasskeySignCount),
+		},
+	}
+}
+
+func passkeyListRowToCredential(row db.ListPasskeysByUserIDRow) wbauthn.Credential {
+	transports := make([]protocol.AuthenticatorTransport, 0, len(row.UserPasskeyTransports))
+	for _, t := range row.UserPasskeyTransports {
+		transports = append(transports, protocol.AuthenticatorTransport(t))
+	}
+	flags := protocol.AuthenticatorFlags(0)
+	if row.UserPasskeyFlags != nil {
+		flags = protocol.AuthenticatorFlags(*row.UserPasskeyFlags)
+	}
+	return wbauthn.Credential{
+		ID:              row.UserPasskeyCredentialID,
+		PublicKey:       row.UserPasskeyPublicKey,
+		AttestationType: row.UserPasskeyAttestationType,
+		Transport:       transports,
+		Flags:           wbauthn.NewCredentialFlags(flags),
+		Authenticator: wbauthn.Authenticator{
+			AAGUID:    bytesFromPgUUID(row.UserPasskeyAaguid),
+			SignCount: uint32(row.UserPasskeySignCount),
+		},
+	}
+}
+
+func credentialTransports(values []protocol.AuthenticatorTransport) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, string(v))
+	}
+	return out
+}
+
+func uuidFromBytes(value []byte) *uuid.UUID {
+	if len(value) != 16 {
+		return nil
+	}
+	id, err := uuid.FromBytes(value)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+func uuidPtrFromBytes(value []byte) *uuid.UUID {
+	if len(value) != 16 {
+		return nil
+	}
+	id, err := uuid.FromBytes(value)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+func boolPtr(value bool) *bool {
+	v := value
+	return &v
+}
+
+func int64Ptr(value int64) *int64 {
+	v := value
+	return &v
+}
+
+func int32Ptr(value int32) *int32 {
+	v := value
+	return &v
+}
+
+func stringPtr(value string) *string {
+	v := value
+	return &v
+}
+
+func bytesFromPgUUID(value pgtype.UUID) []byte {
+	if !value.Valid {
+		return nil
+	}
+	id := value.Bytes
+	return id[:]
+}
