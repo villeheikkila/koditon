@@ -179,6 +179,7 @@ func run(
 		mux.Handle("/mcp", mcpSrv)
 		mux.Handle("/mcp/", mcpSrv)
 		mux.Handle("/.well-known/openai-apps-challenge", mcpSrv)
+		mux.Handle("/health", mcpSrv)
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)

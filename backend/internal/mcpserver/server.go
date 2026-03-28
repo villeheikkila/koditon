@@ -155,12 +155,29 @@ func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
+var allowedCORSOrigins = []string{
+	"https://chatgpt.com",
+	"https://platform.openai.com",
+	"https://claude.ai",
+}
+
 func setCORSHeaders(w http.ResponseWriter, r *http.Request, environment string) {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
 		return
 	}
+	allowed := false
 	if !strings.EqualFold(environment, "production") {
+		allowed = true
+	} else {
+		for _, o := range allowedCORSOrigins {
+			if strings.EqualFold(origin, o) {
+				allowed = true
+				break
+			}
+		}
+	}
+	if allowed {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 	}
