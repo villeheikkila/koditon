@@ -540,6 +540,69 @@ components:
         - value
         - translation
       type: object
+    PasskeyAuthOptionsOutput:
+      additionalProperties: false
+      properties:
+        challenge_id:
+          type: string
+        options:
+          type: object
+      required:
+        - challenge_id
+        - options
+      type: object
+    PasskeyAuthInput:
+      additionalProperties: false
+      properties:
+        challenge_id:
+          type: string
+        credential_json:
+          type: string
+      required:
+        - challenge_id
+        - credential_json
+      type: object
+    PasskeyAuthOutput:
+      additionalProperties: false
+      properties:
+        access_token:
+          type: string
+        access_token_expires_at:
+          format: int64
+          type: integer
+        refresh_token:
+          type: string
+        refresh_token_expires_at:
+          format: int64
+          type: integer
+        user_id:
+          type: string
+      required:
+        - access_token
+        - access_token_expires_at
+        - refresh_token
+        - refresh_token_expires_at
+        - user_id
+      type: object
+    PasskeyRegisterFinishInput:
+      additionalProperties: false
+      properties:
+        challenge_id:
+          type: string
+        credential_json:
+          type: string
+      required:
+        - challenge_id
+        - credential_json
+      type: object
+    PasskeyRegisterFinishOutput:
+      additionalProperties: false
+      properties:
+        credential_id:
+          type: string
+      required:
+        - credential_id
+      type: object
   securitySchemes:
     bearer:
       bearerFormat: JWT
@@ -551,6 +614,120 @@ info:
   version: 0.1.0
 openapi: 3.1.0
 paths:
+  /auth/passkey/authenticate/options:
+    post:
+      description: Returns a WebAuthn challenge and credential request options for passkey sign-in
+      operationId: auth-passkey-authenticate-options
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyAuthOptionsOutput"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Begin passkey authentication
+      tags:
+        - Authentication
+  /auth/passkey/authenticate:
+    post:
+      description: Verify the passkey credential and return access tokens
+      operationId: auth-passkey-authenticate
+      parameters:
+        - in: header
+          name: X-Device-ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyAuthInput"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyAuthOutput"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Complete passkey authentication
+      tags:
+        - Authentication
+  /auth/passkey/register/options:
+    post:
+      description: Returns a WebAuthn challenge and credential creation options to register a new passkey
+      operationId: auth-passkey-register-options
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyAuthOptionsOutput"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Begin passkey registration
+      tags:
+        - Authentication
+  /auth/passkey/register/finish:
+    post:
+      description: Save the new passkey credential for the authenticated user
+      operationId: auth-passkey-register-finish
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyRegisterFinishInput"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyRegisterFinishOutput"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Complete passkey registration
+      tags:
+        - Authentication
   /api/v1/availability/categories:
     get:
       description: Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)

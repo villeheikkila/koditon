@@ -100,4 +100,38 @@ func (s *Server) addRoutes(api huma.API) {
 			op.Middlewares = huma.Middlewares{authMiddleware}
 		}
 	})
+	huma.Post(api, "/auth/passkey/authenticate/options", s.passkeyAuthOptionsHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-passkey-authenticate-options"
+		op.Summary = "Begin passkey authentication"
+		op.Description = "Returns a WebAuthn challenge and options for passkey sign-in"
+		op.Tags = []string{"Authentication"}
+	})
+	huma.Post(api, "/auth/passkey/authenticate", s.passkeyAuthHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-passkey-authenticate"
+		op.Summary = "Complete passkey authentication"
+		op.Description = "Verify the passkey credential and return access tokens"
+		op.Tags = []string{"Authentication"}
+	})
+	huma.Post(api, "/auth/passkey/register/options", s.passkeyRegisterOptionsHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-passkey-register-options"
+		op.Summary = "Begin passkey registration"
+		op.Description = "Returns a WebAuthn challenge and options to register a new passkey"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
+	huma.Post(api, "/auth/passkey/register/finish", s.passkeyRegisterFinishHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-passkey-register-finish"
+		op.Summary = "Complete passkey registration"
+		op.Description = "Save the new passkey credential for the authenticated user"
+		op.Security = []map[string][]string{
+			{"bearer": {}},
+		}
+		if authMiddleware != nil {
+			op.Middlewares = huma.Middlewares{authMiddleware}
+		}
+	})
 }
