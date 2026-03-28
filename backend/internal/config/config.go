@@ -37,8 +37,9 @@ type Config struct {
 	OpenRouter      OpenRouterConfig
 	Telegram        TelegramConfig
 	WebBaseURL      string `env:"WEB_BASE_URL" envDefault:""`
-	MCPAuthToken    string `env:"MCP_AUTH_TOKEN" envDefault:""`
-	APIPublicBaseURL string `env:"API_PUBLIC_BASE_URL" envDefault:""`
+	MCPAuthToken              string `env:"MCP_AUTH_TOKEN" envDefault:""`
+	APIPublicBaseURL          string `env:"API_PUBLIC_BASE_URL" envDefault:""`
+	OpenAIAppsChallengeToken  string `env:"OPENAI_APPS_CHALLENGE_TOKEN" envDefault:""`
 	Redis           RedisConfig
 }
 

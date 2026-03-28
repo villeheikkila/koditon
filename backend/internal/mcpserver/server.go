@@ -1,175 +1,393 @@
 package mcpserver
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"koditon-go/internal/ads"
+	"koditon-go/internal/auth"
+	"koditon-go/internal/authz"
 	"koditon-go/internal/config"
 	"koditon-go/internal/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type Server struct {
-	mcpServer  *server.MCPServer
-	pool       *pgxpool.Pool
-	adsSvc     *ads.Service
-	queries    *db.Queries
-	cfg        config.Config
-	logger     *slog.Logger
-	httpServer *server.StreamableHTTPServer
+const maxMCPRequestBodyBytes = 1 << 20 // 1 MiB
+
+type Handler struct {
+	mcpHandler               http.Handler
+	authService              *auth.Service
+	resourceMetadataURL      string
+	openAIAppsChallengeToken string
+	environment              string
+	logger                   *slog.Logger
 }
 
-func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) *Server {
-	s := &Server{
-		pool:    pool,
+type mcpJSONRPCRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      any             `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+type mcpToolCallParams struct {
+	Name string `json:"name"`
+}
+
+func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *auth.Service) *Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "koditon-mcp",
+		Version: "1.0.0",
+	}, nil)
+
+	impl := &toolImpl{
 		adsSvc:  ads.NewService(pool),
 		queries: db.New(pool),
-		cfg:     cfg,
-		logger:  logger.With("component", "mcp"),
+		pool:    pool,
+		config: toolImplConfig{
+			shortcutSitemapBase:  cfg.Shortcut.SitemapBase,
+			frontdoorSitemapBase: cfg.Frontdoor.SitemapBase,
+		},
+		logger: logger.With("component", "mcpserver"),
 	}
 
-	mcpSrv := server.NewMCPServer(
-		"koditon",
-		"0.1.0",
-		server.WithToolCapabilities(true),
-	)
-
-	s.mcpServer = mcpSrv
-	s.registerTools()
-	s.httpServer = server.NewStreamableHTTPServer(mcpSrv)
-	return s
-}
-
-func (s *Server) Handler() http.Handler {
-	var handler http.Handler = s.httpServer
-	if s.cfg.MCPAuthToken != "" {
-		handler = authMiddleware(s.cfg.MCPAuthToken, handler)
+	toolSecurityScopes := map[string][]string{
+		"koditon_search_listings":            {auth.ScopeMCPCoreRead},
+		"koditon_get_listing_detail":         {auth.ScopeMCPCoreRead},
+		"koditon_search_transactions":        {auth.ScopeMCPCoreRead},
+		"koditon_search_transactions_advanced": {auth.ScopeMCPCoreRead},
+		"koditon_match_ads_from_transaction": {auth.ScopeMCPCoreRead},
+		"koditon_list_cities":                {auth.ScopeMCPCoreRead},
+		"koditon_list_available_locations":   {auth.ScopeMCPCoreRead},
+		"koditon_list_categories":            {auth.ScopeMCPCoreRead},
 	}
-	return handler
+
+	mcp.AddTool(server, impl.searchListingsTool(), impl.searchListings)
+	mcp.AddTool(server, impl.getListingDetailTool(), impl.getListingDetail)
+	mcp.AddTool(server, impl.searchTransactionsTool(), impl.searchTransactions)
+	mcp.AddTool(server, impl.searchTransactionsAdvancedTool(), impl.searchTransactionsAdvanced)
+	mcp.AddTool(server, impl.matchAdsFromTransactionTool(), impl.matchAdsFromTransaction)
+	mcp.AddTool(server, impl.listCitiesTool(), impl.listCities)
+	mcp.AddTool(server, impl.listAvailableLocationsTool(), impl.listAvailableLocations)
+	mcp.AddTool(server, impl.listCategoriesTool(), impl.listCategories)
+
+	streamable := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+		return server
+	}, nil)
+	base := wrapToolsListSecuritySchemes(streamable, toolSecurityScopes)
+
+	resourceMetadataURL := strings.TrimRight(strings.TrimSpace(cfg.APIPublicBaseURL), "/") + "/.well-known/oauth-protected-resource/mcp"
+	requiredAudience := ""
+	if cfg.APIPublicBaseURL != "" {
+		requiredAudience = auth.CanonicalProtectedResource(cfg.APIPublicBaseURL)
+	}
+
+	var mcpHandler http.Handler = base
+	if authSvc != nil {
+		mcpHandler = requireAuth(authSvc, []string{auth.ScopeMCPCoreRead}, requiredAudience, resourceMetadataURL, base)
+	}
+
+	return &Handler{
+		mcpHandler:               mcpHandler,
+		authService:              authSvc,
+		resourceMetadataURL:      resourceMetadataURL,
+		openAIAppsChallengeToken: strings.TrimSpace(cfg.OpenAIAppsChallengeToken),
+		environment:              string(cfg.Environment),
+		logger:                   logger.With("component", "mcpserver"),
+	}
 }
 
-func authMiddleware(token string, next http.Handler) http.Handler {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w)
+	setCORSHeaders(w, r, h.environment)
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/.well-known/openai-apps-challenge":
+		h.handleOpenAIAppsChallenge(w)
+	case r.Method == http.MethodGet && r.URL.Path == "/health":
+		h.writeHealth(w)
+	default:
+		h.mcpHandler.ServeHTTP(w, r)
+	}
+}
+
+func (h *Handler) handleOpenAIAppsChallenge(w http.ResponseWriter) {
+	if h.openAIAppsChallengeToken == "" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = io.WriteString(w, h.openAIAppsChallengeToken)
+}
+
+func (h *Handler) writeHealth(w http.ResponseWriter) {
+	body := map[string]any{
+		"status":  "ok",
+		"service": "koditon-mcp",
+		"time":    time.Now().UTC().Format(time.RFC3339),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func setSecurityHeaders(w http.ResponseWriter) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+}
+
+func setCORSHeaders(w http.ResponseWriter, r *http.Request, environment string) {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return
+	}
+	if !strings.EqualFold(environment, "production") {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
+}
+
+func requireAuth(authService *auth.Service, requiredScopes []string, requiredAudience, resourceMetadataURL string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if bearer != token {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		var bodyCopy []byte
+		if r.Body != nil {
+			bodyReader := http.MaxBytesReader(w, r.Body, maxMCPRequestBodyBytes)
+			var readErr error
+			bodyCopy, readErr = io.ReadAll(bodyReader)
+			if readErr != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(readErr, &maxBytesErr) {
+					writeMCPRequestError(w, http.StatusRequestEntityTooLarge, "request body too large")
+					return
+				}
+				writeMCPRequestError(w, http.StatusBadRequest, "invalid request body")
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(bodyCopy))
+		}
+
+		authorization := strings.TrimSpace(r.Header.Get("Authorization"))
+		result, verifyErr := authz.VerifyAuthorization(r.Context(), authService, authorization, requiredScopes, requiredAudience)
+		if verifyErr != nil {
+			if challenge := auth.BuildBearerChallenge(verifyErr.Status, verifyErr.Message, resourceMetadataURL, requiredScopes...); challenge != "" {
+				w.Header().Set("WWW-Authenticate", challenge)
+			}
+			writeAuthError(w, r, bodyCopy, verifyErr.Status, verifyErr.Message, w.Header().Get("WWW-Authenticate"))
 			return
 		}
-		next.ServeHTTP(w, r)
+
+		if bodyCopy != nil {
+			r.Body = io.NopCloser(bytes.NewReader(bodyCopy))
+		}
+		next.ServeHTTP(w, r.WithContext(result.Context))
 	})
 }
 
-func (s *Server) registerTools() {
-	s.mcpServer.AddTool(
-		mcp.NewTool("search_listings",
-			mcp.WithDescription("Search property listings (ads, buildings, announcements) with filters"),
-			mcp.WithString("query", mcp.Description("Free-text search query")),
-			mcp.WithString("address", mcp.Description("Address search alias for query (partial or exact)")),
-			mcp.WithString("source", mcp.Description("Source filter: shortcut, frontdoor, or all")),
-			mcp.WithString("kind", mcp.Description("Entity kind: ad, building, announcement, or all")),
-			mcp.WithString("listing_type", mcp.Description("Listing type: listing, rental, or all")),
-			mcp.WithString("city", mcp.Description("City name filter")),
-			mcp.WithString("postal", mcp.Description("Postal code filter")),
-			mcp.WithNumber("min_price", mcp.Description("Minimum price in euros")),
-			mcp.WithNumber("max_price", mcp.Description("Maximum price in euros")),
-			mcp.WithNumber("min_area", mcp.Description("Minimum area in square meters")),
-			mcp.WithNumber("max_area", mcp.Description("Maximum area in square meters")),
-			mcp.WithString("sort", mcp.Description("Sort mode: price_asc, price_desc, area_asc, area_desc, seen_desc")),
-			mcp.WithNumber("page", mcp.Description("Page number (default 1)")),
-			mcp.WithNumber("page_size", mcp.Description("Results per page: 25, 50, or 100 (default 50)")),
-		),
-		s.handleSearchListings,
-	)
+func writeMCPRequestError(w http.ResponseWriter, status int, message string) {
+	envelope := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      nil,
+		"error": map[string]any{
+			"code":    -32600,
+			"message": message,
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(envelope)
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("get_listing_detail",
-			mcp.WithDescription("Get full listing detail by canonical ID, URL, or address text. Returns normalized fields for valuation and optional raw_json payload"),
-			mcp.WithString("id", mcp.Description("Canonical ID or listing URL (backward-compatible alias of input)")),
-			mcp.WithString("input", mcp.Description("Canonical ID, listing URL, or address text (partial or exact)")),
-			mcp.WithString("source", mcp.Description("Optional source filter when resolving address text: shortcut, frontdoor, or all")),
-			mcp.WithString("kind", mcp.Description("Optional kind filter when resolving address text: ad, building, announcement, or all (default ad for text input)")),
-			mcp.WithString("city", mcp.Description("Optional city filter when resolving address text")),
-			mcp.WithString("postal", mcp.Description("Optional postal code filter when resolving address text")),
-			mcp.WithNumber("max_candidates", mcp.Description("Maximum candidates to scan for text resolution (default 25, allowed: 25, 50, 100)")),
-			mcp.WithBoolean("include_raw_json", mcp.Description("Include raw_json payload (default false)")),
-		),
-		s.handleGetListingDetail,
-	)
+func writeAuthError(w http.ResponseWriter, r *http.Request, requestBody []byte, status int, message string, wwwAuthenticate string) {
+	if req, ok := parseSingleMCPRequest(requestBody); ok && req.Method == "tools/call" {
+		writeToolAuthError(w, status, req.ID, message, wwwAuthenticate)
+		return
+	}
+	errData := map[string]any{}
+	if meta := auth.MCPWWWAuthenticateMeta(wwwAuthenticate); meta != nil {
+		errData["_meta"] = meta
+	}
+	envelope := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      nil,
+		"error": map[string]any{
+			"code":    -32001,
+			"message": message,
+			"data":    errData,
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(envelope)
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("search_transactions",
-			mcp.WithDescription("Search property price transactions by city and optional address"),
-			mcp.WithString("city", mcp.Description("City name (required)"), mcp.Required()),
-			mcp.WithString("address", mcp.Description("Optional address search term")),
-			mcp.WithNumber("limit", mcp.Description("Maximum results (default 200)")),
-		),
-		s.handleSearchTransactions,
-	)
+func writeToolAuthError(w http.ResponseWriter, status int, id any, message string, wwwAuthenticate string) {
+	result := map[string]any{
+		"content": []map[string]string{{"type": "text", "text": message}},
+		"isError": true,
+	}
+	if meta := auth.MCPWWWAuthenticateMeta(wwwAuthenticate); meta != nil {
+		result["_meta"] = meta
+	}
+	envelope := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result":  result,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(envelope)
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("search_transactions_advanced",
-			mcp.WithDescription("Advanced prices transaction search with exact filters and flexible free-text"),
-			mcp.WithString("city", mcp.Description("Optional city filter (partial match)")),
-			mcp.WithString("query", mcp.Description("Optional free-text filter over address/neighborhood/postal/category/type")),
-			mcp.WithArray("municipality_ids", mcp.Description("Optional municipality UUID filters"), mcp.WithStringItems()),
-			mcp.WithArray("postal_code_ids", mcp.Description("Optional postal code UUID filters"), mcp.WithStringItems()),
-			mcp.WithArray("postal_codes", mcp.Description("Optional postal code text filters"), mcp.WithStringItems()),
-			mcp.WithArray("categories", mcp.Description("Optional transaction category filters"), mcp.WithStringItems()),
-			mcp.WithArray("types", mcp.Description("Optional transaction type filters"), mcp.WithStringItems()),
-			mcp.WithNumber("min_price", mcp.Description("Minimum toteutunut hinta in euros")),
-			mcp.WithNumber("max_price", mcp.Description("Maximum toteutunut hinta in euros")),
-			mcp.WithNumber("min_area", mcp.Description("Minimum area in square meters")),
-			mcp.WithNumber("max_area", mcp.Description("Maximum area in square meters")),
-			mcp.WithString("sort", mcp.Description("Sort mode: date_desc, date_asc, price_desc, price_asc, area_desc, area_asc")),
-			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default 200, max 5000)")),
-		),
-		s.handleSearchTransactionsAdvanced,
-	)
+func parseSingleMCPRequest(body []byte) (*mcpJSONRPCRequest, bool) {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 || body[0] == '[' {
+		return nil, false
+	}
+	var req mcpJSONRPCRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, false
+	}
+	if req.Method == "" {
+		return nil, false
+	}
+	return &req, true
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("match_ads_from_transaction",
-			mcp.WithDescription("Find matching shortcut/frontdoor ads/buildings for a prices transaction using postal code, area and flexible room-layout hints"),
-			mcp.WithString("transaction_id", mcp.Description("Optional prices_transaction_id UUID; when set, transaction context is loaded automatically")),
-			mcp.WithString("city", mcp.Description("Optional city override/filter")),
-			mcp.WithString("postal_code", mcp.Description("Optional postal code override/filter")),
-			mcp.WithNumber("area", mcp.Description("Optional target area in square meters")),
-			mcp.WithNumber("price", mcp.Description("Optional target toteutunut hinta in euros")),
-			mcp.WithString("room_hint", mcp.Description("Optional room layout hint, supports partial/truncated values")),
-			mcp.WithString("query", mcp.Description("Optional extra text query for listing search")),
-			mcp.WithString("source", mcp.Description("Source filter: shortcut, frontdoor, all")),
-			mcp.WithString("kind", mcp.Description("Kind filter: ad, building, announcement, all")),
-			mcp.WithString("listing_type", mcp.Description("Listing type filter: listing, rental, all")),
-			mcp.WithNumber("area_tolerance", mcp.Description("Area tolerance in square meters around target area (default 8.0)")),
-			mcp.WithNumber("price_tolerance_pct", mcp.Description("Price tolerance percentage around target price (default 0.35 = 35%)")),
-			mcp.WithNumber("max_candidates", mcp.Description("Ads search candidate window: 25, 50, 100 (default 100)")),
-			mcp.WithNumber("max_results", mcp.Description("Final ranked matches to return (default 20, max 100)")),
-		),
-		s.handleMatchAdsFromTransaction,
-	)
+func oauthToolSecuritySchemes(requiredScopes []string) []map[string]any {
+	return []map[string]any{{"type": "oauth2", "scopes": append([]string(nil), requiredScopes...)}}
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("list_cities",
-			mcp.WithDescription("List all municipalities with their postal codes"),
-		),
-		s.handleListCities,
-	)
+func mergeRequiredScopes(primary, additional []string) []string {
+	seen := make(map[string]struct{}, len(primary)+len(additional))
+	merged := make([]string, 0, len(primary)+len(additional))
+	for _, s := range append(primary, additional...) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if _, exists := seen[s]; !exists {
+			seen[s] = struct{}{}
+			merged = append(merged, s)
+		}
+	}
+	return merged
+}
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("list_available_locations",
-			mcp.WithDescription("List municipalities that have price transaction data"),
-		),
-		s.handleListAvailableLocations,
-	)
+func wrapToolsListSecuritySchemes(next http.Handler, securityScopesByTool map[string][]string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &bufferedResponse{header: make(http.Header)}
+		next.ServeHTTP(rec, r)
 
-	s.mcpServer.AddTool(
-		mcp.NewTool("list_categories",
-			mcp.WithDescription("List distinct building categories (e.g. Kerrostalo, Rivitalo, etc.)"),
-		),
-		s.handleListCategories,
-	)
+		body := injectToolSecuritySchemes(rec.body.Bytes(), securityScopesByTool)
+		for name, values := range rec.header {
+			for _, value := range values {
+				w.Header().Add(name, value)
+			}
+		}
+		if rec.status != 0 {
+			w.WriteHeader(rec.status)
+		}
+		_, _ = w.Write(body)
+	})
+}
+
+func injectToolSecuritySchemes(body []byte, securityScopesByTool map[string][]string) []byte {
+	var envelope map[string]any
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return body
+	}
+	result, ok := envelope["result"].(map[string]any)
+	if !ok {
+		return body
+	}
+	tools, ok := result["tools"].([]any)
+	if !ok {
+		return body
+	}
+	for _, rawTool := range tools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		toolName, _ := tool["name"].(string)
+		scopes := securityScopesByTool[strings.TrimSpace(toolName)]
+		if len(scopes) == 0 {
+			scopes = []string{auth.ScopeMCPCoreRead}
+		}
+		schemes := oauthToolSecuritySchemes(scopes)
+		tool["securitySchemes"] = schemes
+		meta, _ := tool["_meta"].(map[string]any)
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		meta["securitySchemes"] = schemes
+		tool["_meta"] = meta
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return body
+	}
+	return encoded
+}
+
+type bufferedResponse struct {
+	header http.Header
+	body   bytes.Buffer
+	status int
+}
+
+func (r *bufferedResponse) Header() http.Header        { return r.header }
+func (r *bufferedResponse) WriteHeader(statusCode int) { r.status = statusCode }
+func (r *bufferedResponse) Write(data []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.body.Write(data)
+}
+
+type toolImpl struct {
+	adsSvc  *ads.Service
+	queries *db.Queries
+	pool    *pgxpool.Pool
+	config  toolImplConfig
+	logger  *slog.Logger
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func newToolResultError(msg string) *mcp.CallToolResult {
+	r := &mcp.CallToolResult{}
+	r.SetError(fmt.Errorf("%s", msg))
+	return r
+}
+
+func jsonResult(v any) (*mcp.CallToolResult, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("marshal result: %w", err)
+	}
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+	}, nil
 }
