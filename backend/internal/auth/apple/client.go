@@ -355,3 +355,18 @@ func (c *Client) BundleID() string {
 func Issuer() string {
 	return issuer
 }
+
+func (c *Client) ExchangeAuthorizationCodeWeb(ctx context.Context, authCode, redirectURI string) (*TokenResponse, error) {
+	clientSecret, err := c.clientSecretFunc()
+	if err != nil {
+		return nil, fmt.Errorf("generate client secret: %w", err)
+	}
+	form := url.Values{}
+	form.Set("client_id", c.bundleID)
+	form.Set("client_secret", clientSecret)
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", authCode)
+	form.Set("redirect_uri", redirectURI)
+	return c.sendTokenRequest(ctx, form)
+}
+

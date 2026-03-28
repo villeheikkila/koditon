@@ -100,6 +100,12 @@ func (s *Server) addRoutes(api huma.API) {
 			op.Middlewares = huma.Middlewares{authMiddleware}
 		}
 	})
+	huma.Post(api, "/auth/apple", s.appleWebAuthHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-apple-web"
+		op.Summary = "Sign in with Apple (web)"
+		op.Description = "Exchange an Apple authorization code for access tokens"
+		op.Tags = []string{"Authentication"}
+	})
 	huma.Post(api, "/auth/passkey/authenticate/options", s.passkeyAuthOptionsHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-passkey-authenticate-options"
 		op.Summary = "Begin passkey authentication"

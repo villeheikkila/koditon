@@ -26,14 +26,16 @@ import (
 )
 
 type Service struct {
-	logger         *slog.Logger
-	pool           *pgxpool.Pool
-	queries        *db.Queries
-	jwtService     *JWTService
-	appleClient    *apple.Client
-	passkeyService passkeyCeremonyService
-	geoResolver    GeoResolver
-	policy         Policy
+	logger              *slog.Logger
+	pool                *pgxpool.Pool
+	queries             *db.Queries
+	jwtService          *JWTService
+	appleClient         *apple.Client
+	appleWebClient      *apple.Client
+	appleWebRedirectURI string
+	passkeyService      passkeyCeremonyService
+	geoResolver         GeoResolver
+	policy              Policy
 }
 
 type passkeyCeremonyService interface {
@@ -75,6 +77,19 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create apple client: %w", err)
 	}
+	var appleWebClient *apple.Client
+	if cfg.Auth.Apple.WebServiceID != "" {
+		appleWebClient, err = apple.NewClient(ctx, apple.Config{
+			BundleID:     cfg.Auth.Apple.WebServiceID,
+			TeamID:       cfg.Auth.Apple.TeamID,
+			PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
+			PrivateKey:   cfg.Auth.Apple.PrivateKey,
+			RedisClient:  cfg.RedisClient,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create apple web client: %w", err)
+		}
+	}
 	var passkeyService *passkey.Service
 	if cfg.Auth.Passkey != nil {
 		passkeyService, err = passkey.NewService(passkey.Config{
@@ -95,14 +110,16 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 		geoResolver = noopGeoResolver{}
 	}
 	return &Service{
-		logger:         logger.With("component", "auth"),
-		pool:           cfg.Pool,
-		queries:        db.New(cfg.Pool),
-		jwtService:     jwtService,
-		appleClient:    appleClient,
-		passkeyService: passkeyService,
-		geoResolver:    geoResolver,
-		policy:         newPolicy(cfg.Policy),
+		logger:              logger.With("component", "auth"),
+		pool:                cfg.Pool,
+		queries:             db.New(cfg.Pool),
+		jwtService:          jwtService,
+		appleClient:         appleClient,
+		appleWebClient:      appleWebClient,
+		appleWebRedirectURI: cfg.Auth.Apple.WebRedirectURI,
+		passkeyService:      passkeyService,
+		geoResolver:         geoResolver,
+		policy:              newPolicy(cfg.Policy),
 	}, nil
 }
 
@@ -322,6 +339,132 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		"session_id", sessionID,
 		"is_new_user", isNewUser,
 	)
+	return &SignInWithAppleResponse{
+		UserID:    userID,
+		IsNewUser: isNewUser,
+		SessionID: sessionID,
+	}, nil
+}
+
+
+type SignInWithAppleWebRequest struct {
+	AuthorizationCode string
+	DeviceID          uuid.UUID
+	UserAgent         string
+	IP                string
+}
+
+func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWebRequest) (*SignInWithAppleResponse, error) {
+	ctx, span := startSpan(ctx, "auth.sign_in_apple_web",
+		telemetry.Attrs.AuthProvider("apple"),
+		telemetry.Attrs.AuthHasAuthCode(req.AuthorizationCode != ""),
+		telemetry.Attrs.AuthHasDeviceID(req.DeviceID != uuid.Nil),
+		telemetry.Attrs.AuthHasUserAgent(req.UserAgent != ""),
+	)
+	defer span.End()
+	if s.appleWebClient == nil {
+		return nil, errors.New("apple web sign in not configured")
+	}
+	exchangeCtx, exchangeSpan := startSpan(ctx, "auth.apple.exchange_code_web")
+	tokenResp, err := s.appleWebClient.ExchangeAuthorizationCodeWeb(exchangeCtx, req.AuthorizationCode, s.appleWebRedirectURI)
+	exchangeSpan.End()
+	if err != nil {
+		telemetry.RecordSpanError(span, err, "exchange authorization code web")
+		s.logger.ErrorContext(ctx, "failed to exchange web authorization code", "error", err)
+		return nil, fmt.Errorf("exchange authorization code: %w", err)
+	}
+	if tokenResp.IDToken == "" {
+		telemetry.RecordSpanError(span, ErrMissingIDToken, "missing apple id token")
+		return nil, ErrMissingIDToken
+	}
+	identity, err := s.appleWebClient.VerifyIDToken(ctx, tokenResp.IDToken, "")
+	if err != nil {
+		telemetry.RecordSpanError(span, err, "verify id token")
+		s.logger.ErrorContext(ctx, "failed to verify web id token", "error", err)
+		return nil, fmt.Errorf("verify id token: %w", err)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		telemetry.RecordSpanError(span, err, "begin transaction")
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer rollbackTx(ctx, s.logger, tx)
+	qtx := s.queries.WithTx(tx)
+	var email *string
+	if identity.Email != "" {
+		email = &identity.Email
+	}
+	emailVerified := identity.EmailVerified == "true"
+	identityData, _ := json.Marshal(map[string]any{
+		"iss":            apple.Issuer(),
+		"sub":            identity.Subject,
+		"email":          identity.Email,
+		"provider_id":    identity.Subject,
+		"email_verified": emailVerified,
+		"phone_verified": false,
+	})
+	provider := AuthProviderApple
+	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
+		UserIdentityProvider:   &provider,
+		UserIdentityExternalID: &identity.Subject,
+	})
+	var userID uuid.UUID
+	var isNewUser bool
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			telemetry.RecordSpanError(span, err, "lookup identity")
+			return nil, fmt.Errorf("get identity: %w", err)
+		}
+		user, createErr := qtx.CreateUser(ctx, email)
+		if createErr != nil {
+			telemetry.RecordSpanError(span, createErr, "create user")
+			return nil, fmt.Errorf("create user: %w", createErr)
+		}
+		userID = user.UserUuid
+		isNewUser = true
+		appleProvider := AuthProviderApple
+		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
+			UserUuid:                  util.UUIDToPg(userID),
+			UserIdentityProvider:      &appleProvider,
+			UserIdentityExternalID:    &identity.Subject,
+			UserIdentityEmail:         email,
+			UserIdentityEmailVerified: &emailVerified,
+			UserIdentityData:          identityData,
+		})
+		if err != nil {
+			telemetry.RecordSpanError(span, err, "create identity")
+			return nil, fmt.Errorf("create identity: %w", err)
+		}
+	} else {
+		userID = util.PgUUIDToUUID(existingIdentity.UserUuid)
+		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
+			UserIdentityUuid:          util.UUIDToPg(existingIdentity.UserIdentityUuid),
+			UserIdentityEmail:         email,
+			UserIdentityEmailVerified: &emailVerified,
+			UserIdentityData:          identityData,
+		})
+		if err != nil {
+			telemetry.RecordSpanError(span, err, "update identity")
+			return nil, fmt.Errorf("update identity: %w", err)
+		}
+	}
+	sessionID, err := s.createSessionWithProvider(ctx, tx, createSessionParams{
+		UserID:    userID,
+		Provider:  AuthProviderApple,
+		DeviceID:  req.DeviceID,
+		UserAgent: req.UserAgent,
+		IP:        req.IP,
+	})
+	if err != nil {
+		telemetry.RecordSpanError(span, err, "create session")
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		telemetry.RecordSpanError(span, err, "commit transaction")
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	span.SetAttributes(telemetry.Attrs.AuthIsNewUser(isNewUser))
+	s.logger.InfoContext(ctx, "apple web sign in completed", "user_id", userID, "is_new_user", isNewUser)
 	return &SignInWithAppleResponse{
 		UserID:    userID,
 		IsNewUser: isNewUser,

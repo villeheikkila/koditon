@@ -146,10 +146,12 @@ type AuthConfig struct {
 }
 
 type AppleAuthConfig struct {
-	BundleID     string `env:"AUTH_APPLE_BUNDLE_ID,required"`
-	TeamID       string `env:"AUTH_APPLE_TEAM_ID,required"`
-	PrivateKeyID string `env:"AUTH_APPLE_PRIVATE_KEY_ID,required"`
-	PrivateKey   string `env:"AUTH_APPLE_PRIVATE_KEY,required"`
+	BundleID       string `env:"AUTH_APPLE_BUNDLE_ID,required"`
+	TeamID         string `env:"AUTH_APPLE_TEAM_ID,required"`
+	PrivateKeyID   string `env:"AUTH_APPLE_PRIVATE_KEY_ID,required"`
+	PrivateKey     string `env:"AUTH_APPLE_PRIVATE_KEY,required"`
+	WebServiceID   string `env:"AUTH_APPLE_WEB_SERVICE_ID" envDefault:""`
+	WebRedirectURI string `env:"AUTH_APPLE_WEB_REDIRECT_URI" envDefault:""`
 }
 
 func (c AppleAuthConfig) IsConfigured() bool {

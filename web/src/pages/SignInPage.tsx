@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { passkeySignIn } from '../lib/auth'
+import { passkeySignIn, appleSignIn, isAppleSignInConfigured } from '../lib/auth'
 
 interface Props {
   onSignIn: () => void
@@ -7,7 +7,22 @@ interface Props {
 
 export default function SignInPage({ onSignIn }: Props) {
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [appleState, setAppleState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const appleConfigured = isAppleSignInConfigured()
+
+  async function handleAppleSignIn() {
+    setAppleState('loading')
+    setError(null)
+    try {
+      await appleSignIn()
+      onSignIn()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Apple sign in failed'
+      setError(msg)
+      setAppleState('error')
+    }
+  }
 
   async function handleSignIn() {
     setState('loading')
@@ -23,6 +38,7 @@ export default function SignInPage({ onSignIn }: Props) {
   }
 
   const isLoading = state === 'loading'
+  const isAppleLoading = appleState === 'loading'
 
   return (
     <div className="signin-layout">
@@ -51,6 +67,30 @@ export default function SignInPage({ onSignIn }: Props) {
           )}
         </button>
 
+        {appleConfigured && (
+          <div className="signin-divider">or</div>
+        )}
+
+        {appleConfigured && (
+          <button
+            className="apple-btn"
+            onClick={handleAppleSignIn}
+            disabled={isAppleLoading || isLoading}
+          >
+            {isAppleLoading ? (
+              <>
+                <div className="spinner" style={{ width: 14, height: 14 }} />
+                Signing in…
+              </>
+            ) : (
+              <>
+                <AppleIcon />
+                Sign in with Apple
+              </>
+            )}
+          </button>
+        )}
+
         {error && (
           <p className="signin-error">{error}</p>
         )}
@@ -60,6 +100,14 @@ export default function SignInPage({ onSignIn }: Props) {
         </p>
       </div>
     </div>
+  )
+}
+
+function AppleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 814 1000" fill="currentColor" aria-hidden="true">
+      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-42.3-150.3-109.2-89.6-185.1-89.6-279.1c0-186.3 121.4-284.8 240.8-284.8 108.2 0 159.9 72.2 168.5 74.1 4.5.6 4.5 0 0 0C576.5 275 696.5 340.9 788.1 340.9z M544.4 84.3C576.5 45.7 599 10.1 599 10.1c2.6-5.8 2.6-11.7 0-14.9-3.2-3.2-9-3.2-14.9 0-25.1 8.3-103.7 44.1-152.3 113.8-51.1 73.4-64.1 157.3-64.1 157.3s1.9 1.3 6.4 1.3c23.2 0 107.8-32.1 170.3-183.3z"/>
+    </svg>
   )
 }
 

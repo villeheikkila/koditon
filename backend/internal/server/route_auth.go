@@ -160,3 +160,55 @@ func (s *Server) passkeyRegisterFinishHandler(ctx context.Context, input *passke
 	out.Body.CredentialID = resp.CredentialID
 	return out, nil
 }
+
+// --- apple web sign in ---
+
+type appleWebAuthInput struct {
+	Body struct {
+		Code string `json:"code" required:"true"`
+	}
+	RawDeviceID string `header:"X-Device-ID"`
+}
+
+type appleWebAuthOutput struct {
+	Body struct {
+		AccessToken           string `json:"access_token"`
+		AccessTokenExpiresAt  int64  `json:"access_token_expires_at"`
+		RefreshToken          string `json:"refresh_token"`
+		RefreshTokenExpiresAt int64  `json:"refresh_token_expires_at"`
+		UserID                string `json:"user_id"`
+	}
+}
+
+func (s *Server) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput) (*appleWebAuthOutput, error) {
+	var deviceID uuid.UUID
+	if input.RawDeviceID != "" {
+		deviceID, _ = uuid.Parse(input.RawDeviceID)
+	}
+	siwaResp, err := s.authService.SignInWithAppleWeb(ctx, auth.SignInWithAppleWebRequest{
+		AuthorizationCode: input.Body.Code,
+		DeviceID:          deviceID,
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "apple web sign in failed", "error", err)
+		return nil, huma.Error400BadRequest("sign in failed")
+	}
+	tokens, err := s.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
+		ClientID:  "koditon-web",
+		UserID:    siwaResp.UserID,
+		Scopes:    []string{auth.ScopeCoreRead},
+		SessionID: siwaResp.SessionID,
+		Audience:  auth.CanonicalAPIAudience(s.cfg.APIPublicBaseURL),
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err)
+		return nil, huma.Error500InternalServerError("failed to issue tokens")
+	}
+	out := &appleWebAuthOutput{}
+	out.Body.AccessToken = tokens.AccessToken
+	out.Body.AccessTokenExpiresAt = tokens.AccessExpiry.Unix()
+	out.Body.RefreshToken = tokens.RefreshToken
+	out.Body.RefreshTokenExpiresAt = tokens.RefreshExpiry.Unix()
+	out.Body.UserID = siwaResp.UserID.String()
+	return out, nil
+}

@@ -21,10 +21,12 @@ type RedisConfig struct {
 }
 
 type AppleAuthConfig struct {
-	BundleID     string
-	PrivateKey   string
-	PrivateKeyID string
-	TeamID       string
+	BundleID       string
+	PrivateKey     string
+	PrivateKeyID   string
+	TeamID         string
+	WebServiceID   string
+	WebRedirectURI string
 }
 
 type JWTAuthConfig struct {

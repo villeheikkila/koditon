@@ -128,10 +128,12 @@ func run(
 				UIDHashSalt: cfg.Auth.JWTUIDHashSalt,
 			},
 			Apple: runtimecfg.AppleAuthConfig{
-				BundleID:     cfg.Auth.Apple.BundleID,
-				TeamID:       cfg.Auth.Apple.TeamID,
-				PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
-				PrivateKey:   cfg.Auth.Apple.PrivateKey,
+				BundleID:       cfg.Auth.Apple.BundleID,
+				TeamID:         cfg.Auth.Apple.TeamID,
+				PrivateKeyID:   cfg.Auth.Apple.PrivateKeyID,
+				PrivateKey:     cfg.Auth.Apple.PrivateKey,
+				WebServiceID:   cfg.Auth.Apple.WebServiceID,
+				WebRedirectURI: cfg.Auth.Apple.WebRedirectURI,
 			},
 		}
 		if cfg.Auth.OAuthCookieKey != "" {
