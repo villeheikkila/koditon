@@ -8,11 +8,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"koditon-go/internal/ads"
 	"koditon-go/internal/config"
-	"koditon-go/internal/web"
 )
 
 func main() {
@@ -33,20 +29,21 @@ func run(ctx context.Context) error {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.SlogLevel()}))
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		return fmt.Errorf("create database pool: %w", err)
-	}
-	defer pool.Close()
-	if err := pool.Ping(ctx); err != nil {
-		return fmt.Errorf("ping database: %w", err)
+	staticDir := cfg.WebStaticDir
+	if staticDir == "" {
+		return fmt.Errorf("WEB_STATIC_DIR must be set to the React build output directory")
 	}
 
-	adsService := ads.NewService(pool)
-	handler := web.NewHandler(adsService, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase, logger)
-
+	fs := http.FileServer(http.Dir(staticDir))
 	mux := http.NewServeMux()
-	handler.Register(mux)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := staticDir + r.URL.Path
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			http.ServeFile(w, r, staticDir+"/index.html")
+			return
+		}
+		fs.ServeHTTP(w, r)
+	})
 
 	addr := cfg.Host + ":" + cfg.Port
 	srv := &http.Server{Addr: addr, Handler: mux}
@@ -61,7 +58,7 @@ func run(ctx context.Context) error {
 		}
 	}()
 
-	logger.Info("web server starting", "addr", addr)
+	logger.Info("web server starting", "addr", addr, "static_dir", staticDir)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		return fmt.Errorf("listen: %w", err)
 	}

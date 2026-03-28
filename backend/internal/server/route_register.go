@@ -100,6 +100,12 @@ func (s *Server) addRoutes(api huma.API) {
 			op.Middlewares = huma.Middlewares{authMiddleware}
 		}
 	})
+	huma.Get(api, "/api/v1/entity", s.entityDetailHandler, func(op *huma.Operation) {
+		op.OperationID = "entity-detail"
+		op.Summary = "Get entity detail"
+		op.Description = "Fetch canonical detail for an ad or building by canonical ID or source URL"
+		op.Tags = []string{"Entity"}
+	})
 	huma.Post(api, "/auth/apple", s.appleWebAuthHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-apple-web"
 		op.Summary = "Sign in with Apple (web)"

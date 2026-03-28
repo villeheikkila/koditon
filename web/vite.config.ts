@@ -14,4 +14,7 @@ export default defineConfig({
       '/healthz': 'http://localhost:8080',
     },
   },
+  build: {
+    outDir: 'dist',
+  },
 })

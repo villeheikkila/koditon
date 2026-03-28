@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -31,6 +32,7 @@ type Server struct {
 	frontdoorAPI  *frontdoorclient.Client
 	authService   *auth.Service
 	webHandler    *web.Handler
+	adsService    *ads.Service
 }
 
 func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service) *Server {
@@ -90,15 +92,35 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		frontdoorAPI:  frontdoorClient,
 		authService:   authService,
 		webHandler:    webHandler,
+		adsService:    adsService,
 	}
 }
 
 func (s *Server) Handler(mux *http.ServeMux, api huma.API) http.Handler {
 	s.addRoutes(api)
-	s.webHandler.Register(mux)
+	if s.cfg.WebStaticDir != "" {
+		registerSPA(mux, s.cfg.WebStaticDir)
+	} else {
+		s.webHandler.Register(mux)
+	}
 	var handler http.Handler = mux
 	handler = s.loggingMiddleware(handler)
 	return handler
+}
+
+// registerSPA serves a React SPA from dir. API paths are handled by the mux
+// already; any other path either serves a static asset or falls back to index.html.
+func registerSPA(mux *http.ServeMux, dir string) {
+	fs := http.FileServer(http.Dir(dir))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Let the file server try first; if the asset doesn't exist serve index.html.
+		path := dir + r.URL.Path
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			http.ServeFile(w, r, dir+"/index.html")
+			return
+		}
+		fs.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {

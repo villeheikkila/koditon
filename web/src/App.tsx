@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { getToken, clearToken } from './lib/auth'
 import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
+import DetailPage from './pages/DetailPage'
+import HomePage from './pages/HomePage'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => !!getToken())
@@ -15,9 +18,26 @@ export default function App() {
     setAuthenticated(false)
   }
 
-  if (!authenticated) {
-    return <SignInPage onSignIn={handleSignIn} />
-  }
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/detail" element={<DetailPage />} />
+        <Route path="/search" element={<HomePage />} />
 
-  return <DashboardPage onSignOut={handleSignOut} />
+        {/* Auth-gated root */}
+        <Route
+          path="/"
+          element={
+            authenticated
+              ? <DashboardPage onSignOut={handleSignOut} />
+              : <SignInPage onSignIn={handleSignIn} />
+          }
+        />
+
+        {/* Catch-all: redirect to root */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
