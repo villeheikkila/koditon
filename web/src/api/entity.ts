@@ -12,18 +12,50 @@ export interface EntityDetail {
   kind: string
   native_id: string
   headline: string
-  address?: string
-  city?: string
-  postal?: string
-  price?: number
-  area?: number
-  room_layout?: string
   url?: string
   last_seen_at?: string
+
+  // Location
+  street_address?: string
+  city?: string
+  postal?: string
+
+  // Pricing
+  asking_price?: number
+  debt_free_price?: number
+  debt_share_amount?: number
+  price_per_m2?: number
+
+  // Property
+  area_m2?: number
+  room_layout?: string
+  rooms_count?: number
+  floor_level?: number
+  total_floors?: number
+  build_year?: number
+  condition?: string
+  energy_class?: string
+  plot_type?: string
+  elevator?: boolean
+  sauna?: boolean
+
+  // Monthly charges
+  maintenance_charge_monthly?: number
+  total_charge_monthly?: number
+  water_charge?: number
+
+  // Text
+  description_text?: string
+  availability_text?: string
+  renovations_done_text?: string
+  renovations_planned_text?: string
+  additional_info_text?: string
+  charges_text?: string
+
+  // Extras
   canonical_extra?: DetailField[]
   source_specific?: DetailField[]
   related?: DetailField[]
-  raw_json?: string
 }
 
 async function fetchEntityDetail(id: string): Promise<EntityDetail> {
