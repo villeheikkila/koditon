@@ -106,6 +106,12 @@ func (s *Server) addRoutes(api huma.API) {
 		op.Description = "Fetch canonical detail for an ad or building by canonical ID or source URL"
 		op.Tags = []string{"Entity"}
 	})
+	huma.Get(api, "/api/v1/search", s.searchHandler, func(op *huma.Operation) {
+		op.OperationID = "search"
+		op.Summary = "Search entities"
+		op.Description = "Search ads and buildings by free text, address, city, postal code, price, and area"
+		op.Tags = []string{"Entity"}
+	})
 	huma.Post(api, "/auth/apple", s.appleWebAuthHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-apple-web"
 		op.Summary = "Sign in with Apple (web)"

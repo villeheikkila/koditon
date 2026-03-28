@@ -4,7 +4,7 @@ import { getToken, clearToken } from './lib/auth'
 import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
-import HomePage from './pages/HomePage'
+import SearchPage from './pages/SearchPage'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => !!getToken())
@@ -23,7 +23,7 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/detail" element={<DetailPage />} />
-        <Route path="/search" element={<HomePage />} />
+        <Route path="/search" element={<SearchPage />} />
 
         {/* Auth-gated root */}
         <Route
