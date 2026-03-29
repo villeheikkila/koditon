@@ -5,6 +5,7 @@ import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
 import SearchPage from './pages/SearchPage'
+import OAuthAuthorizePage from './pages/OAuthAuthorizePage'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => !!getToken())
@@ -24,6 +25,7 @@ export default function App() {
         {/* Public routes */}
         <Route path="/detail" element={<DetailPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
 
         {/* Auth-gated root */}
         <Route

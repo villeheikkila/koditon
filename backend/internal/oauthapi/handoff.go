@@ -45,16 +45,17 @@ type oauthAuthorizationHandoff struct {
 }
 
 type authorizeHandoffPageData struct {
-	HandoffID     string
-	ClientName    string
-	ClientLogoURL string
-	RedirectHost  string
-	ScopeText     string
-	UserCode      string
-	ExpiresIn     int
-	AppOpenURL    string
-	QRCodeSVG     template.HTML
-	StatusURL     string
+	HandoffID       string
+	ClientName      string
+	ClientLogoURL   string
+	RedirectHost    string
+	ScopeText       string
+	UserCode        string
+	ExpiresIn       int
+	AppOpenURL      string
+	QRCodeSVG       template.HTML
+	StatusURL       string
+	WebAuthorizeURL string
 }
 
 type appOpenPageData struct {
@@ -303,17 +304,22 @@ func (h *Handler) renderAuthorizeHandoffPage(w http.ResponseWriter, handoff *oau
 		return
 	}
 	clientName, clientLogoURL := h.resolveHandoffClientBranding(context.Background(), handoff)
+	webAuthorizeURL := ""
+	if h.webBaseURL != "" {
+		webAuthorizeURL = strings.TrimRight(h.webBaseURL, "/") + "/oauth/authorize?handoff_token=" + url.QueryEscape(token)
+	}
 	data := authorizeHandoffPageData{
-		HandoffID:     handoff.ID,
-		ClientName:    clientName,
-		ClientLogoURL: clientLogoURL,
-		RedirectHost:  handoff.RedirectHost,
-		ScopeText:     strings.Join(handoff.Scopes, " "),
-		UserCode:      handoff.UserCode,
-		ExpiresIn:     secondsRemaining(handoff.ExpiresAt),
-		AppOpenURL:    appOpenURL,
-		QRCodeSVG:     qrCodeSVG,
-		StatusURL:     h.publicAPIBaseURL + "/oauth/authorize/handoff/status?id=" + url.QueryEscape(handoff.ID),
+		HandoffID:       handoff.ID,
+		ClientName:      clientName,
+		ClientLogoURL:   clientLogoURL,
+		RedirectHost:    handoff.RedirectHost,
+		ScopeText:       strings.Join(handoff.Scopes, " "),
+		UserCode:        handoff.UserCode,
+		ExpiresIn:       secondsRemaining(handoff.ExpiresAt),
+		AppOpenURL:      appOpenURL,
+		QRCodeSVG:       qrCodeSVG,
+		StatusURL:       h.publicAPIBaseURL + "/oauth/authorize/handoff/status?id=" + url.QueryEscape(handoff.ID),
+		WebAuthorizeURL: webAuthorizeURL,
 	}
 	_ = authorizeHandoffTemplate.Execute(w, data)
 }

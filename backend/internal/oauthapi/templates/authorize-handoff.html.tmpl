@@ -331,6 +331,7 @@
               <img src="/maku.svg" alt="" aria-hidden="true" />
               <span>Sign in with Maku</span>
             </a>
+            {{if .WebAuthorizeURL}}<a class="open-app-button" href="{{.WebAuthorizeURL}}" style="text-decoration:none">Approve in browser</a>{{end}}
             <span class="hint">On desktop, scan the QR code to continue in the Maku app.</span>
           </div>
           <div class="status" id="status" aria-live="polite"></div>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import Nav from '../components/Nav'
 import {
   useAvailabilityLocations,
   useAvailabilityCategories,
@@ -90,26 +90,16 @@ export default function DashboardPage({ onSignOut }: { onSignOut: () => void }) 
 
   return (
     <div className="app-layout">
-      <header className="header">
-        <div className="header-logo">
-          <span className="header-logo-dot" />
-          Koditon
-        </div>
-        <span className="header-spacer" />
-        <div className="header-meta">
-          <span className="status-dot" />
-          Finnish Real Estate
-        </div>
-        <Link to="/search" className="header-action-btn" title="Search listings">
-          <SearchIcon />
-        </Link>
-        <button className="header-action-btn" onClick={() => setShowPasskeyManager(true)} title="Manage passkeys">
-          <KeyIcon />
-        </button>
-        <button className="header-action-btn" onClick={onSignOut} title="Sign out">
-          <SignOutIcon />
-        </button>
-      </header>
+      <Nav actions={
+        <>
+          <button className="header-action-btn" onClick={() => setShowPasskeyManager(true)} title="Manage passkeys">
+            <KeyIcon />
+          </button>
+          <button className="header-action-btn" onClick={onSignOut} title="Sign out">
+            <SignOutIcon />
+          </button>
+        </>
+      } />
 
       {showPasskeyManager && <PasskeyManager onClose={() => setShowPasskeyManager(false)} />}
 
@@ -277,15 +267,6 @@ export default function DashboardPage({ onSignOut }: { onSignOut: () => void }) 
         </main>
       </div>
     </div>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import Nav from '../components/Nav'
 import { useSearch, type SearchParams, type SearchRow } from '../api/search'
 
 const PAGE_SIZE = 25
@@ -120,20 +121,11 @@ export default function SearchPage() {
 
   return (
     <div className="search-layout">
-      {/* Top bar */}
-      <div className="search-topbar">
-        <Link to="/" className="search-logo">
-          <span className="header-logo-dot" />
-          Koditon
-        </Link>
-        <div className="search-topbar-right">
-          {data && hasFilters && (
-            <span className="search-total">
-              {data.total.toLocaleString('fi-FI')} results
-            </span>
-          )}
-        </div>
-      </div>
+      <Nav actions={
+        data && hasFilters
+          ? <span className="search-total">{data.total.toLocaleString('fi-FI')} results</span>
+          : undefined
+      } />
 
       <div className="search-body">
         {/* Sidebar filters */}
