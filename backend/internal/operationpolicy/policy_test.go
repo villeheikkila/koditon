@@ -3,9 +3,9 @@ package operationpolicy
 import "testing"
 
 func TestForMCPTool(t *testing.T) {
-	policy, ok := ForMCPTool("maku_search_products")
+	policy, ok := ForMCPTool("koditon_search_products")
 	if !ok {
-		t.Fatal("expected policy for maku_search_products")
+		t.Fatal("expected policy for koditon_search_products")
 	}
 	if policy.RateLimit <= 0 {
 		t.Fatalf("unexpected rate limit: %d", policy.RateLimit)
@@ -16,9 +16,9 @@ func TestForMCPTool(t *testing.T) {
 }
 
 func TestForAPIOperation(t *testing.T) {
-	policy, ok := ForAPIOperation("check-in-create")
+	policy, ok := ForAPIOperation("oauth-token-create")
 	if !ok {
-		t.Fatal("expected policy for check-in-create")
+		t.Fatal("expected policy for oauth-token-create")
 	}
 	if policy.Timeout <= 0 {
 		t.Fatalf("unexpected timeout: %v", policy.Timeout)
@@ -26,25 +26,6 @@ func TestForAPIOperation(t *testing.T) {
 
 	if _, ok := ForAPIOperation("does-not-exist"); ok {
 		t.Fatal("did not expect policy for unknown operation")
-	}
-}
-
-func TestForAPIOperationCachePolicy(t *testing.T) {
-	policy, ok := ForAPIOperation("category-get-all")
-	if !ok {
-		t.Fatal("expected policy for category-get-all")
-	}
-	if !policy.Cache.HTTPEnabled() {
-		t.Fatal("expected HTTP cache policy to be enabled")
-	}
-	if policy.Cache.HTTP.Scope != CacheScopePrivate {
-		t.Fatalf("unexpected cache scope: %q", policy.Cache.HTTP.Scope)
-	}
-	if policy.Cache.HTTP.MaxAge <= 0 {
-		t.Fatalf("unexpected cache max age: %v", policy.Cache.HTTP.MaxAge)
-	}
-	if policy.Cache.ServerEnabled() {
-		t.Fatal("did not expect server cache policy for category-get-all")
 	}
 }
 

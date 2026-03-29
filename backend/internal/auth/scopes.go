@@ -6,41 +6,10 @@ import (
 )
 
 const (
-	ScopeCoreRead                  = "core:read"
-	ScopeMCPCoreRead               = "mcp:core:read"
-	ScopeProfileRead               = "profile:read"
-	ScopeProfileWrite              = "profile:write"
-	ScopeCheckInsRead              = "check-ins:read"
-	ScopeCheckInsWrite             = "check-ins:write"
-	ScopeCheckInCommentsWrite      = "check-in-comments:write"
-	ScopeProductsWrite             = "products:write"
-	ScopeBrandsWrite               = "brands:write"
-	ScopeCompaniesWrite            = "companies:write"
-	ScopeSubBrandsWrite            = "sub-brands:write"
-	ScopeCategoriesWrite           = "categories:write"
-	ScopeFlavorsWrite              = "flavors:write"
-	ScopeLogosWrite                = "logos:write"
-	ScopeReportsWrite              = "reports:write"
-	ScopeEditSuggestionsWrite      = "edit-suggestions:write"
-	ScopeAnalyticsWrite            = "analytics:write"
-	ScopeAdminProfileRead          = "admin:profile:read"
-	ScopeAdminProfileWrite         = "admin:profile:write"
-	ScopeAdminCheckInsRead         = "admin:check-ins:read"
-	ScopeAdminCheckInsWrite        = "admin:check-ins:write"
-	ScopeAdminCheckInCommentsRead  = "admin:check-in-comments:read"
-	ScopeAdminCheckInCommentsWrite = "admin:check-in-comments:write"
-	ScopeAdminReportsRead          = "admin:reports:read"
-	ScopeAdminReportsWrite         = "admin:reports:write"
-	ScopeAdminEditSuggestionsRead  = "admin:edit-suggestions:read"
-	ScopeAdminEditSuggestionsWrite = "admin:edit-suggestions:write"
-	ScopeAdminProductsRead         = "admin:products:read"
-	ScopeAdminProductsWrite        = "admin:products:write"
-	ScopeAdminBrandsRead           = "admin:brands:read"
-	ScopeAdminBrandsWrite          = "admin:brands:write"
-	ScopeAdminCompaniesRead        = "admin:companies:read"
-	ScopeAdminCompaniesWrite       = "admin:companies:write"
-	ScopeAdminSubBrandsRead        = "admin:sub-brands:read"
-	ScopeAdminSubBrandsWrite       = "admin:sub-brands:write"
+	ScopeCoreRead    = "core:read"
+	ScopeMCPCoreRead = "mcp:core:read"
+	ScopeProfileRead = "profile:read"
+	ScopeProfileWrite = "profile:write"
 )
 
 var userScopes = []string{
@@ -48,41 +17,9 @@ var userScopes = []string{
 	ScopeMCPCoreRead,
 	ScopeProfileRead,
 	ScopeProfileWrite,
-	ScopeCheckInsRead,
-	ScopeCheckInsWrite,
-	ScopeCheckInCommentsWrite,
-	ScopeReportsWrite,
-	ScopeEditSuggestionsWrite,
-	ScopeAnalyticsWrite,
-	ScopeProductsWrite,
-	ScopeBrandsWrite,
-	ScopeSubBrandsWrite,
-	ScopeCompaniesWrite,
 }
 
-var adminScopes = []string{
-	ScopeCategoriesWrite,
-	ScopeFlavorsWrite,
-	ScopeLogosWrite,
-	ScopeAdminProfileRead,
-	ScopeAdminProfileWrite,
-	ScopeAdminCheckInsRead,
-	ScopeAdminCheckInsWrite,
-	ScopeAdminCheckInCommentsRead,
-	ScopeAdminCheckInCommentsWrite,
-	ScopeAdminReportsRead,
-	ScopeAdminReportsWrite,
-	ScopeAdminEditSuggestionsRead,
-	ScopeAdminEditSuggestionsWrite,
-	ScopeAdminProductsRead,
-	ScopeAdminProductsWrite,
-	ScopeAdminBrandsRead,
-	ScopeAdminBrandsWrite,
-	ScopeAdminCompaniesRead,
-	ScopeAdminCompaniesWrite,
-	ScopeAdminSubBrandsRead,
-	ScopeAdminSubBrandsWrite,
-}
+var adminScopes = []string{}
 
 func ScopesForRoles(roles []string) []string {
 	seen := make(map[string]struct{}, len(userScopes)+len(adminScopes))

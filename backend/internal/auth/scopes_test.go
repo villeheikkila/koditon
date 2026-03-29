@@ -28,8 +28,8 @@ func TestClampRequestedScopesToUserGrantsDropsScopesMissingFromUserGrants(t *tes
 	t.Parallel()
 
 	got, err := ClampRequestedScopesToUserGrants(
-		[]string{ScopeCoreRead, ScopeAdminProductsRead, ScopeProfileRead},
-		[]string{ScopeCoreRead, ScopeProfileRead, ScopeAdminProductsRead},
+		[]string{ScopeCoreRead, ScopeMCPCoreRead, ScopeProfileRead},
+		[]string{ScopeCoreRead, ScopeProfileRead, ScopeMCPCoreRead},
 		[]string{ScopeCoreRead, ScopeProfileRead},
 	)
 	if err != nil {
@@ -46,9 +46,9 @@ func TestClampRequestedScopesToUserGrantsRejectsClientDisallowedScopes(t *testin
 	t.Parallel()
 
 	_, err := ClampRequestedScopesToUserGrants(
-		[]string{ScopeCoreRead, ScopeAdminProductsRead},
+		[]string{ScopeCoreRead, ScopeMCPCoreRead},
 		[]string{ScopeCoreRead, ScopeProfileRead},
-		[]string{ScopeCoreRead, ScopeAdminProductsRead},
+		[]string{ScopeCoreRead, ScopeMCPCoreRead},
 	)
 	if !errors.Is(err, ErrInvalidScope) {
 		t.Fatalf("ClampRequestedScopesToUserGrants error = %v, want ErrInvalidScope", err)
@@ -59,8 +59,8 @@ func TestClampRequestedScopesToUserGrantsRejectsEmptyGrantedScopes(t *testing.T)
 	t.Parallel()
 
 	_, err := ClampRequestedScopesToUserGrants(
-		[]string{ScopeAdminProductsRead},
-		[]string{ScopeAdminProductsRead},
+		[]string{ScopeMCPCoreRead},
+		[]string{ScopeMCPCoreRead},
 		[]string{ScopeCoreRead},
 	)
 	if !errors.Is(err, ErrInvalidScope) {

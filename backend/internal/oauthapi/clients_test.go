@@ -181,19 +181,19 @@ func TestNormalizeRequestedScopesForDynamicClientUsesAllowedSet(t *testing.T) {
 	}
 }
 
-func TestStaticClientsAllowAdminProductReadForFirstPartyApp(t *testing.T) {
+func TestStaticClientsIncludeProfileWriteForFirstPartyApp(t *testing.T) {
 	t.Parallel()
 
-	clients, err := staticClients("https://getmaku.com")
+	clients, err := staticClients("https://koditon.com")
 	if err != nil {
 		t.Fatalf("staticClients returned error: %v", err)
 	}
 
-	client, ok := clients["maku-apple"]
+	client, ok := clients["koditon-apple"]
 	if !ok {
-		t.Fatal("maku-apple client missing from static clients")
+		t.Fatal("koditon-apple client missing from static clients")
 	}
-	if !slices.Contains(client.Scopes, "admin:products:read") {
-		t.Fatalf("maku-apple scopes missing admin product read: %s", strings.Join(client.Scopes, " "))
+	if !slices.Contains(client.Scopes, "profile:write") {
+		t.Fatalf("koditon-apple scopes missing profile:write: %s", strings.Join(client.Scopes, " "))
 	}
 }
