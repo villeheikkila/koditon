@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -22,7 +23,11 @@ type passkeyAuthOptionsOutput struct {
 func (a *API) passkeyAuthOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyAuthOptionsOutput, error) {
 	resp, err := a.authService.BeginPasskeyAuthentication(ctx)
 	if err != nil {
-		return nil, huma.Error503ServiceUnavailable("passkey authentication unavailable")
+		if errors.Is(err, auth.ErrPasskeyConfig) {
+			return nil, huma.Error503ServiceUnavailable("passkey authentication unavailable")
+		}
+		a.logger.ErrorContext(ctx, "begin passkey authentication failed", "error", err)
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	out := &passkeyAuthOptionsOutput{}
 	out.Body.ChallengeID = resp.ChallengeID.String()
@@ -53,7 +58,7 @@ type passkeyAuthOutput struct {
 func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (*passkeyAuthOutput, error) {
 	challengeID, err := uuid.Parse(input.Body.ChallengeID)
 	if err != nil {
-		return nil, huma.Error400BadRequest("invalid challenge_id")
+		return nil, huma.Error422UnprocessableEntity("challenge_id must be a valid UUID")
 	}
 	var deviceID uuid.UUID
 	if input.RawDeviceID != "" {
@@ -65,14 +70,14 @@ func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (
 		DeviceID:    deviceID,
 	})
 	if err != nil {
-		switch err {
-		case auth.ErrPasskeyNotFound:
-			return nil, huma.Error400BadRequest("passkey not found")
-		case auth.ErrPasskeyChallenge:
-			return nil, huma.Error400BadRequest("passkey challenge is invalid or expired")
+		switch {
+		case errors.Is(err, auth.ErrPasskeyNotFound):
+			return nil, huma.Error404NotFound("passkey not found")
+		case errors.Is(err, auth.ErrPasskeyChallenge):
+			return nil, huma.Error422UnprocessableEntity("passkey challenge is invalid or expired")
 		default:
 			a.logger.ErrorContext(ctx, "passkey authentication failed", "error", err)
-			return nil, huma.Error400BadRequest("passkey authentication failed")
+			return nil, huma.Error401Unauthorized("authentication failed")
 		}
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
@@ -115,7 +120,11 @@ func (a *API) passkeyRegisterOptionsHandler(ctx context.Context, _ *struct{}) (*
 		DeviceID: deviceID,
 	})
 	if err != nil {
-		return nil, huma.Error503ServiceUnavailable("passkey registration unavailable")
+		if errors.Is(err, auth.ErrPasskeyConfig) {
+			return nil, huma.Error503ServiceUnavailable("passkey registration unavailable")
+		}
+		a.logger.ErrorContext(ctx, "begin passkey registration failed", "error", err)
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	out := &passkeyRegisterOptionsOutput{}
 	out.Body.ChallengeID = resp.ChallengeID.String()
@@ -145,7 +154,7 @@ func (a *API) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRe
 	}
 	challengeID, err := uuid.Parse(input.Body.ChallengeID)
 	if err != nil {
-		return nil, huma.Error400BadRequest("invalid challenge_id")
+		return nil, huma.Error422UnprocessableEntity("challenge_id must be a valid UUID")
 	}
 	resp, err := a.authService.FinishPasskeyRegistration(ctx, auth.FinishPasskeyRegistrationRequest{
 		UserID:      claims.UserID,
@@ -153,8 +162,13 @@ func (a *API) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRe
 		Credential:  json.RawMessage(input.Body.CredentialJSON),
 	})
 	if err != nil {
-		a.logger.ErrorContext(ctx, "passkey registration failed", "error", err)
-		return nil, huma.Error400BadRequest("passkey registration failed")
+		switch {
+		case errors.Is(err, auth.ErrPasskeyChallenge):
+			return nil, huma.Error422UnprocessableEntity("passkey challenge is invalid or expired")
+		default:
+			a.logger.ErrorContext(ctx, "passkey registration failed", "error", err)
+			return nil, huma.Error422UnprocessableEntity("passkey registration failed")
+		}
 	}
 	out := &passkeyRegisterFinishOutput{}
 	out.Body.CredentialID = resp.CredentialID
@@ -191,7 +205,7 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 	})
 	if err != nil {
 		a.logger.ErrorContext(ctx, "apple web sign in failed", "error", err)
-		return nil, huma.Error400BadRequest("sign in failed")
+		return nil, huma.Error401Unauthorized("sign in failed")
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
 		ClientID:  "koditon-web",

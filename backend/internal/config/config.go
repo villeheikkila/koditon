@@ -41,7 +41,17 @@ type Config struct {
 	MCPAuthToken              string `env:"MCP_AUTH_TOKEN" envDefault:""`
 	APIPublicBaseURL          string `env:"API_PUBLIC_BASE_URL" envDefault:""`
 	OpenAIAppsChallengeToken  string `env:"OPENAI_APPS_CHALLENGE_TOKEN" envDefault:""`
-	Redis           RedisConfig
+	CORSAllowedOrigins        string `env:"CORS_ALLOWED_ORIGINS" envDefault:""`
+	Redis                     RedisConfig
+	Telemetry                 TelemetryConfig
+}
+
+type TelemetryConfig struct {
+	OTLPEndpoint string  `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:""`
+	ServiceName  string  `env:"OTEL_SERVICE_NAME" envDefault:"koditon"`
+	OTLPProtocol string  `env:"OTEL_EXPORTER_OTLP_PROTOCOL" envDefault:"grpc"`
+	OTLPInsecure bool    `env:"OTEL_EXPORTER_OTLP_INSECURE" envDefault:"false"`
+	SampleRatio  float64 `env:"OTEL_SAMPLE_RATIO" envDefault:"1.0"`
 }
 
 func (c Config) SlogLevel() slog.Level {

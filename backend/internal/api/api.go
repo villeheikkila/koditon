@@ -21,6 +21,7 @@ import (
 type API struct {
 	logger        *slog.Logger
 	cfg           config.Config
+	pool          *pgxpool.Pool
 	pricesQueries *db.Queries
 	postalQueries *db.Queries
 	authService   *auth.Service
@@ -73,6 +74,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 	return &API{
 		logger:        logger.With("component", "api"),
 		cfg:           cfg,
+		pool:          pool,
 		pricesQueries: db.New(pool),
 		postalQueries: db.New(pool),
 		authService:   authService,

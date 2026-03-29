@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+
+	"github.com/danielgtaylor/huma/v2"
 )
 
 type availableMunicipality struct {
@@ -29,7 +31,7 @@ type availableLocationsOutput struct {
 func (a *API) availableLocationsHandler(ctx context.Context, _ *struct{}) (*availableLocationsOutput, error) {
 	municipalityRows, err := a.pricesQueries.ListAvailableMunicipalities(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	municipalities := make([]availableMunicipality, 0, len(municipalityRows))
 	for _, row := range municipalityRows {
@@ -42,7 +44,7 @@ func (a *API) availableLocationsHandler(ctx context.Context, _ *struct{}) (*avai
 	}
 	postalCodeRows, err := a.pricesQueries.ListAvailablePostalCodes(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	postalCodes := make([]availablePostalCode, 0, len(postalCodeRows))
 	for _, row := range postalCodeRows {
@@ -113,7 +115,7 @@ func translatePlot(finnishValue string) string {
 func (a *API) availableCategoriesHandler(ctx context.Context, _ *struct{}) (*availableCategoriesOutput, error) {
 	rows, err := a.pricesQueries.ListDistinctCategories(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	categories := make([]translatedValue, 0, len(rows))
 	for _, row := range rows {
@@ -136,7 +138,7 @@ type availableTypesOutput struct {
 func (a *API) availableTypesHandler(ctx context.Context, _ *struct{}) (*availableTypesOutput, error) {
 	rows, err := a.pricesQueries.ListDistinctTypes(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	types := make([]translatedValue, 0, len(rows))
 	for _, row := range rows {
@@ -159,7 +161,7 @@ type availablePlotsOutput struct {
 func (a *API) availablePlotsHandler(ctx context.Context, _ *struct{}) (*availablePlotsOutput, error) {
 	rows, err := a.pricesQueries.ListDistinctPlots(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	plots := make([]translatedValue, 0, len(rows))
 	for _, row := range rows {

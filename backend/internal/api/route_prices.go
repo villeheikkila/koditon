@@ -72,7 +72,7 @@ func (a *API) pricesTransactionsHandler(ctx context.Context, input *pricesTransa
 		PostalCodeID:   postalCodeID,
 	})
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	transactions := make([]pricesTransaction, 0, len(rows))
 	for _, row := range rows {
@@ -175,7 +175,7 @@ func (a *API) pricesTransactionsFilteredHandler(ctx context.Context, input *pric
 	}
 	rows, err := a.pricesQueries.ListTransactionsFiltered(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	transactions := make([]pricesTransaction, 0, len(rows))
 	for _, row := range rows {

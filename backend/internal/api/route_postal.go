@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 )
 
@@ -31,7 +32,7 @@ type postalCitiesOutput struct {
 func (a *API) postalCitiesHandler(ctx context.Context, _ *struct{}) (*postalCitiesOutput, error) {
 	rows, err := a.postalQueries.ListMunicipalitiesWithPostalCodes(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	cityIndex := make(map[string]int)
 	cities := make([]postalCity, 0, len(rows))

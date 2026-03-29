@@ -19,6 +19,7 @@ import (
 	db "koditon-go/internal/db"
 	"koditon-go/internal/oauthapi"
 	"koditon-go/internal/runtimecfg"
+	"koditon-go/internal/telemetry"
 	"koditon-go/internal/consumers"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/mcpserver"
@@ -58,7 +59,19 @@ func run(
 		return err
 	}
 	logger := newLogger(stderr, cfg)
-	slog.SetDefault(logger)
+	var telCfg *runtimecfg.TelemetryConfig
+	if cfg.Telemetry.OTLPEndpoint != "" {
+		telCfg = &runtimecfg.TelemetryConfig{
+			ServiceName:  cfg.Telemetry.ServiceName,
+			OTLPEndpoint: cfg.Telemetry.OTLPEndpoint,
+			OTLPProtocol: cfg.Telemetry.OTLPProtocol,
+			OTLPInsecure: cfg.Telemetry.OTLPInsecure,
+			SampleRatio:  cfg.Telemetry.SampleRatio,
+		}
+	}
+	telResult := telemetry.Bootstrap(ctx, telCfg, string(cfg.Environment), logger.Handler(), logger)
+	logger = telResult.Logger
+	defer func() { _ = telResult.Shutdown(context.Background()) }()
 	appLogger := logger.With("component", "app")
 	appLogger.Info("starting application",
 		"env", cfg.Environment,
