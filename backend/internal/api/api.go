@@ -16,12 +16,14 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type API struct {
 	logger        *slog.Logger
 	cfg           config.Config
 	pool          *pgxpool.Pool
+	redis         *redis.Client
 	pricesQueries *db.Queries
 	postalQueries *db.Queries
 	authService   *auth.Service
@@ -30,7 +32,7 @@ type API struct {
 	frontdoorAPI  *frontdoorclient.Client
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service, adsService *ads.Service) *API {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, redisClient *redis.Client, authService *auth.Service, adsService *ads.Service) *API {
 	shortcutQueries := db.New(pool)
 	tokenLoad := func(ctx context.Context) (*shortcutclient.Tokens, error) {
 		dbToken, err := shortcutQueries.GetValidShortcutToken(ctx)
@@ -75,6 +77,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		logger:        logger.With("component", "api"),
 		cfg:           cfg,
 		pool:          pool,
+		redis:         redisClient,
 		pricesQueries: db.New(pool),
 		postalQueries: db.New(pool),
 		authService:   authService,

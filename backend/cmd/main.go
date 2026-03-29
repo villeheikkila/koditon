@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -39,6 +40,13 @@ import (
 
 func main() {
 	ctx := context.Background()
+	if len(os.Args) > 1 && os.Args[1] == "verify-env" {
+		if err := runVerifyEnv(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(ctx, os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -173,7 +181,7 @@ func run(
 		if err != nil {
 			return fmt.Errorf("create auth service: %w", err)
 		}
-		srv := server.New(logger, cfg, pool, authService)
+		srv := server.New(logger, cfg, pool, redisClient, authService)
 		mux := http.NewServeMux()
 		if cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != "" {
 			oauthHandler, err := oauthapi.New(logger, oauthapi.Config{
@@ -317,4 +325,102 @@ func formatLevel(level slog.Level) string {
 	default:
 		return level.String()
 	}
+}
+
+type productionModeCheck struct {
+	name    string
+	appMode string
+}
+
+func runVerifyEnv(args []string) error {
+	fs := flag.NewFlagSet("verify-env", flag.ContinueOnError)
+	allModes := fs.Bool("all-modes", false, "Validate env for all production runtime profiles (consumer, api, consumer+api)")
+	mode := fs.String("mode", "", "Validate env as the given mode (consumer, api, consumer,api)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *allModes && *mode != "" {
+		return fmt.Errorf("--mode and --all-modes cannot be used together")
+	}
+
+	baseEnv := config.CurrentEnv()
+	checks := []productionModeCheck{
+		{name: "consumer,api", appMode: "consumer,api"},
+		{name: "consumer", appMode: "consumer"},
+		{name: "api", appMode: "api"},
+	}
+
+	switch {
+	case *allModes:
+		for _, check := range checks {
+			if err := verifyEnvTarget(os.Stdout, check.name, mergedEnv(baseEnv, productionEnvOverrides(check))); err != nil {
+				return err
+			}
+		}
+	case *mode != "":
+		check, err := productionCheckForMode(*mode)
+		if err != nil {
+			return err
+		}
+		if err := verifyEnvTarget(os.Stdout, check.name, mergedEnv(baseEnv, productionEnvOverrides(check))); err != nil {
+			return err
+		}
+	default:
+		if err := verifyEnvTarget(os.Stdout, "current env", baseEnv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyEnvTarget(stdout io.Writer, name string, values map[string]string) error {
+	if _, err := config.FromEnvMap(values); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	_, err := fmt.Fprintf(stdout, "ok: %s\n", name)
+	return err
+}
+
+func productionCheckForMode(raw string) (productionModeCheck, error) {
+	mode := strings.TrimSpace(strings.ToLower(raw))
+	switch mode {
+	case "consumer,api", "api,consumer":
+		return productionModeCheck{name: "consumer,api", appMode: "consumer,api"}, nil
+	case "consumer":
+		return productionModeCheck{name: "consumer", appMode: "consumer"}, nil
+	case "api":
+		return productionModeCheck{name: "api", appMode: "api"}, nil
+	default:
+		return productionModeCheck{}, fmt.Errorf("invalid mode %q: must be consumer, api, or consumer,api", raw)
+	}
+}
+
+func productionEnvOverrides(check productionModeCheck) map[string]string {
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		databaseURL = fmt.Sprintf(
+			"postgres://postgres:%s@db:5432/koditon?sslmode=disable",
+			strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD")),
+		)
+	}
+	return map[string]string{
+		"APP_HOST":             "0.0.0.0",
+		"APP_PORT":             "8080",
+		"APP_ENV":              "production",
+		"APP_SHUTDOWN_TIMEOUT": "10s",
+		"APP_MODE":             check.appMode,
+		"LOG_LEVEL":            "info",
+		"DATABASE_URL":         databaseURL,
+	}
+}
+
+func mergedEnv(base, overrides map[string]string) map[string]string {
+	merged := make(map[string]string, len(base)+len(overrides))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, v := range overrides {
+		merged[k] = v
+	}
+	return merged
 }

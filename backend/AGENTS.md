@@ -7,31 +7,29 @@ Go backend service using pgx, Huma v2 for HTTP API, sqlc for type-safe database 
 ## Build, Test, and Development Commands
 
 ### Development
-- `task backend:dev`: run server with file watching and auto-reload (uses reflex)
+- `mise run dev`: run server with file watching and auto-reload (from `backend/`)
 - `go run ./cmd`: start the application once without watching
-- `go build -o server ./cmd`: build production binary
+- `mise run build`: build production binary
 
 ### Testing
-- `go test ./...`: run all tests
+- `mise run test`: run all tests
 - `go test ./internal/auth`: test specific package
 - `go test -v -run TestSignInAnonymous ./internal/auth`: run single test with verbose output
-- `go test -race ./...`: run tests with race detector
-- `go test -cover ./...`: run tests with coverage report
-- `go test -coverprofile=coverage.out ./...`: generate coverage profile
+- `mise run test:race`: run tests with race detector
+- `mise run test:cover`: run tests with coverage report
 
 ### Linting and Formatting
-- `go vet ./...`: static analysis (run before committing)
-- `go fmt ./...`: format all Go code (use goimports style)
-- `goimports -w .`: organize imports and format (preferred over go fmt)
+- `mise run lint`: static analysis
+- `mise run fmt`: check formatting
+- `mise run fix`: autofix formatting and lints
 
 ### Database Commands
-Use task commands from the root directory (see root AGENTS.md for details):
-- `task db:new NAME=description`: create new timestamped migration
-- `task db:migrate`: apply pending migrations
-- `task db:status`: show current migration state
-- `task db:generate`: regenerate sqlc code from queries
-- `task db:query QUERY="SELECT ..."`: run SQL query
-- `task db:reset`: drop, recreate, and migrate database (destructive)
+Run from `backend/` (see root AGENTS.md for details):
+- `NAME=description mise run db:new`: create new timestamped migration
+- `mise run db:migrate`: apply pending migrations
+- `mise run db:status`: show current migration state
+- `mise run db:generate`: regenerate sqlc code from queries
+- `QUERY="SELECT ..." mise run db:query`: run SQL query
 
 ## Project Structure
 

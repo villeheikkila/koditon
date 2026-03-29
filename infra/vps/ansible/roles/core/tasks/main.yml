@@ -2,6 +2,7 @@
   ansible.builtin.assert:
     that:
       - infra_env is defined
+      - infra_env is mapping
       - infra_env | length > 0
     fail_msg: "infra_env must be defined in group_vars/vps.secrets.yml"
 

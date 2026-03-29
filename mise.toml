@@ -1,0 +1,74 @@
+[settings]
+experimental = true
+
+[tools]
+go = "1.26"
+node = "25"
+
+[env]
+DOCKER_IMAGE = "villeheikkila/koditon:latest"
+LOG_LEVEL    = "debug"
+APP_ENV                     = "development"
+WEB_BASE_URL                = "http://localhost:8080"
+
+# backend shortcuts — forward to backend/mise.toml tasks
+[tasks."backend:dev"]
+description = "Run backend server with hot reload"
+run = "mise -C {{config_root}}/backend run dev"
+
+[tasks."backend:build"]
+description = "Build production binary"
+run = "mise -C {{config_root}}/backend run build"
+
+[tasks."backend:test"]
+description = "Run all tests"
+run = "mise -C {{config_root}}/backend run test"
+
+[tasks."backend:lint"]
+description = "Run static analysis"
+run = "mise -C {{config_root}}/backend run lint"
+
+[tasks."backend:fix"]
+description = "Autofix formatting and lints"
+run = "mise -C {{config_root}}/backend run fix"
+
+[tasks."backend:db:migrate"]
+description = "Apply all pending migrations"
+run = "mise -C {{config_root}}/backend run db:migrate"
+
+[tasks."backend:db:status"]
+description = "Show current migration state"
+run = "mise -C {{config_root}}/backend run db:status"
+
+[tasks."backend:db:generate"]
+description = "Regenerate sqlc code"
+run = "mise -C {{config_root}}/backend run db:generate"
+
+[tasks."backend:db:new"]
+description = "Create a new migration (NAME=<name> required)"
+run = "mise -C {{config_root}}/backend run db:new"
+
+[tasks."web:dev"]
+description = "Start Vite dev server"
+dir = "{{config_root}}/web"
+run = "npm run dev"
+
+[tasks."web:build"]
+description = "Type-check and build web bundle"
+dir = "{{config_root}}/web"
+run = "npm run build"
+
+[tasks."web:lint"]
+description = "Run ESLint"
+dir = "{{config_root}}/web"
+run = "npm run lint"
+
+[tasks."web:preview"]
+description = "Preview production build"
+dir = "{{config_root}}/web"
+run = "npm run preview"
+
+[tasks."web:generate"]
+description = "Generate API client with Orval"
+dir = "{{config_root}}/web"
+run = "npm run generate"

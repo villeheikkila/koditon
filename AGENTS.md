@@ -23,26 +23,34 @@ This includes:
 - Commit and pull request guidelines
 - TUI architecture (`internal/tui`) including router, primitives, screen flow, and snapshot tests
 
-## Taskfile Shortcuts
+## mise Tasks
 
-The repository root contains a `Taskfile.yml` with shortcuts for common operations:
+Tasks are managed with [mise](https://mise.jdx.dev/). Run `mise tasks` in any directory to see what's available.
 
 ### Development
-- `task backend:dev`: runs the backend server with file watching and auto-reload
+- `mise run backend:dev`: runs the backend server with file watching and auto-reload (from project root)
+- `mise run dev`: same, when already in `backend/`
 
 ### Database
-- `task db:new NAME=...`: creates a new timestamped migration file
-- `task db:migrate`: applies pending database migrations
-- `task db:status`: shows current migration state
-- `task db:generate`: regenerates `internal/*/db` from `db/schema` and package-level `queries.sql` files
-- `task db:query QUERY="SELECT ..."`: runs a SQL query directly
-- `task db:query FILE=path/to/file.sql`: runs a SQL file
+Run from project root using `backend:` prefix, or from `backend/` without prefix:
+- `NAME=... mise run backend:db:new`: creates a new timestamped migration file
+- `mise run backend:db:migrate`: applies pending database migrations
+- `mise run backend:db:status`: shows current migration state
+- `mise run backend:db:generate`: regenerates `internal/*/db` from `db/schema` and package-level `queries.sql` files
+- `QUERY="SELECT ..." mise run db:query`: runs a SQL query directly (from `backend/`)
+- `FILE=path/to/file.sql mise run db:query`: runs a SQL file (from `backend/`)
+
+### Web (run from anywhere)
+- `mise run web:dev`: starts the Vite dev server
+- `mise run web:build`: type-checks and builds the web bundle
+- `mise run web:generate`: regenerates the API client with Orval
 
 ### iOS (Native Swift App in `koditon/`)
 
-- `task ios:build`: builds the iOS app using xcede
-- `task ios:run`: runs the iOS app on the simulator (does not exit on its own - must be terminated manually)
-- `task ios:build-run`: builds and runs the iOS app in one command (does not exit on its own - must be terminated manually)
+Use `task` (Go Task) directly from the `koditon/` directory:
+- `task build`: builds the iOS app using xcede
+- `task run`: runs the iOS app on the simulator (does not exit on its own - must be terminated manually)
+- `task build-run`: builds and runs the iOS app in one command (does not exit on its own - must be terminated manually)
 
 The device ID is read from `IOS_DEVICE_ID` in `.env`. You can override the platform with `IOS_PLATFORM=device` for physical devices.
 

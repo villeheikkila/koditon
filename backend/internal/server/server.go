@@ -16,6 +16,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
@@ -25,9 +26,9 @@ type Server struct {
 	webHandler *web.Handler
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service) *Server {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, redisClient *redis.Client, authService *auth.Service) *Server {
 	adsService := ads.NewService(pool)
-	a := api.New(logger, cfg, pool, authService, adsService)
+	a := api.New(logger, cfg, pool, redisClient, authService, adsService)
 	webHandler := web.NewHandler(adsService, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase, logger)
 	return &Server{
 		logger:     logger.With("component", "server"),

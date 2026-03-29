@@ -1,0 +1,30 @@
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/vps.yml
+    - group_vars/vps.secrets.yml
+  vars:
+    backend_image: "ghcr.io/villeheikkila/koditon-backend:verify"
+  tasks:
+    - name: Validate infra_env is provided
+      ansible.builtin.assert:
+        that:
+          - infra_env is defined
+          - infra_env is mapping
+          - infra_env | length > 0
+        fail_msg: "infra_env must be defined in group_vars/vps.secrets.yml"
+
+    - name: Validate required infra env variables
+      ansible.builtin.assert:
+        that:
+          - infra_env[item] is defined
+          - (infra_env[item] | string | trim | length) > 0
+        fail_msg: "Missing infra_env value for {{ item }} in group_vars/vps.secrets.yml"
+      loop: "{{ required_infra_env_vars }}"
+
+    - name: Render production env file locally
+      ansible.builtin.template:
+        src: roles/core/templates/db.env.j2
+        dest: "{{ output_path }}"
+        mode: "0600"

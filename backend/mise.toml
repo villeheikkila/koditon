@@ -1,0 +1,257 @@
+[tools]
+air           = "latest"
+golangci-lint = "latest"
+gofumpt       = "latest"
+sqlc          = "latest"
+"go:golang.org/x/tools/cmd/goimports"  = "latest"
+"go:golang.org/x/vuln/cmd/govulncheck" = "latest"
+"go:golang.org/x/tools/cmd/deadcode"   = "latest"
+"go:github.com/oligot/go-mod-upgrade"  = "latest"
+"go:github.com/jackc/tern/v2"          = "latest"
+
+[env]
+APP_HOST             = "0.0.0.0"
+APP_PORT             = "8080"
+APP_SHUTDOWN_TIMEOUT = "10s"
+APP_MODE             = "consumer,api"
+DATABASE_URL         = "postgres://postgres:postgres@localhost:5432/koditon?sslmode=disable"
+AUTH_JWT_ISSUER      = "koditon"
+# encrypted — add with: mise set --age-encrypt --prompt <VAR>
+# AUTH_JWT_SIGNING_KEY
+# MCP_AUTH_TOKEN
+# SHORTCUT_BASE_URL
+# SHORTCUT_DOCS_BASE_URL
+# SHORTCUT_AD_BASE_URL
+# SHORTCUT_SITEMAP_BASE_URL
+# SHORTCUT_USER_AGENT
+# FRONTDOOR_BASE_URL
+# FRONTDOOR_USER_AGENT
+# FRONTDOOR_COOKIE
+# FRONTDOOR_SITEMAP_BASE_URL
+# OPENROUTER_API_KEY
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID
+
+# ---------- dev ----------
+
+[tasks.dev]
+description = "Run server with hot reload"
+run = "air"
+env = { CGO_ENABLED = "0" }
+
+# ---------- db ----------
+
+[tasks."db:new"]
+description = "Create a new timestamped migration (NAME=<name> required)"
+run = "tern new -m db/migrations $NAME"
+
+[tasks."db:migrate"]
+description = "Apply all pending migrations and dump schema"
+run = [
+  "tern migrate --migrations db/migrations",
+  "./scripts/schema/dump_concise_public_schema.sh",
+]
+
+[tasks."db:status"]
+description = "Show current migration state"
+run = "tern status --migrations db/migrations"
+
+[tasks."db:create"]
+description = "Create the database"
+run = """
+if [ -n "${DATABASE_URL:-}" ]; then
+  DB_NAME=$(echo "$DATABASE_URL" | sed 's|.*/||' | sed 's/?.*//')
+  POSTGRES_URL=$(echo "$DATABASE_URL" | sed "s|/${DB_NAME}|/postgres|")
+  psql "${POSTGRES_URL}" -c "CREATE DATABASE ${DB_NAME};"
+else
+  psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/postgres" -c "CREATE DATABASE ${DB_NAME};"
+fi
+"""
+
+[tasks."db:import"]
+description = "Import a SQL file into the database (FILE=<path> required)"
+run = """
+if [ -n "${DATABASE_URL:-}" ]; then
+  psql "$DATABASE_URL" -f "$FILE"
+else
+  psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}" -f "$FILE"
+fi
+"""
+
+[tasks."db:query"]
+description = "Run SQL (QUERY=... or FILE=<path>)"
+run = """
+if [ -n "${DATABASE_URL:-}" ]; then
+  CONN="$DATABASE_URL"
+else
+  CONN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+fi
+if [ -n "${FILE:-}" ]; then
+  psql "$CONN" -f "$FILE"
+elif [ -n "${QUERY:-}" ]; then
+  psql "$CONN" -c "$QUERY"
+else
+  echo "Error: set QUERY or FILE"; exit 1
+fi
+"""
+
+[tasks."db:generate"]
+description = "Generate type-safe Go code from SQL queries"
+run = "sqlc generate -f sqlc.yaml"
+
+[tasks."db:vet"]
+description = "Run sqlc vet rules"
+run = "sqlc vet -f sqlc.yaml"
+
+[tasks."db:dump"]
+description = "Backup the database (optional FILE=<path>)"
+run = """
+if [ -n "${DATABASE_URL:-}" ]; then
+  CONN="$DATABASE_URL"
+else
+  CONN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+fi
+if [ -n "${FILE:-}" ]; then
+  pg_dump "$CONN" -F p -f "$FILE" && echo "Dumped to $FILE"
+else
+  FILENAME="db_backup_$(date +%Y%m%d_%H%M%S).sql"
+  pg_dump "$CONN" -F p -f "$FILENAME" && echo "Dumped to $FILENAME"
+fi
+"""
+
+[tasks."db:clone:prod:local"]
+description = "Dump production DB and restore into local DB"
+run = """
+PROD_CONN="${PROD_DATABASE_URL:-${DATABASE_URL:-}}"
+[ -z "$PROD_CONN" ] && echo "Error: set PROD_DATABASE_URL or DATABASE_URL" && exit 1
+LOCAL_CONN="${LOCAL_DATABASE_URL:-postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}}"
+[ "$PROD_CONN" = "$LOCAL_CONN" ] && echo "Error: PROD and LOCAL are identical; aborting" && exit 1
+DUMP_FILE="${DUMP_FILE:-/tmp/koditon_prod_$(date +%Y%m%d_%H%M%S).dump}"
+echo "Dumping prod to $DUMP_FILE"
+pg_dump "$PROD_CONN" --format=custom --no-owner --no-privileges --file "$DUMP_FILE"
+echo "Restoring to local database"
+pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$LOCAL_CONN" "$DUMP_FILE"
+echo "Clone complete"
+"""
+
+[tasks."db:schema"]
+description = "Dump concise public schema to db/schema.sql"
+run = "./scripts/schema/dump_concise_public_schema.sh"
+
+# ---------- docker ----------
+
+[tasks."docker:build"]
+description = "Build Docker image (DOCKER_IMAGE from env)"
+run = """
+docker build -t "$DOCKER_IMAGE" .
+echo "Image built: $DOCKER_IMAGE"
+"""
+
+[tasks."docker:push"]
+description = "Push Docker image to registry"
+run = """
+docker push "$DOCKER_IMAGE"
+echo "Image pushed: $DOCKER_IMAGE"
+"""
+
+[tasks."docker:deploy"]
+description = "Build and push image; use infra/ tasks to deploy"
+run = [
+  "mise run docker:build",
+  "mise run docker:push",
+]
+
+# ---------- tests ----------
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks."test:verbose"]
+description = "Run all tests with verbose output"
+run = "go test -v ./..."
+
+[tasks."test:race"]
+description = "Run tests with race detector"
+run = "go test -race ./..."
+
+[tasks."test:cover"]
+description = "Run tests with coverage summary"
+run = "go test -cover ./..."
+
+[tasks."test:coverage"]
+description = "Generate HTML coverage report"
+run = """
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+echo "Coverage report generated at coverage.html"
+"""
+
+# ---------- code quality ----------
+
+[tasks.fmt]
+description = "Check formatting (no writes)"
+run = """
+test -z "$(gofumpt -l .)" || (echo "gofumpt needed"; gofumpt -l .; exit 1)
+test -z "$(goimports -l .)" || (echo "goimports needed"; goimports -l .; exit 1)
+"""
+
+[tasks.fix]
+description = "Autofix formatting and lints"
+run = """
+go fix ./...
+gofumpt -w .
+goimports -w .
+golangci-lint run ./... --fix --timeout=5m
+"""
+
+[tasks.lint]
+description = "Run static analysis"
+run = "golangci-lint run ./... --timeout=5m"
+
+[tasks.deadcode]
+description = "Find unreachable functions"
+run = "deadcode ./..."
+
+[tasks.vuln]
+description = "Check known vulnerabilities"
+run = "govulncheck ./..."
+
+[tasks.tidy]
+description = "Tidy go.mod and go.sum"
+run = "go mod tidy"
+
+[tasks."tidy:check"]
+description = "Ensure go.mod/go.sum are tidy (CI-safe)"
+run = """
+go mod tidy
+git diff --exit-code -- go.mod go.sum
+"""
+
+[tasks.deps]
+description = "Update deps, tidy, and check vulns"
+run = """
+go get -u ./...
+go mod tidy
+govulncheck ./...
+"""
+
+[tasks."update-dependencies"]
+description = "Interactive dependency updater"
+run = "go-mod-upgrade"
+
+# ---------- build ----------
+
+[tasks.build]
+description = "Build production binary"
+run = "go build -o server ./cmd"
+env = { CGO_ENABLED = "0" }
+
+[tasks.tui]
+description = "Run interactive sync TUI"
+run = "go run ./cmd/tui"
+env = { CGO_ENABLED = "0" }
+
+[tasks.clean]
+description = "Remove built artifacts"
+run = "rm -f server coverage.out coverage.html"

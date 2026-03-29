@@ -16,6 +16,57 @@ tasks:
       - docker build --pull --platform linux/amd64 -f ../backend/Dockerfile -t {{.IMAGE}} ../backend
       - docker push {{.IMAGE}}
 
+  check:env:
+    desc: Render production secrets locally and validate compose env interpolation
+    cmds:
+      - |
+        set -euo pipefail
+        TMP_ENV="$(mktemp)"
+        cleanup() {
+          rm -f "${TMP_ENV}"
+        }
+        trap cleanup EXIT
+        export ANSIBLE_LOCAL_TEMP="${TMPDIR:-/tmp}/ansible-local"
+        mkdir -p "${ANSIBLE_LOCAL_TEMP}"
+
+        ansible-playbook \
+          -i localhost, \
+          vps/ansible/render-prod-env.local.yml \
+          -c local \
+          --vault-password-file vps/scripts/ansible-vault-pass.sh \
+          -e output_path="${TMP_ENV}"
+
+        DECRYPTED_ENV_FILE="${TMP_ENV}" docker compose --env-file "${TMP_ENV}" -f docker-compose.prod.yml config -q
+
+  deploy:verify:
+    desc: Render production secrets locally and verify backend runtime env requirements
+    cmds:
+      - task: check:env
+      - |
+        set -euo pipefail
+        TMP_ENV="$(mktemp)"
+        cleanup() {
+          rm -f "${TMP_ENV}"
+        }
+        trap cleanup EXIT
+        export ANSIBLE_LOCAL_TEMP="${TMPDIR:-/tmp}/ansible-local"
+        mkdir -p "${ANSIBLE_LOCAL_TEMP}"
+
+        ansible-playbook \
+          -i localhost, \
+          vps/ansible/render-prod-env.local.yml \
+          -c local \
+          --vault-password-file vps/scripts/ansible-vault-pass.sh \
+          -e output_path="${TMP_ENV}"
+
+        (
+          set -a
+          . "${TMP_ENV}"
+          set +a
+          cd ../backend
+          GOCACHE="${TMPDIR:-/tmp}/koditon-go-build-cache" go run ./cmd/main.go verify-env --all-modes
+        )
+
   deploy:
     desc: Build, push, and deploy backend to production
     vars:
@@ -27,6 +78,7 @@ tasks:
       INFRA_TAG:
         sh: git -C .. log -1 --format=%h -- infra/
     cmds:
+      - task: deploy:verify
       - cmd: |
           IMAGE="ghcr.io/{{.GHCR_USER}}/koditon-backend:{{.BACKEND_TAG}}"
 

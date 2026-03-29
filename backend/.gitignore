@@ -23,8 +23,6 @@ coverage.out
 /vendor/
 
 # Environment and runtime
-.env
-.env.local
 *.log
 
 # Editor and OS
