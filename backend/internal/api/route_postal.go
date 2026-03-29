@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -28,8 +28,8 @@ type postalCitiesOutput struct {
 	}
 }
 
-func (s *Server) postalCitiesHandler(ctx context.Context, _ *struct{}) (*postalCitiesOutput, error) {
-	rows, err := s.postalQueries.ListMunicipalitiesWithPostalCodes(ctx)
+func (a *API) postalCitiesHandler(ctx context.Context, _ *struct{}) (*postalCitiesOutput, error) {
+	rows, err := a.postalQueries.ListMunicipalitiesWithPostalCodes(ctx)
 	if err != nil {
 		return nil, err
 	}

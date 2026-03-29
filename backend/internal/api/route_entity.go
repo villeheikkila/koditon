@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -74,18 +74,18 @@ type entityDetailOutput struct {
 	}
 }
 
-func (s *Server) entityDetailHandler(ctx context.Context, input *entityDetailInput) (*entityDetailOutput, error) {
-	canonicalID, err := ads.ResolveInput(input.ID, s.cfg.Shortcut.SitemapBase, s.cfg.Frontdoor.SitemapBase)
+func (a *API) entityDetailHandler(ctx context.Context, input *entityDetailInput) (*entityDetailOutput, error) {
+	canonicalID, err := ads.ResolveInput(input.ID, a.cfg.Shortcut.SitemapBase, a.cfg.Frontdoor.SitemapBase)
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid ID or URL: " + input.ID)
 	}
 
-	detail, err := s.adsService.DetailByCanonicalID(ctx, canonicalID)
+	detail, err := a.adsService.DetailByCanonicalID(ctx, canonicalID)
 	if err != nil {
 		if errors.Is(err, ads.ErrNotFound) {
 			return nil, huma.Error404NotFound("entity not found")
 		}
-		s.logger.ErrorContext(ctx, "entity detail lookup failed", "canonical_id", canonicalID, "error", err)
+		a.logger.ErrorContext(ctx, "entity detail lookup failed", "canonical_id", canonicalID, "error", err)
 		return nil, huma.Error500InternalServerError("failed to fetch entity detail")
 	}
 

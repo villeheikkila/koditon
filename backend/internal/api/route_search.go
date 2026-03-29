@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -48,7 +48,7 @@ type searchOutput struct {
 	}
 }
 
-func (s *Server) searchHandler(ctx context.Context, input *searchInput) (*searchOutput, error) {
+func (a *API) searchHandler(ctx context.Context, input *searchInput) (*searchOutput, error) {
 	page := input.Page
 	if page < 1 {
 		page = 1
@@ -73,9 +73,9 @@ func (s *Server) searchHandler(ctx context.Context, input *searchInput) (*search
 		PageSize: pageSize,
 	}
 
-	result, err := s.adsService.Search(ctx, params)
+	result, err := a.adsService.Search(ctx, params)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "search failed", "error", err)
+		a.logger.ErrorContext(ctx, "search failed", "error", err)
 		return nil, huma.Error500InternalServerError("search failed")
 	}
 

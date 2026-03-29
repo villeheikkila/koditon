@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -26,8 +26,8 @@ type availableLocationsOutput struct {
 	}
 }
 
-func (s *Server) availableLocationsHandler(ctx context.Context, _ *struct{}) (*availableLocationsOutput, error) {
-	municipalityRows, err := s.pricesQueries.ListAvailableMunicipalities(ctx)
+func (a *API) availableLocationsHandler(ctx context.Context, _ *struct{}) (*availableLocationsOutput, error) {
+	municipalityRows, err := a.pricesQueries.ListAvailableMunicipalities(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (s *Server) availableLocationsHandler(ctx context.Context, _ *struct{}) (*a
 			NameSv: row.PostalMunicipalityNameSv,
 		})
 	}
-	postalCodeRows, err := s.pricesQueries.ListAvailablePostalCodes(ctx)
+	postalCodeRows, err := a.pricesQueries.ListAvailablePostalCodes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,8 @@ func translatePlot(finnishValue string) string {
 	return finnishValue
 }
 
-func (s *Server) availableCategoriesHandler(ctx context.Context, _ *struct{}) (*availableCategoriesOutput, error) {
-	rows, err := s.pricesQueries.ListDistinctCategories(ctx)
+func (a *API) availableCategoriesHandler(ctx context.Context, _ *struct{}) (*availableCategoriesOutput, error) {
+	rows, err := a.pricesQueries.ListDistinctCategories(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +133,8 @@ type availableTypesOutput struct {
 	}
 }
 
-func (s *Server) availableTypesHandler(ctx context.Context, _ *struct{}) (*availableTypesOutput, error) {
-	rows, err := s.pricesQueries.ListDistinctTypes(ctx)
+func (a *API) availableTypesHandler(ctx context.Context, _ *struct{}) (*availableTypesOutput, error) {
+	rows, err := a.pricesQueries.ListDistinctTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +156,8 @@ type availablePlotsOutput struct {
 	}
 }
 
-func (s *Server) availablePlotsHandler(ctx context.Context, _ *struct{}) (*availablePlotsOutput, error) {
-	rows, err := s.pricesQueries.ListDistinctPlots(ctx)
+func (a *API) availablePlotsHandler(ctx context.Context, _ *struct{}) (*availablePlotsOutput, error) {
+	rows, err := a.pricesQueries.ListDistinctPlots(ctx)
 	if err != nil {
 		return nil, err
 	}

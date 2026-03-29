@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -12,7 +12,7 @@ type healthOutput struct {
 	Body HealthResponse
 }
 
-func (s *Server) healthHandler(ctx context.Context, _ *struct{}) (*healthOutput, error) {
+func (a *API) healthHandler(ctx context.Context, _ *struct{}) (*healthOutput, error) {
 	return &healthOutput{
 		Body: HealthResponse{Status: "ok"},
 	}, nil

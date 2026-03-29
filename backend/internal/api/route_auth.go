@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -19,8 +19,8 @@ type passkeyAuthOptionsOutput struct {
 	}
 }
 
-func (s *Server) passkeyAuthOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyAuthOptionsOutput, error) {
-	resp, err := s.authService.BeginPasskeyAuthentication(ctx)
+func (a *API) passkeyAuthOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyAuthOptionsOutput, error) {
+	resp, err := a.authService.BeginPasskeyAuthentication(ctx)
 	if err != nil {
 		return nil, huma.Error503ServiceUnavailable("passkey authentication unavailable")
 	}
@@ -50,7 +50,7 @@ type passkeyAuthOutput struct {
 	}
 }
 
-func (s *Server) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (*passkeyAuthOutput, error) {
+func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (*passkeyAuthOutput, error) {
 	challengeID, err := uuid.Parse(input.Body.ChallengeID)
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid challenge_id")
@@ -59,7 +59,7 @@ func (s *Server) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput
 	if input.RawDeviceID != "" {
 		deviceID, _ = uuid.Parse(input.RawDeviceID)
 	}
-	finishResp, err := s.authService.FinishPasskeyAuthentication(ctx, auth.FinishPasskeyAuthenticateRequest{
+	finishResp, err := a.authService.FinishPasskeyAuthentication(ctx, auth.FinishPasskeyAuthenticateRequest{
 		ChallengeID: challengeID,
 		Credential:  json.RawMessage(input.Body.CredentialJSON),
 		DeviceID:    deviceID,
@@ -71,19 +71,19 @@ func (s *Server) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput
 		case auth.ErrPasskeyChallenge:
 			return nil, huma.Error400BadRequest("passkey challenge is invalid or expired")
 		default:
-			s.logger.ErrorContext(ctx, "passkey authentication failed", "error", err)
+			a.logger.ErrorContext(ctx, "passkey authentication failed", "error", err)
 			return nil, huma.Error400BadRequest("passkey authentication failed")
 		}
 	}
-	tokens, err := s.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
+	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
 		ClientID:  "koditon-web",
 		UserID:    finishResp.UserID,
 		Scopes:    []string{auth.ScopeCoreRead},
 		SessionID: finishResp.SessionID,
-		Audience:  auth.CanonicalAPIAudience(s.cfg.APIPublicBaseURL),
+		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
 	})
 	if err != nil {
-		s.logger.ErrorContext(ctx, "token issuance failed after passkey auth", "error", err)
+		a.logger.ErrorContext(ctx, "token issuance failed after passkey auth", "error", err)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
 	out := &passkeyAuthOutput{}
@@ -104,13 +104,13 @@ type passkeyRegisterOptionsOutput struct {
 	}
 }
 
-func (s *Server) passkeyRegisterOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyRegisterOptionsOutput, error) {
+func (a *API) passkeyRegisterOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyRegisterOptionsOutput, error) {
 	claims := auth.GetClaimsFromContext(ctx)
 	if claims == nil {
 		return nil, huma.Error401Unauthorized("authentication required")
 	}
 	deviceID := uuid.Nil
-	resp, err := s.authService.BeginPasskeyRegistration(ctx, auth.BeginPasskeyRegistrationRequest{
+	resp, err := a.authService.BeginPasskeyRegistration(ctx, auth.BeginPasskeyRegistrationRequest{
 		UserID:   claims.UserID,
 		DeviceID: deviceID,
 	})
@@ -138,7 +138,7 @@ type passkeyRegisterFinishOutput struct {
 	}
 }
 
-func (s *Server) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRegisterFinishInput) (*passkeyRegisterFinishOutput, error) {
+func (a *API) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRegisterFinishInput) (*passkeyRegisterFinishOutput, error) {
 	claims := auth.GetClaimsFromContext(ctx)
 	if claims == nil {
 		return nil, huma.Error401Unauthorized("authentication required")
@@ -147,13 +147,13 @@ func (s *Server) passkeyRegisterFinishHandler(ctx context.Context, input *passke
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid challenge_id")
 	}
-	resp, err := s.authService.FinishPasskeyRegistration(ctx, auth.FinishPasskeyRegistrationRequest{
+	resp, err := a.authService.FinishPasskeyRegistration(ctx, auth.FinishPasskeyRegistrationRequest{
 		UserID:      claims.UserID,
 		ChallengeID: challengeID,
 		Credential:  json.RawMessage(input.Body.CredentialJSON),
 	})
 	if err != nil {
-		s.logger.ErrorContext(ctx, "passkey registration failed", "error", err)
+		a.logger.ErrorContext(ctx, "passkey registration failed", "error", err)
 		return nil, huma.Error400BadRequest("passkey registration failed")
 	}
 	out := &passkeyRegisterFinishOutput{}
@@ -180,28 +180,28 @@ type appleWebAuthOutput struct {
 	}
 }
 
-func (s *Server) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput) (*appleWebAuthOutput, error) {
+func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput) (*appleWebAuthOutput, error) {
 	var deviceID uuid.UUID
 	if input.RawDeviceID != "" {
 		deviceID, _ = uuid.Parse(input.RawDeviceID)
 	}
-	siwaResp, err := s.authService.SignInWithAppleWeb(ctx, auth.SignInWithAppleWebRequest{
+	siwaResp, err := a.authService.SignInWithAppleWeb(ctx, auth.SignInWithAppleWebRequest{
 		AuthorizationCode: input.Body.Code,
 		DeviceID:          deviceID,
 	})
 	if err != nil {
-		s.logger.ErrorContext(ctx, "apple web sign in failed", "error", err)
+		a.logger.ErrorContext(ctx, "apple web sign in failed", "error", err)
 		return nil, huma.Error400BadRequest("sign in failed")
 	}
-	tokens, err := s.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
+	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
 		ClientID:  "koditon-web",
 		UserID:    siwaResp.UserID,
 		Scopes:    []string{auth.ScopeCoreRead},
 		SessionID: siwaResp.SessionID,
-		Audience:  auth.CanonicalAPIAudience(s.cfg.APIPublicBaseURL),
+		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
 	})
 	if err != nil {
-		s.logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err)
+		a.logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
 	out := &appleWebAuthOutput{}

@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -12,15 +12,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// RFC3339Time wraps time.Time to marshal without fractional seconds for iOS compatibility
+// RFC3339Time wraps time.Time to marshal without fractional seconds for iOS compatibility.
 type RFC3339Time struct {
 	time.Time
 }
 
 func (t RFC3339Time) MarshalJSON() ([]byte, error) {
-	// Format as RFC3339 without fractional seconds
-	formatted := t.UTC().Format("2006-01-02T15:04:05Z")
-	return json.Marshal(formatted)
+	return json.Marshal(t.UTC().Format("2006-01-02T15:04:05Z"))
 }
 
 type pricesTransactionsInput struct {
@@ -60,7 +58,7 @@ type pricesTransactionsOutput struct {
 	}
 }
 
-func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTransactionsInput) (*pricesTransactionsOutput, error) {
+func (a *API) pricesTransactionsHandler(ctx context.Context, input *pricesTransactionsInput) (*pricesTransactionsOutput, error) {
 	municipalityID, err := parseUUIDParam(input.MunicipalityID)
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid municipality_id")
@@ -69,7 +67,7 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 	if err != nil {
 		return nil, huma.Error400BadRequest("invalid postal_code_id")
 	}
-	rows, err := s.pricesQueries.ListTransactionsByPostalSelection(ctx, db.ListTransactionsByPostalSelectionParams{
+	rows, err := a.pricesQueries.ListTransactionsByPostalSelection(ctx, db.ListTransactionsByPostalSelectionParams{
 		MunicipalityID: municipalityID,
 		PostalCodeID:   postalCodeID,
 	})
@@ -111,11 +109,7 @@ func (s *Server) pricesTransactionsHandler(ctx context.Context, input *pricesTra
 }
 
 func parseUUIDParam(value string) (uuid.UUID, error) {
-	parsed, err := uuid.Parse(value)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	return parsed, nil
+	return uuid.Parse(value)
 }
 
 type pricesTransactionsFilteredInput struct {
@@ -128,7 +122,7 @@ type pricesTransactionsFilteredInput struct {
 	Limit           int32   `query:"limit" doc:"Maximum number of results (default 100)"`
 }
 
-func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *pricesTransactionsFilteredInput) (*pricesTransactionsOutput, error) {
+func (a *API) pricesTransactionsFilteredHandler(ctx context.Context, input *pricesTransactionsFilteredInput) (*pricesTransactionsOutput, error) {
 	params := db.ListTransactionsFilteredParams{}
 	if input.MunicipalityIDs != "" {
 		ids := strings.Split(input.MunicipalityIDs, ",")
@@ -179,7 +173,7 @@ func (s *Server) pricesTransactionsFilteredHandler(ctx context.Context, input *p
 	if input.Limit > 0 {
 		params.LimitCount = &input.Limit
 	}
-	rows, err := s.pricesQueries.ListTransactionsFiltered(ctx, params)
+	rows, err := a.pricesQueries.ListTransactionsFiltered(ctx, params)
 	if err != nil {
 		return nil, err
 	}
