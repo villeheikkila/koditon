@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Continue In Maku</title>
+  <title>Continue In Koditon</title>
   <style>
     :root {
       --page-bg: #f5f5f7;
@@ -322,24 +322,24 @@
               <p class="client-name">{{.ClientName}}</p>
             </div>
           </div>
-          <h1 id="title">Continue in Maku</h1>
+          <h1 id="title">Continue in Koditon</h1>
           <p class="lede">
             Confirm the request for <strong>{{.ClientName}}</strong> in the app. This page will finish automatically when you're done.
           </p>
           <div class="action-row">
-            <a class="open-app-button" id="open-maku" href="{{.AppOpenURL}}" hidden>
-              <img src="/maku.svg" alt="" aria-hidden="true" />
-              <span>Sign in with Maku</span>
+            <a class="open-app-button" id="open-koditon" href="{{.AppOpenURL}}" hidden>
+              <img src="/koditon.svg" alt="" aria-hidden="true" />
+              <span>Sign in with Koditon</span>
             </a>
             {{if .WebAuthorizeURL}}<a class="open-app-button" href="{{.WebAuthorizeURL}}" style="text-decoration:none">Approve in browser</a>{{end}}
-            <span class="hint">On desktop, scan the QR code to continue in the Maku app.</span>
+            <span class="hint">On desktop, scan the QR code to continue in the Koditon app.</span>
           </div>
           <div class="status" id="status" aria-live="polite"></div>
         </div>
-        <aside class="panel qr-panel" aria-label="Scan to continue in Maku">
+        <aside class="panel qr-panel" aria-label="Scan to continue in Koditon">
           <div class="qr-frame">{{.QRCodeSVG}}</div>
           <div class="code-stack">
-            <p class="qr-caption">Scan with your phone camera to open Maku instantly.</p>
+            <p class="qr-caption">Scan with your phone camera to open Koditon instantly.</p>
             <p class="code-label">Or enter this code</p>
             <p class="code-value">{{.UserCode}}</p>
           </div>
@@ -352,14 +352,14 @@
     const statusURL = {{printf "%q" .StatusURL}};
     let remaining = Math.max(0, Number({{.ExpiresIn}}));
     const status = document.getElementById('status');
-    const openMaku = document.getElementById('open-maku');
-    const context = detectMakuUserAgentContext();
+    const openKoditon = document.getElementById('open-koditon');
+    const context = detectKoditonUserAgentContext();
     let attemptedAutoRefresh = false;
 
-    openMaku.hidden = false;
+    openKoditon.hidden = false;
 
     if (context.isLikelyIOS) {
-      openMaku.querySelector('span').textContent = 'Open Maku';
+      openKoditon.querySelector('span').textContent = 'Open Koditon';
     }
 
     function showStatus(message) {
@@ -387,12 +387,12 @@
         if (!res.ok) throw new Error('poll_failed');
         const data = await res.json();
         if (data.redirect_url) {
-          showStatus('Approved in Maku. Finishing sign-in...');
+          showStatus('Approved in Koditon. Finishing sign-in...');
           window.location.href = data.redirect_url;
           return;
         }
         if (data.status === 'denied') {
-          showStatus('This request was denied in Maku.');
+          showStatus('This request was denied in Koditon.');
           return;
         }
         if (data.status === 'expired') {

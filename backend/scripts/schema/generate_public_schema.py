@@ -19,7 +19,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-DEFAULT_DB_URL = "postgresql://postgres:postgres@localhost:5433/maku"
+DEFAULT_DB_URL = "postgresql://postgres:postgres@localhost:5433/koditon"
 
 
 def get_schema_dump(db_url: str) -> str:

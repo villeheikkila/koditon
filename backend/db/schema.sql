@@ -446,7 +446,7 @@ CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree
 
 
 -- ============================================================
--- Auth Schema (maku-based)
+-- Auth Schema
 -- ============================================================
 
 CREATE TYPE public.enum__name_display AS ENUM (

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Maku Device Verification</title>
+  <title>Koditon Device Verification</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; }
     .card { border: 1px solid #ddd; border-radius: 12px; padding: 20px; }
@@ -26,11 +26,11 @@
         <div class="code" id="auth-code">{{.AuthorizationCode}}</div>
       {{end}}
     {{else if eq .Result "error"}}
-      <p class="warn">Approval failed in app. Try opening Maku again.</p>
+      <p class="warn">Approval failed in app. Try opening Koditon again.</p>
     {{else}}
-      <p class="muted">Open Maku and confirm this request from the Notifications tab.</p>
+      <p class="muted">Open Koditon and confirm this request from the Notifications tab.</p>
     {{end}}
-    <a id="open-app" class="button" href="{{.NativeURL}}">Open Maku</a>
+    <a id="open-app" class="button" href="{{.NativeURL}}">Open Koditon</a>
   </div>
   <script>
     if ({{printf "%q" .Result}} === "") {

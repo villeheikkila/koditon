@@ -15,18 +15,18 @@ func TestNormalize(t *testing.T) {
 	}{
 		{
 			name:  "preserves normal app user agent",
-			input: "Maku/1.0 (iPhone; iOS 26.0)",
-			want:  "Maku/1.0 (iPhone; iOS 26.0)",
+			input: "Koditon/1.0 (iPhone; iOS 26.0)",
+			want:  "Koditon/1.0 (iPhone; iOS 26.0)",
 		},
 		{
 			name:  "trims whitespace",
-			input: "  Maku/1.0 (iPhone; iOS 26.0)  ",
-			want:  "Maku/1.0 (iPhone; iOS 26.0)",
+			input: "  Koditon/1.0 (iPhone; iOS 26.0)  ",
+			want:  "Koditon/1.0 (iPhone; iOS 26.0)",
 		},
 		{
 			name:  "collapses whitespace and strips controls",
-			input: "Maku/1.0\t(\niPhone;\r iOS 26.0)\u0000",
-			want:  "Maku/1.0 ( iPhone; iOS 26.0)",
+			input: "Koditon/1.0\t(\niPhone;\r iOS 26.0)\u0000",
+			want:  "Koditon/1.0 ( iPhone; iOS 26.0)",
 		},
 		{
 			name:  "blank becomes empty",

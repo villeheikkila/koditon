@@ -17,7 +17,7 @@ func TestVerifyIDToken_RejectsNonceMismatch(t *testing.T) {
 	t.Parallel()
 
 	client, signer := newAppleClientForTokenTests(t)
-	idToken := signAppleIDToken(t, signer, "com.example.maku", "expected-nonce")
+	idToken := signAppleIDToken(t, signer, "com.example.koditon", "expected-nonce")
 
 	if _, err := client.VerifyIDToken(context.Background(), idToken, "different-nonce"); err != ErrInvalidNonce {
 		t.Fatalf("expected ErrInvalidNonce, got %v", err)
@@ -28,7 +28,7 @@ func TestVerifyIDToken_AcceptsExactNonce(t *testing.T) {
 	t.Parallel()
 
 	client, signer := newAppleClientForTokenTests(t)
-	idToken := signAppleIDToken(t, signer, "com.example.maku", "expected-nonce")
+	idToken := signAppleIDToken(t, signer, "com.example.koditon", "expected-nonce")
 
 	identity, err := client.VerifyIDToken(context.Background(), idToken, "expected-nonce")
 	if err != nil {
@@ -66,7 +66,7 @@ func newAppleClientForTokenTests(t *testing.T) (*Client, jwk.Key) {
 	}
 
 	return &Client{
-		bundleID: "com.example.maku",
+		bundleID: "com.example.koditon",
 		keySet:   keySet,
 	}, privateJWK
 }

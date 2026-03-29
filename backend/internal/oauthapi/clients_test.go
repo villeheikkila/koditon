@@ -130,7 +130,7 @@ func TestCollectSupportedScopesIncludesAdditionalScopes(t *testing.T) {
 	t.Parallel()
 
 	scopes := collectSupportedScopes(map[string]oauthClient{
-		"getmaku-web": {
+		"koditon-web": {
 			Scopes: []string{"core:read", "profile:read"},
 		},
 	}, []string{"mcp:core:read", "check-ins:write"})

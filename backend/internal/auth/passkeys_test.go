@@ -99,7 +99,7 @@ func TestFinishPasskeyAuthentication_SanitizesSessionUserAgent(t *testing.T) {
 		ChallengeID: challengeID,
 		Credential:  json.RawMessage(`{"type":"public-key"}`),
 		DeviceID:    uuid.New(),
-		UserAgent:   "  Maku/1.0\t(\niPhone; iOS 26.0)\u0000  ",
+		UserAgent:   "  Koditon/1.0\t(\niPhone; iOS 26.0)\u0000  ",
 	})
 	if err != nil {
 		t.Fatalf("finish passkey auth: %v", err)
@@ -112,7 +112,7 @@ func TestFinishPasskeyAuthentication_SanitizesSessionUserAgent(t *testing.T) {
 	if session.DeviceSessionUserAgent == nil {
 		t.Fatal("expected sanitized user agent")
 	}
-	want := "Maku/1.0 ( iPhone; iOS 26.0)"
+	want := "Koditon/1.0 ( iPhone; iOS 26.0)"
 	if *session.DeviceSessionUserAgent != want {
 		t.Fatalf("expected %q, got %q", want, *session.DeviceSessionUserAgent)
 	}

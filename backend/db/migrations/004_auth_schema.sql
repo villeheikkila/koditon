@@ -1,5 +1,5 @@
 -- ============================================================
--- Auth Schema (copied from maku, squashed to current state)
+-- Auth Schema (squashed to current state)
 -- Includes: users, identities, sessions, devices, roles/flags,
 --           passkeys, oauth, email auth, runtime idempotency
 -- ============================================================

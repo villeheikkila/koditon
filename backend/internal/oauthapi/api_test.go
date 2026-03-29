@@ -18,10 +18,10 @@ func TestValidateAuthorizeRequestAcceptsCanonicalResource(t *testing.T) {
 	h := &Handler{
 		publicAPIBaseURL: "https://api.example.com",
 		clients: map[string]oauthClient{
-			"maku-apple": {
-				ClientID:     "maku-apple",
+			"koditon-apple": {
+				ClientID:     "koditon-apple",
 				ClientType:   "public",
-				RedirectURIs: []string{"maku://oauth/callback"},
+				RedirectURIs: []string{"koditon://oauth/callback"},
 				Scopes:       []string{auth.ScopeMCPCoreRead},
 				AudienceMode: auth.OAuthAudienceModeProtectedResource,
 			},
@@ -30,8 +30,8 @@ func TestValidateAuthorizeRequestAcceptsCanonicalResource(t *testing.T) {
 
 	client, scopes, err := h.validateAuthorizeRequest(context.Background(), authorizeRequest{
 		ResponseType:        "code",
-		ClientID:            "maku-apple",
-		RedirectURI:         "maku://oauth/callback",
+		ClientID:            "koditon-apple",
+		RedirectURI:         "koditon://oauth/callback",
 		Resource:            "https://api.example.com/mcp",
 		Scope:               []string{auth.ScopeMCPCoreRead},
 		CodeChallenge:       "challenge",
@@ -40,8 +40,8 @@ func TestValidateAuthorizeRequestAcceptsCanonicalResource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("validateAuthorizeRequest returned error: %v", err)
 	}
-	if client.ClientID != "maku-apple" {
-		t.Fatalf("client id = %q, want %q", client.ClientID, "maku-apple")
+	if client.ClientID != "koditon-apple" {
+		t.Fatalf("client id = %q, want %q", client.ClientID, "koditon-apple")
 	}
 	if len(scopes) != 1 || scopes[0] != auth.ScopeMCPCoreRead {
 		t.Fatalf("scopes = %v, want [%q]", scopes, auth.ScopeMCPCoreRead)
@@ -54,7 +54,7 @@ func TestResolveAudienceForClientDefaultsToAPIForNonMCPClient(t *testing.T) {
 	h := &Handler{publicAPIBaseURL: "https://api.example.com"}
 
 	audience, err := h.resolveAudienceForClient(oauthClient{
-		ClientID:     "maku-apple",
+		ClientID:     "koditon-apple",
 		Scopes:       []string{auth.ScopeCoreRead},
 		AudienceMode: auth.OAuthAudienceModeAPI,
 	}, "")
@@ -90,7 +90,7 @@ func TestResolveAudienceForClientAcceptsAPIAudienceForNonMCPClient(t *testing.T)
 	h := &Handler{publicAPIBaseURL: "https://api.example.com"}
 
 	audience, err := h.resolveAudienceForClient(oauthClient{
-		ClientID:     "maku-apple",
+		ClientID:     "koditon-apple",
 		Scopes:       []string{auth.ScopeCoreRead},
 		AudienceMode: auth.OAuthAudienceModeAPI,
 	}, "https://api.example.com")
@@ -108,8 +108,8 @@ func TestHandleDeviceAuthorizationRejectsUnexpectedResource(t *testing.T) {
 	h := &Handler{
 		publicAPIBaseURL: "https://api.example.com",
 		clients: map[string]oauthClient{
-			"maku-apple": {
-				ClientID:     "maku-apple",
+			"koditon-apple": {
+				ClientID:     "koditon-apple",
 				ClientType:   "public",
 				Scopes:       []string{auth.ScopeMCPCoreRead},
 				AudienceMode: auth.OAuthAudienceModeProtectedResource,
@@ -118,7 +118,7 @@ func TestHandleDeviceAuthorizationRejectsUnexpectedResource(t *testing.T) {
 	}
 
 	form := url.Values{
-		"client_id": {"maku-apple"},
+		"client_id": {"koditon-apple"},
 		"resource":  {"https://other.example.com/mcp"},
 	}
 	req := httptest.NewRequest(http.MethodPost, "/oauth/device_authorization", strings.NewReader(form.Encode()))
@@ -169,7 +169,7 @@ func TestRecoverMalformedOAuthPath(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		`https://api.getmaku.app/oauth/%2522https:/api.getmaku.app/oauth/authorize/handoff/status?id=b437656a-aa18-400b-ba25-e5cae8d89248%22`,
+		`https://api.koditon.com/oauth/%2522https:/api.koditon.com/oauth/authorize/handoff/status?id=b437656a-aa18-400b-ba25-e5cae8d89248%22`,
 		nil,
 	)
 	path, ok := recoverMalformedOAuthPath(req)
@@ -187,7 +187,7 @@ func TestRecoverMalformedOAuthPathSkipsForeignHost(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		`https://api.getmaku.app/oauth/%2522https:/evil.example/oauth/authorize/handoff/status?id=abc%22`,
+		`https://api.koditon.com/oauth/%2522https:/evil.example/oauth/authorize/handoff/status?id=abc%22`,
 		nil,
 	)
 	if _, ok := recoverMalformedOAuthPath(req); ok {

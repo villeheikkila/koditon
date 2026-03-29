@@ -24,7 +24,7 @@ func TestIssueOAuthTokensForUser_BindsAccessTokenToSession(t *testing.T) {
 	sessionID := createOAuthTestSession(t, ctx, service, userID)
 
 	tokenResp, err := service.IssueOAuthTokensForUser(ctx, OAuthIssueTokensForUserRequest{
-		ClientID:  "maku-apple",
+		ClientID:  "koditon-apple",
 		UserID:    userID,
 		Scopes:    []string{ScopeProfileRead},
 		SessionID: sessionID,
@@ -60,7 +60,7 @@ func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 	sessionID := createOAuthTestSession(t, ctx, service, userID)
 
 	tokenResp, err := service.IssueOAuthTokensForUser(ctx, OAuthIssueTokensForUserRequest{
-		ClientID:  "maku-apple",
+		ClientID:  "koditon-apple",
 		UserID:    userID,
 		Scopes:    []string{ScopeProfileRead},
 		SessionID: sessionID,
@@ -71,7 +71,7 @@ func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 	}
 
 	rotated, err := service.RefreshOAuthTokens(ctx, OAuthRefreshTokensRequest{
-		ClientID:     "maku-apple",
+		ClientID:     "koditon-apple",
 		RefreshToken: tokenResp.RefreshToken,
 		Audience:     "https://api.example.test",
 	})
@@ -83,7 +83,7 @@ func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 	}
 
 	if _, err := service.RefreshOAuthTokens(ctx, OAuthRefreshTokensRequest{
-		ClientID:     "maku-apple",
+		ClientID:     "koditon-apple",
 		RefreshToken: tokenResp.RefreshToken,
 		Audience:     "https://api.example.test",
 	}); !errors.Is(err, ErrTokenReuse) {
@@ -107,7 +107,7 @@ func newOAuthTestService(t *testing.T, pool *pgxpool.Pool, queries *db.Queries) 
 	t.Helper()
 
 	jwtService, err := NewJWTService(JWTConfig{
-		Issuer:      "maku-test",
+		Issuer:      "koditon-test",
 		UIDHashSalt: "oauth-flow-test-salt",
 	})
 	if err != nil {
