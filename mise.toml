@@ -6,8 +6,7 @@ go = "1.26"
 node = "25"
 
 [env]
-DOCKER_IMAGE = "villeheikkila/koditon:latest"
-LOG_LEVEL    = "debug"
+LOG_LEVEL = "debug"
 APP_ENV      = "development"
 WEB_BASE_URL = "http://localhost:8080"
 

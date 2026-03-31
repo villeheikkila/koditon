@@ -141,29 +141,6 @@ echo "Clone complete"
 description = "Dump concise public schema to db/schema.sql"
 run = "./scripts/schema/dump_concise_public_schema.sh"
 
-# ---------- docker ----------
-
-[tasks."docker:build"]
-description = "Build Docker image (DOCKER_IMAGE from env)"
-run = """
-docker build -t "$DOCKER_IMAGE" .
-echo "Image built: $DOCKER_IMAGE"
-"""
-
-[tasks."docker:push"]
-description = "Push Docker image to registry"
-run = """
-docker push "$DOCKER_IMAGE"
-echo "Image pushed: $DOCKER_IMAGE"
-"""
-
-[tasks."docker:deploy"]
-description = "Build and push image; use infra/ tasks to deploy"
-run = [
-  "mise run docker:build",
-  "mise run docker:push",
-]
-
 # ---------- tests ----------
 
 [tasks.test]
