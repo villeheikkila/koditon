@@ -1,8 +1,8 @@
 version: "2"
 sql:
   - engine: postgresql
-    # database:
-    #   uri: "${DATABASE_URL}"
+    # db:generate intentionally uses db/schema.sql only.
+    # db:vet injects database.uri into a temporary config for sqlc/db-prepare.
     schema:
       - db/schema.sql
     queries:
@@ -234,9 +234,8 @@ sql:
             go_type:
               type: "string"
               pointer: true
-    # Vet rules applied via: sqlc vet
-    # sqlc/db-prepare requires a running database (DATABASE_URL must be set).
-    # The pattern-based rules work without a database connection.
+    # Vet rules applied via: sqlc vet.
+    # sqlc/db-prepare requires database.uri; see backend/mise.toml db:vet.
     rules:
       - sqlc/db-prepare
       - no-pg-catalog

@@ -39,9 +39,21 @@ run = "mise -C {{config_root}}/backend run db:migrate"
 description = "Show current migration state"
 run = "mise -C {{config_root}}/backend run db:status"
 
+[tasks."backend:db:query"]
+description = "Run SQL (QUERY=... or FILE=<path>)"
+run = "mise -C {{config_root}}/backend run db:query"
+
 [tasks."backend:db:generate"]
 description = "Regenerate sqlc code"
 run = "mise -C {{config_root}}/backend run db:generate"
+
+[tasks."backend:db:schema"]
+description = "Dump concise public schema to backend/db/schema.sql"
+run = "mise -C {{config_root}}/backend run db:schema"
+
+[tasks."backend:db:vet"]
+description = "Run sqlc vet rules"
+run = "mise -C {{config_root}}/backend run db:vet"
 
 [tasks."backend:db:new"]
 description = "Create a new migration (NAME=<name> required)"

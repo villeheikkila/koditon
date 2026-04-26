@@ -104,7 +104,18 @@ run = "sqlc generate -f sqlc.yaml"
 
 [tasks."db:vet"]
 description = "Run sqlc vet rules"
-run = "sqlc vet -f sqlc.yaml"
+run = """
+TMP_SQLC_CONFIG=".sqlc-vet.yaml.tmp"
+awk '
+  { print }
+  /^  - engine: postgresql$/ {
+    print "    database:"
+    print "      uri: \\"${DATABASE_URL}\\""
+  }
+' sqlc.yaml > "$TMP_SQLC_CONFIG"
+trap 'rm -f "$TMP_SQLC_CONFIG"' EXIT
+sqlc vet -f "$TMP_SQLC_CONFIG"
+"""
 
 [tasks."db:dump"]
 description = "Backup the database (optional FILE=<path>)"

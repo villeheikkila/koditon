@@ -1,3 +1,93 @@
+CREATE SCHEMA IF NOT EXISTS runtime;
+
+create table public.auth_signup_email_tokens (
+  auth_signup_email_token_id bigint generated always as identity not null constraint auth_signup_email_tokens_pkey primary key,
+  auth_signup_email_token_uuid uuid default gen_random_uuid() not null constraint auth_signup_email_tokens_uuid_key unique,
+  auth_signup_email_target_email text not null,
+  auth_signup_email_token_hash text not null constraint auth_signup_email_tokens_token_hash_key unique,
+  auth_signup_email_expires_at timestamp with time zone not null,
+  auth_signup_email_consumed_at timestamp with time zone,
+  auth_signup_email_created_at timestamp with time zone default now() not null,
+  constraint auth_signup_email_tokens_target_email_not_blank CHECK ((btrim(auth_signup_email_target_email) <> ''::text))
+);
+
+CREATE INDEX idx_auth_signup_email_tokens_active_expires_at ON public.auth_signup_email_tokens USING btree (auth_signup_email_expires_at) WHERE (auth_signup_email_consumed_at IS NULL);
+CREATE INDEX idx_auth_signup_email_tokens_target_email ON public.auth_signup_email_tokens USING btree (lower(btrim(auth_signup_email_target_email)));
+
+create table public.auth_signup_tickets (
+  auth_signup_ticket_id bigint generated always as identity not null constraint auth_signup_tickets_pkey primary key,
+  auth_signup_ticket_uuid uuid default gen_random_uuid() not null constraint auth_signup_tickets_uuid_key unique,
+  auth_signup_ticket_target_email text not null,
+  auth_signup_ticket_hash text not null constraint auth_signup_tickets_hash_key unique,
+  auth_signup_ticket_expires_at timestamp with time zone not null,
+  auth_signup_ticket_consumed_at timestamp with time zone,
+  auth_signup_ticket_created_at timestamp with time zone default now() not null,
+  constraint auth_signup_tickets_target_email_not_blank CHECK ((btrim(auth_signup_ticket_target_email) <> ''::text))
+);
+
+CREATE INDEX idx_auth_signup_tickets_active_expires_at ON public.auth_signup_tickets USING btree (auth_signup_ticket_expires_at) WHERE (auth_signup_ticket_consumed_at IS NULL);
+CREATE INDEX idx_auth_signup_tickets_target_email ON public.auth_signup_tickets USING btree (lower(btrim(auth_signup_ticket_target_email)));
+
+create table public.auth_webauthn_challenges (
+  auth_webauthn_challenge_id bigint generated always as identity not null constraint auth_webauthn_challenges_pkey primary key,
+  auth_webauthn_challenge_uuid uuid default gen_random_uuid() not null constraint auth_webauthn_challenges_auth_webauthn_challenge_uuid_key unique,
+  auth_webauthn_challenge_flow text not null,
+  auth_webauthn_challenge_session jsonb not null,
+  auth_webauthn_challenge_expires_at timestamp with time zone not null,
+  auth_webauthn_challenge_user_handle bytea,
+  auth_webauthn_challenge_user_display_name text,
+  auth_webauthn_challenge_device_id uuid,
+  auth_webauthn_challenge_consumed_at timestamp with time zone,
+  auth_webauthn_challenge_created_at timestamp with time zone default now() not null,
+  auth_webauthn_challenge_verified_email text,
+  user_id bigint constraint auth_webauthn_challenges_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  constraint auth_webauthn_challenge_flow_check CHECK ((auth_webauthn_challenge_flow = ANY (ARRAY['authenticate'::text, 'register'::text, 'signup'::text])))
+);
+
+CREATE INDEX idx_auth_webauthn_challenges_active ON public.auth_webauthn_challenges USING btree (auth_webauthn_challenge_uuid, auth_webauthn_challenge_flow) WHERE (auth_webauthn_challenge_consumed_at IS NULL);
+CREATE INDEX idx_auth_webauthn_challenges_expires ON public.auth_webauthn_challenges USING btree (auth_webauthn_challenge_expires_at);
+CREATE INDEX idx_auth_webauthn_challenges_uuid ON public.auth_webauthn_challenges USING btree (auth_webauthn_challenge_uuid);
+
+create table public.device_sessions (
+  device_session_uuid uuid default gen_random_uuid() not null constraint device_sessions_uuid_key unique,
+  device_session_user_agent text,
+  device_session_ip inet,
+  device_session_created_at timestamp with time zone default now() not null,
+  device_session_updated_at timestamp with time zone default now() not null,
+  device_session_refreshed_at timestamp with time zone,
+  device_session_not_after timestamp with time zone,
+  device_session_revoked_at timestamp with time zone,
+  device_session_provider text not null,
+  device_session_id bigint generated always as identity not null constraint device_sessions_pkey primary key,
+  device_session_user_device_id bigint not null constraint device_sessions_device_session_user_device_id_fkey references user_devices(user_device_id) ON DELETE CASCADE,
+  user_id bigint not null constraint device_sessions_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  device_session_device_name text,
+  device_session_device_os text,
+  device_session_device_model text,
+  device_session_app_version text,
+  device_session_locale text,
+  device_session_time_zone text,
+  device_session_location_city text,
+  device_session_location_region text,
+  device_session_location_country_code text,
+  device_session_location_source text,
+  constraint device_session_provider_check CHECK ((device_session_provider = ANY (ARRAY['apple'::text, 'anonymous'::text, 'email'::text, 'google'::text, 'passkey'::text])))
+);
+
+CREATE INDEX idx_device_sessions_not_after ON public.device_sessions USING btree (device_session_not_after DESC);
+CREATE INDEX idx_device_sessions_user_created ON public.device_sessions USING btree (user_id, device_session_created_at);
+CREATE INDEX idx_device_sessions_user_device_id ON public.device_sessions USING btree (device_session_user_device_id);
+CREATE INDEX idx_device_sessions_user_id ON public.device_sessions USING btree (user_id);
+
+create table public.feature_flags (
+  flag_uuid uuid default gen_random_uuid() not null constraint feature_flags_uuid_key unique,
+  flag_name text not null constraint feature_flags_flag_name_key unique,
+  flag_description text,
+  flag_default_enabled boolean default false not null,
+  flag_created_at timestamp with time zone default now() not null,
+  flag_id bigint generated always as identity not null constraint feature_flags_pkey primary key
+);
+
 create table public.frontdoor_ads (
   frontdoor_ad_id uuid default gen_random_uuid() not null constraint frontdoor_ads_pkey primary key,
   frontdoor_ad_external_id text not null constraint frontdoor_ads_frontdoor_ads_external_id_key unique,
@@ -9,11 +99,7 @@ create table public.frontdoor_ads (
   frontdoor_ad_processed_at timestamp with time zone,
   frontdoor_ad_page_not_found boolean default false not null,
   frontdoor_ad_publishing_time timestamp with time zone,
-  postal_postal_code_id uuid constraint frontdoor_ads_postal_postal_codes_id_fkey references postal_postal_codes(postal_postal_code_id),
-  frontdoor_ad_address text generated always as ((frontdoor_ad_data #>> '{property,streetAddressFreeForm}'::text[])) stored,
-  frontdoor_ad_area numeric generated always as (((frontdoor_ad_data #>> '{preparsed,area}'::text[]))::numeric) stored,
-  frontdoor_ad_room_layout text generated always as ((frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}'::text[])) stored,
-  frontdoor_ad_asking_price numeric generated always as (COALESCE(((frontdoor_ad_data #>> '{debfFreePrice}'::text[]))::numeric, ((frontdoor_ad_data #>> '{preparsed,price}'::text[]))::numeric)) stored,
+  postal_postal_code_id uuid constraint frontdoor_ads_postal_postal_code_id_fkey references postal_postal_codes(postal_postal_code_id),
   frontdoor_ad_street_address text,
   frontdoor_ad_city text,
   frontdoor_ad_postal text,
@@ -147,7 +233,7 @@ create table public.frontdoor_buildings (
   frontdoor_building_processed_at timestamp with time zone,
   frontdoor_building_housing_company_id bigint constraint frontdoor_buildings_frontdoor_buildings_housing_company_id_key unique,
   frontdoor_building_housing_company_friendly_id text,
-  frontdoor_building_geom postgis.geometry(Point,4326)
+  frontdoor_building_geom geometry(Point,4326)
 );
 
 CREATE UNIQUE INDEX frontdoor_buildings_housing_company_friendly_id_unique ON public.frontdoor_buildings USING btree (frontdoor_building_housing_company_friendly_id) WHERE (frontdoor_building_housing_company_friendly_id IS NOT NULL);
@@ -170,9 +256,127 @@ create table public.frontdoor_sync_tasks (
   constraint frontdoor_sync_tasks_frontdoor_sync_task_entity_id_frontdoo_key UNIQUE (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
 );
 
+create table public.oauth_authorization_codes (
+  oauth_authorization_code_id uuid default gen_random_uuid() not null constraint oauth_authorization_codes_pkey primary key,
+  oauth_authorization_code_code_hash text not null constraint oauth_authorization_codes_oauth_authorization_code_code_has_key unique,
+  oauth_client_id text not null,
+  user_uuid uuid not null constraint oauth_authorization_codes_user_uuid_fkey references users(user_uuid) ON DELETE CASCADE,
+  oauth_authorization_code_redirect_uri text not null,
+  oauth_authorization_code_scopes text[] default '{}'::text[] not null,
+  oauth_authorization_code_code_challenge text not null,
+  oauth_authorization_code_code_challenge_method text not null,
+  oauth_authorization_code_audience text default ''::text not null,
+  oauth_authorization_code_expires_at timestamp with time zone not null,
+  oauth_authorization_code_consumed_at timestamp with time zone,
+  oauth_authorization_code_created_at timestamp with time zone default now() not null,
+  oauth_authorization_code_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_oauth_authorization_codes_audience ON public.oauth_authorization_codes USING btree (oauth_authorization_code_audience);
+CREATE INDEX idx_oauth_authorization_codes_client_id ON public.oauth_authorization_codes USING btree (oauth_client_id);
+CREATE INDEX idx_oauth_authorization_codes_expires_at ON public.oauth_authorization_codes USING btree (oauth_authorization_code_expires_at);
+CREATE INDEX idx_oauth_authorization_codes_user_uuid ON public.oauth_authorization_codes USING btree (user_uuid);
+
+create table public.oauth_authorization_handoffs (
+  oauth_authorization_handoff_id uuid default gen_random_uuid() not null constraint oauth_authorization_handoffs_pkey primary key,
+  oauth_authorization_handoff_token_hash text not null constraint oauth_authorization_handoffs_oauth_authorization_handoff_to_key unique,
+  oauth_authorization_handoff_user_code text not null constraint oauth_authorization_handoffs_oauth_authorization_handoff_us_key unique,
+  oauth_client_id text not null,
+  oauth_authorization_handoff_redirect_uri text not null,
+  oauth_authorization_handoff_scopes text[] default '{}'::text[] not null,
+  oauth_authorization_handoff_audience text default ''::text not null,
+  oauth_authorization_handoff_state text default ''::text not null,
+  oauth_authorization_handoff_code_challenge text not null,
+  oauth_authorization_handoff_code_challenge_method text not null,
+  user_uuid uuid constraint oauth_authorization_handoffs_user_uuid_fkey references users(user_uuid) ON DELETE SET NULL,
+  oauth_authorization_handoff_authorization_code text,
+  oauth_authorization_handoff_redirect_url text,
+  oauth_authorization_handoff_denied_at timestamp with time zone,
+  oauth_authorization_handoff_completed_at timestamp with time zone,
+  oauth_authorization_handoff_expires_at timestamp with time zone not null,
+  oauth_authorization_handoff_created_at timestamp with time zone default now() not null,
+  oauth_authorization_handoff_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_oauth_authorization_handoffs_client_id ON public.oauth_authorization_handoffs USING btree (oauth_client_id);
+CREATE INDEX idx_oauth_authorization_handoffs_expires_at ON public.oauth_authorization_handoffs USING btree (oauth_authorization_handoff_expires_at);
+CREATE INDEX idx_oauth_authorization_handoffs_user_code ON public.oauth_authorization_handoffs USING btree (oauth_authorization_handoff_user_code);
+
+create table public.oauth_device_authorizations (
+  oauth_device_authorization_id uuid default gen_random_uuid() not null constraint oauth_device_authorizations_pkey primary key,
+  oauth_device_authorization_device_code_hash text not null constraint oauth_device_authorizations_device_code_hash_key unique,
+  oauth_client_id text not null,
+  oauth_device_authorization_user_code text not null constraint oauth_device_authorizations_user_code_key unique,
+  oauth_device_authorization_scopes text[] default '{}'::text[] not null,
+  oauth_device_authorization_audience text default ''::text not null,
+  user_uuid uuid constraint oauth_device_authorizations_user_uuid_fkey references users(user_uuid) ON DELETE SET NULL,
+  oauth_device_authorization_expires_at timestamp with time zone not null,
+  oauth_device_authorization_approved_at timestamp with time zone,
+  oauth_device_authorization_denied_at timestamp with time zone,
+  oauth_device_authorization_consumed_at timestamp with time zone,
+  oauth_device_authorization_created_at timestamp with time zone default now() not null,
+  oauth_device_authorization_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_oauth_device_authorizations_audience ON public.oauth_device_authorizations USING btree (oauth_device_authorization_audience);
+CREATE INDEX idx_oauth_device_authorizations_client_id ON public.oauth_device_authorizations USING btree (oauth_client_id);
+CREATE INDEX idx_oauth_device_authorizations_expires_at ON public.oauth_device_authorizations USING btree (oauth_device_authorization_expires_at);
+CREATE INDEX idx_oauth_device_authorizations_user_code ON public.oauth_device_authorizations USING btree (oauth_device_authorization_user_code);
+
+create table public.oauth_dynamic_clients (
+  oauth_dynamic_client_id text not null constraint oauth_dynamic_clients_pkey primary key,
+  oauth_dynamic_client_type text default 'public'::text not null,
+  oauth_dynamic_client_redirect_uris text[] default '{}'::text[] not null,
+  oauth_dynamic_client_scopes text[] default '{}'::text[] not null,
+  oauth_dynamic_client_token_endpoint_auth_method text default 'none'::text not null,
+  oauth_dynamic_client_name text,
+  oauth_dynamic_client_metadata jsonb default '{}'::jsonb not null,
+  oauth_dynamic_client_issued_at timestamp with time zone default now() not null,
+  oauth_dynamic_client_disabled_at timestamp with time zone,
+  oauth_dynamic_client_created_at timestamp with time zone default now() not null,
+  oauth_dynamic_client_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_oauth_dynamic_clients_disabled_at ON public.oauth_dynamic_clients USING btree (oauth_dynamic_client_disabled_at);
+
+create table public.oauth_refresh_tokens (
+  oauth_refresh_token_id uuid default gen_random_uuid() not null constraint oauth_refresh_tokens_pkey primary key,
+  oauth_refresh_token_token_hash text not null constraint oauth_refresh_tokens_oauth_refresh_token_token_hash_key unique,
+  oauth_client_id text not null,
+  user_uuid uuid not null constraint oauth_refresh_tokens_user_uuid_fkey references users(user_uuid) ON DELETE CASCADE,
+  oauth_refresh_token_scopes text[] default '{}'::text[] not null,
+  oauth_refresh_token_audience text default ''::text not null,
+  oauth_refresh_token_expires_at timestamp with time zone not null,
+  oauth_refresh_token_revoked_at timestamp with time zone,
+  oauth_refresh_token_rotated_from uuid constraint oauth_refresh_tokens_oauth_refresh_token_rotated_from_fkey references oauth_refresh_tokens(oauth_refresh_token_id) ON DELETE SET NULL,
+  oauth_refresh_token_created_at timestamp with time zone default now() not null,
+  oauth_refresh_token_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_oauth_refresh_tokens_audience ON public.oauth_refresh_tokens USING btree (oauth_refresh_token_audience);
+CREATE INDEX idx_oauth_refresh_tokens_client_id ON public.oauth_refresh_tokens USING btree (oauth_client_id);
+CREATE INDEX idx_oauth_refresh_tokens_expires_at ON public.oauth_refresh_tokens USING btree (oauth_refresh_token_expires_at);
+CREATE INDEX idx_oauth_refresh_tokens_user_uuid ON public.oauth_refresh_tokens USING btree (user_uuid);
+
+create table public.personal_access_tokens (
+  personal_access_token_id uuid default gen_random_uuid() not null constraint personal_access_tokens_pkey primary key,
+  personal_access_token_name text not null,
+  personal_access_token_prefix text not null,
+  personal_access_token_token_hash text not null,
+  personal_access_token_scopes text[],
+  personal_access_token_created_at timestamp with time zone default now() not null,
+  personal_access_token_last_used_at timestamp with time zone,
+  personal_access_token_expires_at timestamp with time zone,
+  personal_access_token_revoked_at timestamp with time zone,
+  user_id bigint not null constraint personal_access_tokens_user_id_fkey references users(user_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX idx_personal_access_tokens_prefix ON public.personal_access_tokens USING btree (personal_access_token_prefix);
+CREATE INDEX idx_personal_access_tokens_user_id ON public.personal_access_tokens USING btree (user_id);
+
 create table public.postal_ad_areas (
   postal_ad_area_id uuid default uuid_generate_v4() not null constraint postal_ad_areas_pkey primary key,
-  postal_ad_area_code text not null constraint postal_ad_areas_postal_ad_areas_code_key unique,
+  postal_ad_area_code text not null constraint postal_ad_areas_postal_ad_area_code_key unique,
   postal_ad_area_name_fi text not null,
   postal_ad_area_name_sv text,
   postal_ad_area_created_at timestamp with time zone default now() not null,
@@ -181,7 +385,7 @@ create table public.postal_ad_areas (
 
 create table public.postal_municipalities (
   postal_municipality_id uuid default uuid_generate_v4() not null constraint postal_municipalities_pkey primary key,
-  postal_municipality_code text not null constraint postal_municipalities_postal_municipalities_code_key unique,
+  postal_municipality_code text not null constraint postal_municipalities_postal_municipality_code_key unique,
   postal_municipality_name_fi text not null,
   postal_municipality_name_sv text,
   postal_municipality_language_ratio_code text,
@@ -194,15 +398,15 @@ CREATE INDEX idx_postal_municipality_name_fi ON public.postal_municipalities USI
 create table public.postal_postal_codes (
   postal_postal_code_id uuid default uuid_generate_v4() not null constraint postal_postal_codes_pkey primary key,
   postal_postal_code_date date not null,
-  postal_postal_code_code text not null constraint postal_postal_codes_postal_postal_codes_code_key unique,
+  postal_postal_code_code text not null constraint postal_postal_codes_postal_postal_code_code_key unique,
   postal_postal_code_name_fi text not null,
   postal_postal_code_name_sv text,
   postal_postal_code_abbr_fi text,
   postal_postal_code_abbr_sv text,
   postal_postal_code_valid_from date,
   postal_postal_code_type_code text,
-  postal_ad_area_id uuid constraint postal_postal_codes_postal_postal_codes_ad_area_id_fkey references postal_ad_areas(postal_ad_area_id),
-  postal_municipality_id uuid constraint postal_postal_codes_postal_postal_codes_municipality_id_fkey references postal_municipalities(postal_municipality_id),
+  postal_ad_area_id uuid constraint postal_postal_codes_postal_ad_area_id_fkey references postal_ad_areas(postal_ad_area_id),
+  postal_municipality_id uuid constraint postal_postal_codes_postal_municipality_id_fkey references postal_municipalities(postal_municipality_id),
   postal_postal_code_created_at timestamp with time zone default now() not null,
   postal_postal_code_updated_at timestamp with time zone default now() not null,
   postal_postal_code_neighborhood_fi text
@@ -242,7 +446,7 @@ create table public.prices_neighborhoods (
   prices_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhoods_postal_code_id_fkey references prices_postal_codes(prices_postal_code_id),
   prices_neighborhood_created_at timestamp with time zone default now() not null,
   prices_neighborhood_updated_at timestamp with time zone default now() not null,
-  prices_neighborhood_postal_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhoods_posti_postal_cod_fkey references postal_postal_codes(postal_postal_code_id),
+  prices_neighborhood_postal_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhood_postal_postal_cod_fkey references postal_postal_codes(postal_postal_code_id),
   constraint prices_neighborhoods_name_city_unique UNIQUE (prices_neighborhood_name, prices_city_id)
 );
 
@@ -293,10 +497,26 @@ create table public.prices_transactions (
 );
 
 CREATE INDEX idx_prices_transaction_period_identifier ON public.prices_transactions USING btree (prices_transaction_period_identifier);
-CREATE UNIQUE INDEX prices_transactions_unique_key ON public.prices_transactions USING btree (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category) NULLS NOT DISTINCT;
+
+create table public.role_feature_flags (
+  flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
+  role_id bigint not null constraint role_feature_flags_role_id_fkey references roles(role_id) ON DELETE CASCADE,
+  constraint role_feature_flags_pkey PRIMARY KEY (role_id, flag_id)
+);
+
+CREATE INDEX idx_role_feature_flags_flag_id ON public.role_feature_flags USING btree (flag_id);
+CREATE INDEX idx_role_feature_flags_role_id ON public.role_feature_flags USING btree (role_id);
+
+create table public.roles (
+  role_uuid uuid default gen_random_uuid() not null constraint roles_uuid_key unique,
+  role_name text not null constraint roles_role_name_key unique,
+  role_description text,
+  role_created_at timestamp with time zone default now() not null,
+  role_id bigint generated always as identity not null constraint roles_pkey primary key
+);
 
 create table public.schema_migrations (
-  version integer not null
+  version integer not null constraint schema_migrations_pkey primary key
 );
 
 create table public.shortcut_ads (
@@ -308,10 +528,6 @@ create table public.shortcut_ads (
   shortcut_ad_data jsonb,
   shortcut_ad_updated_at timestamp with time zone default CURRENT_TIMESTAMP,
   shortcut_building_id uuid constraint shortcut_ads_shortcut_ads_building_id_fkey references shortcut_buildings(shortcut_building_id) ON DELETE SET NULL,
-  shortcut_ad_address text generated always as ((shortcut_ad_data #>> '{address,formattedAddress}'::text[])) stored,
-  shortcut_ad_area numeric generated always as (((shortcut_ad_data #>> '{adData,size}'::text[]))::numeric) stored,
-  shortcut_ad_room_layout text generated always as ((shortcut_ad_data #>> '{adData,roomConfiguration}'::text[])) stored,
-  shortcut_ad_asking_price numeric generated always as (COALESCE(((shortcut_ad_data #>> '{priceData,priceSell}'::text[]))::numeric, ((shortcut_ad_data #>> '{priceData,price}'::text[]))::numeric)) stored,
   shortcut_ad_street_address text,
   shortcut_ad_city text,
   shortcut_ad_postal text,
@@ -411,7 +627,7 @@ create table public.shortcut_buildings (
   shortcut_building_page_not_found boolean default false,
   shortcut_building_frame_construction_method text,
   shortcut_building_housing_company text,
-  shortcut_building_geom postgis.geometry(Point,4326)
+  shortcut_building_geom geometry(Point,4326)
 );
 
 CREATE INDEX shortcut_building_geom_idx ON public.shortcut_buildings USING gist (shortcut_building_geom);
@@ -444,367 +660,164 @@ create table public.shortcut_tokens (
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
 
-
--- ============================================================
--- Auth Schema
--- ============================================================
-
-CREATE TYPE public.enum__name_display AS ENUM (
-    'full_name',
-    'username'
+create table public.spatial_ref_sys (
+  srid integer not null constraint spatial_ref_sys_pkey primary key,
+  auth_name character varying(256),
+  auth_srid integer,
+  srtext character varying(2048),
+  proj4text character varying(2048),
+  constraint spatial_ref_sys_srid_check CHECK (((srid > 0) AND (srid <= 998999)))
 );
 
-CREATE TABLE public.users (
-    user_uuid uuid NOT NULL,
-    user_first_name text,
-    user_last_name text,
-    user_username text,
-    user_name_display public.enum__name_display DEFAULT 'username'::public.enum__name_display,
-    user_is_private boolean DEFAULT false NOT NULL,
-    user_is_onboarded boolean DEFAULT false NOT NULL,
-    user_joined_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_search text GENERATED ALWAYS AS (((user_username || COALESCE(user_first_name, ''::text)) || COALESCE(user_last_name, ''::text))) STORED,
-    user_preferred_name text GENERATED ALWAYS AS (
-CASE
-    WHEN ((user_name_display = 'full_name'::public.enum__name_display) AND (user_first_name IS NOT NULL) AND (user_last_name IS NOT NULL)) THEN ((user_first_name || ' '::text) || user_last_name)
-    ELSE user_username
-END) STORED,
-    user_id bigint NOT NULL,
-    user_email text,
-    user_has_seen_passkey_onboarding boolean DEFAULT false NOT NULL,
-    CONSTRAINT users_pkey PRIMARY KEY (user_id),
-    CONSTRAINT users_uuid_key UNIQUE (user_uuid)
+create table public.user_devices (
+  user_device_uuid uuid default gen_random_uuid() not null constraint user_devices_uuid_key unique,
+  user_device_name text,
+  user_device_os text,
+  user_device_app_version text,
+  user_device_push_token text,
+  user_device_push_token_updated_at timestamp with time zone,
+  user_device_created_at timestamp with time zone default now() not null,
+  user_device_updated_at timestamp with time zone default now() not null,
+  user_device_last_seen_at timestamp with time zone default now() not null,
+  user_device_push_token_type text,
+  user_device_id bigint generated always as identity not null constraint user_devices_pkey primary key,
+  user_id bigint not null constraint user_devices_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  user_device_push_is_development boolean default false not null,
+  user_device_push_token_invalidated_at timestamp with time zone,
+  user_device_push_token_invalidated_reason text,
+  user_device_model text,
+  user_device_locale text,
+  user_device_time_zone text,
+  constraint user_device_push_token_type_check CHECK (((user_device_push_token_type IS NULL) OR (user_device_push_token_type = 'apns'::text)))
 );
 
-CREATE TABLE public.user_identities (
-    user_identity_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_identity_external_id text NOT NULL,
-    user_identity_email text,
-    user_identity_email_verified boolean DEFAULT false NOT NULL,
-    user_identity_data jsonb DEFAULT '{}'::jsonb,
-    user_identity_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_identity_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_identity_provider text NOT NULL,
-    user_identity_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    CONSTRAINT user_identities_pkey PRIMARY KEY (user_identity_id),
-    CONSTRAINT user_identities_uuid_key UNIQUE (user_identity_uuid),
-    CONSTRAINT user_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+CREATE INDEX idx_user_devices_push_token ON public.user_devices USING btree (user_device_push_token) WHERE (user_device_push_token IS NOT NULL);
+CREATE INDEX idx_user_devices_user_id ON public.user_devices USING btree (user_id);
+
+create table public.user_email_change_tokens (
+  user_email_change_token_id bigint generated always as identity not null constraint user_email_change_tokens_pkey primary key,
+  user_email_change_token_uuid uuid default gen_random_uuid() not null constraint user_email_change_tokens_uuid_key unique,
+  user_id bigint not null constraint user_email_change_tokens_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  user_email_change_target_email text not null,
+  user_email_change_token_hash text not null constraint user_email_change_tokens_token_hash_key unique,
+  user_email_change_expires_at timestamp with time zone not null,
+  user_email_change_consumed_at timestamp with time zone,
+  user_email_change_created_at timestamp with time zone default now() not null,
+  constraint user_email_change_tokens_target_email_not_blank CHECK ((btrim(user_email_change_target_email) <> ''::text))
 );
 
-CREATE TABLE public.user_devices (
-    user_device_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_device_name text,
-    user_device_os text,
-    user_device_app_version text,
-    user_device_push_token text,
-    user_device_push_token_updated_at timestamp with time zone,
-    user_device_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_device_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_device_last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_device_push_token_type text,
-    user_device_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    user_device_push_is_development boolean DEFAULT false NOT NULL,
-    user_device_push_token_invalidated_at timestamp with time zone,
-    user_device_push_token_invalidated_reason text,
-    user_device_model text,
-    user_device_locale text,
-    user_device_time_zone text,
-    CONSTRAINT user_devices_pkey PRIMARY KEY (user_device_id),
-    CONSTRAINT user_devices_uuid_key UNIQUE (user_device_uuid),
-    CONSTRAINT user_devices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+CREATE INDEX idx_user_email_change_tokens_active_expires_at ON public.user_email_change_tokens USING btree (user_email_change_expires_at) WHERE (user_email_change_consumed_at IS NULL);
+CREATE INDEX idx_user_email_change_tokens_user_id ON public.user_email_change_tokens USING btree (user_id);
+
+create table public.user_feature_flags (
+  user_flag_enabled boolean not null,
+  user_flag_created_at timestamp with time zone default now() not null,
+  flag_id bigint not null constraint user_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
+  user_id bigint not null constraint user_feature_flags_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  constraint user_feature_flags_pkey PRIMARY KEY (user_id, flag_id)
 );
 
-CREATE TABLE public.device_sessions (
-    device_session_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    device_session_user_agent text,
-    device_session_ip inet,
-    device_session_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    device_session_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    device_session_refreshed_at timestamp with time zone,
-    device_session_not_after timestamp with time zone,
-    device_session_revoked_at timestamp with time zone,
-    device_session_provider text NOT NULL,
-    device_session_id bigint NOT NULL,
-    device_session_user_device_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    device_session_device_name text,
-    device_session_device_os text,
-    device_session_device_model text,
-    device_session_app_version text,
-    device_session_locale text,
-    device_session_time_zone text,
-    device_session_location_city text,
-    device_session_location_region text,
-    device_session_location_country_code text,
-    device_session_location_source text,
-    CONSTRAINT device_sessions_pkey PRIMARY KEY (device_session_id),
-    CONSTRAINT device_sessions_uuid_key UNIQUE (device_session_uuid),
-    CONSTRAINT device_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
-    CONSTRAINT device_sessions_device_session_user_device_id_fkey FOREIGN KEY (device_session_user_device_id) REFERENCES public.user_devices(user_device_id) ON DELETE CASCADE
+CREATE INDEX idx_user_feature_flags_flag_id ON public.user_feature_flags USING btree (flag_id);
+CREATE INDEX idx_user_feature_flags_user_id ON public.user_feature_flags USING btree (user_id);
+
+create table public.user_identities (
+  user_identity_uuid uuid default gen_random_uuid() not null constraint user_identities_uuid_key unique,
+  user_identity_external_id text not null,
+  user_identity_email text,
+  user_identity_email_verified boolean default false not null,
+  user_identity_data jsonb default '{}'::jsonb,
+  user_identity_created_at timestamp with time zone default now() not null,
+  user_identity_updated_at timestamp with time zone default now() not null,
+  user_identity_provider text not null,
+  user_identity_id bigint generated always as identity not null constraint user_identities_pkey primary key,
+  user_id bigint not null constraint user_identities_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  constraint user_identity_provider_check CHECK ((user_identity_provider = ANY (ARRAY['apple'::text, 'anonymous'::text, 'email'::text, 'google'::text, 'passkey'::text])))
 );
 
-CREATE TABLE public.feature_flags (
-    flag_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    flag_name text NOT NULL,
-    flag_description text,
-    flag_default_enabled boolean DEFAULT false NOT NULL,
-    flag_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    flag_id bigint NOT NULL,
-    CONSTRAINT feature_flags_pkey PRIMARY KEY (flag_id),
-    CONSTRAINT feature_flags_flag_name_key UNIQUE (flag_name)
+CREATE UNIQUE INDEX idx_user_identities_provider_external_id_unique ON public.user_identities USING btree (user_identity_provider, user_identity_external_id);
+CREATE INDEX idx_user_identities_user_id ON public.user_identities USING btree (user_id);
+
+create table public.user_passkeys (
+  user_passkey_id bigint generated always as identity not null constraint user_passkeys_pkey primary key,
+  user_passkey_uuid uuid default gen_random_uuid() not null constraint user_passkeys_user_passkey_uuid_key unique,
+  user_id bigint not null constraint user_passkeys_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  user_identity_id bigint not null constraint user_passkeys_user_identity_id_fkey references user_identities(user_identity_id) ON DELETE CASCADE,
+  user_passkey_credential_id bytea not null constraint user_passkeys_credential_id_key unique,
+  user_passkey_credential_id_b64url text not null constraint user_passkeys_credential_id_b64url_key unique,
+  user_passkey_public_key bytea not null,
+  user_passkey_attestation_type text not null,
+  user_passkey_transports text[] default '{}'::text[] not null,
+  user_passkey_user_handle bytea not null,
+  user_passkey_sign_count bigint default 0 not null,
+  user_passkey_flags integer,
+  user_passkey_aaguid uuid,
+  user_passkey_name text,
+  user_passkey_backup_eligible boolean,
+  user_passkey_backup_state boolean,
+  user_passkey_last_used_at timestamp with time zone,
+  user_passkey_created_at timestamp with time zone default now() not null,
+  user_passkey_updated_at timestamp with time zone default now() not null,
+  user_passkey_revoked_at timestamp with time zone
 );
 
-CREATE TABLE public.roles (
-    role_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    role_name text NOT NULL,
-    role_description text,
-    role_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    role_id bigint NOT NULL,
-    CONSTRAINT roles_pkey PRIMARY KEY (role_id),
-    CONSTRAINT roles_role_name_key UNIQUE (role_name)
+CREATE INDEX idx_user_passkeys_active_user_id ON public.user_passkeys USING btree (user_id) WHERE (user_passkey_revoked_at IS NULL);
+CREATE INDEX idx_user_passkeys_user_handle ON public.user_passkeys USING btree (user_passkey_user_handle);
+CREATE INDEX idx_user_passkeys_user_id ON public.user_passkeys USING btree (user_id);
+
+create table public.user_roles (
+  user_role_created_at timestamp with time zone default now() not null,
+  role_id bigint not null constraint user_roles_role_id_fkey references roles(role_id) ON DELETE CASCADE,
+  user_id bigint not null constraint user_roles_user_id_fkey references users(user_id) ON DELETE CASCADE,
+  constraint user_roles_pkey PRIMARY KEY (user_id, role_id)
 );
 
-CREATE TABLE public.user_roles (
-    user_role_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    role_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    CONSTRAINT user_roles_pkey PRIMARY KEY (user_id, role_id),
-    CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
-    CONSTRAINT user_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(role_id) ON DELETE CASCADE
+CREATE INDEX idx_user_roles_role_id ON public.user_roles USING btree (role_id);
+CREATE INDEX idx_user_roles_user_id ON public.user_roles USING btree (user_id);
+
+create table public.users (
+  user_uuid uuid not null constraint users_uuid_key unique,
+  user_first_name text,
+  user_last_name text,
+  user_username text constraint users_username_key unique,
+  user_name_display enum__name_display default 'username'::enum__name_display,
+  user_is_private boolean default false not null,
+  user_is_onboarded boolean default false not null,
+  user_joined_at timestamp with time zone default now() not null,
+  user_search text generated always as (((user_username || COALESCE(user_first_name, ''::text)) || COALESCE(user_last_name, ''::text))) stored,
+  user_preferred_name text generated always as ( CASE WHEN ((user_name_display = 'full_name'::enum__name_display) AND (user_first_name IS NOT NULL) AND (user_last_name IS NOT NULL)) THEN ((user_first_name || ' '::text) || user_last_name) ELSE user_username END) stored,
+  user_id bigint generated always as identity not null constraint users_pkey primary key,
+  user_email text,
+  user_has_seen_passkey_onboarding boolean default false not null,
+  constraint users_user_username_length CHECK (((user_username IS NULL) OR ((char_length(user_username) >= 2) AND (char_length(user_username) <= 16))))
 );
 
-CREATE TABLE public.role_feature_flags (
-    flag_id bigint NOT NULL,
-    role_id bigint NOT NULL,
-    CONSTRAINT role_feature_flags_pkey PRIMARY KEY (role_id, flag_id),
-    CONSTRAINT role_feature_flags_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.feature_flags(flag_id) ON DELETE CASCADE,
-    CONSTRAINT role_feature_flags_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(role_id) ON DELETE CASCADE
+CREATE INDEX idx_users_created_by_private ON public.users USING btree (user_uuid) WHERE (user_is_private = true);
+CREATE UNIQUE INDEX idx_users_user_email_normalized_unique ON public.users USING btree (lower(btrim(user_email))) WHERE (user_email IS NOT NULL);
+CREATE INDEX idx_users_username ON public.users USING btree (user_username);
+
+create table runtime.idempotency_keys (
+  scope text not null,
+  actor text not null,
+  idempotency_key text not null,
+  request_hash text not null,
+  response_payload bytea,
+  lock_expires_at timestamp with time zone not null,
+  result_expires_at timestamp with time zone not null,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint idempotency_keys_pkey PRIMARY KEY (scope, actor, idempotency_key)
 );
 
-CREATE TABLE public.user_feature_flags (
-    user_flag_enabled boolean NOT NULL,
-    user_flag_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    flag_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    CONSTRAINT user_feature_flags_pkey PRIMARY KEY (user_id, flag_id),
-    CONSTRAINT user_feature_flags_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.feature_flags(flag_id) ON DELETE CASCADE,
-    CONSTRAINT user_feature_flags_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+CREATE INDEX runtime_idempotency_keys_lock_expires_at_idx ON runtime.idempotency_keys USING btree (lock_expires_at);
+CREATE INDEX runtime_idempotency_keys_result_expires_at_idx ON runtime.idempotency_keys USING btree (result_expires_at);
+
+create table runtime.kv_store (
+  kv_key text not null constraint kv_store_pkey primary key,
+  kv_value bytea not null,
+  expires_at timestamp with time zone not null,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null
 );
-
-CREATE TABLE public.personal_access_tokens (
-    personal_access_token_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    personal_access_token_name text NOT NULL,
-    personal_access_token_prefix text NOT NULL,
-    personal_access_token_token_hash text NOT NULL,
-    personal_access_token_scopes text[],
-    personal_access_token_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    personal_access_token_last_used_at timestamp with time zone,
-    personal_access_token_expires_at timestamp with time zone,
-    personal_access_token_revoked_at timestamp with time zone,
-    user_id bigint NOT NULL,
-    CONSTRAINT personal_access_tokens_pkey PRIMARY KEY (personal_access_token_id),
-    CONSTRAINT personal_access_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE public.user_email_change_tokens (
-    user_email_change_token_id bigint NOT NULL,
-    user_email_change_token_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id bigint NOT NULL,
-    user_email_change_target_email text NOT NULL,
-    user_email_change_token_hash text NOT NULL,
-    user_email_change_expires_at timestamp with time zone NOT NULL,
-    user_email_change_consumed_at timestamp with time zone,
-    user_email_change_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT user_email_change_tokens_pkey PRIMARY KEY (user_email_change_token_id),
-    CONSTRAINT user_email_change_tokens_uuid_key UNIQUE (user_email_change_token_uuid),
-    CONSTRAINT user_email_change_tokens_token_hash_key UNIQUE (user_email_change_token_hash),
-    CONSTRAINT user_email_change_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE public.user_passkeys (
-    user_passkey_id bigint NOT NULL,
-    user_passkey_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
-    user_id bigint NOT NULL,
-    user_identity_id bigint NOT NULL,
-    user_passkey_credential_id bytea NOT NULL,
-    user_passkey_credential_id_b64url text NOT NULL,
-    user_passkey_public_key bytea NOT NULL,
-    user_passkey_attestation_type text NOT NULL,
-    user_passkey_transports text[] NOT NULL DEFAULT '{}',
-    user_passkey_user_handle bytea NOT NULL,
-    user_passkey_sign_count bigint NOT NULL DEFAULT 0,
-    user_passkey_flags integer,
-    user_passkey_aaguid uuid,
-    user_passkey_name text,
-    user_passkey_backup_eligible boolean,
-    user_passkey_backup_state boolean,
-    user_passkey_last_used_at timestamptz,
-    user_passkey_created_at timestamptz NOT NULL DEFAULT now(),
-    user_passkey_updated_at timestamptz NOT NULL DEFAULT now(),
-    user_passkey_revoked_at timestamptz,
-    CONSTRAINT user_passkeys_pkey PRIMARY KEY (user_passkey_id),
-    CONSTRAINT user_passkeys_uuid_key UNIQUE (user_passkey_uuid),
-    CONSTRAINT user_passkeys_credential_id_key UNIQUE (user_passkey_credential_id),
-    CONSTRAINT user_passkeys_credential_id_b64url_key UNIQUE (user_passkey_credential_id_b64url),
-    CONSTRAINT user_passkeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
-    CONSTRAINT user_passkeys_user_identity_id_fkey FOREIGN KEY (user_identity_id) REFERENCES public.user_identities(user_identity_id) ON DELETE CASCADE
-);
-
-CREATE TABLE public.auth_webauthn_challenges (
-    auth_webauthn_challenge_id bigint NOT NULL,
-    auth_webauthn_challenge_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
-    auth_webauthn_challenge_flow text NOT NULL,
-    auth_webauthn_challenge_session jsonb NOT NULL,
-    auth_webauthn_challenge_expires_at timestamptz NOT NULL,
-    auth_webauthn_challenge_user_handle bytea,
-    auth_webauthn_challenge_user_display_name text,
-    auth_webauthn_challenge_device_id uuid,
-    auth_webauthn_challenge_consumed_at timestamptz,
-    auth_webauthn_challenge_created_at timestamptz NOT NULL DEFAULT now(),
-    auth_webauthn_challenge_verified_email text,
-    user_id bigint,
-    CONSTRAINT auth_webauthn_challenges_pkey PRIMARY KEY (auth_webauthn_challenge_id),
-    CONSTRAINT auth_webauthn_challenges_uuid_key UNIQUE (auth_webauthn_challenge_uuid),
-    CONSTRAINT auth_webauthn_challenges_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE public.auth_signup_email_tokens (
-    auth_signup_email_token_id bigint NOT NULL,
-    auth_signup_email_token_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    auth_signup_email_target_email text NOT NULL,
-    auth_signup_email_token_hash text NOT NULL,
-    auth_signup_email_expires_at timestamp with time zone NOT NULL,
-    auth_signup_email_consumed_at timestamp with time zone,
-    auth_signup_email_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT auth_signup_email_tokens_pkey PRIMARY KEY (auth_signup_email_token_id),
-    CONSTRAINT auth_signup_email_tokens_uuid_key UNIQUE (auth_signup_email_token_uuid),
-    CONSTRAINT auth_signup_email_tokens_token_hash_key UNIQUE (auth_signup_email_token_hash)
-);
-
-CREATE TABLE public.auth_signup_tickets (
-    auth_signup_ticket_id bigint NOT NULL,
-    auth_signup_ticket_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    auth_signup_ticket_target_email text NOT NULL,
-    auth_signup_ticket_hash text NOT NULL,
-    auth_signup_ticket_expires_at timestamp with time zone NOT NULL,
-    auth_signup_ticket_consumed_at timestamp with time zone,
-    auth_signup_ticket_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT auth_signup_tickets_pkey PRIMARY KEY (auth_signup_ticket_id),
-    CONSTRAINT auth_signup_tickets_uuid_key UNIQUE (auth_signup_ticket_uuid),
-    CONSTRAINT auth_signup_tickets_hash_key UNIQUE (auth_signup_ticket_hash)
-);
-
-CREATE TABLE public.oauth_authorization_codes (
-    oauth_authorization_code_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    oauth_authorization_code_code_hash text NOT NULL UNIQUE,
-    oauth_client_id text NOT NULL,
-    user_uuid uuid NOT NULL,
-    oauth_authorization_code_redirect_uri text NOT NULL,
-    oauth_authorization_code_scopes text[] NOT NULL DEFAULT '{}',
-    oauth_authorization_code_code_challenge text NOT NULL,
-    oauth_authorization_code_code_challenge_method text NOT NULL,
-    oauth_authorization_code_audience text NOT NULL DEFAULT '',
-    oauth_authorization_code_expires_at timestamptz NOT NULL,
-    oauth_authorization_code_consumed_at timestamptz,
-    oauth_authorization_code_created_at timestamptz NOT NULL DEFAULT now(),
-    oauth_authorization_code_updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT oauth_authorization_codes_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES public.users(user_uuid) ON DELETE CASCADE
-);
-
-CREATE TABLE public.oauth_refresh_tokens (
-    oauth_refresh_token_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    oauth_refresh_token_token_hash text NOT NULL UNIQUE,
-    oauth_client_id text NOT NULL,
-    user_uuid uuid NOT NULL,
-    oauth_refresh_token_scopes text[] NOT NULL DEFAULT '{}',
-    oauth_refresh_token_audience text NOT NULL DEFAULT '',
-    oauth_refresh_token_expires_at timestamptz NOT NULL,
-    oauth_refresh_token_revoked_at timestamptz,
-    oauth_refresh_token_rotated_from uuid,
-    oauth_refresh_token_created_at timestamptz NOT NULL DEFAULT now(),
-    oauth_refresh_token_updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT oauth_refresh_tokens_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES public.users(user_uuid) ON DELETE CASCADE
-);
-
-CREATE TABLE public.oauth_device_authorizations (
-    oauth_device_authorization_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    oauth_device_authorization_device_code_hash text NOT NULL UNIQUE,
-    oauth_client_id text NOT NULL,
-    oauth_device_authorization_user_code text NOT NULL UNIQUE,
-    oauth_device_authorization_scopes text[] DEFAULT '{}'::text[] NOT NULL,
-    oauth_device_authorization_audience text NOT NULL DEFAULT '',
-    user_uuid uuid,
-    oauth_device_authorization_expires_at timestamp with time zone NOT NULL,
-    oauth_device_authorization_approved_at timestamp with time zone,
-    oauth_device_authorization_denied_at timestamp with time zone,
-    oauth_device_authorization_consumed_at timestamp with time zone,
-    oauth_device_authorization_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    oauth_device_authorization_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT oauth_device_authorizations_pkey PRIMARY KEY (oauth_device_authorization_id)
-);
-
-CREATE TABLE public.oauth_dynamic_clients (
-    oauth_dynamic_client_id text PRIMARY KEY,
-    oauth_dynamic_client_type text NOT NULL DEFAULT 'public',
-    oauth_dynamic_client_redirect_uris text[] NOT NULL DEFAULT '{}',
-    oauth_dynamic_client_scopes text[] NOT NULL DEFAULT '{}',
-    oauth_dynamic_client_token_endpoint_auth_method text NOT NULL DEFAULT 'none',
-    oauth_dynamic_client_name text,
-    oauth_dynamic_client_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-    oauth_dynamic_client_issued_at timestamptz NOT NULL DEFAULT now(),
-    oauth_dynamic_client_disabled_at timestamptz,
-    oauth_dynamic_client_created_at timestamptz NOT NULL DEFAULT now(),
-    oauth_dynamic_client_updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE public.oauth_authorization_handoffs (
-    oauth_authorization_handoff_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    oauth_authorization_handoff_token_hash text NOT NULL UNIQUE,
-    oauth_authorization_handoff_user_code text NOT NULL UNIQUE,
-    oauth_client_id text NOT NULL,
-    oauth_authorization_handoff_redirect_uri text NOT NULL,
-    oauth_authorization_handoff_scopes text[] NOT NULL DEFAULT '{}',
-    oauth_authorization_handoff_audience text NOT NULL DEFAULT '',
-    oauth_authorization_handoff_state text NOT NULL DEFAULT '',
-    oauth_authorization_handoff_code_challenge text NOT NULL,
-    oauth_authorization_handoff_code_challenge_method text NOT NULL,
-    user_uuid uuid,
-    oauth_authorization_handoff_authorization_code text,
-    oauth_authorization_handoff_redirect_url text,
-    oauth_authorization_handoff_denied_at timestamptz,
-    oauth_authorization_handoff_completed_at timestamptz,
-    oauth_authorization_handoff_expires_at timestamptz NOT NULL,
-    oauth_authorization_handoff_created_at timestamptz NOT NULL DEFAULT now(),
-    oauth_authorization_handoff_updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE SCHEMA IF NOT EXISTS runtime;
-
-CREATE TABLE runtime.idempotency_keys (
-    scope text NOT NULL,
-    actor text NOT NULL,
-    idempotency_key text NOT NULL,
-    request_hash text NOT NULL,
-    response_payload bytea,
-    lock_expires_at timestamptz NOT NULL,
-    result_expires_at timestamptz NOT NULL,
-    completed_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (scope, actor, idempotency_key)
-);
-
-CREATE TABLE runtime.kv_store (
-    kv_key text NOT NULL,
-    kv_value bytea NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-ALTER TABLE ONLY runtime.kv_store
-    ADD CONSTRAINT kv_store_pkey PRIMARY KEY (kv_key);
 
 CREATE INDEX runtime_kv_store_expires_at_idx ON runtime.kv_store USING btree (expires_at);

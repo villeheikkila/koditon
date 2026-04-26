@@ -28,10 +28,10 @@ cp .env.template .env
 cp backend/.env.template backend/.env  # if needed
 ```
 
-Start local services (Postgres + Redis):
+Start local services:
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
 ## Development
@@ -66,9 +66,11 @@ mise run backend:db:migrate
 mise run backend:db:status
 NAME=add_users mise run backend:db:new
 mise run backend:db:generate
+mise run backend:db:vet
 
 # From backend/ (full set of db tasks available)
 mise run db:migrate
+mise run db:vet
 QUERY="SELECT 1" mise run db:query
 FILE=path/to/file.sql mise run db:query
 ```

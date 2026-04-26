@@ -24,7 +24,7 @@ SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_address, frontdoor_ad_area, frontdoor_ad_room_layout, frontdoor_ad_asking_price, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count
 `
 
 type BatchUpsertFrontdoorAdsFromSitemapParams struct {
@@ -53,10 +53,6 @@ func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg Ba
 			&i.FrontdoorAdPageNotFound,
 			&i.FrontdoorAdPublishingTime,
 			&i.PostalPostalCodeID,
-			&i.FrontdoorAdAddress,
-			&i.FrontdoorAdArea,
-			&i.FrontdoorAdRoomLayout,
-			&i.FrontdoorAdAskingPrice,
 			&i.FrontdoorAdStreetAddress,
 			&i.FrontdoorAdCity,
 			&i.FrontdoorAdPostal,
@@ -108,7 +104,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_address, shortcut_ad_area, shortcut_ad_room_layout, shortcut_ad_asking_price, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
 `
 
 type BatchUpsertShortcutAdsFromSitemapParams struct {
@@ -135,10 +131,6 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 			&i.ShortcutAdData,
 			&i.ShortcutAdUpdatedAt,
 			&i.ShortcutBuildingID,
-			&i.ShortcutAdAddress,
-			&i.ShortcutAdArea,
-			&i.ShortcutAdRoomLayout,
-			&i.ShortcutAdAskingPrice,
 			&i.ShortcutAdStreetAddress,
 			&i.ShortcutAdCity,
 			&i.ShortcutAdPostal,
@@ -179,7 +171,7 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 }
 
 const getFrontdoorAdByExternalID = `-- name: GetFrontdoorAdByExternalID :one
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_address, frontdoor_ad_area, frontdoor_ad_room_layout, frontdoor_ad_asking_price, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
 WHERE frontdoor_ad_external_id = $1
 `
 
@@ -198,10 +190,6 @@ func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdExt
 		&i.FrontdoorAdPageNotFound,
 		&i.FrontdoorAdPublishingTime,
 		&i.PostalPostalCodeID,
-		&i.FrontdoorAdAddress,
-		&i.FrontdoorAdArea,
-		&i.FrontdoorAdRoomLayout,
-		&i.FrontdoorAdAskingPrice,
 		&i.FrontdoorAdStreetAddress,
 		&i.FrontdoorAdCity,
 		&i.FrontdoorAdPostal,
@@ -235,7 +223,7 @@ func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdExt
 }
 
 const getShortcutAdByID = `-- name: GetShortcutAdByID :one
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_address, shortcut_ad_area, shortcut_ad_room_layout, shortcut_ad_asking_price, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
 WHERE shortcut_ad_id = $1
 `
 
@@ -251,10 +239,6 @@ func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdID int64) (Sh
 		&i.ShortcutAdData,
 		&i.ShortcutAdUpdatedAt,
 		&i.ShortcutBuildingID,
-		&i.ShortcutAdAddress,
-		&i.ShortcutAdArea,
-		&i.ShortcutAdRoomLayout,
-		&i.ShortcutAdAskingPrice,
 		&i.ShortcutAdStreetAddress,
 		&i.ShortcutAdCity,
 		&i.ShortcutAdPostal,
@@ -288,7 +272,7 @@ func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdID int64) (Sh
 }
 
 const listFrontdoorAds = `-- name: ListFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_address, frontdoor_ad_area, frontdoor_ad_room_layout, frontdoor_ad_asking_price, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
 ORDER BY frontdoor_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -319,10 +303,6 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsPara
 			&i.FrontdoorAdPageNotFound,
 			&i.FrontdoorAdPublishingTime,
 			&i.PostalPostalCodeID,
-			&i.FrontdoorAdAddress,
-			&i.FrontdoorAdArea,
-			&i.FrontdoorAdRoomLayout,
-			&i.FrontdoorAdAskingPrice,
 			&i.FrontdoorAdStreetAddress,
 			&i.FrontdoorAdCity,
 			&i.FrontdoorAdPostal,
@@ -363,7 +343,7 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsPara
 }
 
 const listShortcutAds = `-- name: ListShortcutAds :many
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_address, shortcut_ad_area, shortcut_ad_room_layout, shortcut_ad_asking_price, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -391,10 +371,6 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams
 			&i.ShortcutAdData,
 			&i.ShortcutAdUpdatedAt,
 			&i.ShortcutBuildingID,
-			&i.ShortcutAdAddress,
-			&i.ShortcutAdArea,
-			&i.ShortcutAdRoomLayout,
-			&i.ShortcutAdAskingPrice,
 			&i.ShortcutAdStreetAddress,
 			&i.ShortcutAdCity,
 			&i.ShortcutAdPostal,
@@ -435,7 +411,7 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams
 }
 
 const listUnprocessedFrontdoorAds = `-- name: ListUnprocessedFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_address, frontdoor_ad_area, frontdoor_ad_room_layout, frontdoor_ad_asking_price, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count FROM public.frontdoor_ads
 WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
 ORDER BY frontdoor_ad_first_seen_at ASC
 LIMIT $1
@@ -462,10 +438,6 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, limit int32) 
 			&i.FrontdoorAdPageNotFound,
 			&i.FrontdoorAdPublishingTime,
 			&i.PostalPostalCodeID,
-			&i.FrontdoorAdAddress,
-			&i.FrontdoorAdArea,
-			&i.FrontdoorAdRoomLayout,
-			&i.FrontdoorAdAskingPrice,
 			&i.FrontdoorAdStreetAddress,
 			&i.FrontdoorAdCity,
 			&i.FrontdoorAdPostal,
@@ -570,7 +542,7 @@ INSERT INTO public.frontdoor_ads (
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_address, frontdoor_ad_area, frontdoor_ad_room_layout, frontdoor_ad_asking_price, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_publishing_time, postal_postal_code_id, frontdoor_ad_street_address, frontdoor_ad_city, frontdoor_ad_postal, frontdoor_ad_price, frontdoor_ad_area_value, frontdoor_ad_address_key, frontdoor_ad_search_text, frontdoor_ad_description_text, frontdoor_ad_availability_text, frontdoor_ad_renovations_done_text, frontdoor_ad_renovations_planned_text, frontdoor_ad_additional_info_text, frontdoor_ad_charges_text, frontdoor_ad_maintenance_charge_monthly, frontdoor_ad_total_charge_monthly, frontdoor_ad_water_charge, frontdoor_ad_debt_free_price, frontdoor_ad_debt_share_amount, frontdoor_ad_price_per_m2, frontdoor_ad_floor_level, frontdoor_ad_total_floors, frontdoor_ad_build_year, frontdoor_ad_condition, frontdoor_ad_energy_class, frontdoor_ad_plot_type, frontdoor_ad_elevator, frontdoor_ad_sauna, frontdoor_ad_rooms_count
 `
 
 type UpsertFrontdoorAdFromSitemapParams struct {
@@ -593,10 +565,6 @@ func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg UpsertFr
 		&i.FrontdoorAdPageNotFound,
 		&i.FrontdoorAdPublishingTime,
 		&i.PostalPostalCodeID,
-		&i.FrontdoorAdAddress,
-		&i.FrontdoorAdArea,
-		&i.FrontdoorAdRoomLayout,
-		&i.FrontdoorAdAskingPrice,
 		&i.FrontdoorAdStreetAddress,
 		&i.FrontdoorAdCity,
 		&i.FrontdoorAdPostal,
@@ -660,7 +628,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
     shortcut_ad_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_address, shortcut_ad_area, shortcut_ad_room_layout, shortcut_ad_asking_price, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
 `
 
 type UpsertShortcutAdParams struct {
@@ -689,10 +657,6 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdPara
 		&i.ShortcutAdData,
 		&i.ShortcutAdUpdatedAt,
 		&i.ShortcutBuildingID,
-		&i.ShortcutAdAddress,
-		&i.ShortcutAdArea,
-		&i.ShortcutAdRoomLayout,
-		&i.ShortcutAdAskingPrice,
 		&i.ShortcutAdStreetAddress,
 		&i.ShortcutAdCity,
 		&i.ShortcutAdPostal,
@@ -738,7 +702,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_address, shortcut_ad_area, shortcut_ad_room_layout, shortcut_ad_asking_price, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
 `
 
 type UpsertShortcutAdFromSitemapParams struct {
@@ -759,10 +723,6 @@ func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg UpsertSho
 		&i.ShortcutAdData,
 		&i.ShortcutAdUpdatedAt,
 		&i.ShortcutBuildingID,
-		&i.ShortcutAdAddress,
-		&i.ShortcutAdArea,
-		&i.ShortcutAdRoomLayout,
-		&i.ShortcutAdAskingPrice,
 		&i.ShortcutAdStreetAddress,
 		&i.ShortcutAdCity,
 		&i.ShortcutAdPostal,

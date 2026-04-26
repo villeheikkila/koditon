@@ -5,56 +5,11 @@
 package db
 
 import (
-	"database/sql/driver"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
-
-type EnumNameDisplay string
-
-const (
-	EnumNameDisplayFullName EnumNameDisplay = "full_name"
-	EnumNameDisplayUsername EnumNameDisplay = "username"
-)
-
-func (e *EnumNameDisplay) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = EnumNameDisplay(s)
-	case string:
-		*e = EnumNameDisplay(s)
-	default:
-		return fmt.Errorf("unsupported scan type for EnumNameDisplay: %T", src)
-	}
-	return nil
-}
-
-type NullEnumNameDisplay struct {
-	EnumNameDisplay EnumNameDisplay `json:"enum__name_display"`
-	Valid           bool            `json:"valid"` // Valid is true if EnumNameDisplay is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullEnumNameDisplay) Scan(value interface{}) error {
-	if value == nil {
-		ns.EnumNameDisplay, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.EnumNameDisplay.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullEnumNameDisplay) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.EnumNameDisplay), nil
-}
 
 type AuthSignupEmailToken struct {
 	AuthSignupEmailTokenID     int64      `json:"auth_signup_email_token_id"`
@@ -137,10 +92,6 @@ type FrontdoorAd struct {
 	FrontdoorAdPageNotFound             bool            `json:"frontdoor_ad_page_not_found"`
 	FrontdoorAdPublishingTime           *time.Time      `json:"frontdoor_ad_publishing_time"`
 	PostalPostalCodeID                  *uuid.UUID      `json:"postal_postal_code_id"`
-	FrontdoorAdAddress                  *string         `json:"frontdoor_ad_address"`
-	FrontdoorAdArea                     pgtype.Numeric  `json:"frontdoor_ad_area"`
-	FrontdoorAdRoomLayout               *string         `json:"frontdoor_ad_room_layout"`
-	FrontdoorAdAskingPrice              pgtype.Numeric  `json:"frontdoor_ad_asking_price"`
 	FrontdoorAdStreetAddress            *string         `json:"frontdoor_ad_street_address"`
 	FrontdoorAdCity                     *string         `json:"frontdoor_ad_city"`
 	FrontdoorAdPostal                   *string         `json:"frontdoor_ad_postal"`
@@ -525,10 +476,6 @@ type ShortcutAd struct {
 	ShortcutAdData                     json.RawMessage `json:"shortcut_ad_data"`
 	ShortcutAdUpdatedAt                *time.Time      `json:"shortcut_ad_updated_at"`
 	ShortcutBuildingID                 *uuid.UUID      `json:"shortcut_building_id"`
-	ShortcutAdAddress                  *string         `json:"shortcut_ad_address"`
-	ShortcutAdArea                     pgtype.Numeric  `json:"shortcut_ad_area"`
-	ShortcutAdRoomLayout               *string         `json:"shortcut_ad_room_layout"`
-	ShortcutAdAskingPrice              pgtype.Numeric  `json:"shortcut_ad_asking_price"`
 	ShortcutAdStreetAddress            *string         `json:"shortcut_ad_street_address"`
 	ShortcutAdCity                     *string         `json:"shortcut_ad_city"`
 	ShortcutAdPostal                   *string         `json:"shortcut_ad_postal"`
@@ -640,20 +587,28 @@ type ShortcutToken struct {
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
+type SpatialRefSy struct {
+	Srid      int32   `json:"srid"`
+	AuthName  *string `json:"auth_name"`
+	AuthSrid  *int32  `json:"auth_srid"`
+	Srtext    *string `json:"srtext"`
+	Proj4text *string `json:"proj4text"`
+}
+
 type User struct {
-	UserUuid                     uuid.UUID        `json:"user_uuid"`
-	UserFirstName                *string          `json:"user_first_name"`
-	UserLastName                 *string          `json:"user_last_name"`
-	UserUsername                 *string          `json:"user_username"`
-	UserNameDisplay              *EnumNameDisplay `json:"user_name_display"`
-	UserIsPrivate                bool             `json:"user_is_private"`
-	UserIsOnboarded              bool             `json:"user_is_onboarded"`
-	UserJoinedAt                 time.Time        `json:"user_joined_at"`
-	UserSearch                   *string          `json:"user_search"`
-	UserPreferredName            *string          `json:"user_preferred_name"`
-	UserID                       int64            `json:"user_id"`
-	UserEmail                    *string          `json:"user_email"`
-	UserHasSeenPasskeyOnboarding bool             `json:"user_has_seen_passkey_onboarding"`
+	UserUuid                     uuid.UUID   `json:"user_uuid"`
+	UserFirstName                *string     `json:"user_first_name"`
+	UserLastName                 *string     `json:"user_last_name"`
+	UserUsername                 *string     `json:"user_username"`
+	UserNameDisplay              interface{} `json:"user_name_display"`
+	UserIsPrivate                bool        `json:"user_is_private"`
+	UserIsOnboarded              bool        `json:"user_is_onboarded"`
+	UserJoinedAt                 time.Time   `json:"user_joined_at"`
+	UserSearch                   *string     `json:"user_search"`
+	UserPreferredName            *string     `json:"user_preferred_name"`
+	UserID                       int64       `json:"user_id"`
+	UserEmail                    *string     `json:"user_email"`
+	UserHasSeenPasskeyOnboarding bool        `json:"user_has_seen_passkey_onboarding"`
 }
 
 type UserDevice struct {

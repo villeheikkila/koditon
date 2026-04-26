@@ -33,7 +33,8 @@ mkdir -p "$(dirname "${OUT_FILE}")"
 TMP_FILE="$(mktemp)"
 trap 'rm -f "${TMP_FILE}"' EXIT
 
-psql -X -A -t -v ON_ERROR_STOP=1 "${CONN}" -f "${DUMP_SQL_FILE}" | perl "${INLINE_CONSTRAINTS_SCRIPT}" > "${TMP_FILE}"
+psql -q -X -A -t -v ON_ERROR_STOP=1 "${CONN}" -f "${DUMP_SQL_FILE}" | perl "${INLINE_CONSTRAINTS_SCRIPT}" > "${TMP_FILE}"
+perl -0pi -e 's/\n+\z/\n/' "${TMP_FILE}"
 mv "${TMP_FILE}" "${OUT_FILE}"
 
 echo "Wrote ${OUT_FILE}"
