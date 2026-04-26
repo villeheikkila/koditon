@@ -32,6 +32,8 @@ func run(ctx context.Context) error {
 	subArgs := os.Args[2:]
 
 	switch subcommand {
+	case "api-query":
+		return runAPIQuery(ctx, subArgs, os.Stdout, os.Getenv)
 	case "search":
 		return runSearch(ctx, subArgs)
 	case "detail":
@@ -56,6 +58,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  search         Search ads, buildings, and announcements")
 	fmt.Fprintln(os.Stderr, "  detail         Show entity detail by canonical ID or URL")
 	fmt.Fprintln(os.Stderr, "  transactions   Search price transactions")
+	fmt.Fprintln(os.Stderr, "  api-query      Run raw Frontdoor and Shortcut provider client queries")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Run 'cli <command> --help' for command-specific flags.")
 }
