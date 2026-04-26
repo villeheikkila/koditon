@@ -94,12 +94,6 @@ type rawConfig struct {
 
 	RedisAddr string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 
-	TelemetryOTLPEndpoint string  `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:""`
-	TelemetryServiceName  string  `env:"OTEL_SERVICE_NAME" envDefault:"koditon"`
-	TelemetryOTLPProtocol string  `env:"OTEL_EXPORTER_OTLP_PROTOCOL" envDefault:"grpc"`
-	TelemetryOTLPInsecure bool    `env:"OTEL_EXPORTER_OTLP_INSECURE" envDefault:"false"`
-	TelemetrySampleRatio  float64 `env:"OTEL_SAMPLE_RATIO" envDefault:"1.0"`
-
 	WebBaseURL               string `env:"WEB_BASE_URL" envDefault:""`
 	WebStaticDir             string `env:"WEB_STATIC_DIR" envDefault:""`
 	MCPAuthToken             string `env:"MCP_AUTH_TOKEN" envDefault:""`
@@ -175,13 +169,6 @@ func (r rawConfig) toConfig() Config {
 		Redis: RedisConfig{
 			Addr: r.RedisAddr,
 		},
-		Telemetry: TelemetryConfig{
-			OTLPEndpoint: r.TelemetryOTLPEndpoint,
-			ServiceName:  r.TelemetryServiceName,
-			OTLPProtocol: r.TelemetryOTLPProtocol,
-			OTLPInsecure: r.TelemetryOTLPInsecure,
-			SampleRatio:  r.TelemetrySampleRatio,
-		},
 		WebBaseURL:               r.WebBaseURL,
 		WebStaticDir:             r.WebStaticDir,
 		MCPAuthToken:             r.MCPAuthToken,
@@ -208,7 +195,6 @@ type Config struct {
 	OpenRouter               OpenRouterConfig
 	Telegram                 TelegramConfig
 	Redis                    RedisConfig
-	Telemetry                TelemetryConfig
 	WebBaseURL               string
 	WebStaticDir             string
 	MCPAuthToken             string
@@ -334,14 +320,6 @@ func (c AppleAuthConfig) IsConfigured() bool {
 
 type RedisConfig struct {
 	Addr string
-}
-
-type TelemetryConfig struct {
-	OTLPEndpoint string
-	ServiceName  string
-	OTLPProtocol string
-	OTLPInsecure bool
-	SampleRatio  float64
 }
 
 // CurrentEnv captures the current process environment as a map.

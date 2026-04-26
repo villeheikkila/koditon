@@ -25,11 +25,11 @@ import (
 	"koditon-go/internal/oauthapi"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
+	"koditon-go/internal/requestid"
 	"koditon-go/internal/runtimecfg"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/telegram"
-	"koditon-go/internal/telemetry"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
@@ -68,19 +68,6 @@ func run(
 		return err
 	}
 	logger := newLogger(stderr, cfg)
-	var telCfg *runtimecfg.TelemetryConfig
-	if cfg.Telemetry.OTLPEndpoint != "" {
-		telCfg = &runtimecfg.TelemetryConfig{
-			ServiceName:  cfg.Telemetry.ServiceName,
-			OTLPEndpoint: cfg.Telemetry.OTLPEndpoint,
-			OTLPProtocol: cfg.Telemetry.OTLPProtocol,
-			OTLPInsecure: cfg.Telemetry.OTLPInsecure,
-			SampleRatio:  cfg.Telemetry.SampleRatio,
-		}
-	}
-	telResult := telemetry.Bootstrap(ctx, telCfg, string(cfg.Environment), logger.Handler(), logger)
-	logger = telResult.Logger
-	defer func() { _ = telResult.Shutdown(context.Background()) }()
 	appLogger := logger.With("component", "app")
 	appLogger.Info("starting application",
 		"env", cfg.Environment,
@@ -310,6 +297,7 @@ func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 			handler,
 		)
 	}
+	handler = requestid.NewHandler(handler)
 	return slog.New(handler)
 }
 

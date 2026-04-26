@@ -11,7 +11,6 @@ import (
 
 	"koditon-go/internal/auth/passkey"
 	db "koditon-go/internal/db"
-	"koditon-go/internal/telemetry"
 	"koditon-go/internal/useragent"
 	"koditon-go/internal/util"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -440,29 +438,21 @@ func (s *Service) ListPasskeys(ctx context.Context, userID uuid.UUID) ([]ListPas
 }
 
 func (s *Service) DeletePasskey(ctx context.Context, userID uuid.UUID, credentialID string) error {
-	ctx, span := startSpan(ctx, "auth.passkey.delete", telemetry.Attrs.AuthProvider("passkey"))
-	defer span.End()
-
 	outcome, err := s.queries.RevokePasskeyByCredentialB64ForUser(ctx, db.RevokePasskeyByCredentialB64ForUserParams{
 		UserUuid:                      util.UUIDToPg(userID),
 		UserPasskeyCredentialIDB64url: stringPtr(credentialID),
 	})
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "revoke passkey")
 		return fmt.Errorf("revoke passkey: %w", err)
 	}
-	span.SetAttributes(attribute.String("auth.passkey.delete.outcome", outcome))
-
 	switch outcome {
 	case "deleted":
 		s.logger.InfoContext(ctx, "passkey deleted", "user_id", userID, "outcome", outcome)
 		return nil
 	case "last_passkey":
-		telemetry.RecordSpanError(span, ErrPasskeyLast, "passkey delete blocked: last passkey")
 		s.logger.WarnContext(ctx, "passkey delete blocked: last passkey", "user_id", userID, "outcome", outcome)
 		return ErrPasskeyLast
 	case "not_found":
-		telemetry.RecordSpanError(span, ErrPasskeyNotFound, "passkey delete failed: passkey not found")
 		s.logger.WarnContext(ctx, "passkey delete failed: passkey not found", "user_id", userID, "outcome", outcome)
 		return ErrPasskeyNotFound
 	default:

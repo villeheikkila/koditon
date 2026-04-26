@@ -12,7 +12,6 @@ import (
 	"koditon-go/internal/auth/passkey"
 	db "koditon-go/internal/db"
 	"koditon-go/internal/runtimecfg"
-	"koditon-go/internal/telemetry"
 	"koditon-go/internal/util"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -21,8 +20,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type Service struct {
@@ -153,37 +150,19 @@ func rollbackTx(ctx context.Context, logger *slog.Logger, tx pgx.Tx) {
 	}
 }
 
-const authTracerName = "koditon-go/internal/auth"
-
-func startSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
-	return telemetry.StartSpan(ctx, authTracerName, name, attrs...)
-}
-
 func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleRequest) (*SignInWithAppleResponse, error) {
-	ctx, span := startSpan(ctx, "auth.sign_in_apple",
-		telemetry.Attrs.AuthProvider("apple"),
-		telemetry.Attrs.AuthHasAuthCode(req.AuthorizationCode != ""),
-		telemetry.Attrs.AuthHasNonce(req.Nonce != ""),
-		telemetry.Attrs.AuthHasDeviceID(req.DeviceID != uuid.Nil),
-		telemetry.Attrs.AuthHasUserAgent(req.UserAgent != ""),
-	)
-	defer span.End()
 	s.logger.DebugContext(ctx, "apple sign in started",
 		"has_auth_code", req.AuthorizationCode != "",
 		"has_nonce", req.Nonce != "",
 		"has_device_id", req.DeviceID != uuid.Nil,
 	)
 	if s.appleClient == nil {
-		telemetry.RecordSpanError(span, errors.New("apple client not configured"), "apple client not configured")
 		s.logger.ErrorContext(ctx, "apple client not configured")
 		return nil, errors.New("apple client not configured")
 	}
 	s.logger.DebugContext(ctx, "exchanging authorization code with apple")
-	exchangeCtx, exchangeSpan := startSpan(ctx, "auth.apple.exchange_code")
-	tokenResp, err := s.appleClient.ExchangeAuthorizationCode(exchangeCtx, req.AuthorizationCode)
-	exchangeSpan.End()
+	tokenResp, err := s.appleClient.ExchangeAuthorizationCode(ctx, req.AuthorizationCode)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "exchange authorization code")
 		var exchangeErr *apple.TokenExchangeError
 		if errors.As(err, &exchangeErr) {
 			s.logger.ErrorContext(ctx, "failed to exchange authorization code",
@@ -204,16 +183,12 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		"has_refresh_token", tokenResp.RefreshToken != "",
 	)
 	if tokenResp.IDToken == "" {
-		telemetry.RecordSpanError(span, ErrMissingIDToken, "missing apple id token")
 		s.logger.ErrorContext(ctx, "apple returned empty id token")
 		return nil, ErrMissingIDToken
 	}
 	s.logger.DebugContext(ctx, "verifying apple id token")
-	verifyCtx, verifySpan := startSpan(ctx, "auth.apple.verify_id_token")
-	identity, err := s.appleClient.VerifyIDToken(verifyCtx, tokenResp.IDToken, req.Nonce)
-	verifySpan.End()
+	identity, err := s.appleClient.VerifyIDToken(ctx, tokenResp.IDToken, req.Nonce)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "verify id token")
 		s.logger.ErrorContext(ctx, "failed to verify id token", "error", err)
 		return nil, fmt.Errorf("verify id token: %w", err)
 	}
@@ -222,7 +197,6 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	)
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "begin transaction")
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer rollbackTx(ctx, s.logger, tx)
@@ -251,14 +225,12 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	var isNewUser bool
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			telemetry.RecordSpanError(span, err, "lookup identity")
 			s.logger.ErrorContext(ctx, "failed to lookup identity", "error", err)
 			return nil, fmt.Errorf("get identity: %w", err)
 		}
 		s.logger.DebugContext(ctx, "no existing identity found, creating new user")
 		user, createErr := qtx.CreateUser(ctx, email)
 		if createErr != nil {
-			telemetry.RecordSpanError(span, createErr, "create user")
 			s.logger.ErrorContext(ctx, "failed to create user", "error", createErr)
 			return nil, fmt.Errorf("create user: %w", createErr)
 		}
@@ -275,7 +247,6 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			telemetry.RecordSpanError(span, err, "create identity")
 			s.logger.ErrorContext(ctx, "failed to create identity", "error", err)
 			return nil, fmt.Errorf("create identity: %w", err)
 		}
@@ -290,7 +261,6 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			telemetry.RecordSpanError(span, err, "update identity")
 			s.logger.ErrorContext(ctx, "failed to update identity", "error", err)
 			return nil, fmt.Errorf("update identity: %w", err)
 		}
@@ -300,7 +270,6 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 				UserID:    &existingIdentity.UserIDBigint,
 			})
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				telemetry.RecordSpanError(span, err, "update user email if empty")
 				s.logger.ErrorContext(ctx, "failed to update user email if empty", "error", err)
 				return nil, fmt.Errorf("update user email if empty: %w", err)
 			}
@@ -322,18 +291,15 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		IP:               req.IP,
 	})
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "create session")
 		s.logger.ErrorContext(ctx, "failed to create session", "error", err)
 		return nil, err
 	}
 	s.logger.DebugContext(ctx, "session created", "session_id", sessionID)
 	s.logger.DebugContext(ctx, "committing transaction")
 	if err := tx.Commit(ctx); err != nil {
-		telemetry.RecordSpanError(span, err, "commit transaction")
 		s.logger.ErrorContext(ctx, "failed to commit transaction", "error", err)
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	span.SetAttributes(telemetry.Attrs.AuthIsNewUser(isNewUser))
 	s.logger.InfoContext(ctx, "apple sign in completed successfully",
 		"user_id", userID,
 		"session_id", sessionID,
@@ -354,37 +320,24 @@ type SignInWithAppleWebRequest struct {
 }
 
 func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWebRequest) (*SignInWithAppleResponse, error) {
-	ctx, span := startSpan(ctx, "auth.sign_in_apple_web",
-		telemetry.Attrs.AuthProvider("apple"),
-		telemetry.Attrs.AuthHasAuthCode(req.AuthorizationCode != ""),
-		telemetry.Attrs.AuthHasDeviceID(req.DeviceID != uuid.Nil),
-		telemetry.Attrs.AuthHasUserAgent(req.UserAgent != ""),
-	)
-	defer span.End()
 	if s.appleWebClient == nil {
 		return nil, errors.New("apple web sign in not configured")
 	}
-	exchangeCtx, exchangeSpan := startSpan(ctx, "auth.apple.exchange_code_web")
-	tokenResp, err := s.appleWebClient.ExchangeAuthorizationCodeWeb(exchangeCtx, req.AuthorizationCode, s.appleWebRedirectURI)
-	exchangeSpan.End()
+	tokenResp, err := s.appleWebClient.ExchangeAuthorizationCodeWeb(ctx, req.AuthorizationCode, s.appleWebRedirectURI)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "exchange authorization code web")
 		s.logger.ErrorContext(ctx, "failed to exchange web authorization code", "error", err)
 		return nil, fmt.Errorf("exchange authorization code: %w", err)
 	}
 	if tokenResp.IDToken == "" {
-		telemetry.RecordSpanError(span, ErrMissingIDToken, "missing apple id token")
 		return nil, ErrMissingIDToken
 	}
 	identity, err := s.appleWebClient.VerifyIDToken(ctx, tokenResp.IDToken, "")
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "verify id token")
 		s.logger.ErrorContext(ctx, "failed to verify web id token", "error", err)
 		return nil, fmt.Errorf("verify id token: %w", err)
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "begin transaction")
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer rollbackTx(ctx, s.logger, tx)
@@ -411,12 +364,10 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 	var isNewUser bool
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			telemetry.RecordSpanError(span, err, "lookup identity")
 			return nil, fmt.Errorf("get identity: %w", err)
 		}
 		user, createErr := qtx.CreateUser(ctx, email)
 		if createErr != nil {
-			telemetry.RecordSpanError(span, createErr, "create user")
 			return nil, fmt.Errorf("create user: %w", createErr)
 		}
 		userID = user.UserUuid
@@ -431,7 +382,6 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			telemetry.RecordSpanError(span, err, "create identity")
 			return nil, fmt.Errorf("create identity: %w", err)
 		}
 	} else {
@@ -443,7 +393,6 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			telemetry.RecordSpanError(span, err, "update identity")
 			return nil, fmt.Errorf("update identity: %w", err)
 		}
 	}
@@ -455,14 +404,11 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 		IP:        req.IP,
 	})
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "create session")
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		telemetry.RecordSpanError(span, err, "commit transaction")
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	span.SetAttributes(telemetry.Attrs.AuthIsNewUser(isNewUser))
 	s.logger.InfoContext(ctx, "apple web sign in completed", "user_id", userID, "is_new_user", isNewUser)
 	return &SignInWithAppleResponse{
 		UserID:    userID,
@@ -472,12 +418,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 }
 
 func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
-	ctx, span := startSpan(ctx, "auth.sign_out",
-		telemetry.Attrs.AuthSignOutScope("session"),
-	)
-	defer span.End()
 	if err := s.queries.RevokeSession(ctx, util.UUIDToPg(sessionID)); err != nil {
-		telemetry.RecordSpanError(span, err, "revoke session")
 		return fmt.Errorf("revoke session: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -490,37 +431,24 @@ func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
 }
 
 func (s *Service) SignOutWithOwnershipCheck(ctx context.Context, userID, sessionID uuid.UUID) error {
-	ctx, span := startSpan(ctx, "auth.sign_out",
-		telemetry.Attrs.AuthSignOutScope("user_session"),
-	)
-	defer span.End()
 	session, err := s.queries.GetSessionByID(ctx, util.UUIDToPg(sessionID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			telemetry.RecordSpanError(span, ErrSessionNotFound, "session not found")
 			return ErrSessionNotFound
 		}
-		telemetry.RecordSpanError(span, err, "get session")
 		return fmt.Errorf("get session: %w", err)
 	}
 	if util.PgUUIDToUUID(session.UserUuid) != userID {
-		telemetry.RecordSpanError(span, ErrSessionNotOwned, "session not owned")
 		return ErrSessionNotOwned
 	}
 	return s.SignOut(ctx, sessionID)
 }
 
 func (s *Service) SignOutAllSessions(ctx context.Context, userID uuid.UUID) error {
-	ctx, span := startSpan(ctx, "auth.sign_out",
-		telemetry.Attrs.AuthSignOutScope("user"),
-	)
-	defer span.End()
 	if err := s.queries.RevokeAllUserSessions(ctx, util.UUIDToPg(userID)); err != nil {
-		telemetry.RecordSpanError(span, err, "revoke all sessions")
 		return err
 	}
 	if err := s.queries.RevokeAllOAuthRefreshTokensByUserID(ctx, util.UUIDToPg(userID)); err != nil {
-		telemetry.RecordSpanError(span, err, "revoke all oauth refresh tokens")
 		return fmt.Errorf("revoke all oauth refresh tokens: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -535,8 +463,6 @@ func (s *Service) SignOutAllSessions(ctx context.Context, userID uuid.UUID) erro
 // RevokeOAuthRefreshToken revokes a specific OAuth refresh token (RFC 7009).
 // Returns nil even if the token is already revoked or doesn't exist (per RFC 7009).
 func (s *Service) RevokeOAuthRefreshToken(ctx context.Context, token string) error {
-	ctx, span := startSpan(ctx, "auth.revoke_oauth_refresh_token")
-	defer span.End()
 	tokenHash := hashSHA256Hex(token)
 	row, err := s.queries.RevokeOAuthRefreshTokenByHash(ctx, &tokenHash)
 	if err != nil {
@@ -545,7 +471,6 @@ func (s *Service) RevokeOAuthRefreshToken(ctx context.Context, token string) err
 			// was already invalid or unknown.
 			return nil
 		}
-		telemetry.RecordSpanError(span, err, "revoke oauth refresh token")
 		return fmt.Errorf("revoke oauth refresh token: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -562,8 +487,6 @@ func (s *Service) RevokeOAuthRefreshToken(ctx context.Context, token string) err
 // RevokeOAuthRefreshTokenForClient revokes a specific OAuth refresh token for the given client.
 // Returns nil even if the token is already revoked, unknown, or belongs to a different client.
 func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID, token string) error {
-	ctx, span := startSpan(ctx, "auth.revoke_oauth_refresh_token")
-	defer span.End()
 	clientID = strings.TrimSpace(clientID)
 	token = strings.TrimSpace(token)
 	if clientID == "" || token == "" {
@@ -577,7 +500,6 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		telemetry.RecordSpanError(span, err, "revoke oauth refresh token for client")
 		return fmt.Errorf("revoke oauth refresh token for client: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -592,13 +514,8 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 }
 
 func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*AccessTokenClaims, error) {
-	ctx, span := startSpan(ctx, "auth.verify_access_token",
-		telemetry.Attrs.AuthHasToken(tokenString != ""),
-	)
-	defer span.End()
 	claims, err := s.jwtService.VerifyAccessToken(ctx, tokenString)
 	if err != nil {
-		telemetry.RecordSpanError(span, err, "verify access token")
 		return nil, err
 	}
 	if claims.SessionID == uuid.Nil {
@@ -608,10 +525,8 @@ func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*A
 	_, err = s.queries.GetActiveSessionByID(ctx, util.UUIDToPg(claims.SessionID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			telemetry.RecordSpanError(span, ErrSessionRevoked, "session revoked")
 			return nil, ErrSessionRevoked
 		}
-		telemetry.RecordSpanError(span, err, "get session")
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 	return claims, nil

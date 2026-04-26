@@ -76,14 +76,6 @@ type ClickHouseConfig struct {
 	MaxConnsPerHost int
 }
 
-type TelemetryConfig struct {
-	ServiceName  string
-	OTLPEndpoint string
-	OTLPProtocol string
-	OTLPInsecure bool
-	SampleRatio  float64
-}
-
 type HTTPConfig struct {
 	APIBaseURL               string
 	APIPublicBaseURL         string

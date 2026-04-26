@@ -91,7 +91,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 		requiredAudience = auth.CanonicalProtectedResource(cfg.APIPublicBaseURL)
 	}
 
-	var mcpHandler http.Handler = base
+	mcpHandler := base
 	if authSvc != nil {
 		mcpHandler = requireAuth(authSvc, []string{auth.ScopeMCPCoreRead}, requiredAudience, resourceMetadataURL, base)
 	}

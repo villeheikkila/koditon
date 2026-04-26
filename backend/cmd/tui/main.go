@@ -34,7 +34,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: cfg.SlogLevel()}))
+	logger := slog.New(slog.DiscardHandler)
 	slog.SetDefault(logger)
 	log.SetOutput(io.Discard)
 	log.SetFlags(0)
