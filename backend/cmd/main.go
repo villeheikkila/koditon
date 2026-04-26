@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -17,18 +18,18 @@ import (
 
 	"koditon-go/internal/auth"
 	"koditon-go/internal/config"
-	db "koditon-go/internal/db"
-	"koditon-go/internal/oauthapi"
-	"koditon-go/internal/runtimecfg"
-	"koditon-go/internal/telemetry"
 	"koditon-go/internal/consumers"
+	db "koditon-go/internal/db"
 	"koditon-go/internal/frontdoor"
 	"koditon-go/internal/mcpserver"
+	"koditon-go/internal/oauthapi"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
+	"koditon-go/internal/runtimecfg"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/telegram"
+	"koditon-go/internal/telemetry"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
@@ -416,11 +417,7 @@ func productionEnvOverrides(check productionModeCheck) map[string]string {
 
 func mergedEnv(base, overrides map[string]string) map[string]string {
 	merged := make(map[string]string, len(base)+len(overrides))
-	for k, v := range base {
-		merged[k] = v
-	}
-	for k, v := range overrides {
-		merged[k] = v
-	}
+	maps.Copy(merged, base)
+	maps.Copy(merged, overrides)
 	return merged
 }

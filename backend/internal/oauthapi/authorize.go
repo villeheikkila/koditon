@@ -177,22 +177,6 @@ func (h *Handler) getUserAllowedScopes(ctx context.Context, userID uuid.UUID) ([
 	return auth.ScopesForRoles(roles), nil
 }
 
-func (h *Handler) resolveUserGrantScopes(ctx context.Context, client oauthClient, scopeText string, userID uuid.UUID) ([]string, error) {
-	requested := strings.Fields(strings.TrimSpace(scopeText))
-	requested = h.normalizeRequestedScopesForClient(client, requested)
-	if len(requested) == 0 {
-		return nil, fmt.Errorf("scope is required")
-	}
-	userAllowed, err := h.getUserAllowedScopes(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if err := auth.ValidateRequestedScopes(requested, client.Scopes, userAllowed); err != nil {
-		return nil, err
-	}
-	return requested, nil
-}
-
 func (h *Handler) resolveFirstPartyUserGrantScopes(ctx context.Context, client oauthClient, scopeText string, userID uuid.UUID) ([]string, error) {
 	requested := strings.Fields(strings.TrimSpace(scopeText))
 	requested = h.normalizeRequestedScopesForClient(client, requested)

@@ -107,7 +107,7 @@ type oauthOpaqueRefreshStrategy struct {
 }
 
 func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, queries *db.Queries) (refreshValidation, error) {
-	row, err := queries.GetOAuthRefreshTokenByHashForUpdate(ctx, oauthStringPtr(hashSHA256Hex(s.refreshToken)))
+	row, err := queries.GetOAuthRefreshTokenByHashForUpdate(ctx, new(hashSHA256Hex(s.refreshToken)))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return refreshValidation{}, ErrOAuthInvalidGrant
@@ -135,7 +135,7 @@ func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, quer
 	if !row.OauthRefreshTokenExpiresAt.After(time.Now()) {
 		return refreshValidation{}, ErrOAuthInvalidGrant
 	}
-	revoked, err := queries.RevokeOAuthRefreshTokenByHash(ctx, oauthStringPtr(hashSHA256Hex(s.refreshToken)))
+	revoked, err := queries.RevokeOAuthRefreshTokenByHash(ctx, new(hashSHA256Hex(s.refreshToken)))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return refreshValidation{}, ErrOAuthInvalidGrant
@@ -152,7 +152,7 @@ func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, quer
 func (s oauthOpaqueRefreshStrategy) handleReuse(ctx context.Context, _ pgx.Tx, queries *db.Queries, state refreshFlowState) error {
 	if _, err := queries.RevokeAllOAuthRefreshTokensByUserIDAndClientID(ctx, db.RevokeAllOAuthRefreshTokensByUserIDAndClientIDParams{
 		UserUuid:      util.UUIDToPg(state.UserID),
-		OauthClientID: oauthStringPtr(state.ClientID),
+		OauthClientID: new(state.ClientID),
 	}); err != nil {
 		return fmt.Errorf("revoke oauth refresh tokens after reuse: %w", err)
 	}

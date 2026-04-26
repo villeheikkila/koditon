@@ -369,4 +369,3 @@ func (c *Client) ExchangeAuthorizationCodeWeb(ctx context.Context, authCode, red
 	form.Set("redirect_uri", redirectURI)
 	return c.sendTokenRequest(ctx, form)
 }
-

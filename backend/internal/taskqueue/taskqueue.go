@@ -28,9 +28,9 @@ var ErrNoRows = pgmq.ErrNoRows
 
 type MessageData struct {
 	SyncTaskID int64  `json:"sync_task_id"`
-	EntityID      string `json:"entity_id"`
-	TaskType      string `json:"task_type"`
-	Attempt       int32  `json:"attempt"`
+	EntityID   string `json:"entity_id"`
+	TaskType   string `json:"task_type"`
+	Attempt    int32  `json:"attempt"`
 }
 
 type Message struct {
@@ -75,10 +75,7 @@ func (q *Queue) SendWithDelay(ctx context.Context, data MessageData, delay time.
 	if err != nil {
 		return 0, fmt.Errorf("marshal message: %w", err)
 	}
-	delaySecs := int(delay.Seconds())
-	if delaySecs < 0 {
-		delaySecs = 0
-	}
+	delaySecs := max(int(delay.Seconds()), 0)
 	msgID, err := q.pgmqClient.SendWithDelay(ctx, q.name, json.RawMessage(msgJSON), delaySecs)
 	if err != nil {
 		return 0, fmt.Errorf("send to queue %s: %w", q.name, err)

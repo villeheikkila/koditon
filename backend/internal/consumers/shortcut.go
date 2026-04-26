@@ -86,8 +86,8 @@ func (c *Consumer) enqueueShortcutTask(ctx context.Context, queue *taskqueue.Que
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		SyncTaskID: task.ShortcutSyncTaskID,
-		EntityID:      entityID,
-		TaskType:      taskType,
+		EntityID:   entityID,
+		TaskType:   taskType,
 	})
 	return err
 }

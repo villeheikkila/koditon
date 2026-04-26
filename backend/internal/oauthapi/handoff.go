@@ -78,6 +78,7 @@ func (h *Handler) createAuthorizationHandoff(
 	if err != nil {
 		return nil, "", err
 	}
+	handoffUserCode := strings.ToUpper(userCode[:4])
 	clientName := strings.TrimSpace(client.DisplayName)
 	if clientName == "" {
 		clientName = resolveOAuthClientDisplayName(client.ClientID, nil)
@@ -86,15 +87,15 @@ func (h *Handler) createAuthorizationHandoff(
 		clientName = strings.TrimSpace(req.ClientID)
 	}
 	row, err := h.queries.CreateOAuthAuthorizationHandoff(ctx, db.CreateOAuthAuthorizationHandoffParams{
-		OauthAuthorizationHandoffTokenHash:           stringPtr(hashText(token)),
-		OauthAuthorizationHandoffUserCode:            stringPtr(strings.ToUpper(userCode[:4])),
-		OauthClientID:                                stringPtr(strings.TrimSpace(req.ClientID)),
-		OauthAuthorizationHandoffRedirectUri:         stringPtr(strings.TrimSpace(req.RedirectURI)),
+		OauthAuthorizationHandoffTokenHash:           new(hashText(token)),
+		OauthAuthorizationHandoffUserCode:            &handoffUserCode,
+		OauthClientID:                                new(strings.TrimSpace(req.ClientID)),
+		OauthAuthorizationHandoffRedirectUri:         new(strings.TrimSpace(req.RedirectURI)),
 		OauthAuthorizationHandoffScopes:              append([]string(nil), req.Scope...),
-		OauthAuthorizationHandoffAudience:            stringPtr(strings.TrimSpace(req.Resource)),
-		OauthAuthorizationHandoffState:               stringPtr(strings.TrimSpace(req.State)),
-		OauthAuthorizationHandoffCodeChallenge:       stringPtr(strings.TrimSpace(req.CodeChallenge)),
-		OauthAuthorizationHandoffCodeChallengeMethod: stringPtr(strings.TrimSpace(req.CodeChallengeMethod)),
+		OauthAuthorizationHandoffAudience:            new(strings.TrimSpace(req.Resource)),
+		OauthAuthorizationHandoffState:               new(strings.TrimSpace(req.State)),
+		OauthAuthorizationHandoffCodeChallenge:       new(strings.TrimSpace(req.CodeChallenge)),
+		OauthAuthorizationHandoffCodeChallengeMethod: new(strings.TrimSpace(req.CodeChallengeMethod)),
 		OauthAuthorizationHandoffExpiresAt:           util.TimeToPg(time.Now().Add(oauthAuthorizationHandoffTTL)),
 	})
 	if err != nil {
@@ -162,7 +163,7 @@ func (h *Handler) getAuthorizationHandoffByToken(ctx context.Context, token stri
 	if h.queries == nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, stringPtr(hashText(strings.TrimSpace(token))))
+	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, new(hashText(strings.TrimSpace(token))))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -195,7 +196,7 @@ func (h *Handler) getAuthorizationHandoffByUserCode(ctx context.Context, userCod
 	}
 	row, err := h.queries.GetOAuthAuthorizationHandoffByUserCode(
 		ctx,
-		stringPtr(strings.ToUpper(strings.TrimSpace(userCode))),
+		new(strings.ToUpper(strings.TrimSpace(userCode))),
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -512,8 +513,8 @@ func (h *Handler) handleAuthorizeHandoffApprove(w http.ResponseWriter, r *http.R
 	}
 	row, err := h.queries.ApproveOAuthAuthorizationHandoffByID(r.Context(), db.ApproveOAuthAuthorizationHandoffByIDParams{
 		UserUuid: util.UUIDToPg(claims.UserID),
-		OauthAuthorizationHandoffAuthorizationCode: stringPtr(code),
-		OauthAuthorizationHandoffRedirectUrl:       stringPtr(redirectURL),
+		OauthAuthorizationHandoffAuthorizationCode: &code,
+		OauthAuthorizationHandoffRedirectUrl:       &redirectURL,
 		OauthAuthorizationHandoffID:                util.UUIDToPg(id),
 	})
 	if err != nil {
@@ -629,10 +630,6 @@ func buildRedirectURL(redirectURI, code, state string) (string, error) {
 	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
-}
-
-func stringPtr(s string) *string {
-	return &s
 }
 
 func secondsRemaining(expiresAt time.Time) int {

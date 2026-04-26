@@ -42,17 +42,17 @@ type entityDetailOutput struct {
 		PricePerSquareMeter *float64 `json:"price_per_m2,omitempty"`
 
 		// Property details
-		AreaM2       *float64 `json:"area_m2,omitempty"`
-		RoomLayout   string   `json:"room_layout,omitempty"`
-		RoomsCount   *int32   `json:"rooms_count,omitempty"`
-		FloorLevel   *int32   `json:"floor_level,omitempty"`
-		TotalFloors  *int32   `json:"total_floors,omitempty"`
-		BuildYear    *int32   `json:"build_year,omitempty"`
-		Condition    string   `json:"condition,omitempty"`
-		EnergyClass  string   `json:"energy_class,omitempty"`
-		PlotType     string   `json:"plot_type,omitempty"`
-		Elevator     *bool    `json:"elevator,omitempty"`
-		Sauna        *bool    `json:"sauna,omitempty"`
+		AreaM2      *float64 `json:"area_m2,omitempty"`
+		RoomLayout  string   `json:"room_layout,omitempty"`
+		RoomsCount  *int32   `json:"rooms_count,omitempty"`
+		FloorLevel  *int32   `json:"floor_level,omitempty"`
+		TotalFloors *int32   `json:"total_floors,omitempty"`
+		BuildYear   *int32   `json:"build_year,omitempty"`
+		Condition   string   `json:"condition,omitempty"`
+		EnergyClass string   `json:"energy_class,omitempty"`
+		PlotType    string   `json:"plot_type,omitempty"`
+		Elevator    *bool    `json:"elevator,omitempty"`
+		Sauna       *bool    `json:"sauna,omitempty"`
 
 		// Monthly charges
 		MaintenanceChargeMonthly *float64 `json:"maintenance_charge_monthly,omitempty"`

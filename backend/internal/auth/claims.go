@@ -179,11 +179,12 @@ func joinScopes(scopes []string) string {
 	if len(scopes) == 0 {
 		return ""
 	}
-	out := scopes[0]
+	var out strings.Builder
+	out.WriteString(scopes[0])
 	for i := 1; i < len(scopes); i++ {
-		out += " " + scopes[i]
+		out.WriteString(" " + scopes[i])
 	}
-	return out
+	return out.String()
 }
 
 func splitScopes(scopeText string) []string {

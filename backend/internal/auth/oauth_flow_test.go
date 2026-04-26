@@ -10,7 +10,6 @@ import (
 	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -147,8 +146,4 @@ func createOAuthTestSession(t *testing.T, ctx context.Context, service *Service,
 		t.Fatalf("commit session transaction: %v", err)
 	}
 	return sessionID
-}
-
-func pgUUID(id uuid.UUID) pgtype.UUID {
-	return util.UUIDToPg(id)
 }

@@ -106,8 +106,8 @@ func (c *Consumer) enqueuePricesTask(ctx context.Context, queue *taskqueue.Queue
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		SyncTaskID: task.PricesSyncTaskID,
-		EntityID:      entityID,
-		TaskType:      taskType,
+		EntityID:   entityID,
+		TaskType:   taskType,
 	})
 	return err
 }

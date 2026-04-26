@@ -18,38 +18,37 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // ---- input/output types --------------------------------------------------------
 
 type searchListingsInput struct {
-	Query       string  `json:"query,omitempty"`
-	Address     string  `json:"address,omitempty"`
-	Source      string  `json:"source,omitempty"`
-	Kind        string  `json:"kind,omitempty"`
-	ListingType string  `json:"listing_type,omitempty"`
-	City        string  `json:"city,omitempty"`
-	Postal      string  `json:"postal,omitempty"`
-	MinPrice    *int64  `json:"min_price,omitempty"`
-	MaxPrice    *int64  `json:"max_price,omitempty"`
+	Query       string   `json:"query,omitempty"`
+	Address     string   `json:"address,omitempty"`
+	Source      string   `json:"source,omitempty"`
+	Kind        string   `json:"kind,omitempty"`
+	ListingType string   `json:"listing_type,omitempty"`
+	City        string   `json:"city,omitempty"`
+	Postal      string   `json:"postal,omitempty"`
+	MinPrice    *int64   `json:"min_price,omitempty"`
+	MaxPrice    *int64   `json:"max_price,omitempty"`
 	MinArea     *float64 `json:"min_area,omitempty"`
 	MaxArea     *float64 `json:"max_area,omitempty"`
-	Sort        string  `json:"sort,omitempty"`
-	Page        *int32  `json:"page,omitempty"`
-	PageSize    *int32  `json:"page_size,omitempty"`
+	Sort        string   `json:"sort,omitempty"`
+	Page        *int32   `json:"page,omitempty"`
+	PageSize    *int32   `json:"page_size,omitempty"`
 }
 
 type getListingDetailInput struct {
-	ID             string  `json:"id,omitempty"`
-	Input          string  `json:"input,omitempty"`
-	Source         string  `json:"source,omitempty"`
-	Kind           string  `json:"kind,omitempty"`
-	City           string  `json:"city,omitempty"`
-	Postal         string  `json:"postal,omitempty"`
-	MaxCandidates  *int32  `json:"max_candidates,omitempty"`
-	IncludeRawJSON bool    `json:"include_raw_json,omitempty"`
+	ID             string `json:"id,omitempty"`
+	Input          string `json:"input,omitempty"`
+	Source         string `json:"source,omitempty"`
+	Kind           string `json:"kind,omitempty"`
+	City           string `json:"city,omitempty"`
+	Postal         string `json:"postal,omitempty"`
+	MaxCandidates  *int32 `json:"max_candidates,omitempty"`
+	IncludeRawJSON bool   `json:"include_raw_json,omitempty"`
 }
 
 type searchTransactionsInput struct {
@@ -59,36 +58,36 @@ type searchTransactionsInput struct {
 }
 
 type searchTransactionsAdvancedInput struct {
-	City            string    `json:"city,omitempty"`
-	Query           string    `json:"query,omitempty"`
-	MunicipalityIDs []string  `json:"municipality_ids,omitempty"`
-	PostalCodeIDs   []string  `json:"postal_code_ids,omitempty"`
-	PostalCodes     []string  `json:"postal_codes,omitempty"`
-	Categories      []string  `json:"categories,omitempty"`
-	Types           []string  `json:"types,omitempty"`
-	MinPrice        *int32    `json:"min_price,omitempty"`
-	MaxPrice        *int32    `json:"max_price,omitempty"`
-	MinArea         *float64  `json:"min_area,omitempty"`
-	MaxArea         *float64  `json:"max_area,omitempty"`
-	Sort            string    `json:"sort,omitempty"`
-	Limit           *int32    `json:"limit,omitempty"`
+	City            string   `json:"city,omitempty"`
+	Query           string   `json:"query,omitempty"`
+	MunicipalityIDs []string `json:"municipality_ids,omitempty"`
+	PostalCodeIDs   []string `json:"postal_code_ids,omitempty"`
+	PostalCodes     []string `json:"postal_codes,omitempty"`
+	Categories      []string `json:"categories,omitempty"`
+	Types           []string `json:"types,omitempty"`
+	MinPrice        *int32   `json:"min_price,omitempty"`
+	MaxPrice        *int32   `json:"max_price,omitempty"`
+	MinArea         *float64 `json:"min_area,omitempty"`
+	MaxArea         *float64 `json:"max_area,omitempty"`
+	Sort            string   `json:"sort,omitempty"`
+	Limit           *int32   `json:"limit,omitempty"`
 }
 
 type matchAdsFromTransactionInput struct {
-	TransactionID    string   `json:"transaction_id,omitempty"`
-	City             string   `json:"city,omitempty"`
-	PostalCode       string   `json:"postal_code,omitempty"`
-	Area             *float64 `json:"area,omitempty"`
-	Price            *int64   `json:"price,omitempty"`
-	RoomHint         string   `json:"room_hint,omitempty"`
-	Query            string   `json:"query,omitempty"`
-	Source           string   `json:"source,omitempty"`
-	Kind             string   `json:"kind,omitempty"`
-	ListingType      string   `json:"listing_type,omitempty"`
-	AreaTolerance    *float64 `json:"area_tolerance,omitempty"`
+	TransactionID     string   `json:"transaction_id,omitempty"`
+	City              string   `json:"city,omitempty"`
+	PostalCode        string   `json:"postal_code,omitempty"`
+	Area              *float64 `json:"area,omitempty"`
+	Price             *int64   `json:"price,omitempty"`
+	RoomHint          string   `json:"room_hint,omitempty"`
+	Query             string   `json:"query,omitempty"`
+	Source            string   `json:"source,omitempty"`
+	Kind              string   `json:"kind,omitempty"`
+	ListingType       string   `json:"listing_type,omitempty"`
+	AreaTolerance     *float64 `json:"area_tolerance,omitempty"`
 	PriceTolerancePct *float64 `json:"price_tolerance_pct,omitempty"`
-	MaxCandidates    *int32   `json:"max_candidates,omitempty"`
-	MaxResults       *int32   `json:"max_results,omitempty"`
+	MaxCandidates     *int32   `json:"max_candidates,omitempty"`
+	MaxResults        *int32   `json:"max_results,omitempty"`
 }
 
 type emptyInput struct{}
@@ -103,9 +102,9 @@ func (t *toolImpl) searchListingsTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Search Listings",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -118,9 +117,9 @@ func (t *toolImpl) getListingDetailTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Get Listing Detail",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -133,9 +132,9 @@ func (t *toolImpl) searchTransactionsTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Search Transactions",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -148,9 +147,9 @@ func (t *toolImpl) searchTransactionsAdvancedTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Search Transactions (Advanced)",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -163,9 +162,9 @@ func (t *toolImpl) matchAdsFromTransactionTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Match Listings from Transaction",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -178,9 +177,9 @@ func (t *toolImpl) listCitiesTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "List Cities",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -193,9 +192,9 @@ func (t *toolImpl) listAvailableLocationsTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "List Available Locations",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -208,9 +207,9 @@ func (t *toolImpl) listCategoriesTool() *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "List Categories",
 			ReadOnlyHint:    true,
-			DestructiveHint: boolPtr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
-			OpenWorldHint:   boolPtr(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -524,7 +523,6 @@ func (t *toolImpl) listCategories(ctx context.Context, _ *mcp.CallToolRequest, _
 type toolImplConfig struct {
 	shortcutSitemapBase  string
 	frontdoorSitemapBase string
-	pool                 *pgxpool.Pool
 }
 
 func (t *toolImpl) resolveDetailInput(ctx context.Context, input string, in getListingDetailInput) (string, error) {

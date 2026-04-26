@@ -74,8 +74,8 @@ func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, queue *taskqueue.Qu
 	}
 	_, err = queue.Send(ctx, taskqueue.MessageData{
 		SyncTaskID: task.FrontdoorSyncTaskID,
-		EntityID:      entityID,
-		TaskType:      taskType,
+		EntityID:   entityID,
+		TaskType:   taskType,
 	})
 	return err
 }

@@ -194,21 +194,21 @@ func (r rawConfig) toConfig() Config {
 // Config is the structured application configuration. Its shape is stable; all
 // env-var parsing details live in rawConfig.
 type Config struct {
-	Host            string
-	Port            string
-	ShutdownTimeout time.Duration
-	Environment     Environment
-	LogLevel        string
-	Mode            AppMode
-	DatabaseURL     string
-	Auth            AuthConfig
-	Prices          PricesConfig
-	Shortcut        ShortcutConfig
-	Frontdoor       FrontdoorConfig
-	OpenRouter      OpenRouterConfig
-	Telegram        TelegramConfig
-	Redis           RedisConfig
-	Telemetry       TelemetryConfig
+	Host                     string
+	Port                     string
+	ShutdownTimeout          time.Duration
+	Environment              Environment
+	LogLevel                 string
+	Mode                     AppMode
+	DatabaseURL              string
+	Auth                     AuthConfig
+	Prices                   PricesConfig
+	Shortcut                 ShortcutConfig
+	Frontdoor                FrontdoorConfig
+	OpenRouter               OpenRouterConfig
+	Telegram                 TelegramConfig
+	Redis                    RedisConfig
+	Telemetry                TelemetryConfig
 	WebBaseURL               string
 	WebStaticDir             string
 	MCPAuthToken             string

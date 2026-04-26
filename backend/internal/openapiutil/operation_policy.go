@@ -132,11 +132,7 @@ func ensureIdempotencyHeaderParameter(op *huma.Operation) {
 		Required:    true,
 		Schema: &huma.Schema{
 			Type:      "string",
-			MinLength: ptr(1),
+			MinLength: new(1),
 		},
 	})
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

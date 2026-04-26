@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ScopeCoreRead    = "core:read"
-	ScopeMCPCoreRead = "mcp:core:read"
-	ScopeProfileRead = "profile:read"
+	ScopeCoreRead     = "core:read"
+	ScopeMCPCoreRead  = "mcp:core:read"
+	ScopeProfileRead  = "profile:read"
 	ScopeProfileWrite = "profile:write"
 )
 

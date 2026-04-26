@@ -26,7 +26,7 @@ const (
 	grantAppleCode         = "urn:koditon:params:oauth:grant-type:apple_authorization_code"
 	grantEmailAuthTicket   = "urn:koditon:params:oauth:grant-type:email_auth_ticket"
 	grantPasskeyAssertion  = "urn:koditon:params:oauth:grant-type:passkey_assertion"
-	koditonCLIClientID        = "koditon-cli"
+	koditonCLIClientID     = "koditon-cli"
 	dcrRateLimitPerMinute  = 30
 	devicePollInterval     = 5 * time.Second
 	devicePollSlowDownStep = 5 * time.Second
@@ -193,7 +193,7 @@ func recoverMalformedOAuthPath(r *http.Request) (string, bool) {
 
 	for _, candidate := range candidates {
 		decoded := strings.TrimSpace(candidate)
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			next, err := url.PathUnescape(decoded)
 			if err != nil || next == decoded {
 				break

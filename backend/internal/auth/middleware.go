@@ -14,18 +14,18 @@ func ScopedAuthMiddlewareFactory(api huma.API, svc *Service) func(requiredScopes
 			raw := ctx.Header("Authorization")
 			token := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "Bearer "))
 			if token == "" {
-				huma.WriteErr(api, ctx, 401, "missing bearer token")
+				_ = huma.WriteErr(api, ctx, 401, "missing bearer token")
 				return
 			}
 			claims, err := svc.VerifyAccessToken(ctx.Context(), token)
 			if err != nil {
-				huma.WriteErr(api, ctx, 401, "invalid bearer token")
+				_ = huma.WriteErr(api, ctx, 401, "invalid bearer token")
 				return
 			}
 			if len(requiredScopes) > 0 {
 				allowed := LimitScopes(ScopesForRoles(claims.Roles), claims.Scopes)
 				if !HasScopes(allowed, requiredScopes) {
-					huma.WriteErr(api, ctx, 403, "insufficient scope")
+					_ = huma.WriteErr(api, ctx, 403, "insufficient scope")
 					return
 				}
 			}

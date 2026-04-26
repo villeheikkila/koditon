@@ -346,7 +346,6 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	}, nil
 }
 
-
 type SignInWithAppleWebRequest struct {
 	AuthorizationCode string
 	DeviceID          uuid.UUID
@@ -539,7 +538,7 @@ func (s *Service) RevokeOAuthRefreshToken(ctx context.Context, token string) err
 	ctx, span := startSpan(ctx, "auth.revoke_oauth_refresh_token")
 	defer span.End()
 	tokenHash := hashSHA256Hex(token)
-	row, err := s.queries.RevokeOAuthRefreshTokenByHash(ctx, oauthStringPtr(tokenHash))
+	row, err := s.queries.RevokeOAuthRefreshTokenByHash(ctx, &tokenHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// RFC 7009: the server responds with HTTP 200 even if the token
@@ -571,8 +570,8 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 		return nil
 	}
 	row, err := s.queries.RevokeOAuthRefreshTokenByHashAndClientID(ctx, db.RevokeOAuthRefreshTokenByHashAndClientIDParams{
-		OauthRefreshTokenTokenHash: oauthStringPtr(hashSHA256Hex(token)),
-		OauthClientID:              oauthStringPtr(clientID),
+		OauthRefreshTokenTokenHash: new(hashSHA256Hex(token)),
+		OauthClientID:              new(clientID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

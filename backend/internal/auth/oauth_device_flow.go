@@ -85,20 +85,22 @@ func (s *Service) CreateOAuthDeviceAuthorization(ctx context.Context, req OAuthC
 		return nil, fmt.Errorf("generate device_code: %w", err)
 	}
 	deviceCodeHash := hashSHA256Hex(deviceCode)
+	clientID := strings.TrimSpace(req.ClientID)
+	audience := strings.TrimSpace(req.Audience)
 	expiresAt := time.Now().Add(OAuthDeviceCodeTTL)
 
 	var userCode string
-	for attempts := 0; attempts < 5; attempts++ {
+	for range 5 {
 		candidate, codeErr := randomUserCode(8)
 		if codeErr != nil {
 			return nil, fmt.Errorf("generate user_code: %w", codeErr)
 		}
 		_, execErr := s.queries.CreateOAuthDeviceAuthorization(ctx, db.CreateOAuthDeviceAuthorizationParams{
-			OauthDeviceAuthorizationDeviceCodeHash: oauthStringPtr(deviceCodeHash),
-			OauthClientID:                          oauthStringPtr(strings.TrimSpace(req.ClientID)),
-			OauthDeviceAuthorizationUserCode:       oauthStringPtr(candidate),
+			OauthDeviceAuthorizationDeviceCodeHash: &deviceCodeHash,
+			OauthClientID:                          &clientID,
+			OauthDeviceAuthorizationUserCode:       new(candidate),
 			OauthDeviceAuthorizationScopes:         req.Scopes,
-			OauthDeviceAuthorizationAudience:       oauthStringPtr(strings.TrimSpace(req.Audience)),
+			OauthDeviceAuthorizationAudience:       &audience,
 			OauthDeviceAuthorizationExpiresAt:      util.TimeToPg(expiresAt),
 		})
 		if execErr == nil {
@@ -127,7 +129,7 @@ func (s *Service) ApproveOAuthDeviceAuthorization(ctx context.Context, req OAuth
 	}
 	userCode := strings.ToUpper(strings.TrimSpace(req.UserCode))
 
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, oauthStringPtr(userCode))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidRequest
@@ -146,7 +148,7 @@ func (s *Service) ApproveOAuthDeviceAuthorization(ctx context.Context, req OAuth
 
 	_, err = s.queries.ApproveOAuthDeviceAuthorizationByUserCode(ctx, db.ApproveOAuthDeviceAuthorizationByUserCodeParams{
 		UserUuid:                         util.UUIDToPg(req.UserID),
-		OauthDeviceAuthorizationUserCode: oauthStringPtr(userCode),
+		OauthDeviceAuthorizationUserCode: &userCode,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -162,7 +164,7 @@ func (s *Service) DenyOAuthDeviceAuthorization(ctx context.Context, req OAuthDen
 		return ErrOAuthInvalidRequest
 	}
 	userCode := strings.ToUpper(strings.TrimSpace(req.UserCode))
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, oauthStringPtr(userCode))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidRequest
@@ -180,7 +182,7 @@ func (s *Service) DenyOAuthDeviceAuthorization(ctx context.Context, req OAuthDen
 			return ErrOAuthInvalidGrant
 		}
 	}
-	_, err = s.queries.DenyOAuthDeviceAuthorizationByUserCode(ctx, oauthStringPtr(userCode))
+	_, err = s.queries.DenyOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidGrant
@@ -195,7 +197,7 @@ func (s *Service) GetOAuthDeviceAuthorizationDetailsByUserCode(ctx context.Conte
 	if trimmedCode == "" {
 		return nil, ErrOAuthInvalidRequest
 	}
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, oauthStringPtr(trimmedCode))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, new(trimmedCode))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOAuthInvalidRequest
@@ -234,7 +236,7 @@ func (s *Service) GetOAuthDeviceAuthorizationStatus(ctx context.Context, clientI
 		return OAuthDeviceAuthorizationStatusPending, ErrOAuthInvalidRequest
 	}
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(deviceCode))
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, oauthStringPtr(deviceCodeHash))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OAuthDeviceAuthorizationStatusPending, ErrOAuthInvalidGrant
@@ -263,7 +265,7 @@ func (s *Service) ExchangeOAuthDeviceCode(ctx context.Context, req OAuthExchange
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(req.DeviceCode))
 	clientID := strings.TrimSpace(req.ClientID)
 
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, oauthStringPtr(deviceCodeHash))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOAuthInvalidGrant
@@ -308,8 +310,7 @@ func (s *Service) ConsumeApprovedOAuthDeviceCode(ctx context.Context, req OAuthC
 	}
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(req.DeviceCode))
 	clientID := strings.TrimSpace(req.ClientID)
-
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, oauthStringPtr(deviceCodeHash))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, ErrOAuthInvalidGrant
@@ -373,7 +374,7 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 	defer rollbackTx(ctx, s.logger, tx)
 
 	qtx := s.queries.WithTx(tx)
-	row, err := qtx.GetOAuthDeviceAuthorizationByUserCode(ctx, oauthStringPtr(userCode))
+	row, err := qtx.GetOAuthDeviceAuthorizationByUserCode(ctx, new(userCode))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrOAuthInvalidRequest
@@ -408,15 +409,16 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 		return "", fmt.Errorf("generate oauth authorization code: %w", err)
 	}
 	codeHash := hashSHA256Hex(code)
+	audience := strings.TrimSpace(req.Audience)
 	if _, err := qtx.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            oauthStringPtr(codeHash),
-		OauthClientID:                             oauthStringPtr(clientID),
+		OauthAuthorizationCodeCodeHash:            &codeHash,
+		OauthClientID:                             &clientID,
 		UserUuid:                                  util.UUIDToPg(req.UserID),
-		OauthAuthorizationCodeRedirectUri:         oauthStringPtr(redirectURI),
+		OauthAuthorizationCodeRedirectUri:         &redirectURI,
 		OauthAuthorizationCodeScopes:              req.Scopes,
-		OauthAuthorizationCodeAudience:            oauthStringPtr(strings.TrimSpace(req.Audience)),
-		OauthAuthorizationCodeCodeChallenge:       oauthStringPtr(codeChallenge),
-		OauthAuthorizationCodeCodeChallengeMethod: oauthStringPtr(codeChallengeMethod),
+		OauthAuthorizationCodeAudience:            &audience,
+		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
 		OauthAuthorizationCodeExpiresAt:           util.TimeToPg(time.Now().Add(OAuthAuthorizationCodeTTL)),
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)

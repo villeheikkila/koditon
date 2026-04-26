@@ -1,6 +1,6 @@
 [tools]
 air           = "latest"
-golangci-lint = "latest"
+golangci-lint = "2"
 gofumpt       = "latest"
 sqlc          = "latest"
 "go:golang.org/x/tools/cmd/goimports"  = "latest"
@@ -189,6 +189,10 @@ golangci-lint run ./... --fix --timeout=5m
 description = "Run static analysis"
 run = "golangci-lint run ./... --timeout=5m"
 
+[tasks."lint:logging"]
+description = "Run slog logging style checks"
+run = "golangci-lint run ./... --enable-only=sloglint --timeout=5m"
+
 [tasks.deadcode]
 description = "Find unreachable functions"
 run = "deadcode ./..."
@@ -209,7 +213,7 @@ git diff --exit-code -- go.mod go.sum
 """
 
 [tasks.deps]
-description = "Update deps, tidy, and check vulns"
+description = "Update deps within current import-path major lines, tidy, and check vulns"
 run = """
 go get -u ./...
 go mod tidy
@@ -217,7 +221,20 @@ govulncheck ./...
 """
 
 [tasks."update-dependencies"]
-description = "Interactive dependency updater"
+description = "Update dependencies to the latest available versions, then tidy, fix, test, and check vulns"
+run = """
+go-mod-upgrade --force
+go mod tidy
+go fix ./...
+gofumpt -w .
+goimports -w .
+golangci-lint run ./... --fix --timeout=5m
+go test ./...
+govulncheck ./...
+"""
+
+[tasks."update-dependencies:interactive"]
+description = "Interactively review available dependency upgrades"
 run = "go-mod-upgrade"
 
 # ---------- build ----------

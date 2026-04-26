@@ -32,4 +32,3 @@ func TestBuildBearerChallengeOmitsScopeForUnauthorized(t *testing.T) {
 		t.Fatalf("challenge unexpectedly includes scope for 401: %q", challenge)
 	}
 }
-

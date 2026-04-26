@@ -80,15 +80,20 @@ func (s *Service) CreateOAuthAuthorizationCode(ctx context.Context, req OAuthCre
 		return "", fmt.Errorf("generate oauth authorization code: %w", err)
 	}
 	codeHash := hashSHA256Hex(code)
+	clientID := strings.TrimSpace(req.ClientID)
+	redirectURI := strings.TrimSpace(req.RedirectURI)
+	audience := strings.TrimSpace(req.Audience)
+	codeChallenge := strings.TrimSpace(req.CodeChallenge)
+	codeChallengeMethod := strings.TrimSpace(req.CodeChallengeMethod)
 	if _, err := s.queries.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            oauthStringPtr(codeHash),
-		OauthClientID:                             oauthStringPtr(strings.TrimSpace(req.ClientID)),
+		OauthAuthorizationCodeCodeHash:            &codeHash,
+		OauthClientID:                             &clientID,
 		UserUuid:                                  util.UUIDToPg(req.UserID),
-		OauthAuthorizationCodeRedirectUri:         oauthStringPtr(strings.TrimSpace(req.RedirectURI)),
+		OauthAuthorizationCodeRedirectUri:         &redirectURI,
 		OauthAuthorizationCodeScopes:              req.Scopes,
-		OauthAuthorizationCodeAudience:            oauthStringPtr(strings.TrimSpace(req.Audience)),
-		OauthAuthorizationCodeCodeChallenge:       oauthStringPtr(strings.TrimSpace(req.CodeChallenge)),
-		OauthAuthorizationCodeCodeChallengeMethod: oauthStringPtr(strings.TrimSpace(req.CodeChallengeMethod)),
+		OauthAuthorizationCodeAudience:            &audience,
+		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
 		OauthAuthorizationCodeExpiresAt:           util.TimeToPg(time.Now().Add(OAuthAuthorizationCodeTTL)),
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)
@@ -105,13 +110,16 @@ func (s *Service) ExchangeOAuthAuthorizationCode(ctx context.Context, req OAuthE
 		return nil, ErrOAuthInvalidRequest
 	}
 	codeChallenge := pkceS256Challenge(codeVerifier)
+	codeHash := hashSHA256Hex(code)
+	audience := strings.TrimSpace(req.Audience)
+	codeChallengeMethod := "S256"
 	row, err := s.queries.ConsumeOAuthAuthorizationCode(ctx, db.ConsumeOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            oauthStringPtr(hashSHA256Hex(code)),
-		OauthClientID:                             oauthStringPtr(clientID),
-		OauthAuthorizationCodeRedirectUri:         oauthStringPtr(redirectURI),
-		OauthAuthorizationCodeAudience:            oauthStringPtr(strings.TrimSpace(req.Audience)),
-		OauthAuthorizationCodeCodeChallenge:       oauthStringPtr(codeChallenge),
-		OauthAuthorizationCodeCodeChallengeMethod: oauthStringPtr("S256"),
+		OauthAuthorizationCodeCodeHash:            &codeHash,
+		OauthClientID:                             &clientID,
+		OauthAuthorizationCodeRedirectUri:         &redirectURI,
+		OauthAuthorizationCodeAudience:            &audience,
+		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -244,11 +252,11 @@ func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID 
 	}
 	expiresAt := time.Now().Add(ttl)
 	if _, err := queries.CreateOAuthRefreshToken(ctx, db.CreateOAuthRefreshTokenParams{
-		OauthRefreshTokenTokenHash:   oauthStringPtr(hashSHA256Hex(refreshToken)),
-		OauthClientID:                oauthStringPtr(clientID),
+		OauthRefreshTokenTokenHash:   new(hashSHA256Hex(refreshToken)),
+		OauthClientID:                new(clientID),
 		UserUuid:                     util.UUIDToPg(userID),
 		OauthRefreshTokenScopes:      scopes,
-		OauthRefreshTokenAudience:    oauthStringPtr(strings.TrimSpace(audience)),
+		OauthRefreshTokenAudience:    new(strings.TrimSpace(audience)),
 		OauthRefreshTokenExpiresAt:   util.TimeToPg(expiresAt),
 		OauthRefreshTokenRotatedFrom: util.UUIDToPg(rotatedFrom),
 	}); err != nil {
@@ -276,8 +284,4 @@ func randomURLSafeToken(size int) (string, error) {
 func hashSHA256Hex(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:])
-}
-
-func oauthStringPtr(value string) *string {
-	return &value
 }

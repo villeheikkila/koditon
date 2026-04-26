@@ -39,10 +39,6 @@ type mcpJSONRPCRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-type mcpToolCallParams struct {
-	Name string `json:"name"`
-}
-
 func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *auth.Service) *Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -65,14 +61,14 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	}
 
 	toolSecurityScopes := map[string][]string{
-		"koditon_search_listings":            {auth.ScopeMCPCoreRead},
-		"koditon_get_listing_detail":         {auth.ScopeMCPCoreRead},
-		"koditon_search_transactions":        {auth.ScopeMCPCoreRead},
+		"koditon_search_listings":              {auth.ScopeMCPCoreRead},
+		"koditon_get_listing_detail":           {auth.ScopeMCPCoreRead},
+		"koditon_search_transactions":          {auth.ScopeMCPCoreRead},
 		"koditon_search_transactions_advanced": {auth.ScopeMCPCoreRead},
-		"koditon_match_ads_from_transaction": {auth.ScopeMCPCoreRead},
-		"koditon_list_cities":                {auth.ScopeMCPCoreRead},
-		"koditon_list_available_locations":   {auth.ScopeMCPCoreRead},
-		"koditon_list_categories":            {auth.ScopeMCPCoreRead},
+		"koditon_match_ads_from_transaction":   {auth.ScopeMCPCoreRead},
+		"koditon_list_cities":                  {auth.ScopeMCPCoreRead},
+		"koditon_list_available_locations":     {auth.ScopeMCPCoreRead},
+		"koditon_list_categories":              {auth.ScopeMCPCoreRead},
 	}
 
 	mcp.AddTool(server, impl.searchListingsTool(), impl.searchListings)
@@ -295,22 +291,6 @@ func oauthToolSecuritySchemes(requiredScopes []string) []map[string]any {
 	return []map[string]any{{"type": "oauth2", "scopes": append([]string(nil), requiredScopes...)}}
 }
 
-func mergeRequiredScopes(primary, additional []string) []string {
-	seen := make(map[string]struct{}, len(primary)+len(additional))
-	merged := make([]string, 0, len(primary)+len(additional))
-	for _, s := range append(primary, additional...) {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		if _, exists := seen[s]; !exists {
-			seen[s] = struct{}{}
-			merged = append(merged, s)
-		}
-	}
-	return merged
-}
-
 func wrapToolsListSecuritySchemes(next http.Handler, securityScopesByTool map[string][]string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &bufferedResponse{header: make(http.Header)}
@@ -390,8 +370,6 @@ type toolImpl struct {
 	config  toolImplConfig
 	logger  *slog.Logger
 }
-
-func boolPtr(b bool) *bool { return &b }
 
 func newToolResultError(msg string) *mcp.CallToolResult {
 	r := &mcp.CallToolResult{}

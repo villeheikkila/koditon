@@ -125,37 +125,6 @@ func (s *Service) BeginPasskeyAuthentication(ctx context.Context) (*BeginPasskey
 	return s.createPasskeyAuthenticationChallenge(ctx, assertion.Response, session, uuid.Nil, nil, nil)
 }
 
-func (s *Service) beginPasskeyAuthenticationForUser(
-	ctx context.Context,
-	userID uuid.UUID,
-	displayName string,
-	verifiedEmail string,
-	passkeys []db.ListPasskeysByUserIDRow,
-) (*BeginPasskeyAuthenticateResponse, error) {
-	if s.passkeyService == nil {
-		return nil, ErrPasskeyConfig
-	}
-	if len(passkeys) == 0 {
-		return nil, ErrPasskeyNotFound
-	}
-
-	handle := passkeys[0].UserPasskeyUserHandle
-	credentials := make([]wbauthn.Credential, 0, len(passkeys))
-	for _, row := range passkeys {
-		credentials = append(credentials, passkeyListRowToCredential(row))
-	}
-	assertion, session, err := s.passkeyService.BeginAuthentication(passkey.User{
-		ID:          handle,
-		Name:        displayName,
-		DisplayName: displayName,
-		Credentials: credentials,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("begin scoped login: %w", err)
-	}
-	return s.createPasskeyAuthenticationChallenge(ctx, assertion.Response, session, userID, handle, stringPtr(verifiedEmail))
-}
-
 func (s *Service) createPasskeyAuthenticationChallenge(
 	ctx context.Context,
 	assertion protocol.PublicKeyCredentialRequestOptions,
