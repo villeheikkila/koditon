@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"koditon-go/internal/logging"
 )
 
 type SitemapURLType string
@@ -59,7 +61,7 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]ShortcutSitemapEntry,
 		for _, loc := range extractLocs(sitemapXML) {
 			entry, ok := parseShortcutEntry(loc)
 			if !ok {
-				c.logger.Warn("unknown URL pattern in sitemap, skipping", "url", loc)
+				logging.With(c.logger, logging.Op("shortcut.sitemap.parse")).Warn("unknown url pattern in sitemap, skipping", "url", loc)
 				continue
 			}
 			entries = append(entries, *entry)

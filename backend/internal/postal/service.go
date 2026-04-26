@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/postal/client"
 )
 
@@ -35,12 +36,13 @@ func (s *Service) Sync(ctx context.Context, logger *slog.Logger) (*SyncResult, e
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger.InfoContext(ctx, "fetching postal codes from Posti")
+	logger = logging.With(logger, logging.Op("postal.sync"))
+	logger.InfoContext(ctx, "postal code fetch started", "provider", "posti")
 	records, err := s.client.FetchPostalCodes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetch postal codes: %w", err)
 	}
-	logger.InfoContext(ctx, "fetched postal codes", "count", len(records))
+	logger.InfoContext(ctx, "postal codes fetched", "count", len(records))
 	adAreaParams := extractAdAreas(records)
 	adAreaRows, err := s.queries.UpsertPostalAdAreasBulk(ctx, *adAreaParams)
 	if err != nil {
@@ -50,7 +52,7 @@ func (s *Service) Sync(ctx context.Context, logger *slog.Logger) (*SyncResult, e
 	for _, row := range adAreaRows {
 		adAreaIDs[row.PostalAdAreaCode] = row.PostalAdAreaID
 	}
-	logger.InfoContext(ctx, "upserted ad areas", "count", len(adAreaRows))
+	logger.InfoContext(ctx, "postal ad areas upserted", "count", len(adAreaRows))
 	municipalityParams := extractMunicipalities(records)
 	municipalityRows, err := s.queries.UpsertPostalMunicipalitiesBulk(ctx, *municipalityParams)
 	if err != nil {
@@ -60,17 +62,18 @@ func (s *Service) Sync(ctx context.Context, logger *slog.Logger) (*SyncResult, e
 	for _, row := range municipalityRows {
 		municipalityIDs[row.PostalMunicipalityCode] = row.PostalMunicipalityID
 	}
-	logger.InfoContext(ctx, "upserted municipalities", "count", len(municipalityRows))
+	logger.InfoContext(ctx, "postal municipalities upserted", "count", len(municipalityRows))
 	postalCodeParams := mapUpsertPostalCodesBulkParams(records, adAreaIDs, municipalityIDs)
 	skipped := len(records) - len(postalCodeParams.Codes)
 	upserted, err := s.queries.UpsertPostalPostalCodesBulk(ctx, postalCodeParams)
 	if err != nil {
 		return nil, fmt.Errorf("upsert postal codes: %w", err)
 	}
-	logger.InfoContext(ctx, "synced postal codes",
+	logger.InfoContext(ctx, "postal codes synced",
 		"total", len(records),
 		"upserted", upserted,
 		"skipped", skipped,
+		"outcome", logging.OutcomeSuccess,
 	)
 	return &SyncResult{
 		TotalRecords:           len(records),

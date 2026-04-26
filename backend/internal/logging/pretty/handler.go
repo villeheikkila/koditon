@@ -318,7 +318,7 @@ func (h *Handler) renderStringValue(key, value string) string {
 	switch key {
 	case "method":
 		return h.methodStyle(value).Render(clean)
-	case "request_id", "trace_id", "span_id":
+	case "request_id", "worker_id", "sync_task_id", "message_id", "job_id", "task_id", "user_id":
 		return h.styles.IDValue.Render(clean)
 	default:
 		if isErrorKey(key) {
@@ -462,14 +462,19 @@ func orderedAttrKeys(attrs map[string]slog.Value) []string {
 		keys = append(keys, key)
 	}
 	priority := map[string]int{
-		"request_id": 0,
-		"trace_id":   1,
-		"span_id":    2,
-		"method":     3,
-		"path":       4,
-		"status":     5,
-		"duration":   6,
-		"error":      7,
+		"request_id":   0,
+		"op":           1,
+		"outcome":      2,
+		"method":       3,
+		"route":        4,
+		"path":         5,
+		"status":       6,
+		"duration_ms":  7,
+		"queue":        8,
+		"worker_id":    9,
+		"sync_task_id": 10,
+		"message_id":   11,
+		"error":        12,
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		pi, iok := priority[keys[i]]

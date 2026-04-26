@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+
+	"koditon-go/internal/logging"
 )
 
 type PingRequest struct {
@@ -21,7 +23,7 @@ type pingOutput struct {
 }
 
 func (a *API) pingHandler(ctx context.Context, input *pingInput) (*pingOutput, error) {
-	a.logger.InfoContext(ctx, "ping received", "message", input.Body.Message)
+	logging.With(a.logger, logging.Op("api.ping")).InfoContext(ctx, "ping received", "message_length", len(input.Body.Message))
 	return &pingOutput{
 		Body: PingResponse{Echo: input.Body.Message},
 	}, nil

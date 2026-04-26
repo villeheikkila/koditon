@@ -16,12 +16,13 @@ func TestHandlerOrdersPriorityAttributes(t *testing.T) {
 	})
 	logger := slog.New(handler).With("component", "server")
 	logger.Info("request completed",
-		"path", "/v1/products",
-		"duration", 150*time.Millisecond,
-		"status", 201,
 		"request_id", "req-1",
-		"span_id", "span-1",
-		"trace_id", "trace-1",
+		"op", "request.handle",
+		"outcome", "success",
+		"path", "/v1/products",
+		"route", "/v1/products",
+		"status", 201,
+		"duration_ms", 150,
 	)
 	logLine := strings.TrimSpace(out.String())
 	if strings.Contains(logLine, "component=") {
@@ -29,11 +30,12 @@ func TestHandlerOrdersPriorityAttributes(t *testing.T) {
 	}
 	wantOrder := []string{
 		"request_id=req-1",
-		"trace_id=trace-1",
-		"span_id=span-1",
+		"op=request.handle",
+		"outcome=success",
+		"route=/v1/products",
 		"path=/v1/products",
 		"status=201",
-		"duration=150ms",
+		"duration_ms=150",
 	}
 	assertInOrder(t, logLine, wantOrder)
 }

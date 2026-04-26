@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/taskqueue"
 )
 
@@ -15,7 +16,11 @@ const (
 )
 
 func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
+	logger := logging.With(c.logger,
+		slog.String("task_type", msg.Data.TaskType),
+		slog.String("entity_id", msg.Data.EntityID),
+		slog.Int64("sync_task_id", msg.Data.SyncTaskID),
+	)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypeFrontdoorSitemapSync:
@@ -32,9 +37,10 @@ func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Messag
 }
 
 func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.frontdoor.sitemap_sync"))
 	adIDs, buildingIDs, err := c.syncRunner.FrontdoorSitemap(ctx)
 	if err != nil {
-		logger.ErrorContext(ctx, "frontdoor sitemap sync failed", "error", err)
+		logger.ErrorContext(ctx, "frontdoor sitemap sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
 	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
@@ -49,16 +55,17 @@ func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.
 			enqueueErrors++
 		}
 	}
-	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors)
+	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
 func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.frontdoor.entity_sync"))
 	if err := c.syncRunner.FrontdoorSyncEntity(ctx, msg.Data.EntityID); err != nil {
-		logger.ErrorContext(ctx, "frontdoor sync failed", "entity_id", msg.Data.EntityID, "error", err)
+		logger.ErrorContext(ctx, "frontdoor sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
-	logger.InfoContext(ctx, "frontdoor entity synced", "entity_id", msg.Data.EntityID)
+	logger.InfoContext(ctx, "frontdoor entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 

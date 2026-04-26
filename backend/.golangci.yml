@@ -6,4 +6,6 @@ linters:
     - sloglint
   settings:
     sloglint:
+      static-msg: true
+      key-naming-case: snake
       no-mixed-args: true

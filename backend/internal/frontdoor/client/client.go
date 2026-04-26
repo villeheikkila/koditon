@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"koditon-go/internal/logging"
 )
 
 const (
@@ -264,7 +266,7 @@ func (c *Client) parseEntry(logger *slog.Logger, raw string) (*SitemapEntry, boo
 	if remaining, ok := strings.CutPrefix(raw, buildingPrefix); ok {
 		id := trimAfterSeparators(remaining)
 		if strings.Contains(id, "-") {
-			logger.Warn("skipping building entry with hyphen in ID", "id", id, "url", raw)
+			logging.With(logger, logging.Op("frontdoor.sitemap.parse")).Warn("skipping building entry with hyphen in id", "id", id, "url", raw)
 			return nil, false
 		}
 		return &SitemapEntry{ID: id, Type: EntryTypeBuilding, URL: u}, true

@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"koditon-go/internal/logging"
+
 	"github.com/google/uuid"
 )
 
@@ -69,16 +71,16 @@ func NewWorker(queue *Queue, handler TaskHandler, config WorkerConfig) *Worker {
 		workerID: workerID,
 		handler:  handler,
 		config:   config,
-		logger:   logger.With("worker_id", workerID, "queue", queue.Name()),
+		logger:   logging.With(logger, slog.String("worker_id", workerID), slog.String("queue", queue.Name())),
 		stopCh:   make(chan struct{}),
 		doneCh:   make(chan struct{}),
 	}
 }
 
 func (w *Worker) Start(ctx context.Context) {
-	w.logger.InfoContext(ctx, "worker starting")
+	w.logger.LogAttrs(ctx, slog.LevelInfo, "worker starting", logging.Op("worker.start"))
 	if err := w.queue.EnsureQueue(ctx); err != nil {
-		w.logger.ErrorContext(ctx, "failed to ensure queue exists", "error", err)
+		w.logger.LogAttrs(ctx, slog.LevelError, "ensure queue failed", logging.Op("worker.start"), logging.Outcome(logging.OutcomeError), logging.Error(err))
 		close(w.doneCh)
 		return
 	}
@@ -87,16 +89,16 @@ func (w *Worker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			w.logger.InfoContext(ctx, "context cancelled, shutting down")
+			w.logger.LogAttrs(ctx, slog.LevelInfo, "worker stopping", logging.Op("worker.stop"), logging.Outcome(logging.OutcomeCancelled))
 			close(w.doneCh)
 			return
 		case <-w.stopCh:
-			w.logger.InfoContext(ctx, "stop signal received, shutting down")
+			w.logger.LogAttrs(ctx, slog.LevelInfo, "worker stopping", logging.Op("worker.stop"), logging.Outcome(logging.OutcomeSuccess))
 			close(w.doneCh)
 			return
 		case <-ticker.C:
 			if err := w.processNext(ctx); err != nil {
-				w.logger.WarnContext(ctx, "error processing task", "error", err)
+				w.logger.LogAttrs(ctx, slog.LevelWarn, "worker poll failed", logging.Op("worker.poll"), logging.Outcome(logging.OutcomeError), logging.Error(err))
 			}
 		}
 	}
@@ -122,18 +124,22 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 		return nil
 	}
 	taskLogger := w.logger.With(
-		"sync_task_id", msg.Data.SyncTaskID,
-		"entity_id", msg.Data.EntityID,
-		"task_type", msg.Data.TaskType,
-		"attempt", msg.Data.Attempt,
-		"message_id", msg.MessageID,
+		logging.Args(
+			logging.Op("task.process"),
+			slog.Int64("sync_task_id", msg.Data.SyncTaskID),
+			slog.String("entity_id", msg.Data.EntityID),
+			slog.String("task_type", msg.Data.TaskType),
+			slog.Int("attempt", int(msg.Data.Attempt)),
+			slog.Int64("message_id", msg.MessageID),
+			slog.Int("read_count", int(msg.ReadCount)),
+		)...,
 	)
-	taskLogger.InfoContext(ctx, "received task")
+	taskLogger.InfoContext(ctx, "task received")
 
 	// Mark pending task as processing
 	if cb := w.config.Callbacks; cb != nil && cb.OnProcessing != nil && msg.Data.SyncTaskID > 0 {
 		if err := cb.OnProcessing(ctx, msg.Data.SyncTaskID); err != nil {
-			taskLogger.WarnContext(ctx, "failed to mark task as processing", "error", err)
+			taskLogger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", logging.Outcome(logging.OutcomeError), slog.String("status", "processing"), logging.Error(err))
 		}
 	}
 
@@ -142,23 +148,22 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	processingErr := w.executeHandler(taskCtx, taskLogger, *msg)
 	duration := time.Since(startTime)
 	cancel()
-
-	taskLogger = taskLogger.With("duration_ms", duration.Milliseconds())
+	taskLogger = logging.With(taskLogger, logging.DurationMS(duration))
 
 	if processingErr != nil {
 		w.handleFailure(ctx, taskLogger, *msg, processingErr)
 		return processingErr
 	}
 
-	taskLogger.InfoContext(ctx, "task completed successfully")
+	taskLogger.LogAttrs(ctx, slog.LevelInfo, "task completed", logging.Outcome(logging.OutcomeSuccess))
 	if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
-		taskLogger.ErrorContext(ctx, "failed to delete message from queue", "error", err)
+		taskLogger.LogAttrs(ctx, slog.LevelError, "task ack failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
 	}
 
 	// Mark pending task as completed
 	if cb := w.config.Callbacks; cb != nil && cb.OnCompleted != nil && msg.Data.SyncTaskID > 0 {
 		if err := cb.OnCompleted(ctx, msg.Data.SyncTaskID); err != nil {
-			taskLogger.WarnContext(ctx, "failed to mark task as completed", "error", err)
+			taskLogger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", logging.Outcome(logging.OutcomeError), slog.String("status", "completed"), logging.Error(err))
 		}
 	}
 
@@ -168,7 +173,7 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 func (w *Worker) executeHandler(ctx context.Context, logger *slog.Logger, msg Message) (err error) { //nolint:nonamedreturns
 	defer func() {
 		if r := recover(); r != nil {
-			logger.ErrorContext(ctx, "task handler panicked", "panic", r)
+			logger.LogAttrs(ctx, slog.LevelError, "task handler panicked", logging.Outcome(logging.OutcomeError), slog.Any("panic", r))
 			err = NewPermanentError(fmt.Errorf("handler panicked: %v", r), "panic")
 		}
 	}()
@@ -181,46 +186,56 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 	maxAttempts := w.config.MaxAttempts
 	shouldRetry := !isPermanent && nextAttempt < maxAttempts && IsRetryable(processingErr)
 
-	logger.WarnContext(ctx, "task failed",
-		"error", processingErr,
-		"next_attempt", nextAttempt,
-		"max_attempts", maxAttempts,
-		"is_permanent", isPermanent,
-		"will_retry", shouldRetry,
+	logger.LogAttrs(ctx, slog.LevelWarn, "task failed",
+		logging.Error(processingErr),
+		slog.Int("next_attempt", int(nextAttempt)),
+		slog.Int("max_attempts", int(maxAttempts)),
+		slog.Bool("is_permanent", isPermanent),
+		slog.Bool("will_retry", shouldRetry),
+		logging.Outcome(outcomeForTaskFailure(shouldRetry)),
 	)
 
 	// Always delete the current message from pgmq
-	_ = w.queue.Delete(ctx, msg.MessageID)
+	if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
+		logger.LogAttrs(ctx, slog.LevelWarn, "task ack failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
+	}
 
 	errMsg := processingErr.Error()
 	cb := w.config.Callbacks
 
 	if shouldRetry {
 		retryDelay := w.calculateRetryDelay(int(nextAttempt), processingErr)
-		logger.InfoContext(ctx, "scheduling retry", "retry_delay", retryDelay.String())
+		logger.LogAttrs(ctx, slog.LevelInfo, "task retry scheduled", slog.Int64("retry_delay_ms", retryDelay.Milliseconds()), logging.Outcome(logging.OutcomeRetry))
 
 		// Reset pending task to pending so it remains the source of truth
 		if cb != nil && cb.OnRetry != nil && msg.Data.SyncTaskID > 0 {
 			if err := cb.OnRetry(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
-				logger.WarnContext(ctx, "failed to reset task to pending", "error", err)
+				logger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", slog.String("status", "pending"), logging.Outcome(logging.OutcomeError), logging.Error(err))
 			}
 		}
 
 		retryData := msg.Data
 		retryData.Attempt = nextAttempt
 		if _, err := w.queue.SendWithDelay(ctx, retryData, retryDelay); err != nil {
-			logger.ErrorContext(ctx, "failed to enqueue retry", "error", err)
+			logger.LogAttrs(ctx, slog.LevelError, "task retry enqueue failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
 		}
 	} else {
-		logger.ErrorContext(ctx, "task permanently failed, not retrying")
+		logger.LogAttrs(ctx, slog.LevelError, "task failed permanently", logging.Outcome(logging.OutcomeError))
 
 		// Mark pending task as failed
 		if cb != nil && cb.OnFailed != nil && msg.Data.SyncTaskID > 0 {
 			if err := cb.OnFailed(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
-				logger.WarnContext(ctx, "failed to mark task as failed", "error", err)
+				logger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", slog.String("status", "failed"), logging.Outcome(logging.OutcomeError), logging.Error(err))
 			}
 		}
 	}
+}
+
+func outcomeForTaskFailure(shouldRetry bool) string {
+	if shouldRetry {
+		return logging.OutcomeRetry
+	}
+	return logging.OutcomeError
 }
 
 func (w *Worker) calculateRetryDelay(attempt int, err error) time.Duration {
@@ -253,14 +268,14 @@ func NewWorkerPool(numWorkers int, queue *Queue, handler TaskHandler, config Wor
 }
 
 func (p *WorkerPool) Start(ctx context.Context) {
-	p.logger.InfoContext(ctx, "starting worker pool", "worker_count", len(p.workers))
+	p.logger.LogAttrs(ctx, slog.LevelInfo, "worker pool starting", logging.Op("worker_pool.start"), slog.Int("worker_count", len(p.workers)))
 	for _, worker := range p.workers {
 		go worker.Start(ctx)
 	}
 }
 
 func (p *WorkerPool) Stop() {
-	p.logger.Info("stopping worker pool")
+	p.logger.LogAttrs(context.Background(), slog.LevelInfo, "worker pool stopping", logging.Op("worker_pool.stop"))
 	for _, worker := range p.workers {
 		worker.Stop()
 	}
@@ -270,5 +285,5 @@ func (p *WorkerPool) Wait() {
 	for _, worker := range p.workers {
 		worker.Wait()
 	}
-	p.logger.Info("worker pool stopped")
+	p.logger.LogAttrs(context.Background(), slog.LevelInfo, "worker pool stopped", logging.Op("worker_pool.stop"), logging.Outcome(logging.OutcomeSuccess))
 }

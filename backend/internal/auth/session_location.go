@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	"net/netip"
 	"strings"
+
+	"koditon-go/internal/logging"
 
 	"golang.org/x/text/language"
 )
@@ -27,7 +30,7 @@ func (s *Service) resolveSessionLocation(ctx context.Context, params createSessi
 		if snapshot, resolved, err := s.geoResolver.Resolve(ctx, ip); err == nil && resolved {
 			return snapshot
 		} else if err != nil {
-			s.logger.WarnContext(ctx, "geoip lookup failed", "error", err)
+			logging.With(s.logger, logging.Op("auth.session_location.resolve"), slog.String("ip", ip.String())).WarnContext(ctx, "geoip lookup failed", "error", err, "outcome", logging.OutcomeError)
 		}
 	}
 	return resolveFallbackSessionLocation(params.DeviceTimeZone, params.DeviceLocale)

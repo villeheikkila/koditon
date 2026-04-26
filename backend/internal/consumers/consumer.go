@@ -9,6 +9,7 @@ import (
 
 	"koditon-go/internal/db"
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/postal"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/shortcut"
@@ -73,12 +74,12 @@ func (c *Consumer) Start(ctx context.Context, cfg Config) error {
 	c.pricesPool.Start(ctx)
 	c.postalPool.Start(ctx)
 
-	c.logger.InfoContext(ctx, "consumer started", "worker_count_per_domain", cfg.WorkerCount, "domains", 4)
+	logging.With(c.logger, logging.Op("consumer.start")).InfoContext(ctx, "consumer started", "worker_count_per_domain", cfg.WorkerCount, "domains", 4)
 	return nil
 }
 
 func (c *Consumer) Stop() {
-	c.logger.Info("stopping consumer worker pools")
+	logging.With(c.logger, logging.Op("consumer.stop")).Info("consumer stopping")
 	if c.frontdoorPool != nil {
 		c.frontdoorPool.Stop()
 	}
@@ -103,7 +104,7 @@ func (c *Consumer) Stop() {
 	if c.postalPool != nil {
 		c.postalPool.Wait()
 	}
-	c.logger.Info("consumer stopped")
+	logging.With(c.logger, logging.Op("consumer.stop"), logging.Outcome(logging.OutcomeSuccess)).Info("consumer stopped")
 }
 
 func (c *Consumer) baseWorkerConfig() taskqueue.WorkerConfig {

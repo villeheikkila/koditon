@@ -11,6 +11,7 @@ import (
 	"koditon-go/internal/auth/apple"
 	"koditon-go/internal/auth/passkey"
 	db "koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/runtimecfg"
 	"koditon-go/internal/util"
 
@@ -151,21 +152,22 @@ func rollbackTx(ctx context.Context, logger *slog.Logger, tx pgx.Tx) {
 }
 
 func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleRequest) (*SignInWithAppleResponse, error) {
-	s.logger.DebugContext(ctx, "apple sign in started",
+	logger := logging.With(s.logger, logging.Op("auth.apple_sign_in"))
+	logger.DebugContext(ctx, "apple sign in started",
 		"has_auth_code", req.AuthorizationCode != "",
 		"has_nonce", req.Nonce != "",
 		"has_device_id", req.DeviceID != uuid.Nil,
 	)
 	if s.appleClient == nil {
-		s.logger.ErrorContext(ctx, "apple client not configured")
+		logger.ErrorContext(ctx, "apple client not configured", "outcome", logging.OutcomeError)
 		return nil, errors.New("apple client not configured")
 	}
-	s.logger.DebugContext(ctx, "exchanging authorization code with apple")
+	logger.DebugContext(ctx, "exchanging authorization code with apple")
 	tokenResp, err := s.appleClient.ExchangeAuthorizationCode(ctx, req.AuthorizationCode)
 	if err != nil {
 		var exchangeErr *apple.TokenExchangeError
 		if errors.As(err, &exchangeErr) {
-			s.logger.ErrorContext(ctx, "failed to exchange authorization code",
+			logger.ErrorContext(ctx, "failed to exchange authorization code",
 				"error", err,
 				"apple_status_code", exchangeErr.StatusCode,
 				"apple_error_code", exchangeErr.ErrorCode,
@@ -173,26 +175,26 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 				"apple_bundle_id", s.appleClient.BundleID(),
 			)
 		} else {
-			s.logger.ErrorContext(ctx, "failed to exchange authorization code", "error", err)
+			logger.ErrorContext(ctx, "failed to exchange authorization code", "error", err, "outcome", logging.OutcomeError)
 		}
 		return nil, fmt.Errorf("exchange authorization code: %w", err)
 	}
-	s.logger.DebugContext(ctx, "authorization code exchanged successfully",
+	logger.DebugContext(ctx, "authorization code exchanged successfully",
 		"has_id_token", tokenResp.IDToken != "",
 		"has_access_token", tokenResp.AccessToken != "",
 		"has_refresh_token", tokenResp.RefreshToken != "",
 	)
 	if tokenResp.IDToken == "" {
-		s.logger.ErrorContext(ctx, "apple returned empty id token")
+		logger.ErrorContext(ctx, "apple returned empty id token", "outcome", logging.OutcomeError)
 		return nil, ErrMissingIDToken
 	}
-	s.logger.DebugContext(ctx, "verifying apple id token")
+	logger.DebugContext(ctx, "verifying apple id token")
 	identity, err := s.appleClient.VerifyIDToken(ctx, tokenResp.IDToken, req.Nonce)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to verify id token", "error", err)
+		logger.ErrorContext(ctx, "failed to verify id token", "error", err, "outcome", logging.OutcomeError)
 		return nil, fmt.Errorf("verify id token: %w", err)
 	}
-	s.logger.DebugContext(ctx, "id token verified",
+	logger.DebugContext(ctx, "id token verified",
 		"email_verified", identity.EmailVerified,
 	)
 	tx, err := s.pool.Begin(ctx)
@@ -215,7 +217,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		"email_verified": emailVerified,
 		"phone_verified": false,
 	})
-	s.logger.DebugContext(ctx, "looking up existing identity", "provider", "apple", "external_id", identity.Subject)
+	logger.DebugContext(ctx, "looking up existing identity", "provider", "apple", "external_id", identity.Subject)
 	provider := AuthProviderApple
 	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
 		UserIdentityProvider:   &provider,
@@ -225,18 +227,18 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	var isNewUser bool
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			s.logger.ErrorContext(ctx, "failed to lookup identity", "error", err)
+			logger.ErrorContext(ctx, "failed to lookup identity", "error", err, "outcome", logging.OutcomeError)
 			return nil, fmt.Errorf("get identity: %w", err)
 		}
-		s.logger.DebugContext(ctx, "no existing identity found, creating new user")
+		logger.DebugContext(ctx, "no existing identity found, creating new user")
 		user, createErr := qtx.CreateUser(ctx, email)
 		if createErr != nil {
-			s.logger.ErrorContext(ctx, "failed to create user", "error", createErr)
+			logger.ErrorContext(ctx, "failed to create user", "error", createErr, "outcome", logging.OutcomeError)
 			return nil, fmt.Errorf("create user: %w", createErr)
 		}
 		userID = user.UserUuid
 		isNewUser = true
-		s.logger.DebugContext(ctx, "creating identity for new user", "user_id", userID)
+		logger.DebugContext(ctx, "creating identity for new user", "user_id", userID)
 		appleProvider := AuthProviderApple
 		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 			UserUuid:                  util.UUIDToPg(userID),
@@ -247,13 +249,13 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			s.logger.ErrorContext(ctx, "failed to create identity", "error", err)
+			logger.ErrorContext(ctx, "failed to create identity", "error", err, "user_id", userID, "outcome", logging.OutcomeError)
 			return nil, fmt.Errorf("create identity: %w", err)
 		}
-		s.logger.InfoContext(ctx, "new user created via apple sign in", "user_id", userID)
+		logger.InfoContext(ctx, "new user created via apple sign in", "user_id", userID, "outcome", logging.OutcomeSuccess)
 	} else {
 		userID = util.PgUUIDToUUID(existingIdentity.UserUuid)
-		s.logger.DebugContext(ctx, "existing user found", "user_id", userID, "identity_id", existingIdentity.UserIdentityUuid)
+		logger.DebugContext(ctx, "existing user found", "user_id", userID, "identity_id", existingIdentity.UserIdentityUuid)
 		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
 			UserIdentityUuid:          util.UUIDToPg(existingIdentity.UserIdentityUuid),
 			UserIdentityEmail:         email,
@@ -261,7 +263,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
-			s.logger.ErrorContext(ctx, "failed to update identity", "error", err)
+			logger.ErrorContext(ctx, "failed to update identity", "error", err, "user_id", userID, "outcome", logging.OutcomeError)
 			return nil, fmt.Errorf("update identity: %w", err)
 		}
 		if email != nil {
@@ -270,13 +272,13 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 				UserID:    &existingIdentity.UserIDBigint,
 			})
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				s.logger.ErrorContext(ctx, "failed to update user email if empty", "error", err)
+				logger.ErrorContext(ctx, "failed to update user email if empty", "error", err, "user_id", userID, "outcome", logging.OutcomeError)
 				return nil, fmt.Errorf("update user email if empty: %w", err)
 			}
 		}
-		s.logger.DebugContext(ctx, "identity updated successfully")
+		logger.DebugContext(ctx, "identity updated successfully", "user_id", userID)
 	}
-	s.logger.DebugContext(ctx, "creating session", "user_id", userID, "has_device_id", req.DeviceID != uuid.Nil)
+	logger.DebugContext(ctx, "creating session", "user_id", userID, "has_device_id", req.DeviceID != uuid.Nil)
 	sessionID, err := s.createSessionWithProvider(ctx, tx, createSessionParams{
 		UserID:           userID,
 		Provider:         AuthProviderApple,
@@ -291,19 +293,20 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		IP:               req.IP,
 	})
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to create session", "error", err)
+		logger.ErrorContext(ctx, "failed to create session", "error", err, "user_id", userID, "outcome", logging.OutcomeError)
 		return nil, err
 	}
-	s.logger.DebugContext(ctx, "session created", "session_id", sessionID)
-	s.logger.DebugContext(ctx, "committing transaction")
+	logger.DebugContext(ctx, "session created", "session_id", sessionID)
+	logger.DebugContext(ctx, "committing transaction")
 	if err := tx.Commit(ctx); err != nil {
-		s.logger.ErrorContext(ctx, "failed to commit transaction", "error", err)
+		logger.ErrorContext(ctx, "failed to commit transaction", "error", err, "user_id", userID, "session_id", sessionID, "outcome", logging.OutcomeError)
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	s.logger.InfoContext(ctx, "apple sign in completed successfully",
+	logger.InfoContext(ctx, "apple sign in completed successfully",
 		"user_id", userID,
 		"session_id", sessionID,
 		"is_new_user", isNewUser,
+		"outcome", logging.OutcomeSuccess,
 	)
 	return &SignInWithAppleResponse{
 		UserID:    userID,
@@ -320,12 +323,13 @@ type SignInWithAppleWebRequest struct {
 }
 
 func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWebRequest) (*SignInWithAppleResponse, error) {
+	logger := logging.With(s.logger, logging.Op("auth.apple_web_sign_in"))
 	if s.appleWebClient == nil {
 		return nil, errors.New("apple web sign in not configured")
 	}
 	tokenResp, err := s.appleWebClient.ExchangeAuthorizationCodeWeb(ctx, req.AuthorizationCode, s.appleWebRedirectURI)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to exchange web authorization code", "error", err)
+		logger.ErrorContext(ctx, "failed to exchange web authorization code", "error", err, "outcome", logging.OutcomeError)
 		return nil, fmt.Errorf("exchange authorization code: %w", err)
 	}
 	if tokenResp.IDToken == "" {
@@ -333,7 +337,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 	}
 	identity, err := s.appleWebClient.VerifyIDToken(ctx, tokenResp.IDToken, "")
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to verify web id token", "error", err)
+		logger.ErrorContext(ctx, "failed to verify web id token", "error", err, "outcome", logging.OutcomeError)
 		return nil, fmt.Errorf("verify id token: %w", err)
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -409,7 +413,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-	s.logger.InfoContext(ctx, "apple web sign in completed", "user_id", userID, "is_new_user", isNewUser)
+	logger.InfoContext(ctx, "apple web sign in completed", "user_id", userID, "session_id", sessionID, "is_new_user", isNewUser, "outcome", logging.OutcomeSuccess)
 	return &SignInWithAppleResponse{
 		UserID:    userID,
 		IsNewUser: isNewUser,

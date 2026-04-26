@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"koditon-go/internal/logging"
+
 	"github.com/google/uuid"
 )
 
@@ -31,8 +33,8 @@ func (s *Service) emitTokenEvent(ctx context.Context, evt tokenEvent) {
 	}
 	scopeSet := append([]string(nil), evt.Scopes...)
 	slices.Sort(scopeSet)
-	s.logger.InfoContext(ctx, "auth token event",
-		"event", evt.Name,
+	logging.With(s.logger, logging.Op("auth.token_event")).InfoContext(ctx, "auth token event",
+		"event_name", evt.Name,
 		"auth_type", strings.TrimSpace(evt.AuthType),
 		"client_id", strings.TrimSpace(evt.ClientID),
 		"session_id", evt.SessionID,

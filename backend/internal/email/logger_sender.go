@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+
+	"koditon-go/internal/logging"
 )
 
 type LoggerSender struct {
@@ -21,13 +23,14 @@ func (s *LoggerSender) Send(ctx context.Context, message Message) error {
 	if s == nil || s.logger == nil {
 		return ErrSenderNotConfigured
 	}
-	s.logger.WarnContext(
+	logging.With(s.logger, logging.Op("email.send.dev_logger")).WarnContext(
 		ctx,
-		"email delivery (development logger sender)",
+		"email delivery captured by development logger sender",
+		"recipient_count", len(message.To),
 		"to", strings.Join(message.To, ","),
 		"subject", strings.TrimSpace(message.Subject),
-		"text", strings.TrimSpace(message.Text),
-		"html", strings.TrimSpace(message.HTML),
+		"has_text", strings.TrimSpace(message.Text) != "",
+		"has_html", strings.TrimSpace(message.HTML) != "",
 	)
 	return nil
 }

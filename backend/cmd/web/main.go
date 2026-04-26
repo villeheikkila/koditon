@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"koditon-go/internal/config"
+	"koditon-go/internal/logging"
 )
 
 func main() {
@@ -50,15 +51,15 @@ func run(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		logger.Info("shutting down")
+		logging.With(logger, logging.Op("web.shutdown")).InfoContext(ctx, "web server shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Error("shutdown error", "err", err)
+			logging.With(logger, logging.Op("web.shutdown")).ErrorContext(ctx, "web server shutdown failed", "error", err, "outcome", logging.OutcomeError)
 		}
 	}()
 
-	logger.Info("web server starting", "addr", addr, "static_dir", staticDir)
+	logging.With(logger, logging.Op("web.start")).InfoContext(ctx, "web server starting", "addr", addr, "static_dir", staticDir)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		return fmt.Errorf("listen: %w", err)
 	}

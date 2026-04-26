@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/taskqueue"
 )
 
@@ -16,7 +17,11 @@ const (
 )
 
 func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
+	logger := logging.With(c.logger,
+		slog.String("task_type", msg.Data.TaskType),
+		slog.String("entity_id", msg.Data.EntityID),
+		slog.Int64("sync_task_id", msg.Data.SyncTaskID),
+	)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypeShortcutSitemapSync:
@@ -35,9 +40,10 @@ func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message
 }
 
 func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.shortcut.sitemap_sync"))
 	buildingIDs, adIDs, err := c.syncRunner.ShortcutSitemap(ctx)
 	if err != nil {
-		logger.ErrorContext(ctx, "shortcut sitemap sync failed", "error", err)
+		logger.ErrorContext(ctx, "shortcut sitemap sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
 	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
@@ -52,25 +58,27 @@ func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.L
 			enqueueErrors++
 		}
 	}
-	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs), "enqueue_errors", enqueueErrors)
+	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
 func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.shortcut.scraper_sync"))
 	if err := c.syncRunner.ShortcutSyncEntity(ctx, msg.Data.EntityID); err != nil {
-		logger.ErrorContext(ctx, "shortcut scraper sync failed", "entity_id", msg.Data.EntityID, "error", err)
+		logger.ErrorContext(ctx, "shortcut scraper sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
-	logger.InfoContext(ctx, "shortcut scraper entity synced", "entity_id", msg.Data.EntityID)
+	logger.InfoContext(ctx, "shortcut scraper entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
 func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.shortcut.api_sync"))
 	if err := c.syncRunner.ShortcutSyncEntity(ctx, msg.Data.EntityID); err != nil {
-		logger.ErrorContext(ctx, "shortcut api sync failed", "entity_id", msg.Data.EntityID, "error", err)
+		logger.ErrorContext(ctx, "shortcut api sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
-	logger.InfoContext(ctx, "shortcut api entity synced", "entity_id", msg.Data.EntityID)
+	logger.InfoContext(ctx, "shortcut api entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 

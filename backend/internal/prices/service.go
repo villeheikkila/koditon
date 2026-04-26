@@ -12,6 +12,7 @@ import (
 	openrouter "github.com/revrost/go-openrouter"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/prices/client"
 	"koditon-go/internal/util"
 )
@@ -149,6 +150,7 @@ func (s *Service) SyncAll(ctx context.Context, cfg SyncAllConfig) (*SyncAllResul
 	if logger == nil {
 		logger = slog.Default()
 	}
+	logger = logging.With(logger, logging.Op("prices.sync_all"))
 	result := &SyncAllResult{}
 	cities, err := s.client.FetchCities(ctx)
 	if err != nil {
@@ -162,26 +164,28 @@ func (s *Service) SyncAll(ctx context.Context, cfg SyncAllConfig) (*SyncAllResul
 		cityResult, err := s.syncCityWithPostalCodes(ctx, cityName, logger)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("city %q: %w", cityName, err))
-			logger.WarnContext(ctx, "failed to sync city", "city", cityName, "error", err)
+			logger.WarnContext(ctx, "prices city sync failed", "city", cityName, "error", err, "outcome", logging.OutcomeError)
 			continue
 		}
 		result.CitiesProcessed++
 		result.PostalCodesProcessed += cityResult.postalCodes
 		result.NeighborhoodsUpdated += cityResult.neighborhoods
 		result.TransactionsProcessed += cityResult.transactions
-		logger.InfoContext(ctx, "synced city",
+		logger.InfoContext(ctx, "prices city synced",
 			"city", cityName,
 			"postal_codes", cityResult.postalCodes,
 			"neighborhoods", cityResult.neighborhoods,
 			"transactions", cityResult.transactions,
+			"outcome", logging.OutcomeSuccess,
 		)
 	}
-	logger.InfoContext(ctx, "sync all completed",
+	logger.InfoContext(ctx, "prices sync all completed",
 		"cities", result.CitiesProcessed,
 		"postal_codes", result.PostalCodesProcessed,
 		"neighborhoods", result.NeighborhoodsUpdated,
 		"transactions", result.TransactionsProcessed,
 		"errors", len(result.Errors),
+		"outcome", logging.OutcomeSuccess,
 	)
 	return result, nil
 }
@@ -193,6 +197,7 @@ type cityResult struct {
 }
 
 func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, logger *slog.Logger) (*cityResult, error) {
+	logger = logging.With(logger, slog.String("city", cityName), logging.Op("prices.sync_city"))
 	result := &cityResult{}
 	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
 	if err != nil {
@@ -227,10 +232,10 @@ func (s *Service) syncCityWithPostalCodes(ctx context.Context, cityName string, 
 		}
 		transactions, err := s.client.GetAllTransactionsForPostalCodeFast(ctx, cityName, pc)
 		if err != nil {
-			logger.WarnContext(ctx, "failed to fetch transactions for postal code",
-				"city", cityName,
+			logger.WarnContext(ctx, "prices postal code transaction fetch failed",
 				"postal_code", pc,
 				"error", err,
+				"outcome", logging.OutcomeError,
 			)
 			continue
 		}

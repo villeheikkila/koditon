@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/shortcut/client"
 
 	"github.com/google/uuid"
@@ -81,6 +82,7 @@ func NewService(
 }
 
 func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs []string, err error) {
+	logger := logging.With(s.logger, logging.Op("shortcut.sync_sitemap"))
 	allEntries, fetchErr := s.client.GetSitemapEntries(ctx)
 	if fetchErr != nil {
 		return nil, nil, fmt.Errorf("fetch sitemap entries: %w", fetchErr)
@@ -101,7 +103,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 		validBuildingEntries := make([]client.ShortcutSitemapEntry, 0, len(buildingEntries))
 		for _, entry := range buildingEntries {
 			if _, seen := seenBuildingIDs[entry.ID]; seen {
-				s.logger.Debug("duplicate building ID in sitemap, skipping", "building_id", entry.ID)
+				logger.DebugContext(ctx, "duplicate building id in sitemap, skipping", "building_id", entry.ID)
 				continue
 			}
 			seenBuildingIDs[entry.ID] = struct{}{}
@@ -124,7 +126,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 		validAdTypes := make([]AdType, 0, len(adEntries))
 		for _, entry := range adEntries {
 			if _, seen := seenAdIDs[entry.ID]; seen {
-				s.logger.Debug("duplicate ad ID in sitemap, skipping", "ad_id", entry.ID)
+				logger.DebugContext(ctx, "duplicate ad id in sitemap, skipping", "ad_id", entry.ID)
 				continue
 			}
 			seenAdIDs[entry.ID] = struct{}{}
@@ -135,7 +137,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 			case client.SitemapURLTypeRental:
 				adType = AdTypeRental
 			default:
-				s.logger.Warn("unknown ad type from sitemap, skipping", "ad_id", entry.ID, "type", entry.Type)
+				logger.WarnContext(ctx, "unknown ad type from sitemap, skipping", "ad_id", entry.ID, "type", entry.Type)
 				continue
 			}
 			validEntries = append(validEntries, entry)
@@ -157,6 +159,7 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 }
 
 func (s *Service) SyncAd(ctx context.Context, adID int64) error {
+	logger := logging.With(s.logger, logging.Op("shortcut.sync_ad"), slog.Int64("ad_id", adID))
 	adData, err := s.client.GetAdByID(ctx, int(adID))
 	if err != nil {
 		return fmt.Errorf("fetch ad data (ad_id=%d): %w", adID, err)
@@ -173,11 +176,11 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 		case 101:
 			adType = AdTypeRental
 		default:
-			s.logger.Warn("unknown cardType from ad data, skipping sync", "ad_id", adID, "card_type", int(cardType))
+			logger.WarnContext(ctx, "unknown card type from ad data, skipping sync", "card_type", int(cardType))
 			return nil
 		}
 	} else {
-		s.logger.Warn("missing cardType in ad data, skipping sync", "ad_id", adID)
+		logger.WarnContext(ctx, "missing card type in ad data, skipping sync")
 		return nil
 	}
 	var shortcutBuildingID *uuid.UUID

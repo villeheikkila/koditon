@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"koditon-go/internal/ads"
+	"koditon-go/internal/logging"
 )
 
 type searchInput struct {
@@ -49,6 +50,7 @@ type searchOutput struct {
 }
 
 func (a *API) searchHandler(ctx context.Context, input *searchInput) (*searchOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.search"))
 	page := max(input.Page, 1)
 	pageSize := input.PageSize
 	if pageSize <= 0 {
@@ -72,7 +74,7 @@ func (a *API) searchHandler(ctx context.Context, input *searchInput) (*searchOut
 
 	result, err := a.adsService.Search(ctx, params)
 	if err != nil {
-		a.logger.ErrorContext(ctx, "search failed", "error", err)
+		logger.ErrorContext(ctx, "search failed", "error", err, "query", input.Query, "page", page, "page_size", pageSize, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("search failed")
 	}
 

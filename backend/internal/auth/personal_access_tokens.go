@@ -10,10 +10,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	db "koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
@@ -120,7 +122,7 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 		return nil, fmt.Errorf("get feature flags: %w", err)
 	}
 	if err := s.queries.UpdatePersonalAccessTokenLastUsed(ctx, util.UUIDToPg(row.PersonalAccessTokenID)); err != nil {
-		s.logger.WarnContext(ctx, "update personal access token last used failed", "error", err, "token_prefix", prefix)
+		logging.With(s.logger, logging.Op("auth.personal_access_token.last_used"), slog.String("token_prefix", prefix)).WarnContext(ctx, "personal access token last used update failed", "error", err, "outcome", logging.OutcomeError)
 	}
 	claims := &AccessTokenClaims{
 		UserID:       userID,
@@ -135,7 +137,7 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 	if row.PersonalAccessTokenExpiresAt.Valid {
 		claims.ExpiresAt = row.PersonalAccessTokenExpiresAt.Time
 	}
-	s.logger.DebugContext(ctx, "personal access token authenticated", "user_id", userID, "token_prefix", prefix)
+	logging.With(s.logger, logging.Op("auth.personal_access_token.verify"), slog.String("token_prefix", prefix), slog.Any("user_id", userID)).DebugContext(ctx, "personal access token authenticated", "outcome", logging.OutcomeSuccess)
 	return claims, nil
 }
 

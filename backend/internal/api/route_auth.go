@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"koditon-go/internal/auth"
+	"koditon-go/internal/logging"
 )
 
 // --- passkey authenticate options ---
@@ -21,12 +22,13 @@ type passkeyAuthOptionsOutput struct {
 }
 
 func (a *API) passkeyAuthOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyAuthOptionsOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.passkey.options"))
 	resp, err := a.authService.BeginPasskeyAuthentication(ctx)
 	if err != nil {
 		if errors.Is(err, auth.ErrPasskeyConfig) {
 			return nil, huma.Error503ServiceUnavailable("passkey authentication unavailable")
 		}
-		a.logger.ErrorContext(ctx, "begin passkey authentication failed", "error", err)
+		logger.ErrorContext(ctx, "begin passkey authentication failed", "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	out := &passkeyAuthOptionsOutput{}
@@ -56,6 +58,7 @@ type passkeyAuthOutput struct {
 }
 
 func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (*passkeyAuthOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.passkey.authenticate"))
 	challengeID, err := uuid.Parse(input.Body.ChallengeID)
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity("challenge_id must be a valid UUID")
@@ -76,7 +79,7 @@ func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (
 		case errors.Is(err, auth.ErrPasskeyChallenge):
 			return nil, huma.Error422UnprocessableEntity("passkey challenge is invalid or expired")
 		default:
-			a.logger.ErrorContext(ctx, "passkey authentication failed", "error", err)
+			logger.ErrorContext(ctx, "passkey authentication failed", "error", err, "challenge_id", challengeID, "outcome", logging.OutcomeError)
 			return nil, huma.Error401Unauthorized("authentication failed")
 		}
 	}
@@ -88,7 +91,7 @@ func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (
 		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
 	})
 	if err != nil {
-		a.logger.ErrorContext(ctx, "token issuance failed after passkey auth", "error", err)
+		logger.ErrorContext(ctx, "token issuance failed after passkey auth", "error", err, "user_id", finishResp.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
 	out := &passkeyAuthOutput{}
@@ -110,6 +113,7 @@ type passkeyRegisterOptionsOutput struct {
 }
 
 func (a *API) passkeyRegisterOptionsHandler(ctx context.Context, _ *struct{}) (*passkeyRegisterOptionsOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.passkey.register_options"))
 	claims := auth.GetClaimsFromContext(ctx)
 	if claims == nil {
 		return nil, huma.Error401Unauthorized("authentication required")
@@ -123,7 +127,7 @@ func (a *API) passkeyRegisterOptionsHandler(ctx context.Context, _ *struct{}) (*
 		if errors.Is(err, auth.ErrPasskeyConfig) {
 			return nil, huma.Error503ServiceUnavailable("passkey registration unavailable")
 		}
-		a.logger.ErrorContext(ctx, "begin passkey registration failed", "error", err)
+		logger.ErrorContext(ctx, "begin passkey registration failed", "error", err, "user_id", claims.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("internal server error")
 	}
 	out := &passkeyRegisterOptionsOutput{}
@@ -148,6 +152,7 @@ type passkeyRegisterFinishOutput struct {
 }
 
 func (a *API) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRegisterFinishInput) (*passkeyRegisterFinishOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.passkey.register_finish"))
 	claims := auth.GetClaimsFromContext(ctx)
 	if claims == nil {
 		return nil, huma.Error401Unauthorized("authentication required")
@@ -166,7 +171,7 @@ func (a *API) passkeyRegisterFinishHandler(ctx context.Context, input *passkeyRe
 		case errors.Is(err, auth.ErrPasskeyChallenge):
 			return nil, huma.Error422UnprocessableEntity("passkey challenge is invalid or expired")
 		default:
-			a.logger.ErrorContext(ctx, "passkey registration failed", "error", err)
+			logger.ErrorContext(ctx, "passkey registration failed", "error", err, "user_id", claims.UserID, "challenge_id", challengeID, "outcome", logging.OutcomeError)
 			return nil, huma.Error422UnprocessableEntity("passkey registration failed")
 		}
 	}
@@ -195,6 +200,7 @@ type appleWebAuthOutput struct {
 }
 
 func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput) (*appleWebAuthOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.apple_web"))
 	var deviceID uuid.UUID
 	if input.RawDeviceID != "" {
 		deviceID, _ = uuid.Parse(input.RawDeviceID)
@@ -204,7 +210,7 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 		DeviceID:          deviceID,
 	})
 	if err != nil {
-		a.logger.ErrorContext(ctx, "apple web sign in failed", "error", err)
+		logger.ErrorContext(ctx, "apple web sign in failed", "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error401Unauthorized("sign in failed")
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
@@ -215,7 +221,7 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
 	})
 	if err != nil {
-		a.logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err)
+		logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err, "user_id", siwaResp.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
 	out := &appleWebAuthOutput{}

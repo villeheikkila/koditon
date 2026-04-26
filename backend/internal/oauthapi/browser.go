@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"koditon-go/internal/auth"
+	"koditon-go/internal/logging"
 )
 
 func (h *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.browser.login_page"))
 	cont := strings.TrimSpace(r.URL.Query().Get("continue"))
 	if cont == "" {
 		cont = "/oauth/authorize"
@@ -32,14 +34,14 @@ func (h *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		Audience: auth.CanonicalAPIAudience(h.publicAPIBaseURL),
 	})
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "create oauth login device authorization failed", "error", err)
+		logger.ErrorContext(r.Context(), "create oauth login device authorization failed", "error", err, "outcome", logging.OutcomeError)
 		http.Error(w, "failed to prepare login verification", http.StatusInternalServerError)
 		return
 	}
 	appOpenURL := h.publicAPIBaseURL + "/oauth/app/open?kind=device&user_code=" + url.QueryEscape(resp.UserCode)
 	qrCodeSVG, err := renderQRCodeSVG(appOpenURL)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "render oauth login qr code failed", "error", err)
+		logger.ErrorContext(r.Context(), "render oauth login qr code failed", "error", err, "outcome", logging.OutcomeError)
 		http.Error(w, "failed to prepare login verification", http.StatusInternalServerError)
 		return
 	}
@@ -54,6 +56,7 @@ func (h *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLoginDevicePoll(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.browser.device_poll"))
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "invalid", "reason": "form"})
 		return
@@ -69,7 +72,7 @@ func (h *Handler) handleLoginDevicePoll(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, auth.ErrOAuthInvalidRequest):
 			writeJSON(w, http.StatusOK, map[string]any{"status": "invalid", "reason": "user_code"})
 		default:
-			h.logger.ErrorContext(r.Context(), "poll oauth login device authorization failed", "error", err)
+			logger.ErrorContext(r.Context(), "poll oauth login device authorization failed", "error", err, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to poll login status")
 		}
 		return
@@ -128,6 +131,7 @@ func (h *Handler) handleDeviceVerifyPage(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) handleDeviceVerifyRequest(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.device.verify_request"))
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
 		return
@@ -163,7 +167,7 @@ func (h *Handler) handleDeviceVerifyRequest(w http.ResponseWriter, r *http.Reque
 		case errors.Is(err, auth.ErrOAuthInvalidRequest):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid user_code")
 		default:
-			h.logger.ErrorContext(r.Context(), "load oauth device authorization failed", "error", err)
+			logger.ErrorContext(r.Context(), "load oauth device authorization failed", "error", err, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to load verification request")
 		}
 		return
@@ -188,7 +192,7 @@ func (h *Handler) handleDeviceVerifyRequest(w http.ResponseWriter, r *http.Reque
 	if h.notifier != nil {
 		user, err := h.authService.GetUserByID(r.Context(), claims.UserID)
 		if err != nil {
-			h.logger.ErrorContext(r.Context(), "load user failed for oauth device notification", "error", err)
+			logger.ErrorContext(r.Context(), "load user failed for oauth device notification", "error", err, "user_id", claims.UserID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to create verification notification")
 			return
 		}
@@ -199,7 +203,7 @@ func (h *Handler) handleDeviceVerifyRequest(w http.ResponseWriter, r *http.Reque
 			userCode,
 			continueURL,
 		); err != nil {
-			h.logger.ErrorContext(r.Context(), "create oauth device verification notification failed", "error", err)
+			logger.ErrorContext(r.Context(), "create oauth device verification notification failed", "error", err, "user_id", claims.UserID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to create verification notification")
 			return
 		}
@@ -208,6 +212,7 @@ func (h *Handler) handleDeviceVerifyRequest(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handler) handleDeviceVerifyApprove(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.device.verify_approve"))
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
 		return
@@ -239,7 +244,7 @@ func (h *Handler) handleDeviceVerifyApprove(w http.ResponseWriter, r *http.Reque
 		case errors.Is(err, auth.ErrOAuthInvalidGrant):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "device code is not approvable")
 		default:
-			h.logger.ErrorContext(r.Context(), "approve oauth device authorization failed", "error", err)
+			logger.ErrorContext(r.Context(), "approve oauth device authorization failed", "error", err, "user_id", claims.UserID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to approve device code")
 		}
 		return
@@ -248,6 +253,7 @@ func (h *Handler) handleDeviceVerifyApprove(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handler) handleDeviceVerifyDeny(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.device.verify_deny"))
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
 		return
@@ -279,7 +285,7 @@ func (h *Handler) handleDeviceVerifyDeny(w http.ResponseWriter, r *http.Request)
 		case errors.Is(err, auth.ErrOAuthInvalidGrant):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "device code is not deniable")
 		default:
-			h.logger.ErrorContext(r.Context(), "deny oauth device authorization failed", "error", err)
+			logger.ErrorContext(r.Context(), "deny oauth device authorization failed", "error", err, "user_id", claims.UserID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to deny device code")
 		}
 		return

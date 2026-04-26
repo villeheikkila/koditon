@@ -14,6 +14,7 @@ import (
 
 	"koditon-go/internal/auth"
 	"koditon-go/internal/auth/apple"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/util"
 )
 
@@ -62,9 +63,10 @@ func writeOAuthTokenSuccess(w http.ResponseWriter, tokenResp *auth.OAuthTokenRes
 }
 
 func (h *Handler) handleAuthorizationCodeToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.authorization_code"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, false)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -100,7 +102,7 @@ func (h *Handler) handleAuthorizationCodeToken(w http.ResponseWriter, r *http.Re
 		case errors.Is(err, auth.ErrOAuthInvalidGrant):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "authorization code is invalid or expired")
 		default:
-			h.logger.ErrorContext(r.Context(), "oauth authorization code exchange failed", "error", err)
+			logger.ErrorContext(r.Context(), "oauth authorization code exchange failed", "error", err, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		}
 		return
@@ -109,9 +111,10 @@ func (h *Handler) handleAuthorizationCodeToken(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handler) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.refresh"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -145,7 +148,7 @@ func (h *Handler) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, auth.ErrOAuthInvalidGrant):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "refresh token is invalid or expired")
 		default:
-			h.logger.ErrorContext(r.Context(), "oauth refresh token exchange failed", "error", err)
+			logger.ErrorContext(r.Context(), "oauth refresh token exchange failed", "error", err, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		}
 		return
@@ -154,13 +157,14 @@ func (h *Handler) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleRevoke(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.revoke"))
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
 		return
 	}
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth revoke client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth revoke client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -174,7 +178,7 @@ func (h *Handler) handleRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.authService.RevokeOAuthRefreshTokenForClient(r.Context(), authResult.Client.ClientID, token); err != nil {
-		h.logger.ErrorContext(r.Context(), "oauth token revocation failed", "error", err)
+		logger.ErrorContext(r.Context(), "oauth token revocation failed", "error", err, "client_id", authResult.Client.ClientID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to revoke token")
 		return
 	}
@@ -182,13 +186,14 @@ func (h *Handler) handleRevoke(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleDeviceAuthorization(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.device.authorize"))
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid form body")
 		return
 	}
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, false)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth device authorization client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth device authorization client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -222,7 +227,7 @@ func (h *Handler) handleDeviceAuthorization(w http.ResponseWriter, r *http.Reque
 		Audience: audience,
 	})
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "create oauth device authorization failed", "error", err)
+		logger.ErrorContext(r.Context(), "create oauth device authorization failed", "error", err, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to create device authorization")
 		return
 	}
@@ -240,9 +245,10 @@ func (h *Handler) handleDeviceAuthorization(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handler) handleDeviceCodeToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.device_code"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -284,7 +290,7 @@ func (h *Handler) handleDeviceCodeToken(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, auth.ErrOAuthInvalidGrant):
 			writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "device code is invalid")
 		default:
-			h.logger.ErrorContext(r.Context(), "oauth device code exchange failed", "error", err)
+			logger.ErrorContext(r.Context(), "oauth device code exchange failed", "error", err, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 			writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		}
 		return
@@ -293,9 +299,10 @@ func (h *Handler) handleDeviceCodeToken(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) handleAppleAuthorizationCodeToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.apple_authorization_code"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -326,7 +333,7 @@ func (h *Handler) handleAppleAuthorizationCodeToken(w http.ResponseWriter, r *ht
 		IP:                deviceReq.ip,
 	})
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "oauth apple grant failed", "error", err)
+		logger.ErrorContext(r.Context(), "oauth apple grant failed", "error", err, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 		var exchangeErr *apple.TokenExchangeError
 		switch {
 		case errors.As(err, &exchangeErr) && exchangeErr.ErrorCode == "invalid_grant":
@@ -352,7 +359,7 @@ func (h *Handler) handleAppleAuthorizationCodeToken(w http.ResponseWriter, r *ht
 		Audience:  auth.CanonicalAPIAudience(h.publicAPIBaseURL),
 	})
 	if issueErr != nil {
-		h.logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr)
+		logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr, "client_id", client.ClientID, "user_id", resp.UserID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		return
 	}
@@ -360,9 +367,10 @@ func (h *Handler) handleAppleAuthorizationCodeToken(w http.ResponseWriter, r *ht
 }
 
 func (h *Handler) handleEmailAuthTicketToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.email_auth_ticket"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -390,7 +398,7 @@ func (h *Handler) handleEmailAuthTicketToken(w http.ResponseWriter, r *http.Requ
 	}
 	confirmedEmail, consumeErr := h.emailAuthService.ConsumeAuthenticationTicket(r.Context(), authTicket)
 	if consumeErr != nil {
-		h.logger.ErrorContext(r.Context(), "oauth email auth ticket consume failed", "error", consumeErr)
+		logger.ErrorContext(r.Context(), "oauth email auth ticket consume failed", "error", consumeErr, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "email auth ticket is invalid")
 		return
 	}
@@ -401,7 +409,7 @@ func (h *Handler) handleEmailAuthTicketToken(w http.ResponseWriter, r *http.Requ
 		IP:             deviceReq.ip,
 	})
 	if signErr != nil {
-		h.logger.ErrorContext(r.Context(), "oauth email auth grant failed", "error", signErr)
+		logger.ErrorContext(r.Context(), "oauth email auth grant failed", "error", signErr, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "email sign-in is invalid")
 		return
 	}
@@ -419,7 +427,7 @@ func (h *Handler) handleEmailAuthTicketToken(w http.ResponseWriter, r *http.Requ
 		Audience:  auth.CanonicalAPIAudience(h.publicAPIBaseURL),
 	})
 	if issueErr != nil {
-		h.logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr)
+		logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr, "client_id", client.ClientID, "user_id", resp.UserID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		return
 	}
@@ -427,9 +435,10 @@ func (h *Handler) handleEmailAuthTicketToken(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *Handler) handlePasskeyToken(w http.ResponseWriter, r *http.Request) {
+	logger := logging.With(h.logger, logging.Op("oauth.token.passkey_assertion"))
 	authResult, status, oauthErrCode, description, err := h.authenticateOAuthClient(r.Context(), r, true)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err)
+		logger.ErrorContext(r.Context(), "resolve oauth token client failed", "error", err, "outcome", logging.OutcomeError)
 		writeOAuthError(w, status, oauthErrCode, description)
 		return
 	}
@@ -466,7 +475,7 @@ func (h *Handler) handlePasskeyToken(w http.ResponseWriter, r *http.Request) {
 		IP:          deviceReq.ip,
 	})
 	if signErr != nil {
-		h.logger.ErrorContext(r.Context(), "oauth passkey assertion grant failed", "error", signErr)
+		logger.ErrorContext(r.Context(), "oauth passkey assertion grant failed", "error", signErr, "client_id", client.ClientID, "outcome", logging.OutcomeError)
 		switch {
 		case errors.Is(signErr, auth.ErrPasskeyNotFound):
 			writeOAuthErrorWithCode(w, http.StatusBadRequest, "invalid_grant", "passkey account not found", "passkey_not_found")
@@ -491,7 +500,7 @@ func (h *Handler) handlePasskeyToken(w http.ResponseWriter, r *http.Request) {
 		Audience:  auth.CanonicalAPIAudience(h.publicAPIBaseURL),
 	})
 	if issueErr != nil {
-		h.logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr)
+		logger.ErrorContext(r.Context(), "issue oauth tokens failed", "error", issueErr, "client_id", client.ClientID, "user_id", resp.UserID, "outcome", logging.OutcomeError)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to issue token")
 		return
 	}

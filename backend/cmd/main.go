@@ -21,6 +21,7 @@ import (
 	"koditon-go/internal/consumers"
 	db "koditon-go/internal/db"
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/mcpserver"
 	"koditon-go/internal/oauthapi"
 	"koditon-go/internal/postal"
@@ -68,8 +69,8 @@ func run(
 		return err
 	}
 	logger := newLogger(stderr, cfg)
-	appLogger := logger.With("component", "app")
-	appLogger.Info("starting application",
+	appLogger := logging.With(logger.With("component", "app"), logging.Op("app.start"))
+	appLogger.InfoContext(ctx, "starting application",
 		"env", cfg.Environment,
 		"log_level", cfg.LogLevel,
 		"mode", cfg.Mode.String(),
@@ -81,7 +82,7 @@ func run(
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
-	appLogger.Debug("database connection established")
+	appLogger.DebugContext(ctx, "database connection established")
 	var consumer *consumers.Consumer
 	if cfg.Mode.Consumer {
 		openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
@@ -208,7 +209,7 @@ func run(
 		}
 		errCh = make(chan error, 1)
 		go func() {
-			appLogger.Info("server listening", "addr", httpServer.Addr)
+			logging.With(appLogger, logging.Op("app.http.listen")).InfoContext(ctx, "server listening", "addr", httpServer.Addr)
 			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				errCh <- err
 				return
@@ -218,7 +219,7 @@ func run(
 	}
 	select {
 	case <-ctx.Done():
-		appLogger.Info("shutdown signal received")
+		logging.With(appLogger, logging.Op("app.shutdown")).InfoContext(ctx, "shutdown signal received")
 	case err := <-errCh:
 		if err != nil {
 			if consumer != nil {
@@ -235,30 +236,31 @@ func run(
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 	var shutdownErrs []error
-	appLogger.Debug("stopping consumer")
+	shutdownLogger := logging.With(appLogger, logging.Op("app.shutdown"))
+	shutdownLogger.DebugContext(ctx, "stopping consumer")
 	if consumer != nil {
 		consumer.Stop()
-		appLogger.Debug("consumer stopped")
+		shutdownLogger.DebugContext(ctx, "consumer stopped")
 	}
 	if httpServer != nil {
-		appLogger.Debug("shutting down http server")
+		shutdownLogger.DebugContext(ctx, "shutting down http server")
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			appLogger.Error("http server shutdown failed", tint.Err(err))
+			shutdownLogger.ErrorContext(shutdownCtx, "http server shutdown failed", "error", err, "outcome", logging.OutcomeError)
 			shutdownErrs = append(shutdownErrs, fmt.Errorf("http server shutdown: %w", err))
 		} else {
-			appLogger.Debug("http server stopped")
+			shutdownLogger.DebugContext(shutdownCtx, "http server stopped")
 		}
 		if err := <-errCh; err != nil {
 			shutdownErrs = append(shutdownErrs, fmt.Errorf("http server: %w", err))
 		}
 	}
-	appLogger.Debug("closing database pool")
+	shutdownLogger.DebugContext(ctx, "closing database pool")
 	pool.Close()
-	appLogger.Debug("database pool closed")
+	shutdownLogger.DebugContext(ctx, "database pool closed")
 	if len(shutdownErrs) > 0 {
 		return errors.Join(shutdownErrs...)
 	}
-	appLogger.Info("graceful shutdown complete")
+	shutdownLogger.InfoContext(ctx, "graceful shutdown complete", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 

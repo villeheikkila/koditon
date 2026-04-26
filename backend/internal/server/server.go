@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -12,6 +15,7 @@ import (
 	"koditon-go/internal/api"
 	"koditon-go/internal/auth"
 	"koditon-go/internal/config"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/web"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -148,11 +152,7 @@ func (rl *rateLimiter) allow(key string) bool {
 func (s *Server) rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, _, _ := strings.Cut(r.RemoteAddr, ":")
-			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-				ip, _, _ = strings.Cut(fwd, ",")
-				ip = strings.TrimSpace(ip)
-			}
+			ip := requestClientIP(r)
 			if !rl.allow(ip) {
 				http.Error(w, `{"status":429,"title":"Too Many Requests"}`, http.StatusTooManyRequests)
 				return
@@ -165,41 +165,114 @@ func (s *Server) rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Ha
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		s.logger.InfoContext(
-			r.Context(),
-			"request started",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"remote_addr", r.RemoteAddr,
+		requestLogger := logging.With(
+			s.logger,
+			logging.Op("request.handle"),
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.String("route", requestRoute(r)),
+			slog.String("client_ip", requestClientIP(r)),
 		)
+		requestLogger.InfoContext(r.Context(), "request started")
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
+		duration := time.Since(start)
 		logLevel := slog.LevelInfo
 		if rw.status >= 500 {
 			logLevel = slog.LevelError
 		} else if rw.status >= 400 {
 			logLevel = slog.LevelWarn
 		}
-		s.logger.Log(
+		requestLogger.LogAttrs(
 			r.Context(),
 			logLevel,
 			"request completed",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", rw.status,
-			"duration", time.Since(start),
+			slog.Int("status", rw.status),
+			slog.Int64("response_bytes", rw.bytes),
+			logging.DurationMS(duration),
+			logging.Outcome(httpOutcome(rw.status)),
 		)
 	})
+}
+
+func requestRoute(r *http.Request) string {
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+	return r.URL.Path
+}
+
+func requestClientIP(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+		first, _, _ := strings.Cut(forwarded, ",")
+		if ip := normalizeIP(first); ip != "" {
+			return ip
+		}
+	}
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		if ip := normalizeIP(realIP); ip != "" {
+			return ip
+		}
+	}
+	host, err := remoteHost(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	if ip := normalizeIP(host); ip != "" {
+		return ip
+	}
+	return host
+}
+
+func remoteHost(remoteAddr string) (string, error) {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		return host, nil
+	}
+	if strings.Contains(err.Error(), "missing port in address") {
+		return remoteAddr, nil
+	}
+	return "", fmt.Errorf("split remote addr: %w", err)
+}
+
+func normalizeIP(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	addr, err := netip.ParseAddr(raw)
+	if err != nil {
+		return raw
+	}
+	return addr.String()
+}
+
+func httpOutcome(status int) string {
+	switch {
+	case status >= 500:
+		return logging.OutcomeError
+	case status >= 400:
+		return logging.OutcomeRejected
+	default:
+		return logging.OutcomeSuccess
+	}
 }
 
 type responseWriter struct {
 	http.ResponseWriter
 	status int
+	bytes  int64
 }
 
 func (rw *responseWriter) WriteHeader(status int) {
 	rw.status = status
 	rw.ResponseWriter.WriteHeader(status)
+}
+
+func (rw *responseWriter) Write(p []byte) (int, error) {
+	n, err := rw.ResponseWriter.Write(p)
+	rw.bytes += int64(n)
+	return n, err
 }
 
 func (rw *responseWriter) Flush() {

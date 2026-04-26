@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"time"
 
 	"koditon-go/internal/auth/passkey"
 	db "koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/useragent"
 	"koditon-go/internal/util"
 
@@ -306,6 +308,7 @@ func (s *Service) BeginPasskeyRegistration(ctx context.Context, req BeginPasskey
 }
 
 func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPasskeyRegistrationRequest) (*FinishPasskeyRegistrationResponse, error) {
+	logger := logging.With(s.logger, logging.Op("auth.passkey.finish_registration"), slog.Any("user_id", req.UserID), slog.Any("challenge_id", req.ChallengeID))
 	if s.passkeyService == nil {
 		return nil, ErrPasskeyConfig
 	}
@@ -345,7 +348,7 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 		Credentials: existing,
 	}, sessionData, req.Credential)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "passkey finish registration failed", "error", err, "user_id", req.UserID)
+		logger.ErrorContext(ctx, "passkey finish registration failed", "error", err, "outcome", logging.OutcomeError)
 		return nil, fmt.Errorf("finish registration: %w", err)
 	}
 
@@ -438,6 +441,7 @@ func (s *Service) ListPasskeys(ctx context.Context, userID uuid.UUID) ([]ListPas
 }
 
 func (s *Service) DeletePasskey(ctx context.Context, userID uuid.UUID, credentialID string) error {
+	logger := logging.With(s.logger, logging.Op("auth.passkey.delete"), slog.Any("user_id", userID), slog.String("credential_id", credentialID))
 	outcome, err := s.queries.RevokePasskeyByCredentialB64ForUser(ctx, db.RevokePasskeyByCredentialB64ForUserParams{
 		UserUuid:                      util.UUIDToPg(userID),
 		UserPasskeyCredentialIDB64url: stringPtr(credentialID),
@@ -447,13 +451,13 @@ func (s *Service) DeletePasskey(ctx context.Context, userID uuid.UUID, credentia
 	}
 	switch outcome {
 	case "deleted":
-		s.logger.InfoContext(ctx, "passkey deleted", "user_id", userID, "outcome", outcome)
+		logger.InfoContext(ctx, "passkey deleted", "outcome", outcome)
 		return nil
 	case "last_passkey":
-		s.logger.WarnContext(ctx, "passkey delete blocked: last passkey", "user_id", userID, "outcome", outcome)
+		logger.WarnContext(ctx, "passkey delete blocked", "outcome", outcome)
 		return ErrPasskeyLast
 	case "not_found":
-		s.logger.WarnContext(ctx, "passkey delete failed: passkey not found", "user_id", userID, "outcome", outcome)
+		logger.WarnContext(ctx, "passkey delete failed", "outcome", outcome)
 		return ErrPasskeyNotFound
 	default:
 		return fmt.Errorf("unexpected passkey delete outcome: %s", outcome)

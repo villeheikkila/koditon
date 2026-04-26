@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"koditon-go/internal/ads"
+	"koditon-go/internal/logging"
 )
 
 //go:embed templates/*.html
@@ -47,7 +48,7 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templates.ExecuteTemplate(w, "index.html", nil); err != nil {
-		h.logger.Error("render index", "error", err)
+		logging.With(h.logger, logging.Op("web.index.render")).ErrorContext(r.Context(), "render index failed", "error", err, "outcome", logging.OutcomeError)
 	}
 }
 
@@ -71,14 +72,14 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 			h.renderError(w, http.StatusNotFound, "Entity not found")
 			return
 		}
-		h.logger.Error("detail lookup", "canonical_id", canonicalID, "error", err)
+		logging.With(h.logger, logging.Op("web.detail.lookup"), slog.String("canonical_id", canonicalID)).ErrorContext(r.Context(), "detail lookup failed", "error", err, "outcome", logging.OutcomeError)
 		h.renderError(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templates.ExecuteTemplate(w, "detail.html", detail); err != nil {
-		h.logger.Error("render detail", "error", err)
+		logging.With(h.logger, logging.Op("web.detail.render"), slog.String("canonical_id", canonicalID)).ErrorContext(r.Context(), "render detail failed", "error", err, "outcome", logging.OutcomeError)
 	}
 }
 

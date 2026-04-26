@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"koditon-go/internal/db"
+	"koditon-go/internal/logging"
 	"koditon-go/internal/prices"
 	"koditon-go/internal/taskqueue"
 )
@@ -18,7 +19,11 @@ const (
 )
 
 func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := c.logger.With("task_type", msg.Data.TaskType, "entity_id", msg.Data.EntityID, "sync_task_id", msg.Data.SyncTaskID)
+	logger := logging.With(c.logger,
+		slog.String("task_type", msg.Data.TaskType),
+		slog.String("entity_id", msg.Data.EntityID),
+		slog.Int64("sync_task_id", msg.Data.SyncTaskID),
+	)
 	var err error
 	switch msg.Data.TaskType {
 	case TaskTypePricesCitiesInit:
@@ -39,7 +44,8 @@ func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) 
 }
 
 func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger) error {
-	logger.InfoContext(ctx, "processing prices cities initialization task")
+	logger = logging.With(logger, logging.Op("consumer.prices.cities_init"))
+	logger.InfoContext(ctx, "prices cities initialization started")
 	cities, err := c.syncRunner.PricesFetchCities(ctx)
 	if err != nil {
 		return err
@@ -52,37 +58,41 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 				enqueueErrors++
 			}
 		}
-		logger.InfoContext(ctx, "city entities enqueued", "count", len(cities), "enqueue_errors", enqueueErrors)
+		logger.InfoContext(ctx, "prices city entities enqueued", "count", len(cities), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
 	}
 	return nil
 }
 
 func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
-	logger.InfoContext(ctx, "syncing prices city", "entity_id", msg.Data.EntityID)
+	logger = logging.With(logger, logging.Op("consumer.prices.city_sync"))
+	logger.InfoContext(ctx, "prices city sync started")
 	if err := c.syncRunner.PricesSyncCityEntity(ctx, msg.Data.EntityID); err != nil {
 		return err
 	}
+	logger.InfoContext(ctx, "prices city sync completed", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
 func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, logger *slog.Logger) error {
-	logger.InfoContext(ctx, "processing prices neighborhood postal code sync task")
+	logger = logging.With(logger, logging.Op("consumer.prices.neighborhood_postal_code_sync"))
+	logger.InfoContext(ctx, "prices neighborhood postal code sync started")
 	err := c.syncRunner.PricesSyncNeighborhoodPostalCodes(ctx, func(p prices.SyncNeighborhoodPostalCodesProgress) {
 		if p.Page > 0 {
-			logger.DebugContext(ctx, "fetching postal code transactions", "city", p.City, "postal_code", p.PostalCode, "page", p.Page)
+			logger.DebugContext(ctx, "postal code transactions fetch started", "city", p.City, "postal_code", p.PostalCode, "page", p.Page)
 		} else if p.Updated > 0 {
-			logger.InfoContext(ctx, "updated neighborhood postal code mappings", "city", p.City, "postal_code", p.PostalCode, "updated", p.Updated)
+			logger.InfoContext(ctx, "neighborhood postal code mappings updated", "city", p.City, "postal_code", p.PostalCode, "updated", p.Updated)
 		}
 	})
 	if err != nil {
 		return err
 	}
-	logger.InfoContext(ctx, "completed prices neighborhood postal code sync")
+	logger.InfoContext(ctx, "prices neighborhood postal code sync completed", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
 func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger) error {
-	logger.InfoContext(ctx, "processing prices sync all task")
+	logger = logging.With(logger, logging.Op("consumer.prices.sync_all"))
+	logger.InfoContext(ctx, "prices sync all started")
 	cfg := prices.DefaultSyncAllConfig()
 	cfg.Logger = logger
 	cfg.Concurrency = 5
@@ -90,7 +100,7 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger)
 	if err != nil {
 		return err
 	}
-	logger.InfoContext(ctx, "completed prices sync all", "cities", result.CitiesProcessed, "postal_codes", result.PostalCodesProcessed, "neighborhoods", result.NeighborhoodsUpdated, "transactions", result.TransactionsProcessed, "errors", len(result.Errors))
+	logger.InfoContext(ctx, "prices sync all completed", "cities", result.CitiesProcessed, "postal_codes", result.PostalCodesProcessed, "neighborhoods", result.NeighborhoodsUpdated, "transactions", result.TransactionsProcessed, "errors", len(result.Errors), "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
