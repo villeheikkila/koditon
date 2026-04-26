@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -89,11 +88,11 @@ func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 		t.Fatalf("expected ErrTokenReuse on replay, got %v", err)
 	}
 
-	session, err := queries.GetSessionByID(ctx, util.UUIDToPg(sessionID))
+	session, err := queries.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		t.Fatalf("load session after replay: %v", err)
 	}
-	if !session.DeviceSessionRevokedAt.Valid {
+	if session.DeviceSessionRevokedAt == nil {
 		t.Fatal("expected session to be revoked after refresh token replay")
 	}
 

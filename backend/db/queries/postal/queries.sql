@@ -13,10 +13,10 @@ SELECT
     NULLIF(names_sv, ''),
     now(),
     now()
-FROM unnest(
-    sqlc.arg(codes)::text[],
-    sqlc.arg(names_fi)::text[],
-    sqlc.arg(names_sv)::text[]
+FROM ROWS FROM (
+    unnest(CAST(sqlc.arg(codes) AS text[])),
+    unnest(CAST(sqlc.arg(names_fi) AS text[])),
+    unnest(CAST(sqlc.arg(names_sv) AS text[]))
 ) AS t(codes, names_fi, names_sv)
 ON CONFLICT (postal_ad_area_code) DO UPDATE
 SET postal_ad_area_name_fi = EXCLUDED.postal_ad_area_name_fi,
@@ -41,11 +41,11 @@ SELECT
     NULLIF(language_ratio_codes, ''),
     now(),
     now()
-FROM unnest(
-    sqlc.arg(codes)::text[],
-    sqlc.arg(names_fi)::text[],
-    sqlc.arg(names_sv)::text[],
-    sqlc.arg(language_ratio_codes)::text[]
+FROM ROWS FROM (
+    unnest(CAST(sqlc.arg(codes) AS text[])),
+    unnest(CAST(sqlc.arg(names_fi) AS text[])),
+    unnest(CAST(sqlc.arg(names_sv) AS text[])),
+    unnest(CAST(sqlc.arg(language_ratio_codes) AS text[]))
 ) AS t(codes, names_fi, names_sv, language_ratio_codes)
 ON CONFLICT (postal_municipality_code) DO UPDATE
 SET postal_municipality_name_fi = EXCLUDED.postal_municipality_name_fi,
@@ -85,18 +85,18 @@ SELECT
     municipality_ids,
     now(),
     now()
-FROM unnest(
-    sqlc.arg(dates)::date[],
-    sqlc.arg(codes)::text[],
-    sqlc.arg(names_fi)::text[],
-    sqlc.arg(names_sv)::text[],
-    sqlc.arg(abbrs_fi)::text[],
-    sqlc.arg(abbrs_sv)::text[],
-    sqlc.arg(neighborhoods_fi)::text[],
-    sqlc.arg(valids_from)::date[],
-    sqlc.arg(type_codes)::text[],
-    sqlc.arg(ad_area_ids)::uuid[],
-    sqlc.arg(municipality_ids)::uuid[]
+FROM ROWS FROM (
+    unnest(CAST(sqlc.arg(dates) AS date[])),
+    unnest(CAST(sqlc.arg(codes) AS text[])),
+    unnest(CAST(sqlc.arg(names_fi) AS text[])),
+    unnest(CAST(sqlc.arg(names_sv) AS text[])),
+    unnest(CAST(sqlc.arg(abbrs_fi) AS text[])),
+    unnest(CAST(sqlc.arg(abbrs_sv) AS text[])),
+    unnest(CAST(sqlc.arg(neighborhoods_fi) AS text[])),
+    unnest(CAST(sqlc.arg(valids_from) AS date[])),
+    unnest(CAST(sqlc.arg(type_codes) AS text[])),
+    unnest(CAST(sqlc.arg(ad_area_ids) AS uuid[])),
+    unnest(CAST(sqlc.arg(municipality_ids) AS uuid[]))
 ) AS t(
     dates,
     codes,

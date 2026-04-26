@@ -7,7 +7,6 @@ import (
 	"time"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -37,7 +36,7 @@ type refreshStrategy interface {
 	rotate(ctx context.Context, tx pgx.Tx, queries *db.Queries, state refreshFlowState) (refreshFlowState, error)
 }
 
-func refreshTokenStateFromLockedRow(row db.GetOAuthRefreshTokenByHashForUpdateRow, audience string) refreshFlowState {
+func refreshTokenStateFromLockedRow(row db.OauthRefreshToken, audience string) refreshFlowState {
 	return refreshFlowState{
 		UserID:         row.UserUuid,
 		ClientID:       row.OauthClientID,
@@ -107,7 +106,7 @@ type oauthOpaqueRefreshStrategy struct {
 }
 
 func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, queries *db.Queries) (refreshValidation, error) {
-	row, err := queries.GetOAuthRefreshTokenByHashForUpdate(ctx, new(hashSHA256Hex(s.refreshToken)))
+	row, err := queries.GetOAuthRefreshTokenByHashForUpdate(ctx, hashSHA256Hex(s.refreshToken))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return refreshValidation{}, ErrOAuthInvalidGrant
@@ -126,7 +125,7 @@ func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, quer
 		storedAudience = requestedAudience
 	}
 	state := refreshTokenStateFromLockedRow(row, storedAudience)
-	if row.OauthRefreshTokenRevokedAt.Valid {
+	if row.OauthRefreshTokenRevokedAt != nil {
 		return refreshValidation{
 			state:         state,
 			reuseDetected: true,
@@ -135,7 +134,7 @@ func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, quer
 	if !row.OauthRefreshTokenExpiresAt.After(time.Now()) {
 		return refreshValidation{}, ErrOAuthInvalidGrant
 	}
-	revoked, err := queries.RevokeOAuthRefreshTokenByHash(ctx, new(hashSHA256Hex(s.refreshToken)))
+	revoked, err := queries.RevokeOAuthRefreshTokenByHash(ctx, hashSHA256Hex(s.refreshToken))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return refreshValidation{}, ErrOAuthInvalidGrant
@@ -151,12 +150,12 @@ func (s oauthOpaqueRefreshStrategy) validate(ctx context.Context, _ pgx.Tx, quer
 
 func (s oauthOpaqueRefreshStrategy) handleReuse(ctx context.Context, _ pgx.Tx, queries *db.Queries, state refreshFlowState) error {
 	if _, err := queries.RevokeAllOAuthRefreshTokensByUserIDAndClientID(ctx, db.RevokeAllOAuthRefreshTokensByUserIDAndClientIDParams{
-		UserUuid:      util.UUIDToPg(state.UserID),
-		OauthClientID: new(state.ClientID),
+		UserUuid:      state.UserID,
+		OauthClientID: state.ClientID,
 	}); err != nil {
 		return fmt.Errorf("revoke oauth refresh tokens after reuse: %w", err)
 	}
-	if err := queries.RevokeAllUserSessions(ctx, util.UUIDToPg(state.UserID)); err != nil {
+	if err := queries.RevokeAllUserSessions(ctx, state.UserID); err != nil {
 		return fmt.Errorf("revoke user sessions after refresh token reuse: %w", err)
 	}
 	return nil

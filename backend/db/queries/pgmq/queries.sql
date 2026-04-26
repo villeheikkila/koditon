@@ -34,15 +34,6 @@ SELECT
     created_at::timestamptz AS created_at
 FROM pgmq.list_queues();
 
--- name: GetQueueInfo :one
-SELECT
-    queue_name::text AS queue_name,
-    is_partitioned::bool AS is_partitioned,
-    is_unlogged::bool AS is_unlogged,
-    created_at::timestamptz AS created_at
-FROM pgmq.list_queues()
-WHERE queue_name = sqlc.arg(queue_name);
-
 -- name: CreateQueue :exec
 SELECT pgmq.create(sqlc.arg(queue_name));
 

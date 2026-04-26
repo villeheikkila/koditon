@@ -12,6 +12,7 @@ sql:
       - db/queries/pgmq
       - db/queries/postal
       - db/queries/prices
+      - db/queries/runtime
       - db/queries/shortcut
     gen:
       go:

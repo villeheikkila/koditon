@@ -190,7 +190,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	mapped := make([]UnifiedEntityRow, 0, len(rows))
 	for _, row := range rows {
 		mapped = append(mapped, UnifiedEntityRow{
-			CanonicalID: valueOrEmpty(row.CanonicalID),
+			CanonicalID: strings.TrimSpace(row.CanonicalID),
 			Source:      row.Source,
 			Kind:        row.Kind,
 			NativeID:    row.NativeID,
@@ -200,7 +200,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 			Postal:      valueOrEmpty(row.Postal),
 			Price:       row.Price,
 			Area:        row.Area,
-			RoomLayout:  valueOrEmpty(row.RoomLayout),
+			RoomLayout:  strings.TrimSpace(row.RoomLayout),
 			URL:         strings.TrimSpace(row.Url),
 			LastSeenAt:  row.LastSeenAt,
 		})
@@ -228,7 +228,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt}}
 			detail.Normalized = normalizedFromShortcutAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: ptrUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
@@ -266,9 +266,9 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: valueOrEmpty(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), LastSeenAt: row.FrontdoorAdLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), LastSeenAt: row.FrontdoorAdLastSeenAt}}
 			detail.Normalized = normalizedFromFrontdoorAdDetail(canonicalID, source, kind, detail.Canonical, row)
-			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: valueOrEmpty(row.AdPropertyType)}, {Label: "Condition", Value: valueOrEmpty(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
+			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: strings.TrimSpace(row.AdPropertyType)}, {Label: "Condition", Value: strings.TrimSpace(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
 			detail.Raw = buildRawPayload(row.FrontdoorAdData)
 			detail = promoteCanonicalFields(detail, "External ID", "Property Type", "Condition")
 			return cleanDetail(detail), nil
@@ -604,7 +604,7 @@ func normalizedFromFrontdoorAdDetail(canonicalID, source, kind string, canonical
 		FloorLevel:               int32Path(payload, "residenceDetailsDTO", "housingCompanyApartmentInformationDTO", "floorLevel"),
 		TotalFloors:              firstInt32(int32Path(payload, "property", "housingCompany", "floorCount"), int32Path(payload, "residenceDetailsDTO", "floorCount")),
 		BuildYear:                firstInt32(int32Path(payload, "residenceDetailsDTO", "constructionFinishedYear"), int32Path(payload, "property", "housingCompany", "usageStartYear")),
-		Condition:                firstNonEmpty(valueAtPath(payload, "residenceDetailsDTO", "inspection", "overallCondition"), valueOrEmpty(row.AdCondition), valueAtPath(payload, "property", "condition")),
+		Condition:                firstNonEmpty(valueAtPath(payload, "residenceDetailsDTO", "inspection", "overallCondition"), strings.TrimSpace(row.AdCondition), valueAtPath(payload, "property", "condition")),
 		EnergyClass:              firstNonEmpty(valueAtPath(payload, "property", "housingCompany", "energyCertificate", "energyCertificateType"), valueAtPath(payload, "property", "energyCertificate", "energyCertificateType")),
 		PlotType:                 firstNonEmpty(valueAtPath(payload, "property", "plot", "plotType"), valueAtPath(payload, "property", "plot", "holdingType")),
 		Elevator:                 boolPath(payload, "property", "housingCompany", "hasElevator"),

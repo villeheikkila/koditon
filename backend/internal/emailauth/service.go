@@ -15,7 +15,6 @@ import (
 	"koditon-go/internal/email"
 	"koditon-go/internal/emailaddr"
 	"koditon-go/internal/runtimecfg"
-	"koditon-go/internal/util"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -111,13 +110,13 @@ func (s *Service) RequestAuthentication(ctx context.Context, rawEmail string) er
 	tokenHash := hashToken(rawToken)
 	expiresAt := time.Now().Add(s.emailTokenTTL)
 
-	if err := s.queries.InvalidateActiveSignupEmailTokensForEmail(ctx, &targetEmail); err != nil {
+	if err := s.queries.InvalidateActiveSignupEmailTokensForEmail(ctx, targetEmail); err != nil {
 		return fmt.Errorf("invalidate active tokens: %w", err)
 	}
 	if _, err := s.queries.CreateSignupEmailToken(ctx, db.CreateSignupEmailTokenParams{
-		AuthSignupEmailTargetEmail: &targetEmail,
-		AuthSignupEmailTokenHash:   &tokenHash,
-		AuthSignupEmailExpiresAt:   util.TimeToPg(expiresAt),
+		AuthSignupEmailTargetEmail: targetEmail,
+		AuthSignupEmailTokenHash:   tokenHash,
+		AuthSignupEmailExpiresAt:   expiresAt,
 	}); err != nil {
 		return fmt.Errorf("create email auth token: %w", err)
 	}
@@ -152,19 +151,19 @@ func (s *Service) ConfirmAuthentication(ctx context.Context, rawToken string) (s
 	}
 	tokenHash := hashToken(rawToken)
 
-	emailAddr, err := s.queries.ConsumeActiveSignupEmailTokenByHash(ctx, &tokenHash)
+	emailAddr, err := s.queries.ConsumeActiveSignupEmailTokenByHash(ctx, tokenHash)
 	if err != nil {
 		if err != pgx.ErrNoRows {
 			return "", fmt.Errorf("consume email auth token: %w", err)
 		}
-		status, statusErr := s.queries.GetSignupEmailTokenStatusByHash(ctx, &tokenHash)
+		status, statusErr := s.queries.GetSignupEmailTokenStatusByHash(ctx, tokenHash)
 		if statusErr == pgx.ErrNoRows {
 			return "", ErrInvalidToken
 		}
 		if statusErr != nil {
 			return "", fmt.Errorf("get email auth token status: %w", statusErr)
 		}
-		switch strings.TrimSpace(stringOrEmpty(status)) {
+		switch strings.TrimSpace(status) {
 		case "expired":
 			return "", ErrTokenExpired
 		case "consumed":
@@ -185,9 +184,9 @@ func (s *Service) ConfirmAuthentication(ctx context.Context, rawToken string) (s
 	ticketHash := hashToken(rawTicket)
 	ticketExpiresAt := time.Now().Add(s.ticketTTL)
 	if _, err := s.queries.CreateSignupTicket(ctx, db.CreateSignupTicketParams{
-		AuthSignupTicketTargetEmail: &normalizedEmail,
-		AuthSignupTicketHash:        &ticketHash,
-		AuthSignupTicketExpiresAt:   util.TimeToPg(ticketExpiresAt),
+		AuthSignupTicketTargetEmail: normalizedEmail,
+		AuthSignupTicketHash:        ticketHash,
+		AuthSignupTicketExpiresAt:   ticketExpiresAt,
 	}); err != nil {
 		return "", fmt.Errorf("create email auth ticket: %w", err)
 	}
@@ -203,7 +202,7 @@ func (s *Service) ConsumeAuthenticationTicket(ctx context.Context, rawTicket str
 		return AuthenticatedEmail{}, ErrInvalidTicket
 	}
 	ticketHash := hashToken(rawTicket)
-	targetEmail, err := s.queries.ConsumeActiveSignupTicketByHash(ctx, &ticketHash)
+	targetEmail, err := s.queries.ConsumeActiveSignupTicketByHash(ctx, ticketHash)
 	if err == nil {
 		normalized, normalizeErr := emailaddr.Parse(targetEmail)
 		if normalizeErr != nil {
@@ -215,14 +214,14 @@ func (s *Service) ConsumeAuthenticationTicket(ctx context.Context, rawTicket str
 		return AuthenticatedEmail{}, fmt.Errorf("consume email auth ticket: %w", err)
 	}
 
-	status, statusErr := s.queries.GetSignupTicketStatusByHash(ctx, &ticketHash)
+	status, statusErr := s.queries.GetSignupTicketStatusByHash(ctx, ticketHash)
 	if statusErr == pgx.ErrNoRows {
 		return AuthenticatedEmail{}, ErrInvalidTicket
 	}
 	if statusErr != nil {
 		return AuthenticatedEmail{}, fmt.Errorf("get email auth ticket status: %w", statusErr)
 	}
-	switch strings.TrimSpace(stringOrEmpty(status)) {
+	switch strings.TrimSpace(status) {
 	case "expired":
 		return AuthenticatedEmail{}, ErrTicketExpired
 	case "consumed":
@@ -255,11 +254,4 @@ func generateToken() (string, error) {
 func hashToken(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
-}
-
-func stringOrEmpty(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

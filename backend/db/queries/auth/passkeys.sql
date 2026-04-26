@@ -204,8 +204,7 @@ with target_user as (
 ),
 locked as (
   select
-    up.user_passkey_id,
-    up.user_passkey_credential_id_b64url
+    up.user_passkey_id
   from user_passkeys up
   where up.user_id = (select user_id from target_user)
     and up.user_passkey_revoked_at is null
@@ -216,9 +215,12 @@ active_count as (
   from locked
 ),
 target as (
-  select user_passkey_id
-  from locked
-  where user_passkey_credential_id_b64url = sqlc.arg(user_passkey_credential_id_b64url)
+  select up.user_passkey_id
+  from user_passkeys up
+  where up.user_id = (select user_id from target_user)
+    and up.user_passkey_revoked_at is null
+    and up.user_passkey_credential_id_b64url = sqlc.arg(target_credential_id_b64url)
+  for update
 ),
 updated as (
   update user_passkeys

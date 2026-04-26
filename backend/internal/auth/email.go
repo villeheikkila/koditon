@@ -8,7 +8,6 @@ import (
 
 	db "koditon-go/internal/db"
 	"koditon-go/internal/emailauth"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -93,9 +92,9 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 		userID = account.userID
 		userIDBigint = account.userIDBigint
 		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
-			UserIdentityUuid:          util.UUIDToPg(account.identity.UserIdentityUuid),
+			UserIdentityUuid:          account.identity.UserIdentityUuid,
 			UserIdentityEmail:         &normalizedEmail,
-			UserIdentityEmailVerified: boolPtr(true),
+			UserIdentityEmailVerified: true,
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
@@ -103,7 +102,7 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 		}
 		if _, err := qtx.UpdateUserEmailIfEmptyByIDBigint(ctx, db.UpdateUserEmailIfEmptyByIDBigintParams{
 			UserEmail: &normalizedEmail,
-			UserID:    &userIDBigint,
+			UserID:    userIDBigint,
 		}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("update user email if empty: %w", err)
 		}
@@ -112,11 +111,11 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 		userID = account.userID
 		userIDBigint = account.userIDBigint
 		if _, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
-			UserUuid:                  util.UUIDToPg(userID),
-			UserIdentityProvider:      &emailProvider,
-			UserIdentityExternalID:    &normalizedEmail,
+			UserUuid:                  userID,
+			UserIdentityProvider:      string(emailProvider),
+			UserIdentityExternalID:    normalizedEmail,
 			UserIdentityEmail:         &normalizedEmail,
-			UserIdentityEmailVerified: boolPtr(true),
+			UserIdentityEmailVerified: true,
 			UserIdentityData:          identityData,
 		}); err != nil {
 			if !isUniqueViolation(err) {
@@ -141,18 +140,18 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 		if !isNewUser {
 			if _, err := qtx.UpdateUserEmailIfEmptyByIDBigint(ctx, db.UpdateUserEmailIfEmptyByIDBigintParams{
 				UserEmail: &normalizedEmail,
-				UserID:    &userIDBigint,
+				UserID:    userIDBigint,
 			}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				return nil, fmt.Errorf("update user email if empty: %w", err)
 			}
 		}
 
 		if _, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
-			UserUuid:                  util.UUIDToPg(userID),
-			UserIdentityProvider:      &emailProvider,
-			UserIdentityExternalID:    &normalizedEmail,
+			UserUuid:                  userID,
+			UserIdentityProvider:      string(emailProvider),
+			UserIdentityExternalID:    normalizedEmail,
 			UserIdentityEmail:         &normalizedEmail,
-			UserIdentityEmailVerified: boolPtr(true),
+			UserIdentityEmailVerified: true,
 			UserIdentityData:          identityData,
 		}); err != nil {
 			if !isUniqueViolation(err) {
@@ -207,13 +206,13 @@ func (s *Service) resolveEmailAccount(
 ) (*resolvedEmailAccount, error) {
 	emailProvider := AuthProviderEmail
 	identity, err := queries.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   &emailProvider,
-		UserIdentityExternalID: &normalizedEmail,
+		UserIdentityProvider:   string(emailProvider),
+		UserIdentityExternalID: normalizedEmail,
 	})
 	switch {
 	case err == nil:
 		return &resolvedEmailAccount{
-			userID:       util.PgUUIDToUUID(identity.UserUuid),
+			userID:       identity.UserUuid,
 			userIDBigint: identity.UserIDBigint,
 			identity:     &identity,
 		}, nil
@@ -223,7 +222,7 @@ func (s *Service) resolveEmailAccount(
 		return nil, nil
 	}
 
-	userRow, err := queries.GetUserByEmail(ctx, &normalizedEmail)
+	userRow, err := queries.GetUserByEmail(ctx, normalizedEmail)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return nil, nil
@@ -239,7 +238,7 @@ func (s *Service) resolveEmailAccount(
 }
 
 func (s *Service) findOrCreateUserByEmail(ctx context.Context, qtx *db.Queries, normalizedEmail string) (uuid.UUID, int64, bool, error) {
-	userRow, lookupErr := qtx.GetUserByEmail(ctx, &normalizedEmail)
+	userRow, lookupErr := qtx.GetUserByEmail(ctx, normalizedEmail)
 	switch {
 	case lookupErr == nil:
 		return userRow.UserUuid, userRow.UserIDBigint, false, nil
@@ -252,7 +251,7 @@ func (s *Service) findOrCreateUserByEmail(ctx context.Context, qtx *db.Queries, 
 		if !isUniqueViolation(createErr) {
 			return uuid.Nil, 0, false, fmt.Errorf("create user: %w", createErr)
 		}
-		userRow, lookupErr = qtx.GetUserByEmail(ctx, &normalizedEmail)
+		userRow, lookupErr = qtx.GetUserByEmail(ctx, normalizedEmail)
 		if lookupErr != nil {
 			return uuid.Nil, 0, false, fmt.Errorf("reload user after unique violation: %w", lookupErr)
 		}

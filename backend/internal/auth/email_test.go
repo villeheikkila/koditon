@@ -12,7 +12,6 @@ import (
 
 	db "koditon-go/internal/db"
 	"koditon-go/internal/emailauth"
-	"koditon-go/internal/util"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -193,14 +192,14 @@ func TestSignInWithEmail_RepairsMissingEmailIdentityFromLegacyUserEmail(t *testi
 
 	emailProvider := string(AuthProviderEmail)
 	identity, err := queries.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   &emailProvider,
-		UserIdentityExternalID: &normalizedEmail,
+		UserIdentityProvider:   emailProvider,
+		UserIdentityExternalID: normalizedEmail,
 	})
 	if err != nil {
 		t.Fatalf("get repaired email identity: %v", err)
 	}
-	if util.PgUUIDToUUID(identity.UserUuid) != user.UserUuid {
-		t.Fatalf("expected repaired identity to belong to user %s, got %s", user.UserUuid, util.PgUUIDToUUID(identity.UserUuid))
+	if identity.UserUuid != user.UserUuid {
+		t.Fatalf("expected repaired identity to belong to user %s, got %s", user.UserUuid, identity.UserUuid)
 	}
 }
 
@@ -216,9 +215,9 @@ func createAuthenticatedEmailForTest(t *testing.T, ctx context.Context, queries 
 	tokenHash := sha256.Sum256([]byte(rawToken))
 	tokenHashHex := hex.EncodeToString(tokenHash[:])
 	if _, err := queries.CreateSignupEmailToken(ctx, db.CreateSignupEmailTokenParams{
-		AuthSignupEmailTargetEmail: &normalizedEmail,
-		AuthSignupEmailTokenHash:   &tokenHashHex,
-		AuthSignupEmailExpiresAt:   util.TimeToPg(time.Now().Add(time.Hour)),
+		AuthSignupEmailTargetEmail: normalizedEmail,
+		AuthSignupEmailTokenHash:   tokenHashHex,
+		AuthSignupEmailExpiresAt:   time.Now().Add(time.Hour),
 	}); err != nil {
 		t.Fatalf("create signup email token: %v", err)
 	}

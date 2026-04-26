@@ -191,16 +191,16 @@ with active_tokens as (
 )
 select
   active_tokens.oauth_client_id,
-  coalesce(max(nullif(btrim(active_tokens.oauth_dynamic_client_name), '')), '') as oauth_dynamic_client_name,
-  min(active_tokens.oauth_refresh_token_created_at) as connected_at,
-  max(active_tokens.oauth_refresh_token_updated_at) as last_used_at,
+  coalesce(max(nullif(btrim(active_tokens.oauth_dynamic_client_name), '')), '')::text as oauth_dynamic_client_name,
+  min(active_tokens.oauth_refresh_token_created_at)::timestamptz as connected_at,
+  max(active_tokens.oauth_refresh_token_updated_at)::timestamptz as last_used_at,
   coalesce(array(
     select distinct scope
     from active_tokens grouped
     cross join lateral unnest(grouped.oauth_refresh_token_scopes) as scope
     where grouped.oauth_client_id = active_tokens.oauth_client_id
     order by scope
-  ), '{}'::text[]) as scopes
+  ), '{}'::text[])::text[] as scopes
 from active_tokens
 group by active_tokens.oauth_client_id
 order by max(active_tokens.oauth_refresh_token_updated_at) desc, active_tokens.oauth_client_id asc;

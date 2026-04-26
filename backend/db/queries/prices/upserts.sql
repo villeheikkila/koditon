@@ -174,21 +174,21 @@ SELECT DISTINCT ON (
     neighborhood_ids,
     now(),
     now()
-FROM unnest(
-    sqlc.arg(descriptions)::text[],
-    sqlc.arg(types)::text[],
-    sqlc.arg(areas)::double precision[],
-    sqlc.arg(prices)::int[],
-    sqlc.arg(price_per_square_meters)::int[],
-    sqlc.arg(build_years)::int[],
-    sqlc.arg(floors)::text[],
-    sqlc.arg(elevators)::boolean[],
-    sqlc.arg(conditions)::text[],
-    sqlc.arg(plots)::text[],
-    sqlc.arg(energy_classes)::text[],
-    sqlc.arg(categories)::text[],
-    sqlc.arg(period_identifiers)::text[],
-    sqlc.arg(neighborhood_ids)::uuid[]
+FROM ROWS FROM (
+    unnest(CAST(sqlc.arg(descriptions) AS text[])),
+    unnest(CAST(sqlc.arg(types) AS text[])),
+    unnest(CAST(sqlc.arg(areas) AS double precision[])),
+    unnest(CAST(sqlc.arg(prices) AS int[])),
+    unnest(CAST(sqlc.arg(price_per_square_meters) AS int[])),
+    unnest(CAST(sqlc.arg(build_years) AS int[])),
+    unnest(CAST(sqlc.arg(floors) AS text[])),
+    unnest(CAST(sqlc.arg(elevators) AS boolean[])),
+    unnest(CAST(sqlc.arg(conditions) AS text[])),
+    unnest(CAST(sqlc.arg(plots) AS text[])),
+    unnest(CAST(sqlc.arg(energy_classes) AS text[])),
+    unnest(CAST(sqlc.arg(categories) AS text[])),
+    unnest(CAST(sqlc.arg(period_identifiers) AS text[])),
+    unnest(CAST(sqlc.arg(neighborhood_ids) AS uuid[]))
 ) AS t(
     descriptions,
     types,

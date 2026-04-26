@@ -9,7 +9,6 @@ import (
 	"time"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -96,12 +95,12 @@ func (s *Service) CreateOAuthDeviceAuthorization(ctx context.Context, req OAuthC
 			return nil, fmt.Errorf("generate user_code: %w", codeErr)
 		}
 		_, execErr := s.queries.CreateOAuthDeviceAuthorization(ctx, db.CreateOAuthDeviceAuthorizationParams{
-			OauthDeviceAuthorizationDeviceCodeHash: &deviceCodeHash,
-			OauthClientID:                          &clientID,
-			OauthDeviceAuthorizationUserCode:       new(candidate),
+			OauthDeviceAuthorizationDeviceCodeHash: deviceCodeHash,
+			OauthClientID:                          clientID,
+			OauthDeviceAuthorizationUserCode:       candidate,
 			OauthDeviceAuthorizationScopes:         req.Scopes,
-			OauthDeviceAuthorizationAudience:       &audience,
-			OauthDeviceAuthorizationExpiresAt:      util.TimeToPg(expiresAt),
+			OauthDeviceAuthorizationAudience:       audience,
+			OauthDeviceAuthorizationExpiresAt:      expiresAt,
 		})
 		if execErr == nil {
 			userCode = candidate
@@ -129,7 +128,7 @@ func (s *Service) ApproveOAuthDeviceAuthorization(ctx context.Context, req OAuth
 	}
 	userCode := strings.ToUpper(strings.TrimSpace(req.UserCode))
 
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidRequest
@@ -139,16 +138,16 @@ func (s *Service) ApproveOAuthDeviceAuthorization(ctx context.Context, req OAuth
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return ErrOAuthExpiredToken
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return ErrOAuthInvalidGrant
 	}
-	if row.OauthDeviceAuthorizationApprovedAt.Valid {
+	if row.OauthDeviceAuthorizationApprovedAt != nil {
 		return nil
 	}
 
 	_, err = s.queries.ApproveOAuthDeviceAuthorizationByUserCode(ctx, db.ApproveOAuthDeviceAuthorizationByUserCodeParams{
-		UserUuid:                         util.UUIDToPg(req.UserID),
-		OauthDeviceAuthorizationUserCode: &userCode,
+		UserUuid:                         &req.UserID,
+		OauthDeviceAuthorizationUserCode: userCode,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -164,7 +163,7 @@ func (s *Service) DenyOAuthDeviceAuthorization(ctx context.Context, req OAuthDen
 		return ErrOAuthInvalidRequest
 	}
 	userCode := strings.ToUpper(strings.TrimSpace(req.UserCode))
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidRequest
@@ -174,15 +173,15 @@ func (s *Service) DenyOAuthDeviceAuthorization(ctx context.Context, req OAuthDen
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return ErrOAuthExpiredToken
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return ErrOAuthInvalidGrant
 	}
-	if row.OauthDeviceAuthorizationApprovedAt.Valid {
-		if !row.UserUuid.Valid || util.PgUUIDToUUID(row.UserUuid) != req.UserID {
+	if row.OauthDeviceAuthorizationApprovedAt != nil {
+		if row.UserUuid == nil || *row.UserUuid != req.UserID {
 			return ErrOAuthInvalidGrant
 		}
 	}
-	_, err = s.queries.DenyOAuthDeviceAuthorizationByUserCode(ctx, &userCode)
+	_, err = s.queries.DenyOAuthDeviceAuthorizationByUserCode(ctx, userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOAuthInvalidGrant
@@ -197,7 +196,7 @@ func (s *Service) GetOAuthDeviceAuthorizationDetailsByUserCode(ctx context.Conte
 	if trimmedCode == "" {
 		return nil, ErrOAuthInvalidRequest
 	}
-	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, new(trimmedCode))
+	row, err := s.queries.GetOAuthDeviceAuthorizationByUserCode(ctx, trimmedCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOAuthInvalidRequest
@@ -205,19 +204,16 @@ func (s *Service) GetOAuthDeviceAuthorizationDetailsByUserCode(ctx context.Conte
 		return nil, fmt.Errorf("lookup oauth device authorization: %w", err)
 	}
 	var approvedBy *uuid.UUID
-	if row.UserUuid.Valid {
-		value := util.PgUUIDToUUID(row.UserUuid)
-		approvedBy = &value
+	if row.UserUuid != nil {
+		approvedBy = row.UserUuid
 	}
 	var deniedAt *time.Time
-	if row.OauthDeviceAuthorizationDeniedAt.Valid {
-		value := row.OauthDeviceAuthorizationDeniedAt.Time
-		deniedAt = &value
+	if row.OauthDeviceAuthorizationDeniedAt != nil {
+		deniedAt = row.OauthDeviceAuthorizationDeniedAt
 	}
 	var consumedAt *time.Time
-	if row.OauthDeviceAuthorizationConsumedAt.Valid {
-		value := row.OauthDeviceAuthorizationConsumedAt.Time
-		consumedAt = &value
+	if row.OauthDeviceAuthorizationConsumedAt != nil {
+		consumedAt = row.OauthDeviceAuthorizationConsumedAt
 	}
 	return &OAuthDeviceAuthorizationDetails{
 		ID:         row.OauthDeviceAuthorizationID,
@@ -236,23 +232,23 @@ func (s *Service) GetOAuthDeviceAuthorizationStatus(ctx context.Context, clientI
 		return OAuthDeviceAuthorizationStatusPending, ErrOAuthInvalidRequest
 	}
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(deviceCode))
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OAuthDeviceAuthorizationStatusPending, ErrOAuthInvalidGrant
 		}
 		return OAuthDeviceAuthorizationStatusPending, fmt.Errorf("lookup oauth device authorization: %w", err)
 	}
-	if row.OauthClientID != strings.TrimSpace(clientID) || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthClientID != strings.TrimSpace(clientID) || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return OAuthDeviceAuthorizationStatusPending, ErrOAuthInvalidGrant
 	}
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return OAuthDeviceAuthorizationStatusExpired, nil
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil {
 		return OAuthDeviceAuthorizationStatusDenied, nil
 	}
-	if row.OauthDeviceAuthorizationApprovedAt.Valid && row.UserUuid.Valid {
+	if row.OauthDeviceAuthorizationApprovedAt != nil && row.UserUuid != nil {
 		return OAuthDeviceAuthorizationStatusReady, nil
 	}
 	return OAuthDeviceAuthorizationStatusPending, nil
@@ -265,14 +261,14 @@ func (s *Service) ExchangeOAuthDeviceCode(ctx context.Context, req OAuthExchange
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(req.DeviceCode))
 	clientID := strings.TrimSpace(req.ClientID)
 
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOAuthInvalidGrant
 		}
 		return nil, fmt.Errorf("lookup oauth device authorization: %w", err)
 	}
-	if row.OauthClientID != clientID || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthClientID != clientID || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return nil, ErrOAuthInvalidGrant
 	}
 	if row.OauthDeviceAuthorizationAudience != "" && strings.TrimSpace(req.Audience) != "" && row.OauthDeviceAuthorizationAudience != strings.TrimSpace(req.Audience) {
@@ -281,14 +277,14 @@ func (s *Service) ExchangeOAuthDeviceCode(ctx context.Context, req OAuthExchange
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return nil, ErrOAuthExpiredToken
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil {
 		return nil, ErrOAuthAccessDenied
 	}
-	if !row.OauthDeviceAuthorizationApprovedAt.Valid || !row.UserUuid.Valid {
+	if row.OauthDeviceAuthorizationApprovedAt == nil || row.UserUuid == nil {
 		return nil, ErrOAuthPending
 	}
 
-	_, err = s.queries.ConsumeOAuthDeviceAuthorizationByID(ctx, util.UUIDToPg(row.OauthDeviceAuthorizationID))
+	_, err = s.queries.ConsumeOAuthDeviceAuthorizationByID(ctx, row.OauthDeviceAuthorizationID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOAuthInvalidGrant
@@ -298,7 +294,7 @@ func (s *Service) ExchangeOAuthDeviceCode(ctx context.Context, req OAuthExchange
 
 	return s.IssueOAuthTokensForUser(ctx, OAuthIssueTokensForUserRequest{
 		ClientID: clientID,
-		UserID:   util.PgUUIDToUUID(row.UserUuid),
+		UserID:   *row.UserUuid,
 		Scopes:   row.OauthDeviceAuthorizationScopes,
 		Audience: strings.TrimSpace(req.Audience),
 	})
@@ -310,34 +306,34 @@ func (s *Service) ConsumeApprovedOAuthDeviceCode(ctx context.Context, req OAuthC
 	}
 	deviceCodeHash := hashSHA256Hex(strings.TrimSpace(req.DeviceCode))
 	clientID := strings.TrimSpace(req.ClientID)
-	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, &deviceCodeHash)
+	row, err := s.queries.GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx, deviceCodeHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, ErrOAuthInvalidGrant
 		}
 		return uuid.Nil, fmt.Errorf("lookup oauth device authorization: %w", err)
 	}
-	if row.OauthClientID != clientID || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthClientID != clientID || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return uuid.Nil, ErrOAuthInvalidGrant
 	}
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return uuid.Nil, ErrOAuthExpiredToken
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil {
 		return uuid.Nil, ErrOAuthAccessDenied
 	}
-	if !row.OauthDeviceAuthorizationApprovedAt.Valid || !row.UserUuid.Valid {
+	if row.OauthDeviceAuthorizationApprovedAt == nil || row.UserUuid == nil {
 		return uuid.Nil, ErrOAuthPending
 	}
 
-	_, err = s.queries.ConsumeOAuthDeviceAuthorizationByID(ctx, util.UUIDToPg(row.OauthDeviceAuthorizationID))
+	_, err = s.queries.ConsumeOAuthDeviceAuthorizationByID(ctx, row.OauthDeviceAuthorizationID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, ErrOAuthInvalidGrant
 		}
 		return uuid.Nil, fmt.Errorf("consume oauth device authorization: %w", err)
 	}
-	return util.PgUUIDToUUID(row.UserUuid), nil
+	return *row.UserUuid, nil
 }
 
 type OAuthCreateAuthorizationCodeFromApprovedDeviceRequest struct {
@@ -374,7 +370,7 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 	defer rollbackTx(ctx, s.logger, tx)
 
 	qtx := s.queries.WithTx(tx)
-	row, err := qtx.GetOAuthDeviceAuthorizationByUserCode(ctx, new(userCode))
+	row, err := qtx.GetOAuthDeviceAuthorizationByUserCode(ctx, userCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrOAuthInvalidRequest
@@ -390,14 +386,14 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 	if row.OauthDeviceAuthorizationExpiresAt.Before(time.Now()) {
 		return "", ErrOAuthExpiredToken
 	}
-	if row.OauthDeviceAuthorizationDeniedAt.Valid || row.OauthDeviceAuthorizationConsumedAt.Valid {
+	if row.OauthDeviceAuthorizationDeniedAt != nil || row.OauthDeviceAuthorizationConsumedAt != nil {
 		return "", ErrOAuthInvalidGrant
 	}
-	if !row.OauthDeviceAuthorizationApprovedAt.Valid || !row.UserUuid.Valid || util.PgUUIDToUUID(row.UserUuid) != req.UserID {
+	if row.OauthDeviceAuthorizationApprovedAt == nil || row.UserUuid == nil || *row.UserUuid != req.UserID {
 		return "", ErrOAuthInvalidGrant
 	}
 
-	if _, err := qtx.ConsumeOAuthDeviceAuthorizationByID(ctx, util.UUIDToPg(row.OauthDeviceAuthorizationID)); err != nil {
+	if _, err := qtx.ConsumeOAuthDeviceAuthorizationByID(ctx, row.OauthDeviceAuthorizationID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrOAuthInvalidGrant
 		}
@@ -411,15 +407,15 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 	codeHash := hashSHA256Hex(code)
 	audience := strings.TrimSpace(req.Audience)
 	if _, err := qtx.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            &codeHash,
-		OauthClientID:                             &clientID,
-		UserUuid:                                  util.UUIDToPg(req.UserID),
-		OauthAuthorizationCodeRedirectUri:         &redirectURI,
+		OauthAuthorizationCodeCodeHash:            codeHash,
+		OauthClientID:                             clientID,
+		UserUuid:                                  req.UserID,
+		OauthAuthorizationCodeRedirectUri:         redirectURI,
 		OauthAuthorizationCodeScopes:              req.Scopes,
-		OauthAuthorizationCodeAudience:            &audience,
-		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
-		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
-		OauthAuthorizationCodeExpiresAt:           util.TimeToPg(time.Now().Add(OAuthAuthorizationCodeTTL)),
+		OauthAuthorizationCodeAudience:            audience,
+		OauthAuthorizationCodeCodeChallenge:       codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: codeChallengeMethod,
+		OauthAuthorizationCodeExpiresAt:           time.Now().Add(OAuthAuthorizationCodeTTL),
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)
 	}

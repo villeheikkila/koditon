@@ -9,7 +9,6 @@ import (
 	"time"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -26,7 +25,7 @@ type ConnectedAppItem struct {
 }
 
 func (s *Service) ListConnectedApps(ctx context.Context, userID uuid.UUID) ([]ConnectedAppItem, error) {
-	rows, err := s.queries.ListOAuthAppConnectionsByUserID(ctx, util.UUIDToPg(userID))
+	rows, err := s.queries.ListOAuthAppConnectionsByUserID(ctx, userID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("list connected apps: %w", err)
 	}
@@ -43,10 +42,7 @@ func (s *Service) ListConnectedApps(ctx context.Context, userID uuid.UUID) ([]Co
 			continue
 		}
 
-		displayName := ""
-		if row.OauthDynamicClientName != nil {
-			displayName = strings.TrimSpace(*row.OauthDynamicClientName)
-		}
+		displayName := strings.TrimSpace(row.OauthDynamicClientName)
 		if displayName == "" && hasMetadata {
 			displayName = strings.TrimSpace(metadata.DisplayName)
 		}
@@ -67,8 +63,8 @@ func (s *Service) ListConnectedApps(ctx context.Context, userID uuid.UUID) ([]Co
 			LogoURL:      logoURL,
 			IsFirstParty: hasMetadata && metadata.IsFirstParty,
 			Scopes:       append([]string(nil), row.Scopes...),
-			ConnectedAt:  row.ConnectedAt.Time,
-			LastUsedAt:   row.LastUsedAt.Time,
+			ConnectedAt:  row.ConnectedAt,
+			LastUsedAt:   row.LastUsedAt,
 		})
 	}
 
@@ -82,8 +78,8 @@ func (s *Service) RevokeConnectedApp(ctx context.Context, userID uuid.UUID, clie
 	}
 
 	_, err := s.queries.RevokeAllOAuthRefreshTokensByUserIDAndClientID(ctx, db.RevokeAllOAuthRefreshTokensByUserIDAndClientIDParams{
-		UserUuid:      util.UUIDToPg(userID),
-		OauthClientID: &clientID,
+		UserUuid:      userID,
+		OauthClientID: clientID,
 	})
 	if err != nil {
 		return fmt.Errorf("revoke connected app: %w", err)
@@ -100,7 +96,7 @@ func (s *Service) RevokeConnectedApp(ctx context.Context, userID uuid.UUID, clie
 }
 
 func (s *Service) dynamicClientLogoURL(ctx context.Context, clientID string) string {
-	row, err := s.queries.GetOAuthDynamicClientByID(ctx, &clientID)
+	row, err := s.queries.GetOAuthDynamicClientByID(ctx, clientID)
 	if err != nil {
 		return ""
 	}

@@ -1,12 +1,14 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +51,7 @@ func (s *Server) Handler(mux *http.ServeMux, humaAPI huma.API) http.Handler {
 		s.webHandler.Register(mux)
 	}
 	var handler http.Handler = mux
+	handler = s.recoveryMiddleware(handler)
 	handler = s.loggingMiddleware(handler)
 	handler = s.bodySizeLimitMiddleware(handler)
 	rl := newRateLimiter(300, time.Minute)
@@ -100,6 +103,29 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func (s *Server) recoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				s.logger.ErrorContext(
+					r.Context(),
+					"request panicked",
+					"panic", recovered,
+					"stack", string(debug.Stack()),
+					"outcome", logging.OutcomeError,
+				)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"status": http.StatusInternalServerError,
+					"title":  http.StatusText(http.StatusInternalServerError),
+				})
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) bodySizeLimitMiddleware(next http.Handler) http.Handler {

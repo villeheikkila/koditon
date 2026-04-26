@@ -12,7 +12,6 @@ import (
 	"time"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -86,15 +85,15 @@ func (s *Service) CreateOAuthAuthorizationCode(ctx context.Context, req OAuthCre
 	codeChallenge := strings.TrimSpace(req.CodeChallenge)
 	codeChallengeMethod := strings.TrimSpace(req.CodeChallengeMethod)
 	if _, err := s.queries.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            &codeHash,
-		OauthClientID:                             &clientID,
-		UserUuid:                                  util.UUIDToPg(req.UserID),
-		OauthAuthorizationCodeRedirectUri:         &redirectURI,
+		OauthAuthorizationCodeCodeHash:            codeHash,
+		OauthClientID:                             clientID,
+		UserUuid:                                  req.UserID,
+		OauthAuthorizationCodeRedirectUri:         redirectURI,
 		OauthAuthorizationCodeScopes:              req.Scopes,
-		OauthAuthorizationCodeAudience:            &audience,
-		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
-		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
-		OauthAuthorizationCodeExpiresAt:           util.TimeToPg(time.Now().Add(OAuthAuthorizationCodeTTL)),
+		OauthAuthorizationCodeAudience:            audience,
+		OauthAuthorizationCodeCodeChallenge:       codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: codeChallengeMethod,
+		OauthAuthorizationCodeExpiresAt:           time.Now().Add(OAuthAuthorizationCodeTTL),
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)
 	}
@@ -114,12 +113,12 @@ func (s *Service) ExchangeOAuthAuthorizationCode(ctx context.Context, req OAuthE
 	audience := strings.TrimSpace(req.Audience)
 	codeChallengeMethod := "S256"
 	row, err := s.queries.ConsumeOAuthAuthorizationCode(ctx, db.ConsumeOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            &codeHash,
-		OauthClientID:                             &clientID,
-		OauthAuthorizationCodeRedirectUri:         &redirectURI,
-		OauthAuthorizationCodeAudience:            &audience,
-		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
-		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
+		OauthAuthorizationCodeCodeHash:            codeHash,
+		OauthClientID:                             clientID,
+		OauthAuthorizationCodeRedirectUri:         redirectURI,
+		OauthAuthorizationCodeAudience:            audience,
+		OauthAuthorizationCodeCodeChallenge:       codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: codeChallengeMethod,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -251,14 +250,18 @@ func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID 
 		ttl = defaultOAuthRefreshTokenTTL
 	}
 	expiresAt := time.Now().Add(ttl)
+	var rotatedFromValue *uuid.UUID
+	if rotatedFrom != uuid.Nil {
+		rotatedFromValue = &rotatedFrom
+	}
 	if _, err := queries.CreateOAuthRefreshToken(ctx, db.CreateOAuthRefreshTokenParams{
-		OauthRefreshTokenTokenHash:   new(hashSHA256Hex(refreshToken)),
-		OauthClientID:                new(clientID),
-		UserUuid:                     util.UUIDToPg(userID),
+		OauthRefreshTokenTokenHash:   hashSHA256Hex(refreshToken),
+		OauthClientID:                clientID,
+		UserUuid:                     userID,
 		OauthRefreshTokenScopes:      scopes,
-		OauthRefreshTokenAudience:    new(strings.TrimSpace(audience)),
-		OauthRefreshTokenExpiresAt:   util.TimeToPg(expiresAt),
-		OauthRefreshTokenRotatedFrom: util.UUIDToPg(rotatedFrom),
+		OauthRefreshTokenAudience:    strings.TrimSpace(audience),
+		OauthRefreshTokenExpiresAt:   expiresAt,
+		OauthRefreshTokenRotatedFrom: rotatedFromValue,
 	}); err != nil {
 		return "", time.Time{}, err
 	}

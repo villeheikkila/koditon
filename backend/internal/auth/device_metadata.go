@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -24,7 +23,7 @@ func (s *Service) updateDeviceMetadata(
 
 	qtx := s.queries.WithTx(tx)
 	if err := qtx.UpdateDeviceMetadata(ctx, db.UpdateDeviceMetadataParams{
-		UserDeviceUuid:       util.UUIDToPg(deviceID),
+		UserDeviceUuid:       deviceID,
 		UserDeviceName:       nullableString(params.DeviceName),
 		UserDeviceOs:         nullableString(params.DeviceOS),
 		UserDeviceModel:      nullableString(params.DeviceModel),
@@ -46,7 +45,7 @@ func (s *Service) updateSessionMetadata(
 	qtx := s.queries.WithTx(tx)
 	location := s.resolveSessionLocation(ctx, params)
 	if err := qtx.UpdateSessionMetadata(ctx, db.UpdateSessionMetadataParams{
-		DeviceSessionUuid:                util.UUIDToPg(sessionID),
+		DeviceSessionUuid:                sessionID,
 		DeviceSessionDeviceName:          nullableString(params.DeviceName),
 		DeviceSessionDeviceOs:            nullableString(params.DeviceOS),
 		DeviceSessionDeviceModel:         nullableString(params.DeviceModel),

@@ -16,12 +16,10 @@ import (
 
 	db "koditon-go/internal/db"
 	"koditon-go/internal/logging"
-	"koditon-go/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -48,27 +46,19 @@ func (s *Service) CreatePersonalAccessToken(ctx context.Context, userID uuid.UUI
 	if len(scopes) > 0 {
 		scopeList = scopes
 	}
-	var expiresAtPg pgtype.Timestamptz
-	if expiresAt != nil {
-		expiresAtPg = util.TimeToPg(*expiresAt)
-	}
 	for range apiKeyPrefixAttempts {
 		prefix, secret, err := generatePersonalAccessToken()
 		if err != nil {
 			return "", fmt.Errorf("generate token: %w", err)
 		}
 		tokenHash := hashPersonalAccessTokenSecretSHA256(secret)
-		nameValue := name
-		prefixValue := prefix
-		hashValue := tokenHash
-		userIDValue := user.UserIDBigint
 		_, err = s.queries.CreatePersonalAccessToken(ctx, db.CreatePersonalAccessTokenParams{
-			UserID:                       &userIDValue,
-			PersonalAccessTokenName:      &nameValue,
-			PersonalAccessTokenPrefix:    &prefixValue,
-			PersonalAccessTokenTokenHash: &hashValue,
+			UserID:                       user.UserIDBigint,
+			PersonalAccessTokenName:      name,
+			PersonalAccessTokenPrefix:    prefix,
+			PersonalAccessTokenTokenHash: tokenHash,
 			PersonalAccessTokenScopes:    scopeList,
-			PersonalAccessTokenExpiresAt: expiresAtPg,
+			PersonalAccessTokenExpiresAt: expiresAt,
 		})
 		if err == nil {
 			return fmt.Sprintf("%s.%s", prefix, secret), nil
@@ -87,17 +77,17 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 	if !ok {
 		return nil, ErrInvalidToken
 	}
-	row, err := s.queries.GetPersonalAccessTokenByPrefix(ctx, &prefix)
+	row, err := s.queries.GetPersonalAccessTokenByPrefix(ctx, prefix)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidToken
 		}
 		return nil, fmt.Errorf("get token: %w", err)
 	}
-	if row.PersonalAccessTokenRevokedAt.Valid {
+	if row.PersonalAccessTokenRevokedAt != nil {
 		return nil, ErrTokenRevoked
 	}
-	if row.PersonalAccessTokenExpiresAt.Valid && time.Now().After(row.PersonalAccessTokenExpiresAt.Time) {
+	if row.PersonalAccessTokenExpiresAt != nil && time.Now().After(*row.PersonalAccessTokenExpiresAt) {
 		return nil, ErrTokenExpired
 	}
 	expected := []byte(row.PersonalAccessTokenTokenHash)
@@ -121,7 +111,7 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 	if err != nil {
 		return nil, fmt.Errorf("get feature flags: %w", err)
 	}
-	if err := s.queries.UpdatePersonalAccessTokenLastUsed(ctx, util.UUIDToPg(row.PersonalAccessTokenID)); err != nil {
+	if err := s.queries.UpdatePersonalAccessTokenLastUsed(ctx, row.PersonalAccessTokenID); err != nil {
 		logging.With(s.logger, logging.Op("auth.personal_access_token.last_used"), slog.String("token_prefix", prefix)).WarnContext(ctx, "personal access token last used update failed", "error", err, "outcome", logging.OutcomeError)
 	}
 	claims := &AccessTokenClaims{
@@ -134,8 +124,8 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 		Scopes:       row.PersonalAccessTokenScopes,
 		IssuedAt:     time.Now(),
 	}
-	if row.PersonalAccessTokenExpiresAt.Valid {
-		claims.ExpiresAt = row.PersonalAccessTokenExpiresAt.Time
+	if row.PersonalAccessTokenExpiresAt != nil {
+		claims.ExpiresAt = *row.PersonalAccessTokenExpiresAt
 	}
 	logging.With(s.logger, logging.Op("auth.personal_access_token.verify"), slog.String("token_prefix", prefix), slog.Any("user_id", userID)).DebugContext(ctx, "personal access token authenticated", "outcome", logging.OutcomeSuccess)
 	return claims, nil

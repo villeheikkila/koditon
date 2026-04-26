@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"koditon-go/internal/util"
-
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -35,7 +33,7 @@ type ListSessionItem struct {
 }
 
 func (s *Service) ListSessions(ctx context.Context, userID, currentSessionID uuid.UUID) ([]ListSessionItem, error) {
-	rows, err := s.queries.GetSessionsByUserID(ctx, util.UUIDToPg(userID))
+	rows, err := s.queries.GetSessionsByUserID(ctx, userID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}
@@ -43,13 +41,13 @@ func (s *Service) ListSessions(ctx context.Context, userID, currentSessionID uui
 	items := make([]ListSessionItem, 0, len(rows))
 	for _, row := range rows {
 		var lastRefreshedAt *time.Time
-		if row.DeviceSessionRefreshedAt.Valid {
-			lastRefreshedAt = &row.DeviceSessionRefreshedAt.Time
+		if row.DeviceSessionRefreshedAt != nil {
+			lastRefreshedAt = row.DeviceSessionRefreshedAt
 		}
 
 		var expiresAt *time.Time
-		if row.DeviceSessionNotAfter.Valid {
-			expiresAt = &row.DeviceSessionNotAfter.Time
+		if row.DeviceSessionNotAfter != nil {
+			expiresAt = row.DeviceSessionNotAfter
 		}
 
 		lastSeenAt := row.UserDeviceLastSeenAt

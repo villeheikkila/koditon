@@ -12,11 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"koditon-go/internal/auth"
 	db "koditon-go/internal/db"
-	"koditon-go/internal/util"
 )
 
 const (
@@ -87,16 +85,16 @@ func (h *Handler) createAuthorizationHandoff(
 		clientName = strings.TrimSpace(req.ClientID)
 	}
 	row, err := h.queries.CreateOAuthAuthorizationHandoff(ctx, db.CreateOAuthAuthorizationHandoffParams{
-		OauthAuthorizationHandoffTokenHash:           new(hashText(token)),
-		OauthAuthorizationHandoffUserCode:            &handoffUserCode,
-		OauthClientID:                                new(strings.TrimSpace(req.ClientID)),
-		OauthAuthorizationHandoffRedirectUri:         new(strings.TrimSpace(req.RedirectURI)),
+		OauthAuthorizationHandoffTokenHash:           hashText(token),
+		OauthAuthorizationHandoffUserCode:            handoffUserCode,
+		OauthClientID:                                strings.TrimSpace(req.ClientID),
+		OauthAuthorizationHandoffRedirectUri:         strings.TrimSpace(req.RedirectURI),
 		OauthAuthorizationHandoffScopes:              append([]string(nil), req.Scope...),
-		OauthAuthorizationHandoffAudience:            new(strings.TrimSpace(req.Resource)),
-		OauthAuthorizationHandoffState:               new(strings.TrimSpace(req.State)),
-		OauthAuthorizationHandoffCodeChallenge:       new(strings.TrimSpace(req.CodeChallenge)),
-		OauthAuthorizationHandoffCodeChallengeMethod: new(strings.TrimSpace(req.CodeChallengeMethod)),
-		OauthAuthorizationHandoffExpiresAt:           util.TimeToPg(time.Now().Add(oauthAuthorizationHandoffTTL)),
+		OauthAuthorizationHandoffAudience:            strings.TrimSpace(req.Resource),
+		OauthAuthorizationHandoffState:               strings.TrimSpace(req.State),
+		OauthAuthorizationHandoffCodeChallenge:       strings.TrimSpace(req.CodeChallenge),
+		OauthAuthorizationHandoffCodeChallengeMethod: strings.TrimSpace(req.CodeChallengeMethod),
+		OauthAuthorizationHandoffExpiresAt:           time.Now().Add(oauthAuthorizationHandoffTTL),
 	})
 	if err != nil {
 		return nil, "", err
@@ -115,8 +113,8 @@ func (h *Handler) createAuthorizationHandoff(
 		row.UserUuid,
 		row.OauthAuthorizationHandoffAuthorizationCode,
 		row.OauthAuthorizationHandoffRedirectUrl,
-		row.OauthAuthorizationHandoffDeniedAt.Valid,
-		row.OauthAuthorizationHandoffCompletedAt.Valid,
+		row.OauthAuthorizationHandoffDeniedAt != nil,
+		row.OauthAuthorizationHandoffCompletedAt != nil,
 		row.OauthAuthorizationHandoffExpiresAt,
 	)
 	handoff.ClientDisplayName = clientName
@@ -132,7 +130,7 @@ func (h *Handler) getAuthorizationHandoffByID(ctx context.Context, id string) (*
 	if err != nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByID(ctx, util.UUIDToPg(parsedID))
+	row, err := h.queries.GetOAuthAuthorizationHandoffByID(ctx, parsedID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -153,8 +151,8 @@ func (h *Handler) getAuthorizationHandoffByID(ctx context.Context, id string) (*
 		row.UserUuid,
 		row.OauthAuthorizationHandoffAuthorizationCode,
 		row.OauthAuthorizationHandoffRedirectUrl,
-		row.OauthAuthorizationHandoffDeniedAt.Valid,
-		row.OauthAuthorizationHandoffCompletedAt.Valid,
+		row.OauthAuthorizationHandoffDeniedAt != nil,
+		row.OauthAuthorizationHandoffCompletedAt != nil,
 		row.OauthAuthorizationHandoffExpiresAt,
 	), true
 }
@@ -163,7 +161,7 @@ func (h *Handler) getAuthorizationHandoffByToken(ctx context.Context, token stri
 	if h.queries == nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, new(hashText(strings.TrimSpace(token))))
+	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, hashText(strings.TrimSpace(token)))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -184,8 +182,8 @@ func (h *Handler) getAuthorizationHandoffByToken(ctx context.Context, token stri
 		row.UserUuid,
 		row.OauthAuthorizationHandoffAuthorizationCode,
 		row.OauthAuthorizationHandoffRedirectUrl,
-		row.OauthAuthorizationHandoffDeniedAt.Valid,
-		row.OauthAuthorizationHandoffCompletedAt.Valid,
+		row.OauthAuthorizationHandoffDeniedAt != nil,
+		row.OauthAuthorizationHandoffCompletedAt != nil,
 		row.OauthAuthorizationHandoffExpiresAt,
 	), true
 }
@@ -196,7 +194,7 @@ func (h *Handler) getAuthorizationHandoffByUserCode(ctx context.Context, userCod
 	}
 	row, err := h.queries.GetOAuthAuthorizationHandoffByUserCode(
 		ctx,
-		new(strings.ToUpper(strings.TrimSpace(userCode))),
+		strings.ToUpper(strings.TrimSpace(userCode)),
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -218,8 +216,8 @@ func (h *Handler) getAuthorizationHandoffByUserCode(ctx context.Context, userCod
 		row.UserUuid,
 		row.OauthAuthorizationHandoffAuthorizationCode,
 		row.OauthAuthorizationHandoffRedirectUrl,
-		row.OauthAuthorizationHandoffDeniedAt.Valid,
-		row.OauthAuthorizationHandoffCompletedAt.Valid,
+		row.OauthAuthorizationHandoffDeniedAt != nil,
+		row.OauthAuthorizationHandoffCompletedAt != nil,
 		row.OauthAuthorizationHandoffExpiresAt,
 	), true
 }
@@ -235,7 +233,7 @@ func handoffFromStoredRow(
 	state string,
 	codeChallenge string,
 	codeChallengeMethod string,
-	userUUID pgtype.UUID,
+	userUUID *uuid.UUID,
 	authorizationCode *string,
 	redirectURL *string,
 	denied bool,
@@ -250,7 +248,7 @@ func handoffFromStoredRow(
 		status = "completed"
 	case denied:
 		status = "denied"
-	case authorizationCode != nil && redirectURL != nil && userUUID.Valid:
+	case authorizationCode != nil && redirectURL != nil && userUUID != nil:
 		status = "approved"
 	}
 	redirectHost := redirectURI
@@ -272,7 +270,7 @@ func handoffFromStoredRow(
 		CodeChallengeMethod: codeChallengeMethod,
 		ExpiresAt:           expiresAt,
 		Status:              status,
-		ApprovedBy:          util.PgUUIDToUUID(userUUID),
+		ApprovedBy:          uuidValue(userUUID),
 	}
 	if authorizationCode != nil {
 		handoff.AuthorizationCode = *authorizationCode
@@ -291,6 +289,13 @@ func (h *Handler) handoffStatusPayload(handoff *oauthAuthorizationHandoff) map[s
 		payload["redirect_url"] = handoff.RedirectURL
 	}
 	return payload
+}
+
+func uuidValue(value *uuid.UUID) uuid.UUID {
+	if value == nil {
+		return uuid.Nil
+	}
+	return *value
 }
 
 func (h *Handler) renderAuthorizeHandoffPage(w http.ResponseWriter, handoff *oauthAuthorizationHandoff, token string) {
@@ -512,10 +517,10 @@ func (h *Handler) handleAuthorizeHandoffApprove(w http.ResponseWriter, r *http.R
 		return
 	}
 	row, err := h.queries.ApproveOAuthAuthorizationHandoffByID(r.Context(), db.ApproveOAuthAuthorizationHandoffByIDParams{
-		UserUuid: util.UUIDToPg(claims.UserID),
+		UserUuid: &claims.UserID,
 		OauthAuthorizationHandoffAuthorizationCode: &code,
 		OauthAuthorizationHandoffRedirectUrl:       &redirectURL,
-		OauthAuthorizationHandoffID:                util.UUIDToPg(id),
+		OauthAuthorizationHandoffID:                id,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -540,8 +545,8 @@ func (h *Handler) handleAuthorizeHandoffApprove(w http.ResponseWriter, r *http.R
 		row.UserUuid,
 		row.OauthAuthorizationHandoffAuthorizationCode,
 		row.OauthAuthorizationHandoffRedirectUrl,
-		row.OauthAuthorizationHandoffDeniedAt.Valid,
-		row.OauthAuthorizationHandoffCompletedAt.Valid,
+		row.OauthAuthorizationHandoffDeniedAt != nil,
+		row.OauthAuthorizationHandoffCompletedAt != nil,
 		row.OauthAuthorizationHandoffExpiresAt,
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "redirect_url": updated.RedirectURL})
@@ -573,7 +578,7 @@ func (h *Handler) handleAuthorizeHandoffDeny(w http.ResponseWriter, r *http.Requ
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid handoff id")
 		return
 	}
-	if _, err := h.queries.DenyOAuthAuthorizationHandoffByID(r.Context(), util.UUIDToPg(id)); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := h.queries.DenyOAuthAuthorizationHandoffByID(r.Context(), id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		h.logger.ErrorContext(r.Context(), "deny oauth authorization handoff failed", "error", err)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to deny handoff")
 		return

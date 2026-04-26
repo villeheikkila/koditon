@@ -59,6 +59,11 @@ type rawConfig struct {
 	LogLevel        string        `env:"LOG_LEVEL,required"`
 	Mode            AppMode       `env:"APP_MODE,required"`
 	DatabaseURL     string        `env:"DATABASE_URL,required"`
+	DBMaxConns      int32         `env:"DB_MAX_CONNS" envDefault:"10"`
+	DBMinConns      int32         `env:"DB_MIN_CONNS" envDefault:"2"`
+	DBMaxLifetime   time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"30m"`
+	DBMaxIdleTime   time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"5m"`
+	DBHealthPeriod  time.Duration `env:"DB_HEALTH_CHECK_PERIOD" envDefault:"1m"`
 
 	AuthJWTSigningKey    string        `env:"AUTH_JWT_SIGNING_KEY" envDefault:""`
 	AuthJWTIssuer        string        `env:"AUTH_JWT_ISSUER" envDefault:""`
@@ -125,6 +130,13 @@ func (r rawConfig) toConfig() Config {
 		LogLevel:        r.LogLevel,
 		Mode:            r.Mode,
 		DatabaseURL:     r.DatabaseURL,
+		Database: DatabaseConfig{
+			MaxConns:          r.DBMaxConns,
+			MinConns:          r.DBMinConns,
+			MaxConnLifetime:   r.DBMaxLifetime,
+			MaxConnIdleTime:   r.DBMaxIdleTime,
+			HealthCheckPeriod: r.DBHealthPeriod,
+		},
 		Auth: AuthConfig{
 			JWTSigningKey:    r.AuthJWTSigningKey,
 			JWTIssuer:        r.AuthJWTIssuer,
@@ -186,6 +198,7 @@ type Config struct {
 	LogLevel                 string
 	Mode                     AppMode
 	DatabaseURL              string
+	Database                 DatabaseConfig
 	Auth                     AuthConfig
 	Prices                   PricesConfig
 	Shortcut                 ShortcutConfig
@@ -198,6 +211,14 @@ type Config struct {
 	APIPublicBaseURL         string
 	OpenAIAppsChallengeToken string
 	CORSAllowedOrigins       string
+}
+
+type DatabaseConfig struct {
+	MaxConns          int32
+	MinConns          int32
+	MaxConnLifetime   time.Duration
+	MaxConnIdleTime   time.Duration
+	HealthCheckPeriod time.Duration
 }
 
 func (c Config) SlogLevel() slog.Level {
@@ -325,6 +346,24 @@ func (c Config) Validate() error {
 	}
 	if c.ShutdownTimeout <= 0 {
 		errs = append(errs, fmt.Errorf("APP_SHUTDOWN_TIMEOUT must be positive"))
+	}
+	if c.Database.MaxConns <= 0 {
+		errs = append(errs, fmt.Errorf("DB_MAX_CONNS must be positive"))
+	}
+	if c.Database.MinConns < 0 {
+		errs = append(errs, fmt.Errorf("DB_MIN_CONNS must not be negative"))
+	}
+	if c.Database.MinConns > c.Database.MaxConns {
+		errs = append(errs, fmt.Errorf("DB_MIN_CONNS must not exceed DB_MAX_CONNS"))
+	}
+	if c.Database.MaxConnLifetime <= 0 {
+		errs = append(errs, fmt.Errorf("DB_MAX_CONN_LIFETIME must be positive"))
+	}
+	if c.Database.MaxConnIdleTime <= 0 {
+		errs = append(errs, fmt.Errorf("DB_MAX_CONN_IDLE_TIME must be positive"))
+	}
+	if c.Database.HealthCheckPeriod <= 0 {
+		errs = append(errs, fmt.Errorf("DB_HEALTH_CHECK_PERIOD must be positive"))
 	}
 	if !isValidLogLevel(c.LogLevel) {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL must be debug, info, warn, warning, or error"))

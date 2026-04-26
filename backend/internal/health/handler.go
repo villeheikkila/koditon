@@ -8,21 +8,29 @@ import (
 
 	"koditon-go/internal/buildinfo"
 	"koditon-go/internal/config"
+	"koditon-go/internal/db"
+	"koditon-go/internal/schema"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
-	pool *pgxpool.Pool
-	mode config.AppMode
-	info buildinfo.Info
+	pool    *pgxpool.Pool
+	queries *db.Queries
+	mode    config.AppMode
+	info    buildinfo.Info
 }
 
 func New(pool *pgxpool.Pool, mode config.AppMode, info buildinfo.Info) *Handler {
+	var queries *db.Queries
+	if pool != nil {
+		queries = db.New(pool)
+	}
 	return &Handler{
-		pool: pool,
-		mode: mode,
-		info: info,
+		pool:    pool,
+		queries: queries,
+		mode:    mode,
+		info:    info,
 	}
 }
 
@@ -53,18 +61,27 @@ func (h *Handler) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	}
 	checkCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	checks := map[string]string{"database": "ok"}
+	checks := map[string]string{
+		"database": "ok",
+		"schema":   "ok",
+	}
 	status := http.StatusOK
+	if h.pool == nil || h.queries == nil {
+		status = http.StatusServiceUnavailable
+		checks["database"] = "unavailable"
+		checks["schema"] = "unavailable"
+		writeJSON(w, status, bodyForReadyz(status, h.mode, checks))
+		return
+	}
 	if err := h.pool.Ping(checkCtx); err != nil {
 		status = http.StatusServiceUnavailable
 		checks["database"] = "unavailable"
 	}
-	body := map[string]any{
-		"status": statusText(status),
-		"mode":   h.mode.String(),
-		"checks": checks,
+	if err := schema.Check(checkCtx, h.queries); err != nil {
+		status = http.StatusServiceUnavailable
+		checks["schema"] = "unavailable"
 	}
-	writeJSON(w, status, body)
+	writeJSON(w, status, bodyForReadyz(status, h.mode, checks))
 }
 
 func statusText(status int) string {
@@ -72,6 +89,14 @@ func statusText(status int) string {
 		return "ok"
 	}
 	return "degraded"
+}
+
+func bodyForReadyz(status int, mode config.AppMode, checks map[string]string) map[string]any {
+	return map[string]any{
+		"status": statusText(status),
+		"mode":   mode.String(),
+		"checks": checks,
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

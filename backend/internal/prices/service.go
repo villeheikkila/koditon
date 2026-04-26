@@ -534,7 +534,7 @@ func (s *Service) MatchNeighborhoodsWithLLM(
 	totalRemaining := int(countRow)
 	processed := 0
 	matched := 0
-	offset := int64(0)
+	offset := int32(0)
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -583,7 +583,7 @@ func (s *Service) MatchNeighborhoodsWithLLM(
 		if len(neighborhoods) < batchSize {
 			break
 		}
-		offset += int64(batchSize)
+		offset += int32(batchSize)
 	}
 	if progressFn != nil {
 		progressFn(MatchNeighborhoodsProgress{

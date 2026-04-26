@@ -31,6 +31,7 @@ import (
 	"koditon-go/internal/requestid"
 	"koditon-go/internal/runtimecfg"
 	"koditon-go/internal/runtimekv"
+	"koditon-go/internal/schema"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/telegram"
@@ -89,9 +90,9 @@ func run(
 		"commit", info.Commit,
 		"build_time", info.BuildTime,
 	)
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := newDatabasePool(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("create database pool: %w", err)
+		return err
 	}
 	lifecycle.Defer("database pool", func(context.Context) error {
 		pool.Close()
@@ -99,6 +100,9 @@ func run(
 	})
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
+	}
+	if err := schema.Check(ctx, db.New(pool)); err != nil {
+		return fmt.Errorf("check schema: %w", err)
 	}
 	appLogger.DebugContext(ctx, "database connection established")
 	if cfg.Mode.Consumer {
@@ -179,7 +183,7 @@ func run(
 				RPOrigins:     origins,
 			}
 		}
-		keySetStore := runtimekv.New(pool)
+		keySetStore := runtimekv.New(db.New(pool))
 		authService, err := auth.NewService(ctx, auth.ServiceConfig{
 			Pool:             pool,
 			Auth:             authCfg,
@@ -272,6 +276,23 @@ func run(
 	}
 	shutdownLogger.InfoContext(ctx, "graceful shutdown complete", "outcome", logging.OutcomeSuccess)
 	return nil
+}
+
+func newDatabasePool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database pool config: %w", err)
+	}
+	poolCfg.MaxConns = cfg.Database.MaxConns
+	poolCfg.MinConns = cfg.Database.MinConns
+	poolCfg.MaxConnLifetime = cfg.Database.MaxConnLifetime
+	poolCfg.MaxConnIdleTime = cfg.Database.MaxConnIdleTime
+	poolCfg.HealthCheckPeriod = cfg.Database.HealthCheckPeriod
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("create database pool: %w", err)
+	}
+	return pool, nil
 }
 
 type lifecycleCleanup struct {
