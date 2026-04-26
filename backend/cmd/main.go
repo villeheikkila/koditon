@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"koditon-go/internal/auth"
+	"koditon-go/internal/buildinfo"
 	"koditon-go/internal/config"
 	"koditon-go/internal/consumers"
 	db "koditon-go/internal/db"
 	"koditon-go/internal/frontdoor"
+	"koditon-go/internal/health"
 	"koditon-go/internal/logging"
 	"koditon-go/internal/mcpserver"
 	"koditon-go/internal/oauthapi"
@@ -28,6 +30,7 @@ import (
 	"koditon-go/internal/prices"
 	"koditon-go/internal/requestid"
 	"koditon-go/internal/runtimecfg"
+	"koditon-go/internal/runtimekv"
 	"koditon-go/internal/server"
 	"koditon-go/internal/shortcut"
 	"koditon-go/internal/telegram"
@@ -36,7 +39,6 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
-	"github.com/redis/go-redis/v9"
 	openrouter "github.com/revrost/go-openrouter"
 )
 
@@ -61,7 +63,7 @@ func run(
 	_ func(string) string,
 	_ io.Reader,
 	_, stderr io.Writer,
-) error {
+) (runErr error) {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	cfg, err := config.Load()
@@ -70,20 +72,35 @@ func run(
 	}
 	logger := newLogger(stderr, cfg)
 	appLogger := logging.With(logger.With("component", "app"), logging.Op("app.start"))
+	info := buildinfo.Current()
+	lifecycle := newLifecycle(appLogger)
+	defer func() {
+		if runErr != nil {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cleanupCancel()
+			runErr = errors.Join(runErr, lifecycle.Cleanup(cleanupCtx))
+		}
+	}()
 	appLogger.InfoContext(ctx, "starting application",
 		"env", cfg.Environment,
 		"log_level", cfg.LogLevel,
 		"mode", cfg.Mode.String(),
+		"version", info.Version,
+		"commit", info.Commit,
+		"build_time", info.BuildTime,
 	)
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("create database pool: %w", err)
 	}
+	lifecycle.Defer("database pool", func(context.Context) error {
+		pool.Close()
+		return nil
+	})
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
 	appLogger.DebugContext(ctx, "database connection established")
-	var consumer *consumers.Consumer
 	if cfg.Mode.Consumer {
 		openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
 		pricesService, err := prices.NewService(
@@ -112,7 +129,7 @@ func run(
 			cfg.Frontdoor.SitemapBase,
 		)
 		postalService := postal.NewService(pool)
-		consumer = consumers.New(
+		consumer := consumers.New(
 			logger,
 			pool,
 			pricesService,
@@ -124,13 +141,14 @@ func run(
 		if err := consumer.Start(ctx, consumerConfig); err != nil {
 			return fmt.Errorf("start consumer: %w", err)
 		}
+		lifecycle.Defer("consumer", func(context.Context) error {
+			consumer.Stop()
+			return nil
+		})
 	}
 	var httpServer *http.Server
 	var errCh chan error
 	if cfg.Mode.API {
-		redisClient := redis.NewClient(&redis.Options{
-			Addr: cfg.Redis.Addr,
-		})
 		authCfg := &runtimecfg.AuthConfig{
 			JWT: runtimecfg.JWTAuthConfig{
 				PrivateKey:  cfg.Auth.JWTSigningKey,
@@ -161,17 +179,22 @@ func run(
 				RPOrigins:     origins,
 			}
 		}
+		keySetStore := runtimekv.New(pool)
 		authService, err := auth.NewService(ctx, auth.ServiceConfig{
-			Pool:        pool,
-			Auth:        authCfg,
-			RedisClient: redisClient,
-			Logger:      logger,
+			Pool:             pool,
+			Auth:             authCfg,
+			AppleKeySetStore: keySetStore,
+			Logger:           logger,
 		})
 		if err != nil {
 			return fmt.Errorf("create auth service: %w", err)
 		}
-		srv := server.New(logger, cfg, pool, redisClient, authService)
+		lifecycle.Defer("auth service", func(context.Context) error {
+			return authService.Close()
+		})
+		srv := server.New(logger, cfg, pool, authService)
 		mux := http.NewServeMux()
+		health.New(pool, cfg.Mode, info).Register(mux)
 		if cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != "" {
 			oauthHandler, err := oauthapi.New(logger, oauthapi.Config{
 				HTTP: runtimecfg.HTTPConfig{
@@ -191,7 +214,6 @@ func run(
 		mux.Handle("/mcp", mcpSrv)
 		mux.Handle("/mcp/", mcpSrv)
 		mux.Handle("/.well-known/openai-apps-challenge", mcpSrv)
-		mux.Handle("/health", mcpSrv)
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)
@@ -222,26 +244,14 @@ func run(
 		logging.With(appLogger, logging.Op("app.shutdown")).InfoContext(ctx, "shutdown signal received")
 	case err := <-errCh:
 		if err != nil {
-			if consumer != nil {
-				consumer.Stop()
-			}
 			return fmt.Errorf("http server: %w", err)
-		}
-		if consumer != nil {
-			consumer.Stop()
 		}
 		return nil
 	}
-	// graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 	var shutdownErrs []error
 	shutdownLogger := logging.With(appLogger, logging.Op("app.shutdown"))
-	shutdownLogger.DebugContext(ctx, "stopping consumer")
-	if consumer != nil {
-		consumer.Stop()
-		shutdownLogger.DebugContext(ctx, "consumer stopped")
-	}
 	if httpServer != nil {
 		shutdownLogger.DebugContext(ctx, "shutting down http server")
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
@@ -254,14 +264,50 @@ func run(
 			shutdownErrs = append(shutdownErrs, fmt.Errorf("http server: %w", err))
 		}
 	}
-	shutdownLogger.DebugContext(ctx, "closing database pool")
-	pool.Close()
-	shutdownLogger.DebugContext(ctx, "database pool closed")
+	if err := lifecycle.Cleanup(shutdownCtx); err != nil {
+		shutdownErrs = append(shutdownErrs, err)
+	}
 	if len(shutdownErrs) > 0 {
 		return errors.Join(shutdownErrs...)
 	}
 	shutdownLogger.InfoContext(ctx, "graceful shutdown complete", "outcome", logging.OutcomeSuccess)
 	return nil
+}
+
+type lifecycleCleanup struct {
+	name string
+	fn   func(context.Context) error
+}
+
+type lifecycleStack struct {
+	logger   *slog.Logger
+	cleanups []lifecycleCleanup
+	closed   bool
+}
+
+func newLifecycle(logger *slog.Logger) *lifecycleStack {
+	return &lifecycleStack{logger: logging.With(logger, logging.Op("app.cleanup"))}
+}
+
+func (l *lifecycleStack) Defer(name string, fn func(context.Context) error) {
+	l.cleanups = append(l.cleanups, lifecycleCleanup{name: name, fn: fn})
+}
+
+func (l *lifecycleStack) Cleanup(ctx context.Context) error {
+	if l.closed {
+		return nil
+	}
+	l.closed = true
+	var errs []error
+	for i := len(l.cleanups) - 1; i >= 0; i-- {
+		cleanup := l.cleanups[i]
+		l.logger.DebugContext(ctx, "running cleanup", "resource", cleanup.name)
+		if err := cleanup.fn(ctx); err != nil {
+			l.logger.ErrorContext(ctx, "cleanup failed", "resource", cleanup.name, "error", err, "outcome", logging.OutcomeError)
+			errs = append(errs, fmt.Errorf("%s cleanup: %w", cleanup.name, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func isTerminal(w io.Writer) bool {

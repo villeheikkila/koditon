@@ -1,10 +1,13 @@
 package config
 
 import (
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,42 +60,40 @@ type rawConfig struct {
 	Mode            AppMode       `env:"APP_MODE,required"`
 	DatabaseURL     string        `env:"DATABASE_URL,required"`
 
-	AuthJWTSigningKey    string        `env:"AUTH_JWT_SIGNING_KEY,required"`
-	AuthJWTIssuer        string        `env:"AUTH_JWT_ISSUER,required"`
+	AuthJWTSigningKey    string        `env:"AUTH_JWT_SIGNING_KEY" envDefault:""`
+	AuthJWTIssuer        string        `env:"AUTH_JWT_ISSUER" envDefault:""`
 	AuthJWTUIDHashSalt   string        `env:"AUTH_UID_HASH_SALT" envDefault:""`
 	AuthOAuthCookieKey   string        `env:"AUTH_OAUTH_COOKIE_SIGNING_KEY" envDefault:""`
 	AuthOAuthATTL        time.Duration `env:"AUTH_OAUTH_ACCESS_TOKEN_TTL" envDefault:"15m"`
 	AuthOAuthRTTL        time.Duration `env:"AUTH_OAUTH_REFRESH_TOKEN_TTL" envDefault:"8760h"`
 	AuthPasskeyRPName    string        `env:"AUTH_PASSKEY_RP_DISPLAY_NAME" envDefault:"Koditon"`
-	AuthPasskeyRPID      string        `env:"AUTH_PASSKEY_RP_ID" envDefault:"localhost"`
-	AuthPasskeyRPOrigins string        `env:"AUTH_PASSKEY_RP_ORIGINS" envDefault:"http://localhost:3000"`
+	AuthPasskeyRPID      string        `env:"AUTH_PASSKEY_RP_ID" envDefault:""`
+	AuthPasskeyRPOrigins string        `env:"AUTH_PASSKEY_RP_ORIGINS" envDefault:""`
 
-	AuthAppleBundleID       string `env:"AUTH_APPLE_BUNDLE_ID,required"`
-	AuthAppleTeamID         string `env:"AUTH_APPLE_TEAM_ID,required"`
-	AuthApplePrivateKeyID   string `env:"AUTH_APPLE_PRIVATE_KEY_ID,required"`
-	AuthApplePrivateKey     string `env:"AUTH_APPLE_PRIVATE_KEY,required"`
+	AuthAppleBundleID       string `env:"AUTH_APPLE_BUNDLE_ID" envDefault:""`
+	AuthAppleTeamID         string `env:"AUTH_APPLE_TEAM_ID" envDefault:""`
+	AuthApplePrivateKeyID   string `env:"AUTH_APPLE_PRIVATE_KEY_ID" envDefault:""`
+	AuthApplePrivateKey     string `env:"AUTH_APPLE_PRIVATE_KEY" envDefault:""`
 	AuthAppleWebServiceID   string `env:"AUTH_APPLE_WEB_SERVICE_ID" envDefault:""`
 	AuthAppleWebRedirectURI string `env:"AUTH_APPLE_WEB_REDIRECT_URI" envDefault:""`
 
-	PricesBaseURL string `env:"PRICES_BASE_URL,required"`
+	PricesBaseURL string `env:"PRICES_BASE_URL" envDefault:""`
 
-	ShortcutBaseURL     string `env:"SHORTCUT_BASE_URL,required"`
-	ShortcutDocsBaseURL string `env:"SHORTCUT_DOCS_BASE_URL,required"`
-	ShortcutAdBaseURL   string `env:"SHORTCUT_AD_BASE_URL,required"`
-	ShortcutUserAgent   string `env:"SHORTCUT_USER_AGENT,required"`
-	ShortcutSitemapBase string `env:"SHORTCUT_SITEMAP_BASE_URL,required"`
+	ShortcutBaseURL     string `env:"SHORTCUT_BASE_URL" envDefault:""`
+	ShortcutDocsBaseURL string `env:"SHORTCUT_DOCS_BASE_URL" envDefault:""`
+	ShortcutAdBaseURL   string `env:"SHORTCUT_AD_BASE_URL" envDefault:""`
+	ShortcutUserAgent   string `env:"SHORTCUT_USER_AGENT" envDefault:""`
+	ShortcutSitemapBase string `env:"SHORTCUT_SITEMAP_BASE_URL" envDefault:""`
 
-	FrontdoorBaseURL     string `env:"FRONTDOOR_BASE_URL,required"`
-	FrontdoorUserAgent   string `env:"FRONTDOOR_USER_AGENT,required"`
-	FrontdoorCookie      string `env:"FRONTDOOR_COOKIE,required"`
-	FrontdoorSitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL,required"`
+	FrontdoorBaseURL     string `env:"FRONTDOOR_BASE_URL" envDefault:""`
+	FrontdoorUserAgent   string `env:"FRONTDOOR_USER_AGENT" envDefault:""`
+	FrontdoorCookie      string `env:"FRONTDOOR_COOKIE" envDefault:""`
+	FrontdoorSitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL" envDefault:""`
 
-	OpenRouterAPIKey string `env:"OPENROUTER_API_KEY,required"`
+	OpenRouterAPIKey string `env:"OPENROUTER_API_KEY" envDefault:""`
 
-	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN,required"`
-	TelegramChatID   string `env:"TELEGRAM_CHAT_ID,required"`
-
-	RedisAddr string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN" envDefault:""`
+	TelegramChatID   string `env:"TELEGRAM_CHAT_ID" envDefault:""`
 
 	WebBaseURL               string `env:"WEB_BASE_URL" envDefault:""`
 	WebStaticDir             string `env:"WEB_STATIC_DIR" envDefault:""`
@@ -166,9 +167,6 @@ func (r rawConfig) toConfig() Config {
 			BotToken: r.TelegramBotToken,
 			ChatID:   r.TelegramChatID,
 		},
-		Redis: RedisConfig{
-			Addr: r.RedisAddr,
-		},
 		WebBaseURL:               r.WebBaseURL,
 		WebStaticDir:             r.WebStaticDir,
 		MCPAuthToken:             r.MCPAuthToken,
@@ -194,7 +192,6 @@ type Config struct {
 	Frontdoor                FrontdoorConfig
 	OpenRouter               OpenRouterConfig
 	Telegram                 TelegramConfig
-	Redis                    RedisConfig
 	WebBaseURL               string
 	WebStaticDir             string
 	MCPAuthToken             string
@@ -318,8 +315,156 @@ func (c AppleAuthConfig) IsConfigured() bool {
 	return c.BundleID != "" && c.TeamID != "" && c.PrivateKeyID != "" && c.PrivateKey != ""
 }
 
-type RedisConfig struct {
-	Addr string
+func (c Config) Validate() error {
+	var errs []error
+	requireValue(&errs, "APP_HOST", c.Host)
+	requireValue(&errs, "APP_PORT", c.Port)
+	requireValue(&errs, "DATABASE_URL", c.DatabaseURL)
+	if port, err := strconv.Atoi(strings.TrimSpace(c.Port)); err != nil || port < 1 || port > 65535 {
+		errs = append(errs, fmt.Errorf("APP_PORT must be a valid TCP port"))
+	}
+	if c.ShutdownTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("APP_SHUTDOWN_TIMEOUT must be positive"))
+	}
+	if !isValidLogLevel(c.LogLevel) {
+		errs = append(errs, fmt.Errorf("LOG_LEVEL must be debug, info, warn, warning, or error"))
+	}
+	validateURL(&errs, "DATABASE_URL", c.DatabaseURL, "postgres", "postgresql")
+	if c.Mode.API {
+		c.validateAPI(&errs)
+	}
+	if c.Mode.Consumer {
+		c.validateConsumer(&errs)
+	}
+	validateOptionalURL(&errs, "WEB_BASE_URL", c.WebBaseURL, "http", "https")
+	validateOptionalURL(&errs, "API_PUBLIC_BASE_URL", c.APIPublicBaseURL, "http", "https")
+	validateCORSOrigins(&errs, c.CORSAllowedOrigins)
+	return errors.Join(errs...)
+}
+
+func (c Config) validateAPI(errs *[]error) {
+	requireValue(errs, "AUTH_JWT_SIGNING_KEY", c.Auth.JWTSigningKey)
+	requireValue(errs, "AUTH_JWT_ISSUER", c.Auth.JWTIssuer)
+	c.validateAppleAuth(errs)
+	if c.Auth.OAuthATTL <= 0 {
+		*errs = append(*errs, fmt.Errorf("AUTH_OAUTH_ACCESS_TOKEN_TTL must be positive"))
+	}
+	if c.Auth.OAuthRTTL <= 0 {
+		*errs = append(*errs, fmt.Errorf("AUTH_OAUTH_REFRESH_TOKEN_TTL must be positive"))
+	}
+	if c.Auth.OAuthCookieKey != "" {
+		requireValue(errs, "API_PUBLIC_BASE_URL", c.APIPublicBaseURL)
+		validateURL(errs, "API_PUBLIC_BASE_URL", c.APIPublicBaseURL, "http", "https")
+		validateOptionalURL(errs, "WEB_BASE_URL", c.WebBaseURL, "http", "https")
+	}
+	if strings.TrimSpace(c.Auth.PasskeyRPID) != "" {
+		requireValue(errs, "AUTH_PASSKEY_RP_ORIGINS", c.Auth.PasskeyRPOrigins)
+		validateOrigins(errs, "AUTH_PASSKEY_RP_ORIGINS", c.Auth.PasskeyRPOrigins)
+		if c.Environment == EnvProduction && isLocalHost(c.Auth.PasskeyRPID) {
+			*errs = append(*errs, fmt.Errorf("AUTH_PASSKEY_RP_ID must not be localhost in production"))
+		}
+	}
+}
+
+func (c Config) validateConsumer(errs *[]error) {
+	requireURL(errs, "PRICES_BASE_URL", c.Prices.BaseURL)
+	requireURL(errs, "SHORTCUT_BASE_URL", c.Shortcut.BaseURL)
+	requireURL(errs, "SHORTCUT_DOCS_BASE_URL", c.Shortcut.DocsBaseURL)
+	requireURL(errs, "SHORTCUT_AD_BASE_URL", c.Shortcut.AdBaseURL)
+	requireValue(errs, "SHORTCUT_USER_AGENT", c.Shortcut.UserAgent)
+	requireURL(errs, "SHORTCUT_SITEMAP_BASE_URL", c.Shortcut.SitemapBase)
+	requireURL(errs, "FRONTDOOR_BASE_URL", c.Frontdoor.BaseURL)
+	requireValue(errs, "FRONTDOOR_USER_AGENT", c.Frontdoor.UserAgent)
+	requireValue(errs, "FRONTDOOR_COOKIE", c.Frontdoor.Cookie)
+	requireURL(errs, "FRONTDOOR_SITEMAP_BASE_URL", c.Frontdoor.SitemapBase)
+	requireValue(errs, "OPENROUTER_API_KEY", c.OpenRouter.APIKey)
+}
+
+func (c Config) validateAppleAuth(errs *[]error) {
+	requireValue(errs, "AUTH_APPLE_BUNDLE_ID", c.Auth.Apple.BundleID)
+	requireValue(errs, "AUTH_APPLE_TEAM_ID", c.Auth.Apple.TeamID)
+	requireValue(errs, "AUTH_APPLE_PRIVATE_KEY_ID", c.Auth.Apple.PrivateKeyID)
+	requireValue(errs, "AUTH_APPLE_PRIVATE_KEY", c.Auth.Apple.PrivateKey)
+	if strings.TrimSpace(c.Auth.Apple.PrivateKey) != "" {
+		block, _ := pem.Decode([]byte(c.Auth.Apple.PrivateKey))
+		if block == nil {
+			*errs = append(*errs, fmt.Errorf("AUTH_APPLE_PRIVATE_KEY must be PEM encoded"))
+		}
+	}
+	if c.Auth.Apple.WebServiceID != "" {
+		validateOptionalURL(errs, "AUTH_APPLE_WEB_REDIRECT_URI", c.Auth.Apple.WebRedirectURI, "http", "https")
+	}
+}
+
+func requireURL(errs *[]error, name string, value string) {
+	requireValue(errs, name, value)
+	validateURL(errs, name, value, "http", "https")
+}
+
+func requireValue(errs *[]error, name string, value string) {
+	if strings.TrimSpace(value) == "" {
+		*errs = append(*errs, fmt.Errorf("%s is required", name))
+	}
+}
+
+func validateOptionalURL(errs *[]error, name string, value string, schemes ...string) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	validateURL(errs, name, value, schemes...)
+}
+
+func validateURL(errs *[]error, name string, value string, schemes ...string) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		*errs = append(*errs, fmt.Errorf("%s must be a valid URL", name))
+		return
+	}
+	if len(schemes) == 0 {
+		return
+	}
+	for _, scheme := range schemes {
+		if parsed.Scheme == scheme {
+			return
+		}
+	}
+	*errs = append(*errs, fmt.Errorf("%s must use one of these URL schemes: %s", name, strings.Join(schemes, ", ")))
+}
+
+func validateOrigins(errs *[]error, name string, value string) {
+	parts := strings.Split(value, ",")
+	for _, part := range parts {
+		origin := strings.TrimSpace(part)
+		if origin == "" {
+			continue
+		}
+		validateURL(errs, name, origin, "http", "https")
+	}
+}
+
+func validateCORSOrigins(errs *[]error, value string) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	validateOrigins(errs, "CORS_ALLOWED_ORIGINS", value)
+}
+
+func isValidLogLevel(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "debug", "info", "warn", "warning", "error":
+		return true
+	default:
+		return false
+	}
+}
+
+func isLocalHost(value string) bool {
+	host := strings.TrimSpace(strings.ToLower(value))
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 // CurrentEnv captures the current process environment as a map.
@@ -342,7 +487,11 @@ func FromEnvMap(values map[string]string) (Config, error) {
 		return Config{}, err
 	}
 	raw.sanitize()
-	return raw.toConfig(), nil
+	cfg := raw.toConfig()
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }
 
 // FromEnv parses configuration from the current process environment.
@@ -353,7 +502,9 @@ func FromEnv() (Config, error) {
 // Load loads .env.local and .env files then parses configuration from the
 // resulting environment. Use FromEnvMap in tests instead.
 func Load() (Config, error) {
-	_ = godotenv.Load(".env.local", ".env")
+	if strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))) != string(EnvProduction) {
+		_ = godotenv.Load(".env.local", ".env")
+	}
 	return FromEnv()
 }
 

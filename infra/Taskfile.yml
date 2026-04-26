@@ -4,7 +4,14 @@ tasks:
   docker:build:
     desc: Build the backend production image
     cmds:
-      - docker build --pull -f ../backend/Dockerfile -t ${BACKEND_DOCKER_IMAGE:-koditon-backend:prod} ../backend
+      - >-
+        docker build --pull
+        --build-arg VERSION="${BACKEND_VERSION:-dev}"
+        --build-arg COMMIT="$(git -C .. rev-parse --short HEAD)"
+        --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        -f ../backend/Dockerfile
+        -t ${BACKEND_DOCKER_IMAGE:-koditon-backend:prod}
+        ../backend
 
   docker:push:
     desc: Build and push the backend image to GHCR
@@ -13,7 +20,14 @@ tasks:
       TAG: '{{.TAG | default "latest"}}'
       IMAGE: 'ghcr.io/{{.GHCR_USER}}/koditon-backend:{{.TAG}}'
     cmds:
-      - docker build --pull --platform linux/amd64 -f ../backend/Dockerfile -t {{.IMAGE}} ../backend
+      - >-
+        docker build --pull --platform linux/amd64
+        --build-arg VERSION="{{.TAG}}"
+        --build-arg COMMIT="$(git -C .. rev-parse --short HEAD)"
+        --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        -f ../backend/Dockerfile
+        -t {{.IMAGE}}
+        ../backend
       - docker push {{.IMAGE}}
 
   check:env:
@@ -86,7 +100,13 @@ tasks:
             echo "==> Backend image already exists for tag {{.BACKEND_TAG}}, skipping build"
           else
             echo "==> Building backend image with tag {{.BACKEND_TAG}}..."
-            docker build --pull --platform linux/amd64 -f ../backend/Dockerfile -t "${IMAGE}" ../backend
+            docker build --pull --platform linux/amd64 \
+              --build-arg VERSION="{{.BACKEND_TAG}}" \
+              --build-arg COMMIT="{{.HEAD_TAG}}" \
+              --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              -f ../backend/Dockerfile \
+              -t "${IMAGE}" \
+              ../backend
             docker push "${IMAGE}"
           fi
 

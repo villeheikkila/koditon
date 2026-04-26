@@ -13,7 +13,7 @@ func main() {
 		port = "8080"
 	}
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get("http://localhost:" + port + "/healthz")
+	resp, err := client.Get("http://localhost:" + port + "/readyz")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "healthcheck failed: %v\n", err)
 		os.Exit(1)

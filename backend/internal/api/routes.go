@@ -11,14 +11,6 @@ func addRoutes(a *API, api huma.API) {
 	if a.authService != nil {
 		makeMiddleware = auth.ScopedAuthMiddlewareFactory(api, a.authService)
 	}
-	huma.Get(api, "/livez", a.livezHandler, func(op *huma.Operation) {
-		op.OperationID = "livez"
-		op.Summary = "Liveness probe"
-	})
-	huma.Get(api, "/readyz", a.readyzHandler, func(op *huma.Operation) {
-		op.OperationID = "readyz"
-		op.Summary = "Readiness probe"
-	})
 	huma.Post(api, "/api/v1/ping", a.pingHandler, func(op *huma.Operation) {
 		op.OperationID = "ping"
 		op.Summary = "Echo a message"

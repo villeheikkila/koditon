@@ -14,9 +14,12 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath -buildvcs=false -ldflags="-w -s -buildid=" -o /out/koditon ./cmd/main.go
+    go build -trimpath -buildvcs=false -ldflags="-w -s -buildid= -X koditon-go/internal/buildinfo.Version=${VERSION} -X koditon-go/internal/buildinfo.Commit=${COMMIT} -X koditon-go/internal/buildinfo.BuildTime=${BUILD_TIME}" -o /out/koditon ./cmd/main.go
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \

@@ -26,7 +26,6 @@ var operationIDScopes = map[string][]string{
 }
 
 var publicOperationIDs = map[string]struct{}{
-	"healthz":                           {},
 	"entity-detail":                     {},
 	"search":                            {},
 	"auth-apple-web":                    {},

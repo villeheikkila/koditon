@@ -795,3 +795,16 @@ CREATE TABLE runtime.idempotency_keys (
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (scope, actor, idempotency_key)
 );
+
+CREATE TABLE runtime.kv_store (
+    kv_key text NOT NULL,
+    kv_value bytea NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY runtime.kv_store
+    ADD CONSTRAINT kv_store_pkey PRIMARY KEY (kv_key);
+
+CREATE INDEX runtime_kv_store_expires_at_idx ON runtime.kv_store USING btree (expires_at);

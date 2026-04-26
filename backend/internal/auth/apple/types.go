@@ -1,14 +1,22 @@
 package apple
 
-import "github.com/redis/go-redis/v9"
+import (
+	"context"
+	"time"
+)
+
+type KeySetStore interface {
+	Get(ctx context.Context, key string) ([]byte, error)
+	Set(ctx context.Context, key string, payload []byte, ttl time.Duration) error
+}
 
 type Config struct {
 	BundleID     string
 	TeamID       string
 	PrivateKeyID string
 	PrivateKey   string
-	RedisClient  *redis.Client
-	RedisKey     string
+	KeySetStore  KeySetStore
+	KeySetKey    string
 }
 
 type TokenResponse struct {

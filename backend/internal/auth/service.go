@@ -20,7 +20,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 type Service struct {
@@ -45,12 +44,12 @@ type passkeyCeremonyService interface {
 }
 
 type ServiceConfig struct {
-	Pool        *pgxpool.Pool
-	Auth        *runtimecfg.AuthConfig
-	RedisClient *redis.Client
-	GeoResolver GeoResolver
-	Logger      *slog.Logger
-	Policy      PolicyConfig
+	Pool             *pgxpool.Pool
+	Auth             *runtimecfg.AuthConfig
+	AppleKeySetStore apple.KeySetStore
+	GeoResolver      GeoResolver
+	Logger           *slog.Logger
+	Policy           PolicyConfig
 }
 
 func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
@@ -70,7 +69,7 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 		TeamID:       cfg.Auth.Apple.TeamID,
 		PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
 		PrivateKey:   cfg.Auth.Apple.PrivateKey,
-		RedisClient:  cfg.RedisClient,
+		KeySetStore:  cfg.AppleKeySetStore,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create apple client: %w", err)
@@ -82,7 +81,7 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 			TeamID:       cfg.Auth.Apple.TeamID,
 			PrivateKeyID: cfg.Auth.Apple.PrivateKeyID,
 			PrivateKey:   cfg.Auth.Apple.PrivateKey,
-			RedisClient:  cfg.RedisClient,
+			KeySetStore:  cfg.AppleKeySetStore,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create apple web client: %w", err)

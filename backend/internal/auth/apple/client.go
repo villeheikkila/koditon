@@ -17,16 +17,15 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/redis/go-redis/v9"
 )
 
 const (
-	tokenURL        = "https://appleid.apple.com/auth/token"
-	jwksURL         = "https://appleid.apple.com/auth/keys"
-	issuer          = "https://appleid.apple.com"
-	clientSecretExp = 180 * 24 * time.Hour
-	defaultRedisKey = "koditon:auth:apple:jwks"
-	redisJWKSMaxAge = 24 * time.Hour
+	tokenURL         = "https://appleid.apple.com/auth/token"
+	jwksURL          = "https://appleid.apple.com/auth/keys"
+	issuer           = "https://appleid.apple.com"
+	clientSecretExp  = 180 * 24 * time.Hour
+	defaultKeySetKey = "auth:apple:jwks"
+	keySetMaxAge     = 24 * time.Hour
 )
 
 type Client struct {
@@ -35,8 +34,8 @@ type Client struct {
 	teamID           string
 	privateKeyID     string
 	privateKey       jwk.Key
-	redisClient      *redis.Client
-	redisKey         string
+	keySetStore      KeySetStore
+	keySetKey        string
 	keySetMu         sync.RWMutex
 	keySet           jwk.Set
 	clientSecretFunc func() (string, error)
@@ -59,15 +58,15 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		teamID:       cfg.TeamID,
 		privateKeyID: cfg.PrivateKeyID,
 		privateKey:   privateKey,
-		redisClient:  cfg.RedisClient,
-		redisKey:     strings.TrimSpace(cfg.RedisKey),
+		keySetStore:  cfg.KeySetStore,
+		keySetKey:    strings.TrimSpace(cfg.KeySetKey),
 	}
-	if client.redisKey == "" {
-		client.redisKey = defaultRedisKey
+	if client.keySetKey == "" {
+		client.keySetKey = defaultKeySetKey
 	}
 	client.clientSecretFunc = client.generateClientSecret
-	if _, err := client.loadKeySetFromRedis(ctx); err != nil {
-		return nil, fmt.Errorf("load apple jwks from redis: %w", err)
+	if _, err := client.loadKeySetFromStore(ctx); err != nil {
+		return nil, fmt.Errorf("load apple jwks from store: %w", err)
 	}
 	return client, nil
 }
@@ -254,7 +253,7 @@ func (c *Client) currentKeySet(ctx context.Context) (jwk.Set, error) {
 	if keySet := c.cachedKeySet(); keySet != nil {
 		return keySet, nil
 	}
-	if keySet, err := c.loadKeySetFromRedis(ctx); err != nil {
+	if keySet, err := c.loadKeySetFromStore(ctx); err != nil {
 		return nil, err
 	} else if keySet != nil {
 		return keySet, nil
@@ -274,16 +273,16 @@ func (c *Client) setCachedKeySet(keySet jwk.Set) {
 	c.keySet = keySet
 }
 
-func (c *Client) loadKeySetFromRedis(ctx context.Context) (jwk.Set, error) {
-	if c.redisClient == nil {
+func (c *Client) loadKeySetFromStore(ctx context.Context) (jwk.Set, error) {
+	if c.keySetStore == nil {
 		return nil, nil
 	}
-	payload, err := c.redisClient.Get(ctx, c.redisKey).Bytes()
+	payload, err := c.keySetStore.Get(ctx, c.keySetKey)
 	if err != nil {
-		if err == redis.Nil {
-			return nil, nil
-		}
 		return nil, err
+	}
+	if len(payload) == 0 {
+		return nil, nil
 	}
 	return c.parseAndCacheKeySet(payload)
 }
@@ -297,8 +296,8 @@ func (c *Client) refreshKeySet(ctx context.Context) (jwk.Set, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c.redisClient != nil {
-		if err := c.redisClient.Set(ctx, c.redisKey, payload, redisJWKSMaxAge).Err(); err != nil {
+	if c.keySetStore != nil {
+		if err := c.keySetStore.Set(ctx, c.keySetKey, payload, keySetMaxAge); err != nil {
 			return nil, err
 		}
 	}

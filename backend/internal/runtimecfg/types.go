@@ -11,15 +11,6 @@ type DatabaseConfig struct {
 	HealthCheckPeriod time.Duration
 }
 
-type RedisConfig struct {
-	Addr      string
-	DB        int
-	KeyPrefix string
-	Username  string
-	Password  string
-	UseTLS    bool
-}
-
 type AppleAuthConfig struct {
 	BundleID       string
 	PrivateKey     string

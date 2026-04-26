@@ -37,7 +37,7 @@ func TestForAPIOperationServerCachePolicy(t *testing.T) {
 	if !policy.Cache.ServerEnabled() {
 		t.Fatal("expected server cache policy to be enabled")
 	}
-	if policy.Cache.Server.Store != ServerCacheStoreRedis {
+	if policy.Cache.Server.Store != ServerCacheStorePostgres {
 		t.Fatalf("unexpected server cache store: %q", policy.Cache.Server.Store)
 	}
 	if policy.Cache.Server.TTL <= 0 {

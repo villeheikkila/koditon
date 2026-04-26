@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"koditon-go/internal/ads"
 	"koditon-go/internal/auth"
@@ -118,8 +117,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/.well-known/openai-apps-challenge":
 		h.handleOpenAIAppsChallenge(w)
-	case r.Method == http.MethodGet && r.URL.Path == "/health":
-		h.writeHealth(w)
 	default:
 		h.mcpHandler.ServeHTTP(w, r)
 	}
@@ -132,16 +129,6 @@ func (h *Handler) handleOpenAIAppsChallenge(w http.ResponseWriter) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = io.WriteString(w, h.openAIAppsChallengeToken)
-}
-
-func (h *Handler) writeHealth(w http.ResponseWriter) {
-	body := map[string]any{
-		"status":  "ok",
-		"service": "koditon-mcp",
-		"time":    time.Now().UTC().Format(time.RFC3339),
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(body)
 }
 
 func setSecurityHeaders(w http.ResponseWriter) {

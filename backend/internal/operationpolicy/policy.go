@@ -48,8 +48,8 @@ type HTTPCachePolicy struct {
 type ServerCacheStore string
 
 const (
-	ServerCacheStoreNone  ServerCacheStore = ""
-	ServerCacheStoreRedis ServerCacheStore = "redis"
+	ServerCacheStoreNone     ServerCacheStore = ""
+	ServerCacheStorePostgres ServerCacheStore = "postgres"
 )
 
 type ServerCachePolicy struct {
@@ -86,7 +86,7 @@ var (
 		UseLastModified:      true,
 	}
 	configServerCache = ServerCachePolicy{
-		Store: ServerCacheStoreRedis,
+		Store: ServerCacheStorePostgres,
 		TTL:   5 * time.Minute,
 	}
 
