@@ -12,6 +12,106 @@ import (
 	"github.com/google/uuid"
 )
 
+const getTransactionAdvancedByID = `-- name: GetTransactionAdvancedByID :one
+SELECT
+    ht.prices_transaction_id AS transaction_id,
+    ht.prices_transaction_description AS description,
+    ht.prices_transaction_type AS type,
+    ht.prices_transaction_category AS category,
+    ht.prices_transaction_area AS area,
+    ht.prices_transaction_price AS price,
+    ht.prices_transaction_price_per_square_meter AS price_per_square_meter,
+    ht.prices_transaction_build_year AS build_year,
+    ht.prices_transaction_floor AS floor,
+    ht.prices_transaction_elevator AS elevator,
+    ht.prices_transaction_condition AS condition,
+    ht.prices_transaction_plot AS plot,
+    ht.prices_transaction_energy_class AS energy_class,
+    ht.prices_transaction_period_identifier AS period_identifier,
+    ht.prices_transaction_created_at AS created_at,
+    ht.prices_transaction_updated_at AS updated_at,
+    pn.prices_neighborhood_id AS neighborhood_id,
+    pn.prices_neighborhood_name AS neighborhood,
+    ppc.postal_postal_code_id AS postal_code_id,
+    COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
+    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area,
+    pm.postal_municipality_id AS municipality_id,
+    COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
+    pc.prices_city_name AS city
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.prices_cities AS pc
+    ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE ht.prices_transaction_id = $1
+LIMIT 1
+`
+
+type GetTransactionAdvancedByIDRow struct {
+	TransactionID       uuid.UUID  `json:"transaction_id"`
+	Description         string     `json:"description"`
+	Type                string     `json:"type"`
+	Category            string     `json:"category"`
+	Area                float64    `json:"area"`
+	Price               int32      `json:"price"`
+	PricePerSquareMeter int32      `json:"price_per_square_meter"`
+	BuildYear           int32      `json:"build_year"`
+	Floor               *string    `json:"floor"`
+	Elevator            bool       `json:"elevator"`
+	Condition           *string    `json:"condition"`
+	Plot                *string    `json:"plot"`
+	EnergyClass         *string    `json:"energy_class"`
+	PeriodIdentifier    string     `json:"period_identifier"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	NeighborhoodID      uuid.UUID  `json:"neighborhood_id"`
+	Neighborhood        string     `json:"neighborhood"`
+	PostalCodeID        *uuid.UUID `json:"postal_code_id"`
+	PostalCode          string     `json:"postal_code"`
+	PostalArea          string     `json:"postal_area"`
+	MunicipalityID      *uuid.UUID `json:"municipality_id"`
+	Municipality        string     `json:"municipality"`
+	City                string     `json:"city"`
+}
+
+func (q *Queries) GetTransactionAdvancedByID(ctx context.Context, transactionID uuid.UUID) (GetTransactionAdvancedByIDRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionAdvancedByID, transactionID)
+	var i GetTransactionAdvancedByIDRow
+	err := row.Scan(
+		&i.TransactionID,
+		&i.Description,
+		&i.Type,
+		&i.Category,
+		&i.Area,
+		&i.Price,
+		&i.PricePerSquareMeter,
+		&i.BuildYear,
+		&i.Floor,
+		&i.Elevator,
+		&i.Condition,
+		&i.Plot,
+		&i.EnergyClass,
+		&i.PeriodIdentifier,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.NeighborhoodID,
+		&i.Neighborhood,
+		&i.PostalCodeID,
+		&i.PostalCode,
+		&i.PostalArea,
+		&i.MunicipalityID,
+		&i.Municipality,
+		&i.City,
+	)
+	return i, err
+}
+
 const listTransactionsByNeighborhoods = `-- name: ListTransactionsByNeighborhoods :many
 WITH selected_neighborhoods AS (
     SELECT UNNEST($1::uuid[]) AS neighborhood_id
@@ -346,6 +446,181 @@ func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransact
 			&i.PostalPostalCodeNameFi,
 			&i.PostalMunicipalityID,
 			&i.PostalMunicipalityNameFi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchTransactionsAdvanced = `-- name: SearchTransactionsAdvanced :many
+SELECT
+    ht.prices_transaction_id AS transaction_id,
+    ht.prices_transaction_description AS description,
+    ht.prices_transaction_type AS type,
+    ht.prices_transaction_category AS category,
+    ht.prices_transaction_area AS area,
+    ht.prices_transaction_price AS price,
+    ht.prices_transaction_price_per_square_meter AS price_per_square_meter,
+    ht.prices_transaction_build_year AS build_year,
+    ht.prices_transaction_floor AS floor,
+    ht.prices_transaction_elevator AS elevator,
+    ht.prices_transaction_condition AS condition,
+    ht.prices_transaction_plot AS plot,
+    ht.prices_transaction_energy_class AS energy_class,
+    ht.prices_transaction_period_identifier AS period_identifier,
+    ht.prices_transaction_created_at AS created_at,
+    ht.prices_transaction_updated_at AS updated_at,
+    pn.prices_neighborhood_id AS neighborhood_id,
+    pn.prices_neighborhood_name AS neighborhood,
+    ppc.postal_postal_code_id AS postal_code_id,
+    COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
+    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area,
+    pm.postal_municipality_id AS municipality_id,
+    COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
+    pc.prices_city_name AS city
+FROM public.prices_transactions AS ht
+JOIN public.prices_neighborhoods AS pn
+    ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
+JOIN public.prices_cities AS pc
+    ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc
+    ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN public.postal_municipalities AS pm
+    ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE (trim($1::text) = '' OR lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim($1::text)) || '%'))
+  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR pm.postal_municipality_id = ANY($2::uuid[]))
+  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR ppc.postal_postal_code_id = ANY($3::uuid[]))
+  AND (COALESCE(cardinality($4::text[]), 0) = 0 OR COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) = ANY($4::text[]))
+  AND (COALESCE(cardinality($5::text[]), 0) = 0 OR ht.prices_transaction_category = ANY($5::text[]))
+  AND (COALESCE(cardinality($6::text[]), 0) = 0 OR ht.prices_transaction_type = ANY($6::text[]))
+  AND ($7::int IS NULL OR ht.prices_transaction_price >= $7::int)
+  AND ($8::int IS NULL OR ht.prices_transaction_price <= $8::int)
+  AND ($9::double precision IS NULL OR ht.prices_transaction_area >= $9::double precision)
+  AND ($10::double precision IS NULL OR ht.prices_transaction_area <= $10::double precision)
+  AND (
+      trim($11::text) = ''
+      OR ht.prices_transaction_description ILIKE ('%' || $11::text || '%')
+      OR pn.prices_neighborhood_name ILIKE ('%' || $11::text || '%')
+      OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%' || $11::text || '%')
+      OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%' || $11::text || '%')
+      OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%' || $11::text || '%')
+      OR COALESCE(pm.postal_municipality_name_fi, '') ILIKE ('%' || $11::text || '%')
+      OR ht.prices_transaction_category ILIKE ('%' || $11::text || '%')
+      OR ht.prices_transaction_type ILIKE ('%' || $11::text || '%')
+      OR lower(regexp_replace(COALESCE(ht.prices_transaction_description, ''), '[^[:alnum:]]+', '', 'g')) LIKE ('%' || $12::text || '%')
+  )
+ORDER BY
+    CASE WHEN $13::text = 'price_asc' THEN ht.prices_transaction_price END ASC,
+    CASE WHEN $13::text = 'price_desc' THEN ht.prices_transaction_price END DESC,
+    CASE WHEN $13::text = 'area_asc' THEN ht.prices_transaction_area END ASC,
+    CASE WHEN $13::text = 'area_desc' THEN ht.prices_transaction_area END DESC,
+    CASE WHEN $13::text = 'date_asc' THEN ht.prices_transaction_created_at END ASC,
+    CASE WHEN $13::text IN ('date_desc', '') THEN ht.prices_transaction_created_at END DESC,
+    CASE WHEN $13::text IN ('price_asc', 'price_desc', 'area_asc', 'area_desc') THEN ht.prices_transaction_created_at END DESC,
+    CASE WHEN $13::text IN ('date_asc', 'date_desc', '') THEN ht.prices_transaction_price END ASC
+LIMIT $14::int
+`
+
+type SearchTransactionsAdvancedParams struct {
+	City            string      `json:"city"`
+	MunicipalityIds []uuid.UUID `json:"municipality_ids"`
+	PostalCodeIds   []uuid.UUID `json:"postal_code_ids"`
+	PostalCodes     []string    `json:"postal_codes"`
+	Categories      []string    `json:"categories"`
+	Types           []string    `json:"types"`
+	MinPrice        *int32      `json:"min_price"`
+	MaxPrice        *int32      `json:"max_price"`
+	MinArea         *float64    `json:"min_area"`
+	MaxArea         *float64    `json:"max_area"`
+	Query           string      `json:"query"`
+	NormalizedQuery string      `json:"normalized_query"`
+	SortMode        string      `json:"sort_mode"`
+	LimitCount      int32       `json:"limit_count"`
+}
+
+type SearchTransactionsAdvancedRow struct {
+	TransactionID       uuid.UUID  `json:"transaction_id"`
+	Description         string     `json:"description"`
+	Type                string     `json:"type"`
+	Category            string     `json:"category"`
+	Area                float64    `json:"area"`
+	Price               int32      `json:"price"`
+	PricePerSquareMeter int32      `json:"price_per_square_meter"`
+	BuildYear           int32      `json:"build_year"`
+	Floor               *string    `json:"floor"`
+	Elevator            bool       `json:"elevator"`
+	Condition           *string    `json:"condition"`
+	Plot                *string    `json:"plot"`
+	EnergyClass         *string    `json:"energy_class"`
+	PeriodIdentifier    string     `json:"period_identifier"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	NeighborhoodID      uuid.UUID  `json:"neighborhood_id"`
+	Neighborhood        string     `json:"neighborhood"`
+	PostalCodeID        *uuid.UUID `json:"postal_code_id"`
+	PostalCode          string     `json:"postal_code"`
+	PostalArea          string     `json:"postal_area"`
+	MunicipalityID      *uuid.UUID `json:"municipality_id"`
+	Municipality        string     `json:"municipality"`
+	City                string     `json:"city"`
+}
+
+func (q *Queries) SearchTransactionsAdvanced(ctx context.Context, arg SearchTransactionsAdvancedParams) ([]SearchTransactionsAdvancedRow, error) {
+	rows, err := q.db.Query(ctx, searchTransactionsAdvanced,
+		arg.City,
+		arg.MunicipalityIds,
+		arg.PostalCodeIds,
+		arg.PostalCodes,
+		arg.Categories,
+		arg.Types,
+		arg.MinPrice,
+		arg.MaxPrice,
+		arg.MinArea,
+		arg.MaxArea,
+		arg.Query,
+		arg.NormalizedQuery,
+		arg.SortMode,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchTransactionsAdvancedRow{}
+	for rows.Next() {
+		var i SearchTransactionsAdvancedRow
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.Description,
+			&i.Type,
+			&i.Category,
+			&i.Area,
+			&i.Price,
+			&i.PricePerSquareMeter,
+			&i.BuildYear,
+			&i.Floor,
+			&i.Elevator,
+			&i.Condition,
+			&i.Plot,
+			&i.EnergyClass,
+			&i.PeriodIdentifier,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.NeighborhoodID,
+			&i.Neighborhood,
+			&i.PostalCodeID,
+			&i.PostalCode,
+			&i.PostalArea,
+			&i.MunicipalityID,
+			&i.Municipality,
+			&i.City,
 		); err != nil {
 			return nil, err
 		}

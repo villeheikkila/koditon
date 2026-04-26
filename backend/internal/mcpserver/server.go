@@ -51,7 +51,6 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	impl := &toolImpl{
 		adsSvc:  ads.NewService(pool),
 		queries: db.New(pool),
-		pool:    pool,
 		config: toolImplConfig{
 			shortcutSitemapBase:  cfg.Shortcut.SitemapBase,
 			frontdoorSitemapBase: cfg.Frontdoor.SitemapBase,
@@ -353,7 +352,6 @@ func (r *bufferedResponse) Write(data []byte) (int, error) {
 type toolImpl struct {
 	adsSvc  *ads.Service
 	queries *db.Queries
-	pool    *pgxpool.Pool
 	config  toolImplConfig
 	logger  *slog.Logger
 }

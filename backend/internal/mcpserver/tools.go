@@ -646,173 +646,100 @@ type adsRankedMatch struct {
 
 func (t *toolImpl) runSearchTransactionsAdvanced(ctx context.Context, params transactionsAdvancedParams) ([]transactionsAdvancedRow, error) {
 	query := strings.TrimSpace(params.Query)
-	city := strings.TrimSpace(params.City)
-	clauses := make([]string, 0, 16)
-	clauses = append(clauses, "1=1")
-	sqlArgs := make([]any, 0, 16)
-	add := func(template string, value any) {
-		sqlArgs = append(sqlArgs, value)
-		clauses = append(clauses, fmt.Sprintf(template, len(sqlArgs)))
-	}
-	if city != "" {
-		add("lower(trim(pc.prices_city_name)) LIKE ('%%' || lower(trim($%d)) || '%%')", city)
-	}
-	if len(params.MunicipalityIDs) > 0 {
-		add("pm.postal_municipality_id = ANY($%d::uuid[])", params.MunicipalityIDs)
-	}
-	if len(params.PostalCodeIDs) > 0 {
-		add("ppc.postal_postal_code_id = ANY($%d::uuid[])", params.PostalCodeIDs)
-	}
-	if len(params.PostalCodes) > 0 {
-		add("COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) = ANY($%d::text[])", params.PostalCodes)
-	}
-	if len(params.Categories) > 0 {
-		add("ht.prices_transaction_category = ANY($%d::text[])", params.Categories)
-	}
-	if len(params.Types) > 0 {
-		add("ht.prices_transaction_type = ANY($%d::text[])", params.Types)
-	}
-	if params.MinPrice != nil {
-		add("ht.prices_transaction_price >= $%d::int", *params.MinPrice)
-	}
-	if params.MaxPrice != nil {
-		add("ht.prices_transaction_price <= $%d::int", *params.MaxPrice)
-	}
-	if params.MinArea != nil {
-		add("ht.prices_transaction_area >= $%d::double precision", *params.MinArea)
-	}
-	if params.MaxArea != nil {
-		add("ht.prices_transaction_area <= $%d::double precision", *params.MaxArea)
-	}
-	if query != "" {
-		normalized := compactText(query)
-		sqlArgs = append(sqlArgs, query)
-		qp := len(sqlArgs)
-		sqlArgs = append(sqlArgs, normalized)
-		np := len(sqlArgs)
-		clauses = append(clauses, fmt.Sprintf(`(
-			ht.prices_transaction_description ILIKE ('%%' || $%d || '%%')
-			OR pn.prices_neighborhood_name ILIKE ('%%' || $%d || '%%')
-			OR COALESCE(ppc.postal_postal_code_code, '') ILIKE ('%%' || $%d || '%%')
-			OR COALESCE(ppc_prices.prices_postal_code_code, '') ILIKE ('%%' || $%d || '%%')
-			OR COALESCE(ppc.postal_postal_code_name_fi, '') ILIKE ('%%' || $%d || '%%')
-			OR COALESCE(pm.postal_municipality_name_fi, '') ILIKE ('%%' || $%d || '%%')
-			OR ht.prices_transaction_category ILIKE ('%%' || $%d || '%%')
-			OR ht.prices_transaction_type ILIKE ('%%' || $%d || '%%')
-			OR lower(regexp_replace(COALESCE(ht.prices_transaction_description, ''), '[^[:alnum:]]+', '', 'g')) LIKE ('%%' || $%d || '%%')
-		)`, qp, qp, qp, qp, qp, qp, qp, qp, np))
-	}
-	sortClause := transactionsOrderByClause(params.Sort)
-	sqlArgs = append(sqlArgs, params.Limit)
-	limitPos := len(sqlArgs)
-	sql := fmt.Sprintf(`SELECT
-		ht.prices_transaction_id,
-		ht.prices_transaction_description,
-		ht.prices_transaction_type,
-		ht.prices_transaction_category,
-		ht.prices_transaction_area,
-		ht.prices_transaction_price,
-		ht.prices_transaction_price_per_square_meter,
-		ht.prices_transaction_build_year,
-		ht.prices_transaction_floor,
-		ht.prices_transaction_elevator,
-		ht.prices_transaction_condition,
-		ht.prices_transaction_plot,
-		ht.prices_transaction_energy_class,
-		ht.prices_transaction_period_identifier,
-		ht.prices_transaction_created_at,
-		ht.prices_transaction_updated_at,
-		pn.prices_neighborhood_id,
-		pn.prices_neighborhood_name,
-		ppc.postal_postal_code_id,
-		COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-		COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
-		pm.postal_municipality_id,
-		COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
-		pc.prices_city_name
-	FROM public.prices_transactions AS ht
-	JOIN public.prices_neighborhoods AS pn ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-	JOIN public.prices_cities AS pc ON pc.prices_city_id = pn.prices_city_id
-	LEFT JOIN public.prices_postal_codes AS ppc_prices ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-	LEFT JOIN public.postal_postal_codes AS ppc ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-	LEFT JOIN public.postal_municipalities AS pm ON pm.postal_municipality_id = ppc.postal_municipality_id
-	WHERE %s
-	ORDER BY %s
-	LIMIT $%d::int`, strings.Join(clauses, " AND "), sortClause, limitPos)
-	rows, err := t.pool.Query(ctx, sql, sqlArgs...)
+	rows, err := t.queries.SearchTransactionsAdvanced(ctx, db.SearchTransactionsAdvancedParams{
+		City:            strings.TrimSpace(params.City),
+		MunicipalityIds: params.MunicipalityIDs,
+		PostalCodeIds:   params.PostalCodeIDs,
+		PostalCodes:     params.PostalCodes,
+		Categories:      params.Categories,
+		Types:           params.Types,
+		MinPrice:        params.MinPrice,
+		MaxPrice:        params.MaxPrice,
+		MinArea:         params.MinArea,
+		MaxArea:         params.MaxArea,
+		Query:           query,
+		NormalizedQuery: compactText(query),
+		SortMode:        normalizeTransactionSort(params.Sort),
+		LimitCount:      params.Limit,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make([]transactionsAdvancedRow, 0)
-	for rows.Next() {
-		var row transactionsAdvancedRow
-		if err := rows.Scan(
-			&row.TransactionID, &row.Description, &row.Type, &row.Category,
-			&row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear,
-			&row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass,
-			&row.PeriodIdentifier, &row.CreatedAt, &row.UpdatedAt,
-			&row.NeighborhoodID, &row.Neighborhood,
-			&row.PostalCodeID, &row.PostalCode, &row.PostalArea,
-			&row.MunicipalityID, &row.Municipality, &row.City,
-		); err != nil {
-			return nil, err
-		}
-		row.Display = formatTransactionDisplay(row)
-		out = append(out, row)
+	out := make([]transactionsAdvancedRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, mapSearchTransactionsAdvancedRow(row))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (t *toolImpl) getTransactionByID(ctx context.Context, transactionID uuid.UUID) (transactionsAdvancedRow, error) {
-	sql := `SELECT
-		ht.prices_transaction_id,
-		ht.prices_transaction_description,
-		ht.prices_transaction_type,
-		ht.prices_transaction_category,
-		ht.prices_transaction_area,
-		ht.prices_transaction_price,
-		ht.prices_transaction_price_per_square_meter,
-		ht.prices_transaction_build_year,
-		ht.prices_transaction_floor,
-		ht.prices_transaction_elevator,
-		ht.prices_transaction_condition,
-		ht.prices_transaction_plot,
-		ht.prices_transaction_energy_class,
-		ht.prices_transaction_period_identifier,
-		ht.prices_transaction_created_at,
-		ht.prices_transaction_updated_at,
-		pn.prices_neighborhood_id,
-		pn.prices_neighborhood_name,
-		ppc.postal_postal_code_id,
-		COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-		COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
-		pm.postal_municipality_id,
-		COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
-		pc.prices_city_name
-	FROM public.prices_transactions AS ht
-	JOIN public.prices_neighborhoods AS pn ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-	JOIN public.prices_cities AS pc ON pc.prices_city_id = pn.prices_city_id
-	LEFT JOIN public.prices_postal_codes AS ppc_prices ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-	LEFT JOIN public.postal_postal_codes AS ppc ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-	LEFT JOIN public.postal_municipalities AS pm ON pm.postal_municipality_id = ppc.postal_municipality_id
-	WHERE ht.prices_transaction_id = $1
-	LIMIT 1`
-	var row transactionsAdvancedRow
-	err := t.pool.QueryRow(ctx, sql, transactionID).Scan(
-		&row.TransactionID, &row.Description, &row.Type, &row.Category,
-		&row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear,
-		&row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass,
-		&row.PeriodIdentifier, &row.CreatedAt, &row.UpdatedAt,
-		&row.NeighborhoodID, &row.Neighborhood,
-		&row.PostalCodeID, &row.PostalCode, &row.PostalArea,
-		&row.MunicipalityID, &row.Municipality, &row.City,
-	)
+	row, err := t.queries.GetTransactionAdvancedByID(ctx, transactionID)
 	if err != nil {
 		return transactionsAdvancedRow{}, err
 	}
-	row.Display = formatTransactionDisplay(row)
-	return row, nil
+	return mapGetTransactionAdvancedByIDRow(row), nil
+}
+
+func mapSearchTransactionsAdvancedRow(row db.SearchTransactionsAdvancedRow) transactionsAdvancedRow {
+	out := transactionsAdvancedRow{
+		TransactionID:       row.TransactionID,
+		Description:         row.Description,
+		Type:                row.Type,
+		Category:            row.Category,
+		Area:                row.Area,
+		Price:               row.Price,
+		PricePerSquareMeter: row.PricePerSquareMeter,
+		BuildYear:           row.BuildYear,
+		Floor:               row.Floor,
+		Elevator:            row.Elevator,
+		Condition:           row.Condition,
+		Plot:                row.Plot,
+		EnergyClass:         row.EnergyClass,
+		PeriodIdentifier:    row.PeriodIdentifier,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
+		NeighborhoodID:      row.NeighborhoodID,
+		Neighborhood:        row.Neighborhood,
+		PostalCodeID:        row.PostalCodeID,
+		PostalCode:          row.PostalCode,
+		PostalArea:          row.PostalArea,
+		MunicipalityID:      row.MunicipalityID,
+		Municipality:        row.Municipality,
+		City:                row.City,
+	}
+	out.Display = formatTransactionDisplay(out)
+	return out
+}
+
+func mapGetTransactionAdvancedByIDRow(row db.GetTransactionAdvancedByIDRow) transactionsAdvancedRow {
+	out := transactionsAdvancedRow{
+		TransactionID:       row.TransactionID,
+		Description:         row.Description,
+		Type:                row.Type,
+		Category:            row.Category,
+		Area:                row.Area,
+		Price:               row.Price,
+		PricePerSquareMeter: row.PricePerSquareMeter,
+		BuildYear:           row.BuildYear,
+		Floor:               row.Floor,
+		Elevator:            row.Elevator,
+		Condition:           row.Condition,
+		Plot:                row.Plot,
+		EnergyClass:         row.EnergyClass,
+		PeriodIdentifier:    row.PeriodIdentifier,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
+		NeighborhoodID:      row.NeighborhoodID,
+		Neighborhood:        row.Neighborhood,
+		PostalCodeID:        row.PostalCodeID,
+		PostalCode:          row.PostalCode,
+		PostalArea:          row.PostalArea,
+		MunicipalityID:      row.MunicipalityID,
+		Municipality:        row.Municipality,
+		City:                row.City,
+	}
+	out.Display = formatTransactionDisplay(out)
+	return out
 }
 
 // ---- result helpers ------------------------------------------------------------
@@ -1042,23 +969,6 @@ func parseUUIDs(values []string, fieldName string) ([]uuid.UUID, error) {
 		out = append(out, parsed)
 	}
 	return out, nil
-}
-
-func transactionsOrderByClause(sortMode string) string {
-	switch normalizeTransactionSort(sortMode) {
-	case "price_asc":
-		return "ht.prices_transaction_price ASC, ht.prices_transaction_created_at DESC"
-	case "price_desc":
-		return "ht.prices_transaction_price DESC, ht.prices_transaction_created_at DESC"
-	case "area_asc":
-		return "ht.prices_transaction_area ASC, ht.prices_transaction_created_at DESC"
-	case "area_desc":
-		return "ht.prices_transaction_area DESC, ht.prices_transaction_created_at DESC"
-	case "date_asc":
-		return "ht.prices_transaction_created_at ASC, ht.prices_transaction_price ASC"
-	default:
-		return "ht.prices_transaction_created_at DESC, ht.prices_transaction_price ASC"
-	}
 }
 
 func normalizeTransactionSort(value string) string {
