@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"koditon-go/internal/platform/operationpolicy"
+	"koditon/internal/platform/operationpolicy"
 )
 
 func ApplyOperationPolicyDocumentation(op *huma.Operation) {

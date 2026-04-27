@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"strings"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/domain/authz"
-	"koditon-go/internal/platform/config"
+	"koditon/internal/db"
+	"koditon/internal/domain/ads"
+	"koditon/internal/domain/auth"
+	"koditon/internal/domain/authz"
+	"koditon/internal/platform/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"

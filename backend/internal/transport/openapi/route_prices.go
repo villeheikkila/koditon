@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/db"
+	"koditon/internal/db"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"

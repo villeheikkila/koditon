@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"koditon-go/internal/db"
+	"koditon/internal/db"
 )
 
 type SearchParams struct {

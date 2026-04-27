@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"koditon-go/internal/db"
+	"koditon/internal/db"
 )
 
 type DBTX interface {

@@ -10,10 +10,10 @@ import (
 	"net/netip"
 	"time"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/auth/passkey"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/useragent"
+	db "koditon/internal/db"
+	"koditon/internal/domain/auth/passkey"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/useragent"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	wbauthn "github.com/go-webauthn/webauthn/webauthn"

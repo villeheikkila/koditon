@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"koditon-go/internal/platform/buildinfo"
-	"koditon-go/internal/platform/config"
+	"koditon/internal/platform/buildinfo"
+	"koditon/internal/platform/config"
 )
 
 func TestLivezIncludesBuildInfo(t *testing.T) {

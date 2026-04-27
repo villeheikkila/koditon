@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"koditon-go/internal/platform/util"
+	"koditon/internal/platform/util"
 )
 
 type contextKey string

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/emailauth"
+	db "koditon/internal/db"
+	"koditon/internal/domain/emailauth"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

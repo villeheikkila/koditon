@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/platform/logging"
 )
 
 type LoggerSender struct {

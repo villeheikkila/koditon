@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	openrouter "github.com/revrost/go-openrouter"
 
-	"koditon-go/internal/clients/prices"
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/util"
+	"koditon/internal/clients/prices"
+	"koditon/internal/db"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/util"
 )
 
 type Service struct {

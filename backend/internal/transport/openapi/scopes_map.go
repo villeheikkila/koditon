@@ -1,6 +1,6 @@
 package api
 
-import "koditon-go/internal/domain/auth"
+import "koditon/internal/domain/auth"
 
 func scopesForOperationID(operationID string) ([]string, bool) {
 	scopes, ok := operationIDScopes[operationID]

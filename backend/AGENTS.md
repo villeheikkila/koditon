@@ -74,8 +74,8 @@ backend/
       "github.com/jackc/pgx/v5"
       "github.com/jackc/pgx/v5/pgxpool"
       
-      "koditon-go/internal/domain/auth"
-      "koditon-go/internal/platform/config"
+      "koditon/internal/domain/auth"
+      "koditon/internal/platform/config"
   )
   ```
 

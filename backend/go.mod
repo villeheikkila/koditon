@@ -1,4 +1,4 @@
-module koditon-go
+module koditon
 
 go 1.26.0
 

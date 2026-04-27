@@ -1,7 +1,7 @@
 package api
 
 import (
-	"koditon-go/internal/domain/auth"
+	"koditon/internal/domain/auth"
 
 	"github.com/danielgtaylor/huma/v2"
 )

@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/domain/auth"
+	"koditon/internal/domain/auth"
 )
 
 type authorizeRequest struct {

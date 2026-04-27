@@ -17,7 +17,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 
-	"koditon-go/internal/platform/util"
+	"koditon/internal/platform/util"
 )
 
 type JWTConfig struct {

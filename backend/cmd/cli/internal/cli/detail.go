@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/domain/ads"
 )
 
 func RunDetail(ctx context.Context, svc *ads.Service, input, shortcutBase, frontdoorBase, webBaseURL string) error {

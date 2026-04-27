@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
+	db "koditon/internal/db"
+	"koditon/internal/platform/logging"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

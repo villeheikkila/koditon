@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/db"
+	"koditon/internal/domain/ads"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

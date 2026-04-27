@@ -8,8 +8,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/domain/auth"
+	"koditon/internal/platform/logging"
 )
 
 // --- passkey authenticate options ---

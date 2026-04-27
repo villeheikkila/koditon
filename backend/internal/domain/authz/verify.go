@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"koditon-go/internal/domain/auth"
+	"koditon/internal/domain/auth"
 )
 
 const AuthTypeBearer = "bearer"

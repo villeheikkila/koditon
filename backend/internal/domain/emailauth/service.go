@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/platform/email"
-	"koditon-go/internal/platform/emailaddr"
-	"koditon-go/internal/platform/runtimecfg"
+	db "koditon/internal/db"
+	"koditon/internal/platform/email"
+	"koditon/internal/platform/emailaddr"
+	"koditon/internal/platform/runtimecfg"
 
 	"github.com/jackc/pgx/v5"
 )

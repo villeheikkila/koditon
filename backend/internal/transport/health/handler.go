@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/buildinfo"
-	"koditon-go/internal/platform/config"
-	"koditon-go/internal/platform/schema"
+	"koditon/internal/db"
+	"koditon/internal/platform/buildinfo"
+	"koditon/internal/platform/config"
+	"koditon/internal/platform/schema"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

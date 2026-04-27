@@ -7,14 +7,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/taskqueue"
-	"koditon-go/internal/sync/flows"
-	"koditon-go/internal/sync/frontdoor"
-	"koditon-go/internal/sync/postal"
-	"koditon-go/internal/sync/prices"
-	"koditon-go/internal/sync/shortcut"
+	"koditon/internal/db"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/taskqueue"
+	"koditon/internal/sync/flows"
+	"koditon/internal/sync/frontdoor"
+	"koditon/internal/sync/postal"
+	"koditon/internal/sync/prices"
+	"koditon/internal/sync/shortcut"
 )
 
 type Consumer struct {

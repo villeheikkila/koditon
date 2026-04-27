@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"koditon-go/internal/sync/flows"
+	"koditon/internal/sync/flows"
 )
 
 type AppOption func(*appConfig)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"koditon-go/internal/platform/util"
+	"koditon/internal/platform/util"
 )
 
 func (c *Client) GetTransactionsForPage(ctx context.Context, params *ApartmentSearchParams, page int) (*TransactionResponse, error) {

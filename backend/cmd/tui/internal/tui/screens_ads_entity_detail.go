@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/domain/ads"
 )
 
 const rawJSONDefaultLimit = 8 * 1024

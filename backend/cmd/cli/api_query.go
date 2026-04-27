@@ -14,8 +14,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	frontdoorclient "koditon-go/internal/clients/frontdoor"
-	shortcutclient "koditon-go/internal/clients/shortcut"
+	frontdoorclient "koditon/internal/clients/frontdoor"
+	shortcutclient "koditon/internal/clients/shortcut"
 )
 
 type providerConfig struct {

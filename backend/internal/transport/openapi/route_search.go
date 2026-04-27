@@ -6,8 +6,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/domain/ads"
+	"koditon/internal/platform/logging"
 )
 
 type searchInput struct {

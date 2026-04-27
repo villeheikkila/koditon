@@ -8,11 +8,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/sync/frontdoor"
-	"koditon-go/internal/sync/postal"
-	"koditon-go/internal/sync/prices"
-	"koditon-go/internal/sync/shortcut"
+	"koditon/internal/domain/ads"
+	"koditon/internal/sync/frontdoor"
+	"koditon/internal/sync/postal"
+	"koditon/internal/sync/prices"
+	"koditon/internal/sync/shortcut"
 )
 
 type Runner struct {

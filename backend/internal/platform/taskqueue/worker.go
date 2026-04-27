@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/platform/logging"
 
 	"github.com/google/uuid"
 )

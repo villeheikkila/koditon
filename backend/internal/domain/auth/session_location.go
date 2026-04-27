@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/platform/logging"
 
 	"golang.org/x/text/language"
 )

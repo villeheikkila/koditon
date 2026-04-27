@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/platform/config"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/transport/openapi"
-	"koditon-go/internal/transport/web"
+	"koditon/internal/domain/ads"
+	"koditon/internal/domain/auth"
+	"koditon/internal/platform/config"
+	"koditon/internal/platform/logging"
+	"koditon/internal/transport/openapi"
+	"koditon/internal/transport/web"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgxpool"

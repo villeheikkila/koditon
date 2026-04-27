@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/domain/ads"
 )
 
 func TestBuildDetailResultOmitsRawJSONByDefault(t *testing.T) {

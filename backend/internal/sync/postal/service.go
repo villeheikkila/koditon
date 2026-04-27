@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/clients/postal"
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/clients/postal"
+	"koditon/internal/db"
+	"koditon/internal/platform/logging"
 )
 
 type Service struct {

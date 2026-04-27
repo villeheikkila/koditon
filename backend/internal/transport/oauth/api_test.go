@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"koditon-go/internal/domain/auth"
+	"koditon/internal/domain/auth"
 )
 
 func TestValidateAuthorizeRequestAcceptsCanonicalResource(t *testing.T) {

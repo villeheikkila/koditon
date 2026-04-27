@@ -1,7 +1,7 @@
 package api
 
 import (
-	"koditon-go/internal/platform/openapiutil"
+	"koditon/internal/platform/openapiutil"
 
 	"github.com/danielgtaylor/huma/v2"
 )

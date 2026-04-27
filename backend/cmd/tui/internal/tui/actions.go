@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/sync/flows"
-	"koditon-go/internal/sync/prices"
+	"koditon/internal/sync/flows"
+	"koditon/internal/sync/prices"
 )
 
 type progressUpdate struct {

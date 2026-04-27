@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"strings"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/auth/apple"
-	"koditon-go/internal/domain/auth/passkey"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/runtimecfg"
+	db "koditon/internal/db"
+	"koditon/internal/domain/auth/apple"
+	"koditon/internal/domain/auth/passkey"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/runtimecfg"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	wbauthn "github.com/go-webauthn/webauthn/webauthn"

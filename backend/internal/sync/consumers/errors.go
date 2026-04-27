@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/http"
 
-	frontdoorclient "koditon-go/internal/clients/frontdoor"
-	pricesclient "koditon-go/internal/clients/prices"
-	shortcutclient "koditon-go/internal/clients/shortcut"
-	"koditon-go/internal/platform/taskqueue"
-	"koditon-go/internal/sync/flows"
+	frontdoorclient "koditon/internal/clients/frontdoor"
+	pricesclient "koditon/internal/clients/prices"
+	shortcutclient "koditon/internal/clients/shortcut"
+	"koditon/internal/platform/taskqueue"
+	"koditon/internal/sync/flows"
 )
 
 func classifyError(err error) error {

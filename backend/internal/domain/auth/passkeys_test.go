@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	db "koditon-go/internal/db"
-	passkeysvc "koditon-go/internal/domain/auth/passkey"
+	db "koditon/internal/db"
+	passkeysvc "koditon/internal/domain/auth/passkey"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	wbauthn "github.com/go-webauthn/webauthn/webauthn"

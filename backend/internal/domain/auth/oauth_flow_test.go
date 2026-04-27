@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	db "koditon-go/internal/db"
+	db "koditon/internal/db"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

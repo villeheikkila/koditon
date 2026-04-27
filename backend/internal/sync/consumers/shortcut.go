@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/taskqueue"
+	"koditon/internal/db"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/taskqueue"
 )
 
 const (

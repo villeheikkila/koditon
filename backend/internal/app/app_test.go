@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"koditon-go/internal/platform/config"
+	"koditon/internal/platform/config"
 )
 
 func TestLifecycleCleanupRunsInReverseOrder(t *testing.T) {

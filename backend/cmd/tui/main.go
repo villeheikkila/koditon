@@ -12,14 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	openrouter "github.com/revrost/go-openrouter"
 
-	"koditon-go/cmd/tui/internal/tui"
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/platform/config"
-	"koditon-go/internal/sync/flows"
-	"koditon-go/internal/sync/frontdoor"
-	"koditon-go/internal/sync/postal"
-	"koditon-go/internal/sync/prices"
-	"koditon-go/internal/sync/shortcut"
+	"koditon/cmd/tui/internal/tui"
+	"koditon/internal/domain/ads"
+	"koditon/internal/platform/config"
+	"koditon/internal/sync/flows"
+	"koditon/internal/sync/frontdoor"
+	"koditon/internal/sync/postal"
+	"koditon/internal/sync/prices"
+	"koditon/internal/sync/shortcut"
 )
 
 func main() {

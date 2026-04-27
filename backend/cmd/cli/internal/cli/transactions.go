@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"koditon-go/internal/sync/prices"
+	"koditon/internal/sync/prices"
 )
 
 type TransactionsFlags struct {

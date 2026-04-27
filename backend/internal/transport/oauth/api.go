@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/domain/emailauth"
-	"koditon-go/internal/platform/runtimecfg"
+	db "koditon/internal/db"
+	"koditon/internal/domain/auth"
+	"koditon/internal/domain/emailauth"
+	"koditon/internal/platform/runtimecfg"
 
 	"github.com/google/uuid"
 )

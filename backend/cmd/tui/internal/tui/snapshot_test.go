@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/domain/ads"
 )
 
 func TestScreenSnapshots(t *testing.T) {

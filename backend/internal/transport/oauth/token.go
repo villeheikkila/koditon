@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/domain/auth/apple"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/util"
+	"koditon/internal/domain/auth"
+	"koditon/internal/domain/auth/apple"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/util"
 )
 
 func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {

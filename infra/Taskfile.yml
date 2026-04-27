@@ -78,7 +78,7 @@ tasks:
           . "${TMP_ENV}"
           set +a
           cd ../backend
-          GOCACHE="${TMPDIR:-/tmp}/koditon-go-build-cache" go run ./cmd/main.go verify-env --all-modes
+          GOCACHE="${TMPDIR:-/tmp}/koditon-build-cache" go run ./cmd/main.go verify-env --all-modes
         )
 
   deploy:

@@ -3,9 +3,9 @@ package frontdoor
 import (
 	"encoding/json"
 
-	"koditon-go/internal/clients/frontdoor"
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/util"
+	"koditon/internal/clients/frontdoor"
+	"koditon/internal/db"
+	"koditon/internal/platform/util"
 
 	"github.com/google/uuid"
 )

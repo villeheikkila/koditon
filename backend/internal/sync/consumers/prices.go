@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/taskqueue"
-	"koditon-go/internal/sync/prices"
+	"koditon/internal/db"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/taskqueue"
+	"koditon/internal/sync/prices"
 )
 
 const (

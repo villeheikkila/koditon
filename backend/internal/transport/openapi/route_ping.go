@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/platform/logging"
 )
 
 type PingRequest struct {

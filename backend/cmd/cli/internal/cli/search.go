@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/domain/ads"
+	"koditon/internal/domain/ads"
 )
 
 type SearchFlags struct {

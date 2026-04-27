@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/platform/logging"
-	"koditon-go/internal/platform/sitemap"
+	"koditon/internal/platform/logging"
+	"koditon/internal/platform/sitemap"
 )
 
 type SitemapURLType string

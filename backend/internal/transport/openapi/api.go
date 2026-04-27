@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"time"
 
-	frontdoorclient "koditon-go/internal/clients/frontdoor"
-	shortcutclient "koditon-go/internal/clients/shortcut"
-	"koditon-go/internal/db"
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/platform/config"
+	frontdoorclient "koditon/internal/clients/frontdoor"
+	shortcutclient "koditon/internal/clients/shortcut"
+	"koditon/internal/db"
+	"koditon/internal/domain/ads"
+	"koditon/internal/domain/auth"
+	"koditon/internal/platform/config"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"

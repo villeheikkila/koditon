@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/clients/frontdoor"
-	"koditon-go/internal/db"
+	"koditon/internal/clients/frontdoor"
+	"koditon/internal/db"
 )
 
 type Service struct {

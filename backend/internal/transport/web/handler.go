@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"koditon-go/internal/domain/ads"
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/domain/ads"
+	"koditon/internal/platform/logging"
 )
 
 //go:embed templates/*.html

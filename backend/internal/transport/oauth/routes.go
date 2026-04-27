@@ -9,8 +9,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/platform/openapiutil"
+	"koditon/internal/domain/auth"
+	"koditon/internal/platform/openapiutil"
 )
 
 const (

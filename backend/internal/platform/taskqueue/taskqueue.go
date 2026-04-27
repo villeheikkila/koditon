@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"koditon-go/internal/platform/pgmq"
+	"koditon/internal/platform/pgmq"
 )
 
 const (

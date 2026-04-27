@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/clients/postal"
-	"koditon-go/internal/db"
+	"koditon/internal/clients/postal"
+	"koditon/internal/db"
 )
 
 func parseDate(s string) *time.Time {

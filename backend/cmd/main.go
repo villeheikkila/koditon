@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"koditon-go/internal/app"
+	"koditon/internal/app"
 )
 
 func main() {

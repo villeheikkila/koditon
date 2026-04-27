@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"koditon-go/internal/platform/sitemap"
+	"koditon/internal/platform/sitemap"
 )
 
 var (

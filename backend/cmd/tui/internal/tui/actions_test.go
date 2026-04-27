@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"koditon-go/internal/sync/prices"
+	"koditon/internal/sync/prices"
 )
 
 func TestParseSortMode(t *testing.T) {

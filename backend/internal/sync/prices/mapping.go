@@ -5,9 +5,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon-go/internal/clients/prices"
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/util"
+	"koditon/internal/clients/prices"
+	"koditon/internal/db"
+	"koditon/internal/platform/util"
 )
 
 func mapUpsertCityParams(name string) string {

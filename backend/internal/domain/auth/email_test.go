@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/emailauth"
+	db "koditon/internal/db"
+	"koditon/internal/domain/emailauth"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

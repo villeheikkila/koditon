@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"koditon-go/internal/domain/auth"
-	"koditon-go/internal/platform/logging"
+	"koditon/internal/domain/auth"
+	"koditon/internal/platform/logging"
 )
 
 func (h *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {

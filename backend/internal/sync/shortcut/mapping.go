@@ -1,9 +1,9 @@
 package shortcut
 
 import (
-	"koditon-go/internal/clients/shortcut"
-	"koditon-go/internal/db"
-	"koditon-go/internal/platform/util"
+	"koditon/internal/clients/shortcut"
+	"koditon/internal/db"
+	"koditon/internal/platform/util"
 
 	"github.com/google/uuid"
 )

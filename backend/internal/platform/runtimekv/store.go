@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"koditon-go/internal/db"
+	"koditon/internal/db"
 
 	"github.com/jackc/pgx/v5"
 )

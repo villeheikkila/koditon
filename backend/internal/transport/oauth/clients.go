@@ -21,8 +21,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	db "koditon-go/internal/db"
-	"koditon-go/internal/domain/auth"
+	db "koditon/internal/db"
+	"koditon/internal/domain/auth"
 )
 
 type oauthDCRConfig struct {
