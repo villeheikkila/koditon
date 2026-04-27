@@ -159,45 +159,29 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 }
 
 func (s *Service) SyncAd(ctx context.Context, adID int64) error {
-	logger := logging.With(s.logger, logging.Op("shortcut.sync_ad"), slog.Int64("ad_id", adID))
 	adData, err := s.client.GetAdByID(ctx, int(adID))
 	if err != nil {
 		return fmt.Errorf("fetch ad data (ad_id=%d): %w", adID, err)
 	}
-	var adDataMap map[string]any
-	if err := json.Unmarshal(adData, &adDataMap); err != nil {
-		return fmt.Errorf("unmarshal ad data (ad_id=%d): %w", adID, err)
-	}
-	var adType AdType
-	if cardType, ok := adDataMap["cardType"].(float64); ok {
-		switch int(cardType) {
-		case 100:
-			adType = AdTypeListing
-		case 101:
-			adType = AdTypeRental
-		default:
-			logger.WarnContext(ctx, "unknown card type from ad data, skipping sync", "card_type", int(cardType))
-			return nil
-		}
-	} else {
-		logger.WarnContext(ctx, "missing card type in ad data, skipping sync")
-		return nil
+	payload, err := ValidateShortcutAdPayloadV1(adData, adID)
+	if err != nil {
+		return fmt.Errorf("validate ad data (ad_id=%d): %w", adID, err)
 	}
 	var shortcutBuildingID *uuid.UUID
-	if buildingData, ok := adDataMap["buildingData"].(map[string]any); ok {
-		if buildingIDFloat, ok := buildingData["buildingId"].(float64); ok {
-			buildingIDInt := int64(buildingIDFloat)
-			building, err := s.queries.GetShortcutBuildingByExternalID(ctx, buildingIDInt)
-			if err == nil {
-				shortcutBuildingID = &building.ShortcutBuildingID
-			}
+	if payload.BuildingExternalID != nil {
+		building, err := s.queries.GetShortcutBuildingByExternalID(ctx, *payload.BuildingExternalID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("get linked building (ad_id=%d, building_external_id=%d): %w", adID, *payload.BuildingExternalID, err)
+		}
+		if err == nil {
+			shortcutBuildingID = &building.ShortcutBuildingID
 		}
 	}
 	existingAd, err := s.queries.GetShortcutAdByID(ctx, adID)
 	if err != nil {
 		return fmt.Errorf("get existing ad (ad_id=%d): %w", adID, err)
 	}
-	params := mapUpsertAdParams(adID, existingAd.ShortcutAdUrl, string(adType), adData, shortcutBuildingID)
+	params := mapUpsertAdParams(adID, existingAd.ShortcutAdUrl, string(payload.AdType), payload.Raw, payload.SchemaVersion, shortcutBuildingID)
 	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}

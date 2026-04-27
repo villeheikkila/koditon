@@ -462,6 +462,7 @@ type ShortcutAd struct {
 	ShortcutAdElevator                 *bool           `json:"shortcut_ad_elevator"`
 	ShortcutAdSauna                    *bool           `json:"shortcut_ad_sauna"`
 	ShortcutAdRoomsCount               *int32          `json:"shortcut_ad_rooms_count"`
+	ShortcutAdDataSchemaVersion        int16           `json:"shortcut_ad_data_schema_version"`
 }
 
 type ShortcutBuilding struct {

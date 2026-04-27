@@ -37,13 +37,14 @@ func mapBatchUpsertAdsFromSitemapParams(entries []client.ShortcutSitemapEntry, a
 	}
 }
 
-func mapUpsertAdParams(adID int64, url string, adType string, data []byte, shortcutBuildingID *uuid.UUID) db.UpsertShortcutAdParams {
+func mapUpsertAdParams(adID int64, url string, adType string, data []byte, schemaVersion int16, shortcutBuildingID *uuid.UUID) db.UpsertShortcutAdParams {
 	return db.UpsertShortcutAdParams{
-		ShortcutAdID:       adID,
-		ShortcutAdUrl:      url,
-		ShortcutAdType:     adType,
-		ShortcutAdData:     data,
-		ShortcutBuildingID: shortcutBuildingID,
+		ShortcutAdID:                adID,
+		ShortcutAdUrl:               url,
+		ShortcutAdType:              adType,
+		ShortcutAdData:              data,
+		ShortcutAdDataSchemaVersion: schemaVersion,
+		ShortcutBuildingID:          shortcutBuildingID,
 	}
 }
 

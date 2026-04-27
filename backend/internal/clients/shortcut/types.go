@@ -3,7 +3,9 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 )
 
 type LocationResponse struct {
@@ -26,24 +28,24 @@ func (l LocationResponse) LocationString() string {
 }
 
 type Coordinates struct {
-	Latitude  float64 `json:"latitude,string,omitempty"`
-	Longitude float64 `json:"longitude,string,omitempty"`
+	Latitude  FloatOrString `json:"latitude,omitempty"`
+	Longitude FloatOrString `json:"longitude,omitempty"`
 }
 
 type BuildingData struct {
-	Address      *string `json:"address"`
-	District     *string `json:"district"`
-	City         *string `json:"city"`
-	Country      *string `json:"country"`
-	Year         *int    `json:"year"`
-	BuildingType *int    `json:"buildingType"`
+	Address      *string      `json:"address"`
+	District     *string      `json:"district"`
+	City         *string      `json:"city"`
+	Country      *string      `json:"country"`
+	Year         *IntOrString `json:"year"`
+	BuildingType *IntOrString `json:"buildingType"`
 }
 
 type Card struct {
 	ID                int             `json:"id"`
 	URL               string          `json:"url"`
 	Description       *string         `json:"description"`
-	Rooms             *int            `json:"rooms"`
+	Rooms             *IntOrString    `json:"rooms"`
 	RoomConfiguration *string         `json:"roomConfiguration"`
 	Price             *NumberOrString `json:"price"`
 	NewDevelopment    *bool           `json:"newDevelopment"`
@@ -73,7 +75,7 @@ type BuildingResponse struct {
 	SizeMin          *int         `json:"sizeMin"`
 	SizeMax          *int         `json:"sizeMax"`
 	Status           *int         `json:"status"`
-	VrkID            *string      `json:"vrkId"`
+	VrkID            *IntOrString `json:"vrkId"`
 	FormattedAddress *string      `json:"formattedAddress"`
 	URL              *string      `json:"url"`
 	Address          *AddressInfo `json:"address"`
@@ -120,6 +122,87 @@ type Media struct {
 
 type NumberOrString struct {
 	raw string
+}
+
+type IntOrString struct {
+	value int64
+	valid bool
+}
+
+func (n *IntOrString) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		n.valid = false
+		n.value = 0
+		return nil
+	}
+	raw := strings.Trim(string(data), `"`)
+	if strings.TrimSpace(raw) == "" {
+		n.valid = false
+		n.value = 0
+		return nil
+	}
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil {
+		floatValue, floatErr := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(raw), ",", "."), 64)
+		if floatErr != nil {
+			return err
+		}
+		value = int64(floatValue)
+	}
+	n.value = value
+	n.valid = true
+	return nil
+}
+
+func (n IntOrString) MarshalJSON() ([]byte, error) {
+	if !n.valid {
+		return []byte("null"), nil
+	}
+	return []byte(strconv.FormatInt(n.value, 10)), nil
+}
+
+func (n IntOrString) Int64() (int64, bool) {
+	return n.value, n.valid
+}
+
+type FloatOrString struct {
+	value float64
+	valid bool
+}
+
+func (n *FloatOrString) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		n.valid = false
+		n.value = 0
+		return nil
+	}
+	raw := strings.Trim(string(data), `"`)
+	if strings.TrimSpace(raw) == "" {
+		n.valid = false
+		n.value = 0
+		return nil
+	}
+	value, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(raw), ",", "."), 64)
+	if err != nil {
+		return err
+	}
+	n.value = value
+	n.valid = true
+	return nil
+}
+
+func (n FloatOrString) MarshalJSON() ([]byte, error) {
+	if !n.valid {
+		return []byte("null"), nil
+	}
+	if math.IsInf(n.value, 0) || math.IsNaN(n.value) {
+		return nil, fmt.Errorf("invalid float value: %v", n.value)
+	}
+	return []byte(strconv.FormatFloat(n.value, 'f', -1, 64)), nil
+}
+
+func (n FloatOrString) Float64() (float64, bool) {
+	return n.value, n.valid
 }
 
 func (n *NumberOrString) UnmarshalJSON(data []byte) error {

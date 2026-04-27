@@ -510,7 +510,8 @@ create table public.shortcut_ads (
   shortcut_ad_plot_type text,
   shortcut_ad_elevator boolean,
   shortcut_ad_sauna boolean,
-  shortcut_ad_rooms_count integer
+  shortcut_ad_rooms_count integer,
+  shortcut_ad_data_schema_version smallint default 1 not null
 );
 
 CREATE INDEX idx_shortcut_ad_zipcode_name ON public.shortcut_ads USING btree (((((shortcut_ad_data -> 'address'::text) -> 'zipCode'::text) ->> 'name'::text)));

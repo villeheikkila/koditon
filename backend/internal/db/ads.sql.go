@@ -104,7 +104,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count, shortcut_ad_data_schema_version
 `
 
 type BatchUpsertShortcutAdsFromSitemapParams struct {
@@ -159,6 +159,7 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 			&i.ShortcutAdElevator,
 			&i.ShortcutAdSauna,
 			&i.ShortcutAdRoomsCount,
+			&i.ShortcutAdDataSchemaVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +224,7 @@ func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdExt
 }
 
 const getShortcutAdByID = `-- name: GetShortcutAdByID :one
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count, shortcut_ad_data_schema_version FROM public.shortcut_ads
 WHERE shortcut_ad_id = $1
 `
 
@@ -267,6 +268,7 @@ func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdID int64) (Sh
 		&i.ShortcutAdElevator,
 		&i.ShortcutAdSauna,
 		&i.ShortcutAdRoomsCount,
+		&i.ShortcutAdDataSchemaVersion,
 	)
 	return i, err
 }
@@ -343,7 +345,7 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsPara
 }
 
 const listShortcutAds = `-- name: ListShortcutAds :many
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count, shortcut_ad_data_schema_version FROM public.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -399,6 +401,7 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams
 			&i.ShortcutAdElevator,
 			&i.ShortcutAdSauna,
 			&i.ShortcutAdRoomsCount,
+			&i.ShortcutAdDataSchemaVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -616,27 +619,30 @@ INSERT INTO public.shortcut_ads (
     shortcut_ad_url,
     shortcut_ad_type,
     shortcut_ad_data,
+    shortcut_ad_data_schema_version,
     shortcut_building_id,
     shortcut_ad_last_seen_at
 ) VALUES (
-    $1, $2, $3, $4, $5, now()
+    $1, $2, $3, $4, $5, $6, now()
 )
 ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_data = EXCLUDED.shortcut_ad_data,
+    shortcut_ad_data_schema_version = EXCLUDED.shortcut_ad_data_schema_version,
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
     shortcut_ad_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count, shortcut_ad_data_schema_version
 `
 
 type UpsertShortcutAdParams struct {
-	ShortcutAdID       int64           `json:"shortcut_ad_id"`
-	ShortcutAdUrl      string          `json:"shortcut_ad_url"`
-	ShortcutAdType     string          `json:"shortcut_ad_type"`
-	ShortcutAdData     json.RawMessage `json:"shortcut_ad_data"`
-	ShortcutBuildingID *uuid.UUID      `json:"shortcut_building_id"`
+	ShortcutAdID                int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl               string          `json:"shortcut_ad_url"`
+	ShortcutAdType              string          `json:"shortcut_ad_type"`
+	ShortcutAdData              json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutAdDataSchemaVersion int16           `json:"shortcut_ad_data_schema_version"`
+	ShortcutBuildingID          *uuid.UUID      `json:"shortcut_building_id"`
 }
 
 func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdParams) (ShortcutAd, error) {
@@ -645,6 +651,7 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdPara
 		arg.ShortcutAdUrl,
 		arg.ShortcutAdType,
 		arg.ShortcutAdData,
+		arg.ShortcutAdDataSchemaVersion,
 		arg.ShortcutBuildingID,
 	)
 	var i ShortcutAd
@@ -685,6 +692,7 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdPara
 		&i.ShortcutAdElevator,
 		&i.ShortcutAdSauna,
 		&i.ShortcutAdRoomsCount,
+		&i.ShortcutAdDataSchemaVersion,
 	)
 	return i, err
 }
@@ -702,7 +710,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_street_address, shortcut_ad_city, shortcut_ad_postal, shortcut_ad_price, shortcut_ad_area_value, shortcut_ad_address_key, shortcut_ad_search_text, shortcut_ad_description_text, shortcut_ad_availability_text, shortcut_ad_renovations_done_text, shortcut_ad_renovations_planned_text, shortcut_ad_additional_info_text, shortcut_ad_charges_text, shortcut_ad_maintenance_charge_monthly, shortcut_ad_total_charge_monthly, shortcut_ad_water_charge, shortcut_ad_debt_free_price, shortcut_ad_debt_share_amount, shortcut_ad_price_per_m2, shortcut_ad_floor_level, shortcut_ad_total_floors, shortcut_ad_build_year, shortcut_ad_condition, shortcut_ad_energy_class, shortcut_ad_plot_type, shortcut_ad_elevator, shortcut_ad_sauna, shortcut_ad_rooms_count, shortcut_ad_data_schema_version
 `
 
 type UpsertShortcutAdFromSitemapParams struct {
@@ -751,6 +759,7 @@ func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg UpsertSho
 		&i.ShortcutAdElevator,
 		&i.ShortcutAdSauna,
 		&i.ShortcutAdRoomsCount,
+		&i.ShortcutAdDataSchemaVersion,
 	)
 	return i, err
 }

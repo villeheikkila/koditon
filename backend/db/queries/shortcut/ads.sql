@@ -42,15 +42,17 @@ INSERT INTO public.shortcut_ads (
     shortcut_ad_url,
     shortcut_ad_type,
     shortcut_ad_data,
+    shortcut_ad_data_schema_version,
     shortcut_building_id,
     shortcut_ad_last_seen_at
 ) VALUES (
-    $1, $2, $3, $4, $5, now()
+    $1, $2, $3, $4, $5, $6, now()
 )
 ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_data = EXCLUDED.shortcut_ad_data,
+    shortcut_ad_data_schema_version = EXCLUDED.shortcut_ad_data_schema_version,
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
     shortcut_ad_updated_at = CURRENT_TIMESTAMP
