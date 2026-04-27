@@ -7,9 +7,12 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func TestLiveAdPayloadDecodes(t *testing.T) {
+	_ = godotenv.Load(".env.local", ".env", "../.env.local", "../.env", "backend/.env.local", "backend/.env")
 	if os.Getenv("SHORTCUT_LIVE_API_TESTS") != "1" {
 		t.Skip("set SHORTCUT_LIVE_API_TESTS=1 to run live external API tests")
 	}

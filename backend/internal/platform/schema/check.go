@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const RequiredVersion = 12
+const RequiredVersion = 14
 
 type DB interface {
 	GetSchemaVersion(ctx context.Context) (int32, error)

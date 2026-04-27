@@ -93,6 +93,81 @@ func TestValidateShortcutAdPayloadV1AcceptsBuildingObjectWithoutBuildingData(t *
 	}
 }
 
+func TestValidateShortcutAdPayloadV1AcceptsTopLevelBuildingIDAndRentPrice(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"cardId": 126,
+		"cardType": 101,
+		"buildingId": "765",
+		"address": {
+			"street": "Testikatu 4",
+			"city": "Oulu",
+			"zipCode": "90100"
+		},
+		"priceData": {"rentPerMonth": "990"},
+		"adData": {
+			"size": "38",
+			"floor": "2",
+			"totalFloors": "6",
+			"rooms": "2",
+			"elevator": "true",
+			"sauna": "0"
+		}
+	}`)
+	payload, err := ValidateShortcutAdPayloadV1(raw, 126)
+	if err != nil {
+		t.Fatalf("expected valid payload: %v", err)
+	}
+	if payload.BuildingExternalID == nil || *payload.BuildingExternalID != 765 {
+		t.Fatalf("expected building external id 765, got %v", payload.BuildingExternalID)
+	}
+}
+
+func TestValidateShortcutAdPayloadV1AcceptsSizeTotalFallback(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"cardId": 128,
+		"cardType": 100,
+		"buildingId": 765,
+		"address": {
+			"street": "Testikatu 6",
+			"city": "Oulu",
+			"zipCode": "90100"
+		},
+		"priceData": {"priceSell": 190000},
+		"adData": {
+			"size": null,
+			"sizeTotal": "187"
+		}
+	}`)
+	if _, err := ValidateShortcutAdPayloadV1(raw, 128); err != nil {
+		t.Fatalf("expected valid payload: %v", err)
+	}
+}
+
+func TestValidateShortcutAdPayloadV1RejectsMalformedOptionalDetails(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"cardId": 127,
+		"cardType": 100,
+		"buildingId": 765,
+		"address": {
+			"street": "Testikatu 5",
+			"city": "Oulu",
+			"zipCode": "90100"
+		},
+		"priceData": {"priceSell": 190000},
+		"adData": {
+			"size": "38",
+			"floor": "not-a-floor"
+		}
+	}`)
+	_, err := ValidateShortcutAdPayloadV1(raw, 127)
+	if !errors.Is(err, ErrInvalidShortcutAdPayload) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
 func TestValidateShortcutAdPayloadV1RejectsInvalidPayloads(t *testing.T) {
 	t.Parallel()
 	cases := map[string][]byte{
