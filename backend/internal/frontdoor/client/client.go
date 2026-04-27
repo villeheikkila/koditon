@@ -10,12 +10,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"koditon-go/internal/logging"
+	"koditon-go/internal/sitemap"
 )
 
 const (
@@ -206,7 +206,7 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]SitemapEntry, error) 
 			fetchErrors = append(fetchErrors, fmt.Errorf("fetch %s: %w", sitemapURL, err))
 			continue
 		}
-		for _, loc := range extractLocs(sitemapXML) {
+		for _, loc := range sitemap.ExtractLocs(sitemapXML) {
 			if entry, ok := c.parseEntry(slog.Default(), loc); ok {
 				entries = append(entries, *entry)
 			}
@@ -266,15 +266,13 @@ func (c *Client) parseEntry(logger *slog.Logger, raw string) (*SitemapEntry, boo
 	if remaining, ok := strings.CutPrefix(raw, buildingPrefix); ok {
 		id := trimAfterSeparators(remaining)
 		if strings.Contains(id, "-") {
-			logging.With(logger, logging.Op("frontdoor.sitemap.parse")).Warn("skipping building entry with hyphen in id", "id", id, "url", raw)
+			logging.With(logger, logging.Op("frontdoor.sitemap.parse")).Warn("skipping unsupported KSA housing company shell page", "slug", id, "url", raw)
 			return nil, false
 		}
 		return &SitemapEntry{ID: id, Type: EntryTypeBuilding, URL: u}, true
 	}
 	return nil, false
 }
-
-var locPattern = regexp.MustCompile(`<loc>([^<]+)</loc>`)
 
 func (c *Client) fetchXMLWithRetry(ctx context.Context, url string) (string, error) {
 	var lastErr error
@@ -295,17 +293,6 @@ func (c *Client) fetchXMLWithRetry(ctx context.Context, url string) (string, err
 		lastErr = err
 	}
 	return "", fmt.Errorf("failed after %d attempts: %w", maxRetries, lastErr)
-}
-
-func extractLocs(xml string) []string {
-	matches := locPattern.FindAllStringSubmatch(xml, -1)
-	results := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			results = append(results, strings.TrimSpace(match[1]))
-		}
-	}
-	return results
 }
 
 func (c *Client) fetchXML(ctx context.Context, url string) (string, error) {

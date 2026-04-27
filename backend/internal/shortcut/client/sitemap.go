@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"koditon-go/internal/logging"
+	"koditon-go/internal/sitemap"
 )
 
 type SitemapURLType string
@@ -45,7 +45,7 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]ShortcutSitemapEntry,
 		return nil, fmt.Errorf("fetch sitemap index: %w", err)
 	}
 	var indexURLs []string
-	for _, loc := range extractLocs(indexXML) {
+	for _, loc := range sitemap.ExtractLocs(indexXML) {
 		if strings.Contains(loc, "/sm_building_") || strings.Contains(loc, "/sm_ad_") {
 			indexURLs = append(indexURLs, loc)
 		}
@@ -58,7 +58,7 @@ func (c *Client) GetSitemapEntries(ctx context.Context) ([]ShortcutSitemapEntry,
 			fetchErrors = append(fetchErrors, fmt.Errorf("fetch %s: %w", sitemapURL, err))
 			continue
 		}
-		for _, loc := range extractLocs(sitemapXML) {
+		for _, loc := range sitemap.ExtractLocs(sitemapXML) {
 			entry, ok := parseShortcutEntry(loc)
 			if !ok {
 				logging.With(c.logger, logging.Op("shortcut.sitemap.parse")).Warn("unknown url pattern in sitemap, skipping", "url", loc)
@@ -124,19 +124,6 @@ func parseShortcutEntry(raw string) (*ShortcutSitemapEntry, bool) {
 		}
 	}
 	return &ShortcutSitemapEntry{ID: id, URL: u, Type: entryType}, true
-}
-
-var locPattern = regexp.MustCompile(`<loc>([^<]+)</loc>`)
-
-func extractLocs(xml string) []string {
-	matches := locPattern.FindAllStringSubmatch(xml, -1)
-	results := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			results = append(results, strings.TrimSpace(match[1]))
-		}
-	}
-	return results
 }
 
 func (c *Client) fetchSitemapXML(ctx context.Context, url string) (string, error) {

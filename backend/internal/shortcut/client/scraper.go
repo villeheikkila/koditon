@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"koditon-go/internal/sitemap"
 )
 
 var (
@@ -360,11 +361,10 @@ func parseRentalListings(doc *goquery.Document) ([]RentalListing, error) {
 }
 
 func (c *Client) parseSitemap(data []byte, t SitemapType) []SitemapEntry {
-	locMatches := sitemapLocRegexp.FindAllStringSubmatch(string(data), -1)
-	results := make([]SitemapEntry, 0, len(locMatches))
-	for _, match := range locMatches {
-		url := strings.TrimSpace(match[1])
-		if entry, ok := c.parseSitemapURL(url, t); ok {
+	locs := sitemap.ExtractLocs(string(data))
+	results := make([]SitemapEntry, 0, len(locs))
+	for _, loc := range locs {
+		if entry, ok := c.parseSitemapURL(loc, t); ok {
 			results = append(results, entry)
 		}
 	}
@@ -453,7 +453,6 @@ func optionalString(v string) *string {
 
 var (
 	numberCleanupRegexp = regexp.MustCompile(`[^0-9,\.]+`)
-	sitemapLocRegexp    = regexp.MustCompile(`(?i)<loc>\s*(.*?)\s*</loc>`)
 )
 
 func (c *Client) buildSitemapURLPatterns() map[SitemapType]*regexp.Regexp {
