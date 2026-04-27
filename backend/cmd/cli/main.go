@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	openrouter "github.com/revrost/go-openrouter"
 
-	"koditon-go/internal/ads"
-	"koditon-go/internal/cli"
-	"koditon-go/internal/config"
-	"koditon-go/internal/prices"
+	"koditon-go/cmd/cli/internal/cli"
+	"koditon-go/internal/domain/ads"
+	"koditon-go/internal/platform/config"
+	"koditon-go/internal/sync/prices"
 )
 
 func main() {

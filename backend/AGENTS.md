@@ -13,8 +13,8 @@ Go backend service using pgx, Huma v2 for HTTP API, sqlc for type-safe database 
 
 ### Testing
 - `mise run test`: run all tests
-- `go test ./internal/auth`: test specific package
-- `go test -v -run TestSignInAnonymous ./internal/auth`: run single test with verbose output
+- `go test ./internal/domain/auth`: test specific package
+- `go test -v -run TestSignInAnonymous ./internal/domain/auth`: run single test with verbose output
 - `mise run test:race`: run tests with race detector
 - `mise run test:cover`: run tests with coverage report
 
@@ -36,29 +36,30 @@ Run from `backend/` (see root AGENTS.md for details):
 ```
 backend/
 ├── cmd/
-│   └── main.go              # Entrypoint; keep minimal, delegate to internal/
+│   ├── main.go              # Entrypoint; keep minimal, delegate to internal/app
+│   ├── cli/                 # CLI binary and private implementation
+│   └── tui/                 # TUI binary and private implementation
 ├── internal/
-│   ├── auth/                # Authentication and authorization
-│   │   ├── db/              # Generated sqlc code (DO NOT EDIT)
-│   │   ├── apple/           # Apple Sign In client
-│   │   ├── service.go       # Core auth business logic
-│   │   ├── jwt.go           # JWT token handling
-│   │   └── middleware.go    # HTTP auth middleware
-│   ├── config/              # Configuration loading and validation
-│   ├── server/              # HTTP server, routes, handlers
-│   ├── taskqueue/           # PGMQ-based task queue system
-│   ├── consumers/           # Background task consumers
-│   └── [domain]/            # Domain packages (prices, postal, etc.)
-│       ├── db/              # Generated sqlc code (DO NOT EDIT)
-│       │   ├── schema.sql   # Table definitions for sqlc
-│       │   ├── queries.sql  # SQL queries for sqlc
-│       │   └── *.go         # Generated code
-│       ├── client/          # External API clients
-│       └── service.go       # Business logic
+│   ├── app/                 # Application bootstrap, wiring, lifecycle
+│   ├── clients/             # External provider API clients
+│   ├── db/                  # Generated sqlc storage package (DO NOT EDIT)
+│   ├── domain/              # Core feature/domain packages
+│   ├── platform/            # Config, logging, queue, schema, utility infrastructure
+│   ├── sync/                # Sync engine services, flows, and consumers
+│   └── transport/           # HTTP/OpenAPI, OAuth, MCP, web, health transports
 ├── db/
-│   └── migrations/          # Tern migration files
+│   ├── migrations/          # Tern migration files
+│   └── queries/             # sqlc query files grouped by feature
 └── sqlc.yaml                # sqlc configuration
 ```
+
+### Package Boundaries
+- `cmd/main.go` imports `internal/app`; binary-specific CLI/TUI implementation belongs under `cmd/*/internal`.
+- `internal/app` may import all backend subsystems for wiring.
+- `internal/clients/*` contains external API wire types and fetch/parse behavior; it must not import `internal/db`, `internal/sync`, or `internal/transport`.
+- `internal/sync/*` owns provider synchronization, mapping, and DB upserts; it may import `internal/clients/*`, `internal/db`, and `internal/platform/*`.
+- `internal/transport/*` owns request/response adapters and may import domain, sync, db, and platform packages.
+- `internal/platform/*` should stay reusable and avoid importing domain, sync, or transport packages.
 
 ## Code Style and Conventions
 
@@ -73,8 +74,8 @@ backend/
       "github.com/jackc/pgx/v5"
       "github.com/jackc/pgx/v5/pgxpool"
       
-      "koditon-go/internal/auth"
-      "koditon-go/internal/config"
+      "koditon-go/internal/domain/auth"
+      "koditon-go/internal/platform/config"
   )
   ```
 
@@ -104,8 +105,8 @@ backend/
 - Don't log sensitive data (tokens, passwords, PII)
 
 ### Database
-- Generated code in `internal/*/db/` is READ ONLY - never hand-edit
-- SQL queries go in `internal/*/db/queries.sql` with sqlc annotations
+- Generated code in `internal/db/` is READ ONLY - never hand-edit
+- SQL queries go in `db/queries/<feature>/*.sql` with sqlc annotations
 - Use transactions for multi-step operations; always `defer tx.Rollback(ctx)`
 - Migrations are forward-only; never add down migrations
 - Use `FOR UPDATE` when reading rows that will be updated in the same transaction
@@ -134,9 +135,10 @@ backend/
 ## Commit and Pull Request Guidelines
 
 ### Commits
-- Imperative mood: "Add feature" not "Added feature" or "Adds feature"
-- Concise subject line (50 chars or less)
-- Example: "Add session refresh token rotation"
+- Use conventional commits with a lowercase type prefix such as `feat:`, `fix:`, `refactor:`, or `chore:`
+- Keep the summary short, imperative, and lowercase after the prefix
+- No trailing punctuation
+- Prefer `type: concise summary`, for example `feat: add session refresh token rotation`
 - Don't mix unrelated changes in a single commit
 
 ### Pull Requests
@@ -164,7 +166,7 @@ backend/
 ### Configuration
 - Environment-based using `github.com/caarlos0/env`
 - `.env` files loaded automatically
-- All config in `internal/config/config.go`
+- All config in `internal/platform/config/config.go`
 - Required fields fail fast on startup
 
 ### HTTP Framework
@@ -173,7 +175,7 @@ backend/
 - Type-safe handlers with input/output structs
 - Middleware for auth, logging, CORS
 
-### TUI Architecture (`internal/tui`)
+### TUI Architecture (`cmd/tui/internal/tui`)
 - Entrypoint is `NewApp(runner).Model()` used by `cmd/tui/main.go`; do not reintroduce a monolithic model.
 - Navigation uses stack router primitives in `router.go` with `Screen` + `Navigator` contracts.
 - Shell layout is centralized in `shell.go`; screens provide `ShellState()` and body content only.
@@ -186,9 +188,9 @@ backend/
 - Keep rendering deterministic for tests; avoid time/random-dependent output in snapshot paths without test injection.
 
 ### TUI Testing
-- Run `go test ./internal/tui/...` for router/runtime/snapshot coverage.
-- Snapshot fixtures are in `internal/tui/testdata/*.golden`.
-- Regenerate snapshots with `UPDATE_GOLDEN=1 go test ./internal/tui -run TestScreenSnapshots`.
+- Run `go test ./cmd/tui/internal/tui/...` for router/runtime/snapshot coverage.
+- Snapshot fixtures are in `cmd/tui/internal/tui/testdata/*.golden`.
+- Regenerate snapshots with `UPDATE_GOLDEN=1 go test ./cmd/tui/internal/tui -run TestScreenSnapshots`.
 
 ## Common Patterns
 

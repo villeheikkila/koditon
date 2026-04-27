@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/signal"
 
-	"koditon-go/internal/config"
-	"koditon-go/internal/logging"
+	"koditon-go/internal/platform/config"
+	"koditon-go/internal/platform/logging"
 )
 
 func main() {
