@@ -1,34 +1,33 @@
-                                                                                                  
-  [1;38;5;86mKoditon Manual Sync[m                                                                             
-  [1;38;5;111mSubsystems > Frontdoor > Actions[m                                                                
-  [38;5;244mEnter select/run • Esc back • q quit • Ctrl+C cancel active job[m                                 
-                                                                                                  
-  [38;5;238m╭────────────────────────────────────────────────────────────────────────────────────────────╮[m  
-  [38;5;238m│[m   [1;38;5;86mFrontdoor Actions[m                                                                        [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [1;38;5;230;48;5;33m  Full Sitemap Sync[m                                                                        [38;5;238m│[m  
-  [38;5;238m│[m [38;5;153;48;5;24m    Fetch sitemap and sync all frontdoor ad/building entities now[m                          [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [38;5;252m  Sitemap Discover[m                                                                         [38;5;238m│[m  
-  [38;5;238m│[m [38;5;250m    Fetch frontdoor sitemap and report discovered entities without syncing[m                 [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [38;5;252m  Sync Buildings[m                                                                           [38;5;238m│[m  
-  [38;5;238m│[m [38;5;250m    Fetch frontdoor sitemap and sync only buildings in batch[m                               [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [38;5;252m  Sync Ad by ID[m                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [38;5;250m    Sync one frontdoor ad by friendly ID[m                                                   [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m [38;5;252m  Sync Building by ID[m                                                                      [38;5;238m│[m  
-  [38;5;238m│[m [38;5;250m    Sync one frontdoor building by housing company ID[m                                      [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m                                                                                            [38;5;238m│[m  
-  [38;5;238m│[m   [38;2;98;98;98m↑/k[m [38;2;74;74;74mup[m[38;2;60;60;60m • [m[38;2;98;98;98m↓/j[m [38;2;74;74;74mdown[m[38;2;60;60;60m • [m[38;2;98;98;98mq[m [38;2;74;74;74mquit[m[38;2;60;60;60m • [m[38;2;98;98;98m?[m [38;2;74;74;74mmore[m                                                      [38;5;238m│[m  
-  [38;5;238m╰────────────────────────────────────────────────────────────────────────────────────────────╯[m  
-                                                                                                  
+
+  [1;38;5;86mKoditon Manual Sync[m
+  [1;38;5;111mSubsystems > Frontdoor > Actions[m
+  [38;5;244mEnter select/run • Esc back • q quit • Ctrl+C cancel active job[m
+
+  [38;5;238m╭────────────────────────────────────────────────────────────────────────────────────────────╮[m
+  [38;5;238m│[m   [1;38;5;86mFrontdoor Actions[m                                                                        [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m [1;38;5;230;48;5;33m  Full Sitemap Sync[m                                                                        [38;5;238m│[m
+  [38;5;238m│[m [38;5;153;48;5;24m    Queue frontdoor sitemap sync and watch the durable job[m                                 [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m [38;5;252m  Sitemap Discover[m                                                                         [38;5;238m│[m
+  [38;5;238m│[m [38;5;250m    Fetch frontdoor sitemap and report discovered entities without syncing[m                 [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m [38;5;252m  Sync Buildings[m                                                                           [38;5;238m│[m
+  [38;5;238m│[m [38;5;250m    Queue frontdoor building-only sitemap fanout[m                                           [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m [38;5;252m  Sync Ad by ID[m                                                                            [38;5;238m│[m
+  [38;5;238m│[m [38;5;250m    Queue one frontdoor ad sync by friendly ID[m                                             [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m [38;5;252m  Sync Building by ID[m                                                                      [38;5;238m│[m
+  [38;5;238m│[m [38;5;250m    Queue one frontdoor building sync by housing company ID[m                                [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m                                                                                            [38;5;238m│[m
+  [38;5;238m│[m   [38;2;98;98;98m↑/k[m [38;2;74;74;74mup[m[38;2;60;60;60m • [m[38;2;98;98;98m↓/j[m [38;2;74;74;74mdown[m[38;2;60;60;60m • [m[38;2;98;98;98mq[m [38;2;74;74;74mquit[m[38;2;60;60;60m • [m[38;2;98;98;98m?[m [38;2;74;74;74mmore[m                                                      [38;5;238m│[m
+  [38;5;238m╰────────────────────────────────────────────────────────────────────────────────────────────╯[m

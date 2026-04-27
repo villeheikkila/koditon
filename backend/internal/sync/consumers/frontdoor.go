@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	TaskTypeFrontdoorSitemapSync = "frontdoor_sitemap_sync"
-	TaskTypeFrontdoorSync        = "frontdoor_sync"
+	TaskTypeFrontdoorSitemapSync          = "frontdoor_sitemap_sync"
+	TaskTypeFrontdoorBuildingsSitemapSync = "frontdoor_buildings_sitemap_sync"
+	TaskTypeFrontdoorSync                 = "frontdoor_sync"
 )
 
 func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Message) error {
@@ -34,16 +35,34 @@ func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.
 	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
 	var enqueueErrors int
 	for _, adID := range adIDs {
-		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, taskqueue.EntityPrefixAd+adID, TaskTypeFrontdoorSync); enqErr != nil {
+		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, adID, TaskTypeFrontdoorSync); enqErr != nil {
 			enqueueErrors++
 		}
 	}
 	for _, buildingID := range buildingIDs {
-		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, taskqueue.EntityPrefixBuilding+buildingID, TaskTypeFrontdoorSync); enqErr != nil {
+		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, buildingID, TaskTypeFrontdoorSync); enqErr != nil {
 			enqueueErrors++
 		}
 	}
 	logger.InfoContext(ctx, "frontdoor sitemap sync completed", "ads", len(adIDs), "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
+func (c *Consumer) handleFrontdoorBuildingsSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.frontdoor.buildings_sitemap_sync"))
+	_, buildingIDs, err := c.syncRunner.FrontdoorSitemap(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "frontdoor buildings sitemap sync failed", "error", err, "outcome", logging.OutcomeError)
+		return err
+	}
+	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
+	var enqueueErrors int
+	for _, buildingID := range buildingIDs {
+		if enqErr := c.enqueueFrontdoorTask(ctx, frontdoorQueue, buildingID, TaskTypeFrontdoorSync); enqErr != nil {
+			enqueueErrors++
+		}
+	}
+	logger.InfoContext(ctx, "frontdoor buildings sitemap sync completed", "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
@@ -73,6 +92,8 @@ func (c *Consumer) runFrontdoorSyncJob(ctx context.Context, logger *slog.Logger,
 	switch job.SyncJobKind {
 	case TaskTypeFrontdoorSitemapSync:
 		return c.handleFrontdoorSitemapSync(ctx, logger, msg)
+	case TaskTypeFrontdoorBuildingsSitemapSync:
+		return c.handleFrontdoorBuildingsSitemapSync(ctx, logger, msg)
 	case TaskTypeFrontdoorSync:
 		return c.handleFrontdoorEntitySync(ctx, logger, msg)
 	default:

@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	syncflows "koditon/internal/sync/flows"
-
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -42,7 +40,7 @@ func newJobRuntime() *jobRuntime {
 	return &jobRuntime{}
 }
 
-func (r *jobRuntime) Start(runner *syncflows.Runner, a action, inputs []string, events chan<- tea.Msg) (string, error) {
+func (r *jobRuntime) Start(app *appContext, a action, inputs []string, events chan<- tea.Msg) (string, error) {
 	r.mu.Lock()
 	if r.active != nil {
 		r.mu.Unlock()
@@ -58,7 +56,7 @@ func (r *jobRuntime) Start(runner *syncflows.Runner, a action, inputs []string, 
 		report := func(update progressUpdate) {
 			events <- runProgressMsg{message: update.Message, current: update.Current, total: update.Total}
 		}
-		result, err := a.Run(ctx, runner, inputs, report)
+		result, err := a.Run(ctx, app, inputs, report)
 		events <- runFinishedMsg{actionTitle: a.Title, result: result, err: err, duration: time.Since(start)}
 		r.mu.Lock()
 		if r.active != nil && r.active.id == jobID {

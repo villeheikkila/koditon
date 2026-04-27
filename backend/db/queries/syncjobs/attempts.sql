@@ -24,6 +24,15 @@ SET sync_job_attempt_status = sqlc.arg(sync_job_attempt_status),
     sync_job_attempt_finished_at = now()
 WHERE sync_job_attempt_id = sqlc.arg(sync_job_attempt_id);
 
+-- name: FinalizeRunningSyncJobAttemptsForJobs :execrows
+UPDATE public.sync_job_attempts
+SET sync_job_attempt_status = 'retry',
+    sync_job_attempt_error_code = 'stale_claim_recovered',
+    sync_job_attempt_error_detail = 'stale in_progress sync job claim was reset',
+    sync_job_attempt_finished_at = now()
+WHERE sync_job_id = ANY(sqlc.arg(sync_job_ids)::uuid[])
+  AND sync_job_attempt_status = 'running';
+
 -- name: ListSyncJobAttempts :many
 SELECT sync_job_attempt_id,
        sync_job_id,

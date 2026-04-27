@@ -6,19 +6,17 @@ import (
 	"testing"
 	"time"
 
-	syncflows "koditon/internal/sync/flows"
-
 	tea "charm.land/bubbletea/v2"
 )
 
 func TestJobRuntimeStartAndFinish(t *testing.T) {
 	runtime := newJobRuntime()
 	events := make(chan tea.Msg, 8)
-	a := action{Title: "test", Run: func(_ context.Context, _ *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+	a := action{Title: "test", Run: func(_ context.Context, _ *appContext, _ []string, report reportFn) (actionResult, error) {
 		report(progressUpdate{Message: "step", Current: 1, Total: 1})
 		return actionResult{Output: "ok"}, nil
 	}}
-	_, err := runtime.Start(nil, a, nil, events)
+	_, err := runtime.Start(&appContext{}, a, nil, events)
 	if err != nil {
 		t.Fatalf("start returned error: %v", err)
 	}
@@ -39,11 +37,11 @@ func TestJobRuntimeStartAndFinish(t *testing.T) {
 func TestJobRuntimeCancelActive(t *testing.T) {
 	runtime := newJobRuntime()
 	events := make(chan tea.Msg, 8)
-	a := action{Title: "cancel", Run: func(ctx context.Context, _ *syncflows.Runner, _ []string, _ reportFn) (actionResult, error) {
+	a := action{Title: "cancel", Run: func(ctx context.Context, _ *appContext, _ []string, _ reportFn) (actionResult, error) {
 		<-ctx.Done()
 		return actionResult{}, ctx.Err()
 	}}
-	_, err := runtime.Start(nil, a, nil, events)
+	_, err := runtime.Start(&appContext{}, a, nil, events)
 	if err != nil {
 		t.Fatalf("start returned error: %v", err)
 	}
@@ -76,15 +74,15 @@ func TestJobRuntimeRejectsConcurrentStart(t *testing.T) {
 	runtime := newJobRuntime()
 	events := make(chan tea.Msg, 8)
 	wait := make(chan struct{})
-	a := action{Title: "wait", Run: func(_ context.Context, _ *syncflows.Runner, _ []string, _ reportFn) (actionResult, error) {
+	a := action{Title: "wait", Run: func(_ context.Context, _ *appContext, _ []string, _ reportFn) (actionResult, error) {
 		<-wait
 		return actionResult{}, nil
 	}}
-	_, err := runtime.Start(nil, a, nil, events)
+	_, err := runtime.Start(&appContext{}, a, nil, events)
 	if err != nil {
 		t.Fatalf("first start returned error: %v", err)
 	}
-	_, secondErr := runtime.Start(nil, a, nil, events)
+	_, secondErr := runtime.Start(&appContext{}, a, nil, events)
 	if !errors.Is(secondErr, ErrJobAlreadyRunning) {
 		t.Fatalf("expected ErrJobAlreadyRunning, got %v", secondErr)
 	}

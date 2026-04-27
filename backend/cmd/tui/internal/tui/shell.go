@@ -1,5 +1,7 @@
 package tui
 
+import "strings"
+
 type shellState struct {
 	Title      string
 	Breadcrumb string
@@ -20,5 +22,13 @@ func renderShell(st styles, state shellState) string {
 	if state.Footer != "" {
 		content += "\n\n" + st.muted.Render(state.Footer)
 	}
-	return st.app.Render(content)
+	return trimLineEndSpaces(st.app.Render(content))
+}
+
+func trimLineEndSpaces(value string) string {
+	lines := strings.Split(value, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " \t")
+	}
+	return strings.Join(lines, "\n")
 }

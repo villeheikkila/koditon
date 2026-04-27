@@ -12,6 +12,24 @@ import (
 	"github.com/google/uuid"
 )
 
+const finalizeRunningSyncJobAttemptsForJobs = `-- name: FinalizeRunningSyncJobAttemptsForJobs :execrows
+UPDATE public.sync_job_attempts
+SET sync_job_attempt_status = 'retry',
+    sync_job_attempt_error_code = 'stale_claim_recovered',
+    sync_job_attempt_error_detail = 'stale in_progress sync job claim was reset',
+    sync_job_attempt_finished_at = now()
+WHERE sync_job_id = ANY($1::uuid[])
+  AND sync_job_attempt_status = 'running'
+`
+
+func (q *Queries) FinalizeRunningSyncJobAttemptsForJobs(ctx context.Context, syncJobIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, finalizeRunningSyncJobAttemptsForJobs, syncJobIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const finalizeSyncJobAttempt = `-- name: FinalizeSyncJobAttempt :exec
 UPDATE public.sync_job_attempts
 SET sync_job_attempt_status = $1,

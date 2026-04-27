@@ -151,6 +151,44 @@ func (q *Queries) DeferPendingSyncJobForCapacity(ctx context.Context, arg DeferP
 	return result.RowsAffected(), nil
 }
 
+const getSyncJobByDedupKey = `-- name: GetSyncJobByDedupKey :one
+SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
+FROM public.sync_jobs
+WHERE sync_job_dedup_key = $1
+`
+
+func (q *Queries) GetSyncJobByDedupKey(ctx context.Context, syncJobDedupKey string) (SyncJob, error) {
+	row := q.db.QueryRow(ctx, getSyncJobByDedupKey, syncJobDedupKey)
+	var i SyncJob
+	err := row.Scan(
+		&i.SyncJobID,
+		&i.SyncJobProvider,
+		&i.SyncJobKind,
+		&i.SyncJobEntityID,
+		&i.SyncJobDedupKey,
+		&i.SyncJobStatus,
+		&i.SyncJobPriority,
+		&i.SyncJobAttemptCount,
+		&i.SyncJobMaxAttempts,
+		&i.SyncJobRunAfter,
+		&i.SyncJobCapacityClass,
+		&i.SyncJobPayload,
+		&i.SyncJobCheckpoint,
+		&i.SyncJobResult,
+		&i.SyncJobLastError,
+		&i.SyncJobLastErrorCode,
+		&i.SyncJobLastHttpStatus,
+		&i.SyncJobLastPgmqMessageID,
+		&i.SyncJobClaimToken,
+		&i.SyncJobCreatedAt,
+		&i.SyncJobUpdatedAt,
+		&i.SyncJobLastEnqueuedAt,
+		&i.SyncJobLastStartedAt,
+		&i.SyncJobLastFinishedAt,
+	)
+	return i, err
+}
+
 const getSyncJobByID = `-- name: GetSyncJobByID :one
 SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
 FROM public.sync_jobs
@@ -187,6 +225,66 @@ func (q *Queries) GetSyncJobByID(ctx context.Context, syncJobID uuid.UUID) (Sync
 		&i.SyncJobLastFinishedAt,
 	)
 	return i, err
+}
+
+const listDuePendingSyncJobsForReconcile = `-- name: ListDuePendingSyncJobsForReconcile :many
+SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
+FROM public.sync_jobs
+WHERE sync_job_status = 'pending'
+  AND sync_job_run_after <= $1
+ORDER BY sync_job_priority DESC, sync_job_run_after ASC, sync_job_created_at ASC
+LIMIT $2
+FOR UPDATE SKIP LOCKED
+`
+
+type ListDuePendingSyncJobsForReconcileParams struct {
+	NowAt      time.Time `json:"now_at"`
+	LimitCount int32     `json:"limit_count"`
+}
+
+func (q *Queries) ListDuePendingSyncJobsForReconcile(ctx context.Context, arg ListDuePendingSyncJobsForReconcileParams) ([]SyncJob, error) {
+	rows, err := q.db.Query(ctx, listDuePendingSyncJobsForReconcile, arg.NowAt, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SyncJob{}
+	for rows.Next() {
+		var i SyncJob
+		if err := rows.Scan(
+			&i.SyncJobID,
+			&i.SyncJobProvider,
+			&i.SyncJobKind,
+			&i.SyncJobEntityID,
+			&i.SyncJobDedupKey,
+			&i.SyncJobStatus,
+			&i.SyncJobPriority,
+			&i.SyncJobAttemptCount,
+			&i.SyncJobMaxAttempts,
+			&i.SyncJobRunAfter,
+			&i.SyncJobCapacityClass,
+			&i.SyncJobPayload,
+			&i.SyncJobCheckpoint,
+			&i.SyncJobResult,
+			&i.SyncJobLastError,
+			&i.SyncJobLastErrorCode,
+			&i.SyncJobLastHttpStatus,
+			&i.SyncJobLastPgmqMessageID,
+			&i.SyncJobClaimToken,
+			&i.SyncJobCreatedAt,
+			&i.SyncJobUpdatedAt,
+			&i.SyncJobLastEnqueuedAt,
+			&i.SyncJobLastStartedAt,
+			&i.SyncJobLastFinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const markSyncJobFinal = `-- name: MarkSyncJobFinal :execrows

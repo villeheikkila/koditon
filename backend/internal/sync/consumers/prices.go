@@ -87,15 +87,21 @@ func (c *Consumer) handlePricesNeighborhoodPostalCodeSync(ctx context.Context, l
 
 func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.sync_all"))
-	logger.InfoContext(ctx, "prices sync all started")
-	cfg := prices.DefaultSyncAllConfig()
-	cfg.Logger = logger
-	cfg.Concurrency = 5
-	result, err := c.syncRunner.PricesSyncAll(ctx, cfg)
+	logger.InfoContext(ctx, "prices sync all fanout started")
+	cities, err := c.syncRunner.PricesFetchCities(ctx)
 	if err != nil {
 		return err
 	}
-	logger.InfoContext(ctx, "prices sync all completed", "cities", result.CitiesProcessed, "postal_codes", result.PostalCodesProcessed, "neighborhoods", result.NeighborhoodsUpdated, "transactions", result.TransactionsProcessed, "errors", len(result.Errors), "outcome", logging.OutcomeSuccess)
+	var enqueueErrors int
+	for _, city := range cities {
+		if err := c.enqueuePricesTask(ctx, nil, taskqueue.EntityPrefixCity+city, TaskTypePricesSync); err != nil {
+			enqueueErrors++
+		}
+	}
+	if enqueueErrors > 0 {
+		return fmt.Errorf("enqueue prices sync all city jobs: %d errors", enqueueErrors)
+	}
+	logger.InfoContext(ctx, "prices sync all fanout completed", "cities", len(cities), "outcome", logging.OutcomeSuccess)
 	return nil
 }
 

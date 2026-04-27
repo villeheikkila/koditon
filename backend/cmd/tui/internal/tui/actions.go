@@ -10,6 +10,7 @@ import (
 	"time"
 
 	syncflows "koditon/internal/sync/flows"
+	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/prices"
 )
 
@@ -51,7 +52,7 @@ type action struct {
 	Prompts       []string
 	UseCityPicker bool
 	BuildInput    func(ctx *appContext, action action, values []string, breadcrumb string) Screen
-	Run           func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error)
+	Run           func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error)
 }
 
 type subsystem struct {
@@ -70,7 +71,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Search Reports",
 					Description: "Browse shortcut/frontdoor ads and frontdoor announcements with filters",
 					BuildInput:  newAdsReportFormScreen,
-					Run: func(_ context.Context, _ *syncflows.Runner, _ []string, _ reportFn) (actionResult, error) {
+					Run: func(_ context.Context, _ *appContext, _ []string, _ reportFn) (actionResult, error) {
 						return actionResult{Output: "ads report browser opened"}, nil
 					},
 				},
@@ -82,32 +83,17 @@ func buildSubsystems() []subsystem {
 			Actions: []action{
 				{
 					Title:       "Full Sitemap Sync",
-					Description: "Fetch sitemap and sync all frontdoor ad/building entities now",
-					BuildInput:  newBatchSyncSettingsScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						opts, err := parseBatchRunOptions(inputs)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
-						adIDs, buildingIDs, err := runner.FrontdoorSitemap(ctx)
-						if err != nil {
-							return actionResult{}, err
-						}
-						entityIDs := make([]string, 0, len(adIDs)+len(buildingIDs))
-						entityIDs = append(entityIDs, adIDs...)
-						entityIDs = append(entityIDs, buildingIDs...)
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d ads and %d buildings", len(adIDs), len(buildingIDs))})
-						batch := runEntityBatch(ctx, entityIDs, runner.FrontdoorSyncEntity, nil, report, opts)
-						return actionResult{Output: fmt.Sprintf("discovered ads=%d buildings=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(adIDs), len(buildingIDs), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					Description: "Queue frontdoor sitemap sync and watch the durable job",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sitemap_sync", EntityID: "frontdoor:sitemap"}})
 					},
 				},
 				{
 					Title:       "Sitemap Discover",
 					Description: "Fetch frontdoor sitemap and report discovered entities without syncing",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
-						adIDs, buildingIDs, err := runner.FrontdoorSitemap(ctx)
+						adIDs, buildingIDs, err := app.runner.FrontdoorSitemap(ctx)
 						if err != nil {
 							return actionResult{}, err
 						}
@@ -116,47 +102,27 @@ func buildSubsystems() []subsystem {
 				},
 				{
 					Title:       "Sync Buildings",
-					Description: "Fetch frontdoor sitemap and sync only buildings in batch",
-					BuildInput:  newBatchSyncSettingsScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						opts, err := parseBatchRunOptions(inputs)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Fetching frontdoor sitemap..."})
-						_, buildingIDs, err := runner.FrontdoorSitemap(ctx)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings", len(buildingIDs))})
-						batch := runEntityBatch(ctx, buildingIDs, runner.FrontdoorSyncEntity, nil, report, opts)
-						return actionResult{Output: fmt.Sprintf("buildings=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					Description: "Queue frontdoor building-only sitemap fanout",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_buildings_sitemap_sync", EntityID: "frontdoor:buildings_sitemap"}})
 					},
 				},
 				{
 					Title:       "Sync Ad by ID",
-					Description: "Sync one frontdoor ad by friendly ID",
+					Description: "Queue one frontdoor ad sync by friendly ID",
 					Prompts:     []string{"friendly ad id"},
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "ad:" + strings.TrimSpace(inputs[0])
-						report(progressUpdate{Message: "Syncing " + entityID})
-						if err := runner.FrontdoorSyncEntity(ctx, entityID); err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "synced " + entityID}, nil
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
 					},
 				},
 				{
 					Title:       "Sync Building by ID",
-					Description: "Sync one frontdoor building by housing company ID",
+					Description: "Queue one frontdoor building sync by housing company ID",
 					Prompts:     []string{"building housing company id"},
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "building:" + strings.TrimSpace(inputs[0])
-						report(progressUpdate{Message: "Syncing " + entityID})
-						if err := runner.FrontdoorSyncEntity(ctx, entityID); err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "synced " + entityID}, nil
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
 					},
 				},
 			},
@@ -167,32 +133,17 @@ func buildSubsystems() []subsystem {
 			Actions: []action{
 				{
 					Title:       "Full Sitemap Sync",
-					Description: "Fetch sitemap and sync all shortcut ad/building entities now",
-					BuildInput:  newBatchSyncSettingsScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						opts, err := parseBatchRunOptions(inputs)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
-						buildingIDs, adIDs, err := runner.ShortcutSitemap(ctx)
-						if err != nil {
-							return actionResult{}, err
-						}
-						entityIDs := make([]string, 0, len(adIDs)+len(buildingIDs))
-						entityIDs = append(entityIDs, buildingIDs...)
-						entityIDs = append(entityIDs, adIDs...)
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings and %d ads", len(buildingIDs), len(adIDs))})
-						batch := runEntityBatch(ctx, entityIDs, runner.ShortcutSyncEntity, shortcutDetailFn(runner), report, opts)
-						return actionResult{Output: fmt.Sprintf("discovered buildings=%d ads=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), len(adIDs), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					Description: "Queue shortcut sitemap sync and watch the durable job",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_sitemap_sync", EntityID: "shortcut:sitemap"}})
 					},
 				},
 				{
 					Title:       "Sitemap Discover",
 					Description: "Fetch shortcut sitemap and report discovered entities without syncing",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
-						buildingIDs, adIDs, err := runner.ShortcutSitemap(ctx)
+						buildingIDs, adIDs, err := app.runner.ShortcutSitemap(ctx)
 						if err != nil {
 							return actionResult{}, err
 						}
@@ -201,47 +152,27 @@ func buildSubsystems() []subsystem {
 				},
 				{
 					Title:       "Sync Buildings",
-					Description: "Fetch shortcut sitemap and sync only buildings in batch",
-					BuildInput:  newBatchSyncSettingsScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						opts, err := parseBatchRunOptions(inputs)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Fetching shortcut sitemap..."})
-						buildingIDs, _, err := runner.ShortcutSitemap(ctx)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d buildings", len(buildingIDs))})
-						batch := runEntityBatch(ctx, buildingIDs, runner.ShortcutSyncEntity, shortcutDetailFn(runner), report, opts)
-						return actionResult{Output: fmt.Sprintf("buildings=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(buildingIDs), batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					Description: "Queue shortcut building-only sitemap fanout",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_buildings_sitemap_sync", EntityID: "shortcut:buildings_sitemap"}})
 					},
 				},
 				{
 					Title:       "Sync Ad by ID",
-					Description: "Sync one shortcut ad by numeric ID",
+					Description: "Queue one shortcut ad sync by numeric ID",
 					Prompts:     []string{"ad id"},
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "ad:" + strings.TrimSpace(inputs[0])
-						report(progressUpdate{Message: "Syncing " + entityID})
-						if err := runner.ShortcutSyncEntity(ctx, entityID); err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "synced " + entityID}, nil
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
 					},
 				},
 				{
 					Title:       "Sync Building by UUID",
-					Description: "Sync one shortcut building by UUID",
+					Description: "Queue one shortcut building sync by UUID",
 					Prompts:     []string{"building uuid"},
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "building:" + strings.TrimSpace(inputs[0])
-						report(progressUpdate{Message: "Syncing " + entityID})
-						if err := runner.ShortcutSyncEntity(ctx, entityID); err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "synced " + entityID}, nil
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
 					},
 				},
 			},
@@ -252,33 +183,17 @@ func buildSubsystems() []subsystem {
 			Actions: []action{
 				{
 					Title:       "Cities Init (Full Sync Now)",
-					Description: "Fetch prices cities and sync each city in-process",
-					BuildInput:  newBatchSyncSettingsScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
-						opts, err := parseBatchRunOptions(inputs)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Fetching prices cities..."})
-						cities, err := runner.PricesFetchCities(ctx)
-						if err != nil {
-							return actionResult{}, err
-						}
-						entityIDs := make([]string, 0, len(cities))
-						for _, city := range cities {
-							entityIDs = append(entityIDs, "city:"+city)
-						}
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d cities", len(cities))})
-						batch := runEntityBatch(ctx, entityIDs, runner.PricesSyncCityEntity, nil, report, opts)
-						return actionResult{Output: fmt.Sprintf("cities=%d total=%d success=%d failed=%d loaded=%s failed_items=%s duration=%s", len(cities), batch.Result.Total, batch.Result.Success, batch.Result.Failed, summarizeEntityIDs(batch.Loaded, 5), summarizeEntityIDs(batch.Failed, 3), batch.Result.Duration.Round(time.Millisecond))}, joinResultErrors(batch.Result)
+					Description: "Queue prices city initialization and watch the durable job",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_cities_init", EntityID: "prices:cities"}})
 					},
 				},
 				{
 					Title:       "Cities Discover",
 					Description: "Fetch available prices cities without syncing",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
 						report(progressUpdate{Message: "Fetching prices cities..."})
-						cities, err := runner.PricesFetchCities(ctx)
+						cities, err := app.runner.PricesFetchCities(ctx)
 						if err != nil {
 							return actionResult{}, err
 						}
@@ -288,91 +203,26 @@ func buildSubsystems() []subsystem {
 				},
 				{
 					Title:       "Sync All",
-					Description: "Run prices sync-all flow",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
-						report(progressUpdate{Message: "Running prices sync-all..."})
-						cfg := prices.DefaultSyncAllConfig()
-						cfg.Concurrency = 1
-						cfg.Logger = newProgressLogger(report)
-						res, err := runner.PricesSyncAll(ctx, cfg)
-						if err != nil {
-							return actionResult{}, err
-						}
-						report(progressUpdate{Message: "Prices sync-all completed"})
-						return actionResult{Output: fmt.Sprintf("cities=%d postal_codes=%d neighborhoods=%d transactions=%d errors=%d", res.CitiesProcessed, res.PostalCodesProcessed, res.NeighborhoodsUpdated, res.TransactionsProcessed, len(res.Errors))}, nil
+					Description: "Queue prices sync-all fanout",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_sync_all", EntityID: "prices:sync_all"}})
 					},
 				},
 				{
 					Title:       "Neighborhood Postal Code Sync",
-					Description: "Run neighborhood->postal code mapping sync",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
-						report(progressUpdate{Message: "Running neighborhood postal code sync..."})
-						err := runner.PricesSyncNeighborhoodPostalCodes(ctx, func(p prices.SyncNeighborhoodPostalCodesProgress) {
-							if p.Page > 0 {
-								report(progressUpdate{Message: fmt.Sprintf("City=%s postal=%s page=%d", p.City, p.PostalCode, p.Page)})
-								return
-							}
-							if p.Updated > 0 {
-								report(progressUpdate{Message: fmt.Sprintf("Updated %d mappings for %s %s", p.Updated, p.City, p.PostalCode)})
-							}
-						})
-						if err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "completed prices neighborhood postal code sync"}, nil
+					Description: "Queue neighborhood->postal code mapping sync",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_neighborhood_postal_code_sync", EntityID: "prices:neighborhood_postal_codes"}})
 					},
 				},
 				{
 					Title:         "Sync City by Name",
-					Description:   "Sync prices data for one city",
+					Description:   "Queue prices data sync for one city",
 					Prompts:       []string{"city name"},
 					UseCityPicker: true,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "city:" + strings.TrimSpace(inputs[0])
-						report(progressUpdate{Message: "Syncing " + entityID})
-						if err := runner.PricesSyncCityEntityWithProgress(ctx, entityID, func(p prices.SyncCityProgress) {
-							msg := "prices city " + p.Step
-							switch p.Step {
-							case "city_upsert_start":
-								msg = fmt.Sprintf("%s upsert city row", p.City)
-							case "city_upsert_done":
-								msg = fmt.Sprintf("%s city upsert complete", p.City)
-							case "postal_codes_fetch_start":
-								msg = fmt.Sprintf("%s fetch postal codes", p.City)
-							case "postal_codes_fetch_done":
-								msg = fmt.Sprintf("%s fetched postal codes count=%d", p.City, p.Count)
-							case "postal_codes_upsert_start":
-								msg = fmt.Sprintf("%s upsert postal codes count=%d", p.City, p.Count)
-							case "postal_codes_upsert_done":
-								msg = fmt.Sprintf("%s postal codes upserted count=%d", p.City, p.Count)
-							case "neighborhoods_fetch_start":
-								msg = fmt.Sprintf("%s fetch neighborhoods", p.City)
-							case "neighborhoods_fetch_done":
-								msg = fmt.Sprintf("%s fetched neighborhoods count=%d", p.City, p.Count)
-							case "transactions_fetch_start":
-								msg = fmt.Sprintf("%s fetch transaction pages", p.City)
-							case "transactions_page":
-								msg = fmt.Sprintf("%s fetched transactions page=%d rows=%d %s", p.City, p.Page, p.Count, p.Details)
-							case "transactions_fetch_done":
-								msg = fmt.Sprintf("%s fetched all transactions count=%d", p.City, p.Count)
-							case "neighborhoods_merge_done":
-								msg = fmt.Sprintf("%s merged neighborhood set count=%d", p.City, p.Count)
-							case "neighborhoods_upsert_start":
-								msg = fmt.Sprintf("%s upsert neighborhoods count=%d", p.City, p.Count)
-							case "neighborhoods_upsert_done":
-								msg = fmt.Sprintf("%s neighborhoods upserted count=%d", p.City, p.Count)
-							case "transactions_upsert_start":
-								msg = fmt.Sprintf("%s upsert transactions count=%d period=%s", p.City, p.Count, p.Details)
-							case "transactions_upsert_done":
-								msg = fmt.Sprintf("%s transactions upserted count=%d period=%s", p.City, p.Count, p.Details)
-							case "sync_city_done":
-								msg = fmt.Sprintf("%s sync complete", p.City)
-							}
-							report(progressUpdate{Message: msg})
-						}); err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: "synced " + entityID}, nil
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_sync", EntityID: entityID}})
 					},
 				},
 				{
@@ -381,7 +231,7 @@ func buildSubsystems() []subsystem {
 					Prompts:       []string{"city name"},
 					UseCityPicker: true,
 					BuildInput:    newTransactionsSearchFormScreen,
-					Run: func(ctx context.Context, runner *syncflows.Runner, inputs []string, report reportFn) (actionResult, error) {
+					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						city := safeInput(inputs, 0)
 						search := safeInput(inputs, 1)
 						minArea, err := parseOptionalFloat64(safeInput(inputs, 2))
@@ -401,7 +251,7 @@ func buildSubsystems() []subsystem {
 							return actionResult{}, fmt.Errorf("parse limit: %w", err)
 						}
 						report(progressUpdate{Message: fmt.Sprintf("Searching city=%s query=%s min_area=%s max_area=%s sort=%s limit=%d", city, search, formatOptionalFloat(minArea), formatOptionalFloat(maxArea), sortMode, limit)})
-						rows, err := runner.PricesSearchTransactionsByCityAndAddress(ctx, city, search, limit)
+						rows, err := app.runner.PricesSearchTransactionsByCityAndAddress(ctx, city, search, limit)
 						if err != nil {
 							return actionResult{}, err
 						}
@@ -452,14 +302,9 @@ func buildSubsystems() []subsystem {
 			Actions: []action{
 				{
 					Title:       "Sync",
-					Description: "Run postal data sync",
-					Run: func(ctx context.Context, runner *syncflows.Runner, _ []string, report reportFn) (actionResult, error) {
-						report(progressUpdate{Message: "Running postal sync..."})
-						res, err := runner.PostalSync(ctx, newProgressLogger(report))
-						if err != nil {
-							return actionResult{}, err
-						}
-						return actionResult{Output: fmt.Sprintf("total=%d ad_areas=%d municipalities=%d postal_codes=%d skipped=%d", res.TotalRecords, res.AdAreasUpserted, res.MunicipalitiesUpserted, res.PostalCodesUpserted, res.SkippedRecords)}, nil
+					Description: "Queue postal data sync",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "postal", Kind: "postal_sync", EntityID: "postal:all"}})
 					},
 				},
 			},

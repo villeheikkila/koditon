@@ -27,7 +27,7 @@ func (s *jobScreen) Key() string {
 func (s *jobScreen) Init() tea.Cmd {
 	s.running = true
 	startCmd := s.view.Start(s.action.Title)
-	_, err := s.ctx.runtime.Start(s.ctx.runner, s.action, s.inputs, s.events)
+	_, err := s.ctx.runtime.Start(s.ctx, s.action, s.inputs, s.events)
 	if err != nil {
 		s.running = false
 		if errors.Is(err, ErrJobAlreadyRunning) {

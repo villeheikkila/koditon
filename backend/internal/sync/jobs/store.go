@@ -104,6 +104,21 @@ type FinalUpdate struct {
 	HTTPStatus *int32
 }
 
+type JobSnapshot struct {
+	Job      db.SyncJob
+	Attempts []db.SyncJobAttempt
+}
+
+type ReconcileResult struct {
+	Scanned    int
+	Reenqueued int
+}
+
+type ReapResult struct {
+	RecoveredJobs     []db.SyncJob
+	FinalizedAttempts int64
+}
+
 func NewStore(logger *slog.Logger, pool *pgxpool.Pool) *Store {
 	if logger == nil {
 		logger = slog.Default()
@@ -124,8 +139,10 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 		},
 		KindMaxInProgress: map[string]int{
 			"frontdoor_sitemap_sync":               1,
+			"frontdoor_buildings_sitemap_sync":     1,
 			"frontdoor_sync":                       2,
 			"shortcut_sitemap_sync":                1,
+			"shortcut_buildings_sitemap_sync":      1,
 			"shortcut_scraper_sync":                1,
 			"shortcut_api_sync":                    2,
 			"prices_cities_init":                   1,
@@ -202,7 +219,14 @@ func (s *Store) Enqueue(ctx context.Context, req EnqueueRequest) (EnqueueResult,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return EnqueueResult{Enqueued: false}, nil
+			existing, getErr := qtx.GetSyncJobByDedupKey(ctx, DedupKey(req.Provider, req.Kind, req.EntityID))
+			if getErr != nil {
+				return EnqueueResult{}, fmt.Errorf("get existing sync job after enqueue conflict: %w", getErr)
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return EnqueueResult{}, fmt.Errorf("commit sync job enqueue conflict tx: %w", err)
+			}
+			return EnqueueResult{Job: existing, Enqueued: false, MessageID: existing.SyncJobLastPgmqMessageID}, nil
 		}
 		return EnqueueResult{}, fmt.Errorf("upsert sync job: %w", err)
 	}
@@ -353,18 +377,93 @@ func (s *Store) TransitionToFinal(ctx context.Context, job db.SyncJob, update Fi
 }
 
 func (s *Store) ReapStaleClaims(ctx context.Context, staleAfter time.Duration, limit int32) ([]db.SyncJob, error) {
+	result, err := s.ReapStaleClaimsWithAttempts(ctx, staleAfter, limit)
+	if err != nil {
+		return nil, err
+	}
+	return result.RecoveredJobs, nil
+}
+
+func (s *Store) ReapStaleClaimsWithAttempts(ctx context.Context, staleAfter time.Duration, limit int32) (ReapResult, error) {
 	if staleAfter <= 0 {
 		staleAfter = defaultStaleClaimAfter
 	}
 	if limit <= 0 {
 		limit = 25
 	}
-	staleBefore := time.Now().Add(-staleAfter)
-	jobs, err := s.queries.ReapStaleSyncJobs(ctx, db.ReapStaleSyncJobsParams{StaleBefore: &staleBefore, LimitCount: limit})
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("reap stale sync jobs: %w", err)
+		return ReapResult{}, fmt.Errorf("begin stale sync job reap tx: %w", err)
 	}
-	return jobs, nil
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := s.queries.WithTx(tx)
+	staleBefore := time.Now().Add(-staleAfter)
+	jobs, err := qtx.ReapStaleSyncJobs(ctx, db.ReapStaleSyncJobsParams{StaleBefore: &staleBefore, LimitCount: limit})
+	if err != nil {
+		return ReapResult{}, fmt.Errorf("reap stale sync jobs: %w", err)
+	}
+	if len(jobs) == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return ReapResult{}, fmt.Errorf("commit empty stale sync job reap tx: %w", err)
+		}
+		return ReapResult{}, nil
+	}
+	ids := make([]uuid.UUID, 0, len(jobs))
+	for _, job := range jobs {
+		ids = append(ids, job.SyncJobID)
+	}
+	rows, err := qtx.FinalizeRunningSyncJobAttemptsForJobs(ctx, ids)
+	if err != nil {
+		return ReapResult{}, fmt.Errorf("finalize stale sync job attempts: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ReapResult{}, fmt.Errorf("commit stale sync job reap tx: %w", err)
+	}
+	return ReapResult{RecoveredJobs: jobs, FinalizedAttempts: rows}, nil
+}
+
+func (s *Store) ReconcilePendingJobs(ctx context.Context, limit int32) (ReconcileResult, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ReconcileResult{}, fmt.Errorf("begin sync job reconcile tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := s.queries.WithTx(tx)
+	now := time.Now()
+	jobs, err := qtx.ListDuePendingSyncJobsForReconcile(ctx, db.ListDuePendingSyncJobsForReconcileParams{NowAt: now, LimitCount: limit})
+	if err != nil {
+		return ReconcileResult{}, fmt.Errorf("list due pending sync jobs: %w", err)
+	}
+	result := ReconcileResult{Scanned: len(jobs)}
+	for _, job := range jobs {
+		queueName := QueueNameForProvider(job.SyncJobProvider)
+		if queueName == "" {
+			continue
+		}
+		if _, err := sendJobMessage(ctx, qtx, queueName, job, 0); err != nil {
+			return ReconcileResult{}, err
+		}
+		result.Reenqueued++
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ReconcileResult{}, fmt.Errorf("commit sync job reconcile tx: %w", err)
+	}
+	return result, nil
+}
+
+func (s *Store) GetSnapshot(ctx context.Context, jobID uuid.UUID) (JobSnapshot, error) {
+	job, err := s.queries.GetSyncJobByID(ctx, jobID)
+	if err != nil {
+		return JobSnapshot{}, fmt.Errorf("get sync job: %w", err)
+	}
+	attempts, err := s.queries.ListSyncJobAttempts(ctx, jobID)
+	if err != nil {
+		return JobSnapshot{}, fmt.Errorf("list sync job attempts: %w", err)
+	}
+	return JobSnapshot{Job: job, Attempts: attempts}, nil
 }
 
 func sendJobMessage(ctx context.Context, qtx *db.Queries, queueName string, job db.SyncJob, delaySeconds int) (int64, error) {

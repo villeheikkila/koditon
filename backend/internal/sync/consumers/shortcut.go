@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	TaskTypeShortcutSitemapSync = "shortcut_sitemap_sync"
-	TaskTypeShortcutScraperSync = "shortcut_scraper_sync"
-	TaskTypeShortcutAPISync     = "shortcut_api_sync"
+	TaskTypeShortcutSitemapSync          = "shortcut_sitemap_sync"
+	TaskTypeShortcutBuildingsSitemapSync = "shortcut_buildings_sitemap_sync"
+	TaskTypeShortcutScraperSync          = "shortcut_scraper_sync"
+	TaskTypeShortcutAPISync              = "shortcut_api_sync"
 )
 
 func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message) error {
@@ -35,16 +36,34 @@ func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.L
 	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
 	var enqueueErrors int
 	for _, buildingID := range buildingIDs {
-		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, taskqueue.EntityPrefixBuilding+buildingID, TaskTypeShortcutScraperSync); enqErr != nil {
+		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, buildingID, TaskTypeShortcutScraperSync); enqErr != nil {
 			enqueueErrors++
 		}
 	}
 	for _, adID := range adIDs {
-		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, taskqueue.EntityPrefixAd+adID, TaskTypeShortcutScraperSync); enqErr != nil {
+		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, adID, TaskTypeShortcutScraperSync); enqErr != nil {
 			enqueueErrors++
 		}
 	}
 	logger.InfoContext(ctx, "shortcut sitemap sync completed", "buildings", len(buildingIDs), "ads", len(adIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
+func (c *Consumer) handleShortcutBuildingsSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
+	logger = logging.With(logger, logging.Op("consumer.shortcut.buildings_sitemap_sync"))
+	buildingIDs, _, err := c.syncRunner.ShortcutSitemap(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "shortcut buildings sitemap sync failed", "error", err, "outcome", logging.OutcomeError)
+		return err
+	}
+	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
+	var enqueueErrors int
+	for _, buildingID := range buildingIDs {
+		if enqErr := c.enqueueShortcutTask(ctx, shortcutQueue, buildingID, TaskTypeShortcutScraperSync); enqErr != nil {
+			enqueueErrors++
+		}
+	}
+	logger.InfoContext(ctx, "shortcut buildings sitemap sync completed", "buildings", len(buildingIDs), "enqueue_errors", enqueueErrors, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
@@ -84,6 +103,8 @@ func (c *Consumer) runShortcutSyncJob(ctx context.Context, logger *slog.Logger, 
 	switch job.SyncJobKind {
 	case TaskTypeShortcutSitemapSync:
 		return c.handleShortcutSitemapSync(ctx, logger, msg)
+	case TaskTypeShortcutBuildingsSitemapSync:
+		return c.handleShortcutBuildingsSitemapSync(ctx, logger, msg)
 	case TaskTypeShortcutScraperSync:
 		return c.handleShortcutScraperSync(ctx, logger, msg)
 	case TaskTypeShortcutAPISync:
