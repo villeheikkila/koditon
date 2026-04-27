@@ -17,7 +17,7 @@ import (
 	"koditon/internal/domain/auth"
 	"koditon/internal/platform/config"
 	"koditon/internal/platform/logging"
-	"koditon/internal/transport/openapi"
+	api "koditon/internal/transport/openapi"
 	"koditon/internal/transport/web"
 
 	"github.com/danielgtaylor/huma/v2"

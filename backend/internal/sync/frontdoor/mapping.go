@@ -3,7 +3,7 @@ package frontdoor
 import (
 	"encoding/json"
 
-	"koditon/internal/clients/frontdoor"
+	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 

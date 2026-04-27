@@ -1,18 +1,99 @@
 [settings]
 experimental = true
+task_output = "prefix"
 
 [tools]
 go = "1.26"
 node = "25"
+"go:github.com/jackc/tern/v2" = "latest"
+"go:github.com/oligot/go-mod-upgrade" = "latest"
+"go:golang.org/x/tools/cmd/goimports" = "latest"
+"go:golang.org/x/vuln/cmd/govulncheck" = "latest"
+"go:golang.org/x/tools/cmd/deadcode" = "latest"
+"go:mvdan.cc/gofumpt" = "latest"
+golangci-lint = "2"
+sqlc = "latest"
 
 [env]
 LOG_LEVEL = "debug"
 APP_ENV      = "development"
 WEB_BASE_URL = "http://localhost:8080"
 
+[tasks.dev]
+description = "Ensure local infra is running, verify backend dependencies, and start backend watch mode"
+run = { task = "backend:dev" }
+
+[tasks."infra:local:up"]
+description = "Start local Docker Compose infrastructure"
+run = "docker compose -f docker-compose.yml up -d"
+
+[tasks."infra:local:down"]
+description = "Stop local Docker Compose infrastructure"
+run = "docker compose -f docker-compose.yml down"
+
+[tasks."infra:local:logs"]
+description = "Tail local Docker Compose logs"
+run = "docker compose -f docker-compose.yml logs -f"
+
+[tasks."infra:local:ps"]
+description = "Show local Docker Compose service state"
+run = "docker compose -f docker-compose.yml ps"
+
+[tasks."infra:local:pull"]
+description = "Pull local Docker Compose images"
+run = "docker compose -f docker-compose.yml pull"
+
+[tasks."infra:local:ensure"]
+description = "Start local Docker Compose infrastructure if Postgres is not already running"
+run = '''
+set -euo pipefail
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required"
+  exit 1
+fi
+
+RUNNING_SERVICES="$(docker compose -f docker-compose.yml ps --services --status running 2>/dev/null || true)"
+if printf '%s\n' "${RUNNING_SERVICES}" | grep -qx postgres; then
+  echo "local infra already running"
+  exit 0
+fi
+
+echo "starting local infra: postgres"
+docker compose -f docker-compose.yml up -d postgres
+'''
+
+[tasks."infra:local:reset"]
+description = "Recreate the local Docker Compose stack and its volumes"
+run = '''
+set -euo pipefail
+docker compose -f docker-compose.yml down -v --remove-orphans
+docker compose -f docker-compose.yml up -d
+'''
+
+[tasks."test:all"]
+description = "Run all tests"
+depends = ["backend:test"]
+run = "true"
+
+[tasks."lint:all"]
+description = "Run all linters"
+depends = ["backend:lint", "web:lint"]
+run = "true"
+
+[tasks."clean:all"]
+description = "Clean build artifacts"
+depends = ["backend:clean"]
+run = "true"
+
 # backend shortcuts — forward to backend/mise.toml tasks
+[tasks."backend:dev:preflight"]
+description = "Ensure local infra is up and backend dependencies are reachable"
+depends = ["infra:local:ensure", "backend:db:wait"]
+run = "echo 'backend preflight complete'"
+
 [tasks."backend:dev"]
-description = "Run backend server with hot reload"
+description = "Ensure local infra is ready and run backend server with hot reload"
+depends = ["backend:dev:preflight"]
 run = "mise -C {{config_root}}/backend run dev"
 
 [tasks."backend:build"]
@@ -23,21 +104,111 @@ run = "mise -C {{config_root}}/backend run build"
 description = "Run all tests"
 run = "mise -C {{config_root}}/backend run test"
 
+[tasks."backend:test:verbose"]
+description = "Run backend tests with verbose output"
+run = "mise -C {{config_root}}/backend run test:verbose"
+
+[tasks."backend:test:race"]
+description = "Run backend tests with the race detector"
+run = "mise -C {{config_root}}/backend run test:race"
+
+[tasks."backend:test:cover"]
+description = "Run backend tests with coverage summary"
+run = "mise -C {{config_root}}/backend run test:cover"
+
+[tasks."backend:test:coverage"]
+description = "Generate backend HTML coverage report"
+run = "mise -C {{config_root}}/backend run test:coverage"
+
+[tasks."backend:fmt"]
+description = "Check backend formatting without writing"
+run = "mise -C {{config_root}}/backend run fmt"
+
 [tasks."backend:lint"]
 description = "Run static analysis"
 run = "mise -C {{config_root}}/backend run lint"
+
+[tasks."backend:lint:logging"]
+description = "Run slog logging style checks"
+run = "mise -C {{config_root}}/backend run lint:logging"
 
 [tasks."backend:fix"]
 description = "Autofix formatting and lints"
 run = "mise -C {{config_root}}/backend run fix"
 
+[tasks."backend:deadcode"]
+description = "Find unreachable backend functions"
+run = "mise -C {{config_root}}/backend run deadcode"
+
+[tasks."backend:vuln"]
+description = "Check backend dependencies for known vulnerabilities"
+run = "mise -C {{config_root}}/backend run vuln"
+
+[tasks."backend:tidy"]
+description = "Run go mod tidy"
+run = "mise -C {{config_root}}/backend run tidy"
+
+[tasks."backend:tidy:check"]
+description = "Ensure go.mod and go.sum are tidy"
+run = "mise -C {{config_root}}/backend run tidy:check"
+
+[tasks."backend:deps"]
+description = "Update Go dependencies and check for vulnerabilities"
+run = "mise -C {{config_root}}/backend run deps"
+
+[tasks."backend:update-dependencies"]
+description = "Update backend dependencies, tidy, fix, test, and check vulnerabilities"
+run = "mise -C {{config_root}}/backend run update-dependencies"
+
+[tasks."backend:update-dependencies:interactive"]
+description = "Interactively review available backend dependency upgrades"
+run = "mise -C {{config_root}}/backend run update-dependencies:interactive"
+
+[tasks."backend:clean"]
+description = "Remove backend build artifacts"
+run = "mise -C {{config_root}}/backend run clean"
+
 [tasks."backend:db:migrate"]
 description = "Apply all pending migrations"
 run = "mise -C {{config_root}}/backend run db:migrate"
 
+[tasks."backend:db:wait"]
+description = "Wait for local PostgreSQL to accept connections"
+run = '''
+set -euo pipefail
+TIMEOUT="${TIMEOUT:-30}"
+DEADLINE=$(( $(date +%s) + TIMEOUT ))
+
+until docker compose -f docker-compose.yml exec -T postgres pg_isready -U postgres -d koditon >/dev/null 2>&1; do
+  if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
+    echo "database did not become ready within ${TIMEOUT}s"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "database is ready"
+'''
+
 [tasks."backend:db:status"]
 description = "Show current migration state"
 run = "mise -C {{config_root}}/backend run db:status"
+
+[tasks."backend:db:drop"]
+description = "Drop the configured database"
+run = "mise -C {{config_root}}/backend run db:drop"
+
+[tasks."backend:db:create"]
+description = "Create the configured database"
+run = "mise -C {{config_root}}/backend run db:create"
+
+[tasks."backend:db:reset"]
+description = "Drop, create, and migrate the database"
+run = "mise -C {{config_root}}/backend run db:reset"
+
+[tasks."backend:db:import"]
+description = "Import a SQL file into the database (FILE=<path> required)"
+run = "mise -C {{config_root}}/backend run db:import"
 
 [tasks."backend:db:query"]
 description = "Run SQL (QUERY=... or FILE=<path>)"
@@ -50,6 +221,10 @@ run = "mise -C {{config_root}}/backend run db:generate"
 [tasks."backend:db:schema"]
 description = "Dump concise public schema to backend/db/schema.sql"
 run = "mise -C {{config_root}}/backend run db:schema"
+
+[tasks."backend:db:dump"]
+description = "Backup the database (optional FILE=<path>)"
+run = "mise -C {{config_root}}/backend run db:dump"
 
 [tasks."backend:db:vet"]
 description = "Run sqlc vet rules"

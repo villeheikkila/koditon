@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon/internal/clients/frontdoor"
+	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 )
 

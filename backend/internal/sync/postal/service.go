@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon/internal/clients/postal"
+	client "koditon/internal/clients/postal"
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 )

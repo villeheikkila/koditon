@@ -10,7 +10,7 @@ import (
 	pricesclient "koditon/internal/clients/prices"
 	shortcutclient "koditon/internal/clients/shortcut"
 	"koditon/internal/platform/taskqueue"
-	"koditon/internal/sync/flows"
+	syncflows "koditon/internal/sync/flows"
 )
 
 func classifyError(err error) error {

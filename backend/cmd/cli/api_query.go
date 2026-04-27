@@ -72,22 +72,23 @@ func providerConfigFromEnv(getenv func(string) string) providerConfig {
 }
 
 func printAPIQueryUsage() {
-	fmt.Fprintln(flag.CommandLine.Output(), "Usage: cli api-query <frontdoor|shortcut> <query> [flags]")
-	fmt.Fprintln(flag.CommandLine.Output())
-	fmt.Fprintln(flag.CommandLine.Output(), "Frontdoor queries:")
-	fmt.Fprintln(flag.CommandLine.Output(), "  ad --friendly-id <id>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  building-page --url <url>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  sitemap")
-	fmt.Fprintln(flag.CommandLine.Output())
-	fmt.Fprintln(flag.CommandLine.Output(), "Shortcut queries:")
-	fmt.Fprintln(flag.CommandLine.Output(), "  ad --id <numeric-id>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  locations --postal <postal-code-or-query>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  buildings --query <text>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  building-data --location-id <id>")
-	fmt.Fprintln(flag.CommandLine.Output(), "  search-apartments --location-card-id <id> --location-card-type <type> --location-name <name> [--card-type sale|rent] [--page N] [--page-size N]")
-	fmt.Fprintln(flag.CommandLine.Output(), "  sitemap")
-	fmt.Fprintln(flag.CommandLine.Output())
-	fmt.Fprintln(flag.CommandLine.Output(), "Common flags: --compact --timeout 30s")
+	output := flag.CommandLine.Output()
+	_, _ = fmt.Fprintln(output, "Usage: cli api-query <frontdoor|shortcut> <query> [flags]")
+	_, _ = fmt.Fprintln(output)
+	_, _ = fmt.Fprintln(output, "Frontdoor queries:")
+	_, _ = fmt.Fprintln(output, "  ad --friendly-id <id>")
+	_, _ = fmt.Fprintln(output, "  building-page --url <url>")
+	_, _ = fmt.Fprintln(output, "  sitemap")
+	_, _ = fmt.Fprintln(output)
+	_, _ = fmt.Fprintln(output, "Shortcut queries:")
+	_, _ = fmt.Fprintln(output, "  ad --id <numeric-id>")
+	_, _ = fmt.Fprintln(output, "  locations --postal <postal-code-or-query>")
+	_, _ = fmt.Fprintln(output, "  buildings --query <text>")
+	_, _ = fmt.Fprintln(output, "  building-data --location-id <id>")
+	_, _ = fmt.Fprintln(output, "  search-apartments --location-card-id <id> --location-card-type <type> --location-name <name> [--card-type sale|rent] [--page N] [--page-size N]")
+	_, _ = fmt.Fprintln(output, "  sitemap")
+	_, _ = fmt.Fprintln(output)
+	_, _ = fmt.Fprintln(output, "Common flags: --compact --timeout 30s")
 }
 
 func runFrontdoorAPIQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
@@ -382,7 +383,7 @@ func validateHTTPURL(name, value string) error {
 
 func newShortcutAPIClient(cfg providerConfig) *shortcutclient.Client {
 	return shortcutclient.NewClient(
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		slog.New(slog.DiscardHandler),
 		nil,
 		nil,
 		cfg.ShortcutBaseURL,

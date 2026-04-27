@@ -31,9 +31,9 @@ import (
 	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 	"koditon/internal/transport/health"
-	"koditon/internal/transport/httpserver"
-	"koditon/internal/transport/mcp"
-	"koditon/internal/transport/oauth"
+	server "koditon/internal/transport/httpserver"
+	mcpserver "koditon/internal/transport/mcp"
+	oauthapi "koditon/internal/transport/oauth"
 	"koditon/internal/transport/telegram"
 
 	"github.com/danielgtaylor/huma/v2"

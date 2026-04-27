@@ -46,7 +46,11 @@ env = { CGO_ENABLED = "0" }
 
 [tasks."db:new"]
 description = "Create a new timestamped migration (NAME=<name> required)"
-run = "tern new -m db/migrations $NAME"
+run = '''
+set -euo pipefail
+: "${NAME:?NAME is required}"
+tern new -m db/migrations "$NAME"
+'''
 
 [tasks."db:migrate"]
 description = "Apply all pending migrations and dump schema"
@@ -68,6 +72,19 @@ if [ -n "${DATABASE_URL:-}" ]; then
   psql "${POSTGRES_URL}" -c "CREATE DATABASE ${DB_NAME};"
 else
   psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/postgres" -c "CREATE DATABASE ${DB_NAME};"
+fi
+"""
+
+[tasks."db:drop"]
+description = "Drop the configured database"
+run = """
+if [ -n "${DATABASE_URL:-}" ]; then
+  DB_NAME=$(echo "$DATABASE_URL" | sed 's|.*/||' | sed 's/?.*//')
+  POSTGRES_URL=$(echo "$DATABASE_URL" | sed "s|/${DB_NAME}|/postgres|")
+  psql "${DATABASE_URL}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();" || true
+  psql "${POSTGRES_URL}" -c "DROP DATABASE IF EXISTS ${DB_NAME};"
+else
+  psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/postgres" -c "DROP DATABASE IF EXISTS ${DB_NAME};"
 fi
 """
 
@@ -100,6 +117,12 @@ fi
 
 [tasks."db:generate"]
 description = "Generate type-safe Go code from SQL queries"
+sources = [
+  "sqlc.yaml",
+  "db/schema.sql",
+  "db/queries/**/*.sql",
+]
+outputs = ["internal/db/*.go"]
 run = "sqlc generate -f sqlc.yaml"
 
 [tasks."db:vet"]
@@ -116,6 +139,11 @@ awk '
 trap 'rm -f "$TMP_SQLC_CONFIG"' EXIT
 sqlc vet -f "$TMP_SQLC_CONFIG"
 """
+
+[tasks."db:reset"]
+description = "Drop, create, and migrate the database"
+depends = ["db:drop", "db:create", "db:migrate"]
+run = "echo \"Database reset complete. Run 'mise run db:generate' to regenerate code.\""
 
 [tasks."db:dump"]
 description = "Backup the database (optional FILE=<path>)"
@@ -156,22 +184,27 @@ run = "./scripts/schema/dump_concise_public_schema.sh"
 
 [tasks.test]
 description = "Run all tests"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "go test ./..."
 
 [tasks."test:verbose"]
 description = "Run all tests with verbose output"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "go test -v ./..."
 
 [tasks."test:race"]
 description = "Run tests with race detector"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "go test -race ./..."
 
 [tasks."test:cover"]
 description = "Run tests with coverage summary"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "go test -cover ./..."
 
 [tasks."test:coverage"]
 description = "Generate HTML coverage report"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = """
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out -o coverage.html
@@ -198,6 +231,7 @@ golangci-lint run ./... --fix --timeout=5m
 
 [tasks.lint]
 description = "Run static analysis"
+env = { GOLANGCI_LINT_CACHE = "/tmp/koditon-golangci-cache", GOCACHE = "/tmp/koditon-go-cache", XDG_CACHE_HOME = "/tmp/koditon-xdg" }
 run = "golangci-lint run ./... --timeout=5m"
 
 [tasks."lint:logging"]
@@ -206,18 +240,22 @@ run = "golangci-lint run ./... --enable-only=sloglint --timeout=5m"
 
 [tasks.deadcode]
 description = "Find unreachable functions"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "deadcode ./..."
 
 [tasks.vuln]
 description = "Check known vulnerabilities"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "govulncheck ./..."
 
 [tasks.tidy]
 description = "Tidy go.mod and go.sum"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = "go mod tidy"
 
 [tasks."tidy:check"]
 description = "Ensure go.mod/go.sum are tidy (CI-safe)"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = """
 go mod tidy
 git diff --exit-code -- go.mod go.sum
@@ -225,6 +263,7 @@ git diff --exit-code -- go.mod go.sum
 
 [tasks.deps]
 description = "Update deps within current import-path major lines, tidy, and check vulns"
+env = { GOCACHE = "/tmp/koditon-go-cache" }
 run = """
 go get -u ./...
 go mod tidy
@@ -233,6 +272,7 @@ govulncheck ./...
 
 [tasks."update-dependencies"]
 description = "Update dependencies to the latest available versions, then tidy, fix, test, and check vulns"
+env = { GOCACHE = "/tmp/koditon-go-cache", GOLANGCI_LINT_CACHE = "/tmp/koditon-golangci-cache", XDG_CACHE_HOME = "/tmp/koditon-xdg" }
 run = """
 go-mod-upgrade --force
 go mod tidy
@@ -252,13 +292,19 @@ run = "go-mod-upgrade"
 
 [tasks.build]
 description = "Build production binary"
+env = { CGO_ENABLED = "0", GOCACHE = "/tmp/koditon-go-cache" }
+sources = [
+  "cmd/**/*.go",
+  "internal/**/*.go",
+  "go.mod",
+  "go.sum",
+]
+outputs = ["server"]
 run = "go build -o server ./cmd"
-env = { CGO_ENABLED = "0" }
 
 [tasks.tui]
 description = "Run interactive sync TUI"
 run = "go run ./cmd/tui"
-env = { CGO_ENABLED = "0" }
 
 [tasks.clean]
 description = "Remove built artifacts"

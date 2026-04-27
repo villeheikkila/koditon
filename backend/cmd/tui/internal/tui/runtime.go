@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
+	syncflows "koditon/internal/sync/flows"
 
-	"koditon/internal/sync/flows"
+	tea "charm.land/bubbletea/v2"
 )
 
 var ErrJobAlreadyRunning = errors.New("job already running")

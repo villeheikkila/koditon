@@ -10,7 +10,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
-	"koditon/internal/sync/flows"
+	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"

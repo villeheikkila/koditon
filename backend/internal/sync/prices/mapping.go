@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"koditon/internal/clients/prices"
+	client "koditon/internal/clients/prices"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 )

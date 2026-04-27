@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"koditon/internal/sync/flows"
+	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/prices"
 )
 

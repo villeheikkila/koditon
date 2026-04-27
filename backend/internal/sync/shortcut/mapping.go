@@ -1,7 +1,7 @@
 package shortcut
 
 import (
-	"koditon/internal/clients/shortcut"
+	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 

@@ -15,7 +15,7 @@ import (
 	"koditon/cmd/tui/internal/tui"
 	"koditon/internal/domain/ads"
 	"koditon/internal/platform/config"
-	"koditon/internal/sync/flows"
+	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"

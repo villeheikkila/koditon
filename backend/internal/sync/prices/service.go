@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	openrouter "github.com/revrost/go-openrouter"
 
-	"koditon/internal/clients/prices"
+	client "koditon/internal/clients/prices"
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/util"

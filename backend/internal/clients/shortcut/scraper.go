@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"koditon/internal/platform/sitemap"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 var (
@@ -451,9 +452,7 @@ func optionalString(v string) *string {
 	return &v
 }
 
-var (
-	numberCleanupRegexp = regexp.MustCompile(`[^0-9,\.]+`)
-)
+var numberCleanupRegexp = regexp.MustCompile(`[^0-9,\.]+`)
 
 func (c *Client) buildSitemapURLPatterns() map[SitemapType]*regexp.Regexp {
 	baseURL := regexp.QuoteMeta(c.baseURL)

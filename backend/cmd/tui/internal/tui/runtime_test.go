@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
+	syncflows "koditon/internal/sync/flows"
 
-	"koditon/internal/sync/flows"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestJobRuntimeStartAndFinish(t *testing.T) {

@@ -109,7 +109,6 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 	case account != nil && account.usedLegacyUserLookup:
 		s.logger.WarnContext(ctx, "repairing missing email identity from legacy user_email lookup", "user_id", account.userID, "email", normalizedEmail)
 		userID = account.userID
-		userIDBigint = account.userIDBigint
 		if _, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 			UserUuid:                  userID,
 			UserIdentityProvider:      string(emailProvider),
@@ -129,7 +128,6 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 				return nil, fmt.Errorf("reload repaired email identity: %w", pgx.ErrNoRows)
 			}
 			userID = account.userID
-			userIDBigint = account.userIDBigint
 		}
 	default:
 		userID, userIDBigint, isNewUser, err = s.findOrCreateUserByEmail(ctx, qtx, normalizedEmail)
@@ -165,7 +163,6 @@ func (s *Service) SignInWithEmail(ctx context.Context, req SignInWithEmailReques
 				return nil, fmt.Errorf("reload email identity after unique violation: %w", pgx.ErrNoRows)
 			}
 			userID = account.userID
-			userIDBigint = account.userIDBigint
 			isNewUser = false
 		}
 	}
