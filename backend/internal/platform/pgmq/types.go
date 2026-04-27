@@ -6,7 +6,11 @@ import (
 )
 
 const (
-	DefaultVT = 30
+	DefaultVT        = 30
+	DefaultReadLimit = 1
+	QueuePrefix      = "q"
+	ArchivePrefix    = "a"
+	PGMQSchema       = "pgmq"
 )
 
 type Message struct {
@@ -16,4 +20,20 @@ type Message struct {
 	VT         time.Time       `json:"vt"`
 	Message    json.RawMessage `json:"message"`
 	Headers    json.RawMessage `json:"headers,omitempty"`
+}
+
+type QueueMeta struct {
+	QueueName     string    `json:"queue_name"`
+	IsPartitioned bool      `json:"is_partitioned"`
+	IsUnlogged    bool      `json:"is_unlogged"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type QueueMetrics struct {
+	QueueName       string    `json:"queue_name"`
+	QueueLength     int64     `json:"queue_length"`
+	NewestMsgAgeSec int32     `json:"newest_msg_age_sec"`
+	OldestMsgAgeSec int32     `json:"oldest_msg_age_sec"`
+	TotalMessages   int64     `json:"total_messages"`
+	ScrapeTime      time.Time `json:"scrape_time"`
 }
