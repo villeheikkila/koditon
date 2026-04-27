@@ -103,6 +103,18 @@ func New(baseURL, userAgent, cookie, sitemapBaseURL string) *Client {
 }
 
 func (c *Client) GetAdByFriendlyID(ctx context.Context, friendlyID string) (*AdResponse, error) {
+	body, err := c.GetAdRawByFriendlyID(ctx, friendlyID)
+	if err != nil {
+		return nil, err
+	}
+	var ad AdResponse
+	if err := json.Unmarshal(body, &ad); err != nil {
+		return nil, fmt.Errorf("decode ad response: %w", err)
+	}
+	return &ad, nil
+}
+
+func (c *Client) GetAdRawByFriendlyID(ctx context.Context, friendlyID string) ([]byte, error) {
 	reqCtx := ctx
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -138,14 +150,26 @@ func (c *Client) GetAdByFriendlyID(ctx context.Context, friendlyID string) (*AdR
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
-	var ad AdResponse
-	if err := json.Unmarshal(body, &ad); err != nil {
-		return nil, fmt.Errorf("decode ad response: %w", err)
-	}
-	return &ad, nil
+	return body, nil
 }
 
 func (c *Client) GetBuildingPageData(ctx context.Context, pageURL string) (*HousingCompanyResponse, error) {
+	body, err := c.GetBuildingPageRaw(ctx, pageURL)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ExtractInitialState(body)
+	if err != nil {
+		return nil, err
+	}
+	var respPayload HousingCompanyResponse
+	if err := json.Unmarshal(raw, &respPayload); err != nil {
+		return nil, fmt.Errorf("decode housing company response: %w", err)
+	}
+	return &respPayload, nil
+}
+
+func (c *Client) GetBuildingPageRaw(ctx context.Context, pageURL string) ([]byte, error) {
 	reqCtx := ctx
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -176,15 +200,7 @@ func (c *Client) GetBuildingPageData(ctx context.Context, pageURL string) (*Hous
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
-	raw, err := extractInitialState(body)
-	if err != nil {
-		return nil, err
-	}
-	var respPayload HousingCompanyResponse
-	if err := json.Unmarshal(raw, &respPayload); err != nil {
-		return nil, fmt.Errorf("decode housing company response: %w", err)
-	}
-	return &respPayload, nil
+	return body, nil
 }
 
 func (c *Client) GetSitemapEntries(ctx context.Context) ([]SitemapEntry, error) {
@@ -229,7 +245,7 @@ func (c *Client) applyDefaultHeaders(req *http.Request) {
 	}
 }
 
-func extractInitialState(body []byte) (json.RawMessage, error) {
+func ExtractInitialState(body []byte) (json.RawMessage, error) {
 	const prefix = "window.__INITIAL_STATE__ = "
 	html := string(body)
 	start := strings.Index(html, prefix)

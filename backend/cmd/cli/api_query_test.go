@@ -5,6 +5,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -146,6 +148,42 @@ func TestAPIQueryShortcutSitemapPrintsParsedEntries(t *testing.T) {
 	out := stdout.String()
 	if !strings.Contains(out, "\"type\": \"listing\"") || !strings.Contains(out, "\"id\": \"42\"") {
 		t.Fatalf("output = %s", out)
+	}
+}
+
+func TestAPIQueryFrontdoorProfileSchemaUsesFixtureCache(t *testing.T) {
+	t.Parallel()
+	cacheDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cacheDir, "sitemap"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cacheDir, "ad"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cacheDir, "building-state"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sitemap := `[{"id":"abc123","type":"ad","url":"https://example.invalid/kohde/abc123"},{"id":"123","type":"building","url":"https://example.invalid/talo/123"}]`
+	if err := os.WriteFile(filepath.Join(cacheDir, "sitemap", "entries.json"), []byte(sitemap), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cacheDir, "ad", "abc123.json"), []byte(`{"id":1,"friendlyId":"abc123","sellingPrice":250000,"property":{"postCode":{"postCode":"00100"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	buildingStatePath := filepath.Join(cacheDir, "building-state", sha256Hex("https://example.invalid/talo/123")+".json")
+	if err := os.WriteFile(buildingStatePath, []byte(`{"housingCompany":{"id":123,"name":"As Oy Test"},"announcements":[{"searchPrice":100000}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	err := runAPIQuery(context.Background(), []string{"frontdoor", "profile-schema", "--cache-dir", cacheDir, "--sample-size", "2", "--compact"}, &stdout, envGetter(nil))
+	if err != nil {
+		t.Fatalf("runAPIQuery returned error: %v", err)
+	}
+	out := stdout.String()
+	for _, want := range []string{`"processed":2`, `"$\.friendlyId"`, `"adSamples":1`, `"buildingSamples":1`} {
+		if !strings.Contains(out, strings.ReplaceAll(want, `\`, ``)) {
+			t.Fatalf("output missing %s: %s", want, out)
+		}
 	}
 }
 

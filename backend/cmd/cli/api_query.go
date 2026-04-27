@@ -79,6 +79,7 @@ func printAPIQueryUsage() {
 	_, _ = fmt.Fprintln(output, "  ad --friendly-id <id>")
 	_, _ = fmt.Fprintln(output, "  building-page --url <url>")
 	_, _ = fmt.Fprintln(output, "  sitemap")
+	_, _ = fmt.Fprintln(output, "  profile-schema [--cache-dir .cache/frontdoor-schema] [--sample-size 100] [--fetch-missing]")
 	_, _ = fmt.Fprintln(output)
 	_, _ = fmt.Fprintln(output, "Shortcut queries:")
 	_, _ = fmt.Fprintln(output, "  ad --id <numeric-id>")
@@ -103,6 +104,8 @@ func runFrontdoorAPIQuery(ctx context.Context, args []string, stdout io.Writer, 
 		return runFrontdoorBuildingPageQuery(ctx, args[1:], stdout, cfg)
 	case "sitemap":
 		return runFrontdoorSitemapQuery(ctx, args[1:], stdout, cfg)
+	case "profile-schema":
+		return runFrontdoorProfileSchemaQuery(ctx, args[1:], stdout, cfg)
 	default:
 		return fmt.Errorf("unknown frontdoor api query: %s", query)
 	}
@@ -168,6 +171,88 @@ func runFrontdoorSitemapQuery(ctx context.Context, args []string, stdout io.Writ
 		return err
 	}
 	return writeJSON(stdout, frontdoorSitemapOutput(entries), opts.Compact)
+}
+
+func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
+	fs, opts := newAPIFlagSet("api-query frontdoor profile-schema")
+	cacheDir := fs.String("cache-dir", ".cache/frontdoor-schema", "Directory for cached Frontdoor schema fixtures")
+	sampleSize := fs.Int("sample-size", 100, "Maximum sitemap entries to profile")
+	fetchMissing := fs.Bool("fetch-missing", false, "Fetch missing cache entries from the Frontdoor API")
+	refresh := fs.Bool("refresh", false, "Refetch entries even when cached")
+	examples := fs.Bool("examples", false, "Include scalar examples from cached payloads in the schema profile")
+	delay := fs.Duration("delay", 100*time.Millisecond, "Delay between live fetches")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *sampleSize <= 0 {
+		return fmt.Errorf("--sample-size must be positive")
+	}
+	if *fetchMissing || *refresh {
+		if err := requireProviderValues(map[string]string{
+			"FRONTDOOR_BASE_URL":         cfg.FrontdoorBaseURL,
+			"FRONTDOOR_SITEMAP_BASE_URL": cfg.FrontdoorSitemapBase,
+			"FRONTDOOR_USER_AGENT":       cfg.FrontdoorUserAgent,
+		}); err != nil {
+			return err
+		}
+	}
+	cache := frontdoorSchemaCache{dir: *cacheDir}
+	client := frontdoorclient.New(cfg.FrontdoorBaseURL, cfg.FrontdoorUserAgent, cfg.FrontdoorCookie, cfg.FrontdoorSitemapBase)
+	reqCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	entries, err := cache.readSitemapEntries()
+	if err != nil {
+		if !*fetchMissing && !*refresh {
+			return err
+		}
+	}
+	if *refresh || len(entries) == 0 {
+		entries, err = client.GetSitemapEntries(reqCtx)
+		if err != nil {
+			return err
+		}
+		if err := cache.writeSitemapEntries(entries); err != nil {
+			return err
+		}
+	}
+	result := newFrontdoorSchemaProfileResult(*cacheDir, *examples)
+	for _, entry := range entries {
+		if result.Processed >= *sampleSize {
+			break
+		}
+		switch entry.Type {
+		case frontdoorclient.EntryTypeAd:
+			raw, fetched, err := cache.readOrFetchAd(reqCtx, client, entry.ID, *fetchMissing, *refresh)
+			if err != nil {
+				return err
+			}
+			if fetched {
+				result.Fetched++
+				sleepContext(reqCtx, *delay)
+			}
+			if err := result.Ads.ProfileJSON(raw); err != nil {
+				return fmt.Errorf("profile frontdoor ad %s: %w", entry.ID, err)
+			}
+			result.AdSamples++
+		case frontdoorclient.EntryTypeBuilding:
+			raw, fetched, err := cache.readOrFetchBuildingState(reqCtx, client, entry.URL.String(), *fetchMissing, *refresh)
+			if err != nil {
+				return err
+			}
+			if fetched {
+				result.Fetched++
+				sleepContext(reqCtx, *delay)
+			}
+			if err := result.BuildingStates.ProfileJSON(raw); err != nil {
+				return fmt.Errorf("profile frontdoor building %s: %w", entry.ID, err)
+			}
+			result.BuildingSamples++
+		}
+		result.Processed++
+	}
+	result.Ads.Finalize()
+	result.BuildingStates.Finalize()
+	return writeJSON(stdout, result, opts.Compact)
 }
 
 func runShortcutAPIQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
