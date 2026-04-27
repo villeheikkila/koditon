@@ -305,6 +305,28 @@ type SyncCityProgress struct {
 	Details string
 }
 
+type SyncCityIndexResult struct {
+	City        string
+	PostalCodes []string
+}
+
+type SyncPostalCodeProgress struct {
+	City         string
+	PostalCode   string
+	Page         int
+	Transactions int
+	Upserted     int64
+}
+
+type SyncPostalCodePageResult struct {
+	City         string
+	PostalCode   string
+	Page         int
+	NextPage     *int
+	Transactions int
+	Upserted     int64
+}
+
 func (s *Service) SyncNeighborhoodPostalCodes(ctx context.Context, progressFn func(SyncNeighborhoodPostalCodesProgress)) error {
 	cities, err := s.queries.ListPricesCities(ctx)
 	if err != nil {
@@ -385,6 +407,148 @@ func (s *Service) syncNeighborhoodsForPostalCode(
 
 func (s *Service) SyncCity(ctx context.Context, cityName string) error {
 	return s.SyncCityWithProgress(ctx, cityName, nil)
+}
+
+func (s *Service) SyncCityIndex(ctx context.Context, cityName string, progressFn func(SyncCityProgress)) (*SyncCityIndexResult, error) {
+	report := func(p SyncCityProgress) {
+		if progressFn != nil {
+			progressFn(p)
+		}
+	}
+	report(SyncCityProgress{City: cityName, Step: "city_upsert_start"})
+	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
+	if err != nil {
+		return nil, fmt.Errorf("upsert city %q: %w", cityName, err)
+	}
+	report(SyncCityProgress{City: cityName, Step: "city_upsert_done"})
+	report(SyncCityProgress{City: cityName, Step: "postal_codes_fetch_start"})
+	postalCodes, err := s.client.FetchPostalCodes(ctx, cityName)
+	if err != nil {
+		return nil, fmt.Errorf("fetch postal codes for %q: %w", cityName, err)
+	}
+	postalCodes = util.UniqueStrings(postalCodes)
+	report(SyncCityProgress{City: cityName, Step: "postal_codes_fetch_done", Count: len(postalCodes)})
+	if len(postalCodes) > 0 {
+		report(SyncCityProgress{City: cityName, Step: "postal_codes_upsert_start", Count: len(postalCodes)})
+		rows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams(postalCodes, cityRow.PricesCityID))
+		if err != nil {
+			return nil, fmt.Errorf("bulk upsert postal codes for %q: %w", cityName, err)
+		}
+		report(SyncCityProgress{City: cityName, Step: "postal_codes_upsert_done", Count: len(rows)})
+	}
+	report(SyncCityProgress{City: cityName, Step: "neighborhoods_fetch_start"})
+	neighborhoods, err := s.client.FetchNeighborhoods(ctx, cityName)
+	if err != nil {
+		return nil, fmt.Errorf("fetch neighborhoods for %q: %w", cityName, err)
+	}
+	neighborhoods = util.UniqueStrings(neighborhoods)
+	report(SyncCityProgress{City: cityName, Step: "neighborhoods_fetch_done", Count: len(neighborhoods)})
+	if len(neighborhoods) > 0 {
+		report(SyncCityProgress{City: cityName, Step: "neighborhoods_upsert_start", Count: len(neighborhoods)})
+		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, mapUpsertNeighborhoodsBulkParams(neighborhoods, cityRow.PricesCityID))
+		if err != nil {
+			return nil, fmt.Errorf("bulk upsert neighborhoods for %q: %w", cityName, err)
+		}
+		report(SyncCityProgress{City: cityName, Step: "neighborhoods_upsert_done", Count: len(rows)})
+	}
+	report(SyncCityProgress{City: cityName, Step: "sync_city_index_done", Count: len(postalCodes)})
+	return &SyncCityIndexResult{City: cityName, PostalCodes: postalCodes}, nil
+}
+
+func (s *Service) SyncPostalCodeTransactions(ctx context.Context, cityName, postalCode string, progressFn func(SyncPostalCodeProgress)) error {
+	nextPage := new(int)
+	*nextPage = 0
+	for nextPage != nil {
+		page := *nextPage
+		result, err := s.SyncPostalCodeTransactionPage(ctx, cityName, postalCode, page, progressFn)
+		if err != nil {
+			return err
+		}
+		nextPage = result.NextPage
+	}
+	return nil
+}
+
+func (s *Service) SyncPostalCodeTransactionPage(ctx context.Context, cityName, postalCode string, page int, progressFn func(SyncPostalCodeProgress)) (*SyncPostalCodePageResult, error) {
+	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
+	if err != nil {
+		return nil, fmt.Errorf("upsert city %q: %w", cityName, err)
+	}
+	pcRows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams([]string{postalCode}, cityRow.PricesCityID))
+	if err != nil {
+		return nil, fmt.Errorf("upsert postal code %q for %q: %w", postalCode, cityName, err)
+	}
+	var postalCodeID uuid.UUID
+	if len(pcRows) > 0 {
+		postalCodeID = pcRows[0].PricesPostalCodeID
+	}
+	params := client.NewApartmentSearchParams(cityName)
+	params.PostalCodes = []string{postalCode}
+	response, err := s.client.GetTransactionsForPage(ctx, params, page)
+	if err != nil {
+		return nil, fmt.Errorf("fetch page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
+	}
+	upserted, err := s.upsertPostalCodeTransactionPage(ctx, cityRow.PricesCityID, postalCodeID, response.Apartments, s.nowFunc().Format("2006-01"))
+	if err != nil {
+		return nil, fmt.Errorf("upsert page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
+	}
+	if progressFn != nil {
+		progressFn(SyncPostalCodeProgress{City: cityName, PostalCode: postalCode, Page: page, Transactions: len(response.Apartments), Upserted: upserted})
+	}
+	return &SyncPostalCodePageResult{
+		City:         cityName,
+		PostalCode:   postalCode,
+		Page:         page,
+		NextPage:     response.NextPage,
+		Transactions: len(response.Apartments),
+		Upserted:     upserted,
+	}, nil
+}
+
+func (s *Service) upsertPostalCodeTransactionPage(ctx context.Context, cityID uuid.UUID, postalCodeID uuid.UUID, transactions []*client.TransactionEntity, periodIdentifier string) (int64, error) {
+	if len(transactions) == 0 {
+		return 0, nil
+	}
+	neighborhoodNames := make([]string, 0, len(transactions))
+	seen := make(map[string]struct{})
+	for _, tx := range transactions {
+		name := util.TrimUnicodeSpace(tx.Neighborhood)
+		if name == "" {
+			continue
+		}
+		key := util.NormalizeString(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		neighborhoodNames = append(neighborhoodNames, name)
+	}
+	neighborhoodIDs := make(map[string]uuid.UUID, len(neighborhoodNames))
+	if len(neighborhoodNames) > 0 {
+		rows, err := s.queries.UpsertPricesNeighborhoodsBulk(ctx, mapUpsertNeighborhoodsBulkParams(neighborhoodNames, cityID))
+		if err != nil {
+			return 0, fmt.Errorf("bulk upsert neighborhoods: %w", err)
+		}
+		for _, row := range rows {
+			key := util.NormalizeString(row.PricesNeighborhoodName)
+			neighborhoodIDs[key] = row.PricesNeighborhoodID
+			if postalCodeID != uuid.Nil {
+				pcID := postalCodeID
+				if err := s.queries.UpdateNeighborhoodPostalCode(ctx, db.UpdateNeighborhoodPostalCodeParams{PostalCodeID: &pcID, Name: row.PricesNeighborhoodName, CityID: cityID}); err != nil {
+					return 0, fmt.Errorf("update neighborhood postal code %q: %w", row.PricesNeighborhoodName, err)
+				}
+			}
+		}
+	}
+	bulkParams, err := mapUpsertTransactionsBulkParams(transactions, neighborhoodIDs, periodIdentifier)
+	if err != nil {
+		return 0, fmt.Errorf("build transaction params: %w", err)
+	}
+	upserted, err := s.queries.UpsertPricesTransactionsBulk(ctx, *bulkParams)
+	if err != nil {
+		return 0, fmt.Errorf("bulk upsert transactions: %w", err)
+	}
+	return upserted, nil
 }
 
 func (s *Service) SyncCityWithProgress(ctx context.Context, cityName string, progressFn func(SyncCityProgress)) error {

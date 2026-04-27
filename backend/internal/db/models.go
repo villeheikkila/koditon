@@ -212,20 +212,6 @@ type FrontdoorBuildingAnnouncement struct {
 	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
 }
 
-type FrontdoorSyncTask struct {
-	FrontdoorSyncTaskID          int64      `json:"frontdoor_sync_task_id"`
-	FrontdoorSyncTaskEntityID    string     `json:"frontdoor_sync_task_entity_id"`
-	FrontdoorSyncTaskType        string     `json:"frontdoor_sync_task_type"`
-	FrontdoorSyncTaskStatus      string     `json:"frontdoor_sync_task_status"`
-	FrontdoorSyncTaskPriority    int32      `json:"frontdoor_sync_task_priority"`
-	FrontdoorSyncTaskMaxAttempts int32      `json:"frontdoor_sync_task_max_attempts"`
-	FrontdoorSyncTaskAttempts    int32      `json:"frontdoor_sync_task_attempts"`
-	FrontdoorSyncTaskLastError   *string    `json:"frontdoor_sync_task_last_error"`
-	FrontdoorSyncTaskCreatedAt   time.Time  `json:"frontdoor_sync_task_created_at"`
-	FrontdoorSyncTaskStartedAt   *time.Time `json:"frontdoor_sync_task_started_at"`
-	FrontdoorSyncTaskCompletedAt *time.Time `json:"frontdoor_sync_task_completed_at"`
-}
-
 type OauthAuthorizationCode struct {
 	OauthAuthorizationCodeID                  uuid.UUID  `json:"oauth_authorization_code_id"`
 	OauthAuthorizationCodeCodeHash            string     `json:"oauth_authorization_code_code_hash"`
@@ -356,20 +342,6 @@ type PostalPostalCode struct {
 	PostalPostalCodeNeighborhoodFi *string    `json:"postal_postal_code_neighborhood_fi"`
 }
 
-type PostalSyncTask struct {
-	PostalSyncTaskID          int64      `json:"postal_sync_task_id"`
-	PostalSyncTaskEntityID    string     `json:"postal_sync_task_entity_id"`
-	PostalSyncTaskType        string     `json:"postal_sync_task_type"`
-	PostalSyncTaskStatus      string     `json:"postal_sync_task_status"`
-	PostalSyncTaskPriority    int32      `json:"postal_sync_task_priority"`
-	PostalSyncTaskMaxAttempts int32      `json:"postal_sync_task_max_attempts"`
-	PostalSyncTaskAttempts    int32      `json:"postal_sync_task_attempts"`
-	PostalSyncTaskLastError   *string    `json:"postal_sync_task_last_error"`
-	PostalSyncTaskCreatedAt   time.Time  `json:"postal_sync_task_created_at"`
-	PostalSyncTaskStartedAt   *time.Time `json:"postal_sync_task_started_at"`
-	PostalSyncTaskCompletedAt *time.Time `json:"postal_sync_task_completed_at"`
-}
-
 type PricesCity struct {
 	PricesCityID        uuid.UUID `json:"prices_city_id"`
 	PricesCityName      string    `json:"prices_city_name"`
@@ -393,20 +365,6 @@ type PricesPostalCode struct {
 	PricesCityID              uuid.UUID `json:"prices_city_id"`
 	PricesPostalCodeCreatedAt time.Time `json:"prices_postal_code_created_at"`
 	PricesPostalCodeUpdatedAt time.Time `json:"prices_postal_code_updated_at"`
-}
-
-type PricesSyncTask struct {
-	PricesSyncTaskID          int64      `json:"prices_sync_task_id"`
-	PricesSyncTaskEntityID    string     `json:"prices_sync_task_entity_id"`
-	PricesSyncTaskType        string     `json:"prices_sync_task_type"`
-	PricesSyncTaskStatus      string     `json:"prices_sync_task_status"`
-	PricesSyncTaskPriority    int32      `json:"prices_sync_task_priority"`
-	PricesSyncTaskMaxAttempts int32      `json:"prices_sync_task_max_attempts"`
-	PricesSyncTaskAttempts    int32      `json:"prices_sync_task_attempts"`
-	PricesSyncTaskLastError   *string    `json:"prices_sync_task_last_error"`
-	PricesSyncTaskCreatedAt   time.Time  `json:"prices_sync_task_created_at"`
-	PricesSyncTaskStartedAt   *time.Time `json:"prices_sync_task_started_at"`
-	PricesSyncTaskCompletedAt *time.Time `json:"prices_sync_task_completed_at"`
 }
 
 type PricesTransaction struct {
@@ -563,20 +521,6 @@ type ShortcutBuildingRental struct {
 	ShortcutBuildingRentalIdx           *int32     `json:"shortcut_building_rental_idx"`
 }
 
-type ShortcutSyncTask struct {
-	ShortcutSyncTaskID          int64      `json:"shortcut_sync_task_id"`
-	ShortcutSyncTaskEntityID    string     `json:"shortcut_sync_task_entity_id"`
-	ShortcutSyncTaskType        string     `json:"shortcut_sync_task_type"`
-	ShortcutSyncTaskStatus      string     `json:"shortcut_sync_task_status"`
-	ShortcutSyncTaskPriority    int32      `json:"shortcut_sync_task_priority"`
-	ShortcutSyncTaskMaxAttempts int32      `json:"shortcut_sync_task_max_attempts"`
-	ShortcutSyncTaskAttempts    int32      `json:"shortcut_sync_task_attempts"`
-	ShortcutSyncTaskLastError   *string    `json:"shortcut_sync_task_last_error"`
-	ShortcutSyncTaskCreatedAt   time.Time  `json:"shortcut_sync_task_created_at"`
-	ShortcutSyncTaskStartedAt   *time.Time `json:"shortcut_sync_task_started_at"`
-	ShortcutSyncTaskCompletedAt *time.Time `json:"shortcut_sync_task_completed_at"`
-}
-
 type ShortcutToken struct {
 	ShortcutTokenID        uuid.UUID `json:"shortcut_token_id"`
 	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
@@ -593,6 +537,47 @@ type SpatialRefSy struct {
 	AuthSrid  *int32  `json:"auth_srid"`
 	Srtext    *string `json:"srtext"`
 	Proj4text *string `json:"proj4text"`
+}
+
+type SyncJob struct {
+	SyncJobID                uuid.UUID       `json:"sync_job_id"`
+	SyncJobProvider          string          `json:"sync_job_provider"`
+	SyncJobKind              string          `json:"sync_job_kind"`
+	SyncJobEntityID          string          `json:"sync_job_entity_id"`
+	SyncJobDedupKey          string          `json:"sync_job_dedup_key"`
+	SyncJobStatus            string          `json:"sync_job_status"`
+	SyncJobPriority          int32           `json:"sync_job_priority"`
+	SyncJobAttemptCount      int32           `json:"sync_job_attempt_count"`
+	SyncJobMaxAttempts       int32           `json:"sync_job_max_attempts"`
+	SyncJobRunAfter          time.Time       `json:"sync_job_run_after"`
+	SyncJobCapacityClass     string          `json:"sync_job_capacity_class"`
+	SyncJobPayload           json.RawMessage `json:"sync_job_payload"`
+	SyncJobCheckpoint        json.RawMessage `json:"sync_job_checkpoint"`
+	SyncJobResult            json.RawMessage `json:"sync_job_result"`
+	SyncJobLastError         *string         `json:"sync_job_last_error"`
+	SyncJobLastErrorCode     *string         `json:"sync_job_last_error_code"`
+	SyncJobLastHttpStatus    *int32          `json:"sync_job_last_http_status"`
+	SyncJobLastPgmqMessageID *int64          `json:"sync_job_last_pgmq_message_id"`
+	SyncJobClaimToken        *uuid.UUID      `json:"sync_job_claim_token"`
+	SyncJobCreatedAt         time.Time       `json:"sync_job_created_at"`
+	SyncJobUpdatedAt         time.Time       `json:"sync_job_updated_at"`
+	SyncJobLastEnqueuedAt    *time.Time      `json:"sync_job_last_enqueued_at"`
+	SyncJobLastStartedAt     *time.Time      `json:"sync_job_last_started_at"`
+	SyncJobLastFinishedAt    *time.Time      `json:"sync_job_last_finished_at"`
+}
+
+type SyncJobAttempt struct {
+	SyncJobAttemptID              int64           `json:"sync_job_attempt_id"`
+	SyncJobID                     uuid.UUID       `json:"sync_job_id"`
+	SyncJobAttemptQueueName       string          `json:"sync_job_attempt_queue_name"`
+	SyncJobAttemptMsgID           *int64          `json:"sync_job_attempt_msg_id"`
+	SyncJobAttemptNo              int32           `json:"sync_job_attempt_no"`
+	SyncJobAttemptStatus          string          `json:"sync_job_attempt_status"`
+	SyncJobAttemptErrorCode       *string         `json:"sync_job_attempt_error_code"`
+	SyncJobAttemptErrorDetail     *string         `json:"sync_job_attempt_error_detail"`
+	SyncJobAttemptPayloadSnapshot json.RawMessage `json:"sync_job_attempt_payload_snapshot"`
+	SyncJobAttemptCreatedAt       time.Time       `json:"sync_job_attempt_created_at"`
+	SyncJobAttemptFinishedAt      *time.Time      `json:"sync_job_attempt_finished_at"`
 }
 
 type User struct {

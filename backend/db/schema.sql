@@ -241,21 +241,6 @@ CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings
 CREATE INDEX idx_frontdoor_building_business_id ON public.frontdoor_buildings USING btree (frontdoor_building_business_id);
 CREATE INDEX idx_frontdoor_building_processed_at ON public.frontdoor_buildings USING btree (frontdoor_building_processed_at);
 
-create table public.frontdoor_sync_tasks (
-  frontdoor_sync_task_id bigint default nextval('frontdoor_sync_tasks_frontdoor_sync_task_id_seq'::regclass) not null constraint frontdoor_sync_tasks_pkey primary key,
-  frontdoor_sync_task_entity_id text not null,
-  frontdoor_sync_task_type text not null,
-  frontdoor_sync_task_status text default 'pending'::text not null,
-  frontdoor_sync_task_priority integer default 0 not null,
-  frontdoor_sync_task_max_attempts integer default 3 not null,
-  frontdoor_sync_task_attempts integer default 0 not null,
-  frontdoor_sync_task_last_error text,
-  frontdoor_sync_task_created_at timestamp with time zone default now() not null,
-  frontdoor_sync_task_started_at timestamp with time zone,
-  frontdoor_sync_task_completed_at timestamp with time zone,
-  constraint frontdoor_sync_tasks_frontdoor_sync_task_entity_id_frontdoo_key UNIQUE (frontdoor_sync_task_entity_id, frontdoor_sync_task_type)
-);
-
 create table public.oauth_authorization_codes (
   oauth_authorization_code_id uuid default gen_random_uuid() not null constraint oauth_authorization_codes_pkey primary key,
   oauth_authorization_code_code_hash text not null constraint oauth_authorization_codes_oauth_authorization_code_code_has_key unique,
@@ -417,21 +402,6 @@ CREATE INDEX idx_postal_postal_code_municipality_id ON public.postal_postal_code
 CREATE INDEX idx_postal_postal_code_name_fi ON public.postal_postal_codes USING btree (postal_postal_code_name_fi);
 CREATE INDEX idx_postal_postal_code_neighborhood_fi ON public.postal_postal_codes USING btree (postal_postal_code_neighborhood_fi);
 
-create table public.postal_sync_tasks (
-  postal_sync_task_id bigint default nextval('postal_sync_tasks_postal_sync_task_id_seq'::regclass) not null constraint postal_sync_tasks_pkey primary key,
-  postal_sync_task_entity_id text not null,
-  postal_sync_task_type text not null,
-  postal_sync_task_status text default 'pending'::text not null,
-  postal_sync_task_priority integer default 0 not null,
-  postal_sync_task_max_attempts integer default 3 not null,
-  postal_sync_task_attempts integer default 0 not null,
-  postal_sync_task_last_error text,
-  postal_sync_task_created_at timestamp with time zone default now() not null,
-  postal_sync_task_started_at timestamp with time zone,
-  postal_sync_task_completed_at timestamp with time zone,
-  constraint postal_sync_tasks_postal_sync_task_entity_id_postal_sync_ta_key UNIQUE (postal_sync_task_entity_id, postal_sync_task_type)
-);
-
 create table public.prices_cities (
   prices_city_id uuid default uuid_generate_v4() not null constraint prices_cities_pkey primary key,
   prices_city_name text not null constraint prices_cities_prices_cities_name_key unique,
@@ -458,21 +428,6 @@ create table public.prices_postal_codes (
   prices_city_id uuid not null constraint prices_postal_codes_prices_postal_codes_city_id_fkey references prices_cities(prices_city_id),
   prices_postal_code_created_at timestamp with time zone default now() not null,
   prices_postal_code_updated_at timestamp with time zone default now() not null
-);
-
-create table public.prices_sync_tasks (
-  prices_sync_task_id bigint default nextval('prices_sync_tasks_prices_sync_task_id_seq'::regclass) not null constraint prices_sync_tasks_pkey primary key,
-  prices_sync_task_entity_id text not null,
-  prices_sync_task_type text not null,
-  prices_sync_task_status text default 'pending'::text not null,
-  prices_sync_task_priority integer default 0 not null,
-  prices_sync_task_max_attempts integer default 3 not null,
-  prices_sync_task_attempts integer default 0 not null,
-  prices_sync_task_last_error text,
-  prices_sync_task_created_at timestamp with time zone default now() not null,
-  prices_sync_task_started_at timestamp with time zone,
-  prices_sync_task_completed_at timestamp with time zone,
-  constraint prices_sync_tasks_prices_sync_task_entity_id_prices_sync_ta_key UNIQUE (prices_sync_task_entity_id, prices_sync_task_type)
 );
 
 create table public.prices_transactions (
@@ -632,21 +587,6 @@ create table public.shortcut_buildings (
 
 CREATE INDEX shortcut_building_geom_idx ON public.shortcut_buildings USING gist (shortcut_building_geom);
 
-create table public.shortcut_sync_tasks (
-  shortcut_sync_task_id bigint default nextval('shortcut_sync_tasks_shortcut_sync_task_id_seq'::regclass) not null constraint shortcut_sync_tasks_pkey primary key,
-  shortcut_sync_task_entity_id text not null,
-  shortcut_sync_task_type text not null,
-  shortcut_sync_task_status text default 'pending'::text not null,
-  shortcut_sync_task_priority integer default 0 not null,
-  shortcut_sync_task_max_attempts integer default 3 not null,
-  shortcut_sync_task_attempts integer default 0 not null,
-  shortcut_sync_task_last_error text,
-  shortcut_sync_task_created_at timestamp with time zone default now() not null,
-  shortcut_sync_task_started_at timestamp with time zone,
-  shortcut_sync_task_completed_at timestamp with time zone,
-  constraint shortcut_sync_tasks_shortcut_sync_task_entity_id_shortcut_s_key UNIQUE (shortcut_sync_task_entity_id, shortcut_sync_task_type)
-);
-
 create table public.shortcut_tokens (
   shortcut_token_id uuid default gen_random_uuid() not null constraint shortcut_tokens_pkey primary key,
   shortcut_token_cuid text not null constraint shortcut_token_cuid_key unique,
@@ -668,6 +608,62 @@ create table public.spatial_ref_sys (
   proj4text character varying(2048),
   constraint spatial_ref_sys_srid_check CHECK (((srid > 0) AND (srid <= 998999)))
 );
+
+create table public.sync_job_attempts (
+  sync_job_attempt_id bigint generated always as identity not null constraint sync_job_attempts_pkey primary key,
+  sync_job_id uuid not null constraint sync_job_attempts_sync_job_id_fkey references sync_jobs(sync_job_id) ON DELETE CASCADE,
+  sync_job_attempt_queue_name text not null,
+  sync_job_attempt_msg_id bigint,
+  sync_job_attempt_no integer not null,
+  sync_job_attempt_status text not null,
+  sync_job_attempt_error_code text,
+  sync_job_attempt_error_detail text,
+  sync_job_attempt_payload_snapshot jsonb,
+  sync_job_attempt_created_at timestamp with time zone default now() not null,
+  sync_job_attempt_finished_at timestamp with time zone,
+  constraint sync_job_attempts_payload_snapshot_object_check CHECK (((sync_job_attempt_payload_snapshot IS NULL) OR (jsonb_typeof(sync_job_attempt_payload_snapshot) = 'object'::text))),
+  constraint sync_job_attempts_status_check CHECK ((sync_job_attempt_status = ANY (ARRAY['running'::text, 'succeeded'::text, 'failed'::text, 'retry'::text, 'not_found'::text, 'noop'::text, 'skipped_lock'::text])))
+);
+
+CREATE INDEX idx_sync_job_attempts_job_created_at_desc ON public.sync_job_attempts USING btree (sync_job_id, sync_job_attempt_created_at DESC);
+
+create table public.sync_jobs (
+  sync_job_id uuid default uuid_generate_v4() not null constraint sync_jobs_pkey primary key,
+  sync_job_provider text not null,
+  sync_job_kind text not null,
+  sync_job_entity_id text not null,
+  sync_job_dedup_key text not null constraint sync_jobs_sync_job_dedup_key_key unique,
+  sync_job_status text default 'pending'::text not null,
+  sync_job_priority integer default 0 not null,
+  sync_job_attempt_count integer default 0 not null,
+  sync_job_max_attempts integer default 3 not null,
+  sync_job_run_after timestamp with time zone default now() not null,
+  sync_job_capacity_class text default 'default'::text not null,
+  sync_job_payload jsonb default '{}'::jsonb not null,
+  sync_job_checkpoint jsonb,
+  sync_job_result jsonb,
+  sync_job_last_error text,
+  sync_job_last_error_code text,
+  sync_job_last_http_status integer,
+  sync_job_last_pgmq_message_id bigint,
+  sync_job_claim_token uuid,
+  sync_job_created_at timestamp with time zone default now() not null,
+  sync_job_updated_at timestamp with time zone default now() not null,
+  sync_job_last_enqueued_at timestamp with time zone,
+  sync_job_last_started_at timestamp with time zone,
+  sync_job_last_finished_at timestamp with time zone,
+  constraint sync_jobs_attempt_count_check CHECK ((sync_job_attempt_count >= 0)),
+  constraint sync_jobs_checkpoint_object_check CHECK (((sync_job_checkpoint IS NULL) OR (jsonb_typeof(sync_job_checkpoint) = 'object'::text))),
+  constraint sync_jobs_max_attempts_check CHECK ((sync_job_max_attempts >= 1)),
+  constraint sync_jobs_payload_object_check CHECK ((jsonb_typeof(sync_job_payload) = 'object'::text)),
+  constraint sync_jobs_result_object_check CHECK (((sync_job_result IS NULL) OR (jsonb_typeof(sync_job_result) = 'object'::text))),
+  constraint sync_jobs_status_check CHECK ((sync_job_status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'succeeded'::text, 'failed'::text, 'not_found'::text, 'noop'::text, 'skipped_lock'::text])))
+);
+
+CREATE INDEX idx_sync_jobs_capacity_status ON public.sync_jobs USING btree (sync_job_capacity_class, sync_job_status);
+CREATE INDEX idx_sync_jobs_entity ON public.sync_jobs USING btree (sync_job_provider, sync_job_entity_id, sync_job_kind);
+CREATE INDEX idx_sync_jobs_kind_status_run_after ON public.sync_jobs USING btree (sync_job_kind, sync_job_status, sync_job_run_after);
+CREATE INDEX idx_sync_jobs_provider_status_run_after ON public.sync_jobs USING btree (sync_job_provider, sync_job_status, sync_job_run_after);
 
 create table public.user_devices (
   user_device_uuid uuid default gen_random_uuid() not null constraint user_devices_uuid_key unique,

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/text/encoding/charmap"
@@ -141,6 +142,13 @@ type TransactionResponse struct {
 type Client struct {
 	httpClient *http.Client
 	baseURL    *url.URL
+	limiter    *requestLimiter
+}
+
+type requestLimiter struct {
+	mu       sync.Mutex
+	next     time.Time
+	interval time.Duration
 }
 
 func NewClient(baseURL string) (*Client, error) {
@@ -165,7 +173,34 @@ func NewClient(baseURL string) (*Client, error) {
 	return &Client{
 		httpClient: httpClient,
 		baseURL:    parsedBaseURL,
+		limiter:    newRequestLimiter(1 * time.Second),
 	}, nil
+}
+
+func newRequestLimiter(interval time.Duration) *requestLimiter {
+	return &requestLimiter{interval: interval}
+}
+
+func (l *requestLimiter) Wait(ctx context.Context) error {
+	if l == nil || l.interval <= 0 {
+		return nil
+	}
+	l.mu.Lock()
+	now := time.Now()
+	waitUntil := l.next
+	if waitUntil.Before(now) {
+		waitUntil = now
+	}
+	l.next = waitUntil.Add(l.interval)
+	l.mu.Unlock()
+	timer := time.NewTimer(time.Until(waitUntil))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *Client) setCommonHeaders(req *http.Request) {
@@ -186,6 +221,9 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 
 func (c *Client) doRequest(ctx context.Context, req *http.Request, target any) error {
 	c.setCommonHeaders(req)
+	if err := c.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("wait for prices request budget: %w", err)
+	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("perform request: %w", err)

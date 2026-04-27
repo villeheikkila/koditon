@@ -8,6 +8,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
+	syncjobs "koditon/internal/sync/jobs"
 )
 
 const (
@@ -20,23 +21,8 @@ func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message
 	logger := logging.With(c.logger,
 		slog.String("task_type", msg.Data.TaskType),
 		slog.String("entity_id", msg.Data.EntityID),
-		slog.Int64("sync_task_id", msg.Data.SyncTaskID),
 	)
-	var err error
-	switch msg.Data.TaskType {
-	case TaskTypeShortcutSitemapSync:
-		err = c.handleShortcutSitemapSync(ctx, logger, msg)
-	case TaskTypeShortcutScraperSync:
-		err = c.handleShortcutScraperSync(ctx, logger, msg)
-	case TaskTypeShortcutAPISync:
-		err = c.handleShortcutAPISync(ctx, logger, msg)
-	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown shortcut task type: %s", msg.Data.TaskType), "unrecognized task type")
-	}
-	if err != nil {
-		return classifyError(err)
-	}
-	return nil
+	return c.handleSyncJobTask(ctx, "shortcut", logger, msg, c.runShortcutSyncJob)
 }
 
 func (c *Consumer) handleShortcutSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
@@ -82,20 +68,27 @@ func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logge
 	return nil
 }
 
-func (c *Consumer) enqueueShortcutTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.UpsertShortcutSyncTask(ctx, db.UpsertShortcutSyncTaskParams{
-		ShortcutSyncTaskEntityID:    entityID,
-		ShortcutSyncTaskType:        taskType,
-		ShortcutSyncTaskPriority:    int32(taskqueue.PriorityNormal),
-		ShortcutSyncTaskMaxAttempts: int32(3),
-	})
-	if err != nil {
-		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
-	}
-	_, err = queue.Send(ctx, taskqueue.MessageData{
-		SyncTaskID: task.ShortcutSyncTaskID,
-		EntityID:   entityID,
-		TaskType:   taskType,
+func (c *Consumer) enqueueShortcutTask(ctx context.Context, _ *taskqueue.Queue, entityID, taskType string) error {
+	_, err := c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "shortcut",
+		Kind:        taskType,
+		EntityID:    entityID,
+		Priority:    int32(taskqueue.PriorityNormal),
+		MaxAttempts: 3,
 	})
 	return err
+}
+
+func (c *Consumer) runShortcutSyncJob(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	msg := taskqueue.Message{Data: taskqueue.MessageData{EntityID: job.SyncJobEntityID, TaskType: job.SyncJobKind}}
+	switch job.SyncJobKind {
+	case TaskTypeShortcutSitemapSync:
+		return c.handleShortcutSitemapSync(ctx, logger, msg)
+	case TaskTypeShortcutScraperSync:
+		return c.handleShortcutScraperSync(ctx, logger, msg)
+	case TaskTypeShortcutAPISync:
+		return c.handleShortcutAPISync(ctx, logger, msg)
+	default:
+		return taskqueue.NewPermanentError(fmt.Errorf("unknown shortcut sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
+	}
 }

@@ -123,6 +123,29 @@ func (r *Runner) PricesSyncCityEntityWithProgress(ctx context.Context, entityID 
 	return nil
 }
 
+func (r *Runner) PricesSyncCityIndex(ctx context.Context, cityName string, progressFn func(prices.SyncCityProgress)) (*prices.SyncCityIndexResult, error) {
+	result, err := r.pricesService.SyncCityIndex(ctx, cityName, progressFn)
+	if err != nil {
+		return nil, fmt.Errorf("sync prices city index %s: %w", cityName, err)
+	}
+	return result, nil
+}
+
+func (r *Runner) PricesSyncPostalCodeTransactions(ctx context.Context, cityName, postalCode string, progressFn func(prices.SyncPostalCodeProgress)) error {
+	if err := r.pricesService.SyncPostalCodeTransactions(ctx, cityName, postalCode, progressFn); err != nil {
+		return fmt.Errorf("sync prices postal code %s/%s: %w", cityName, postalCode, err)
+	}
+	return nil
+}
+
+func (r *Runner) PricesSyncPostalCodeTransactionPage(ctx context.Context, cityName, postalCode string, page int, progressFn func(prices.SyncPostalCodeProgress)) (*prices.SyncPostalCodePageResult, error) {
+	result, err := r.pricesService.SyncPostalCodeTransactionPage(ctx, cityName, postalCode, page, progressFn)
+	if err != nil {
+		return nil, fmt.Errorf("sync prices postal code page %s/%s/%d: %w", cityName, postalCode, page, err)
+	}
+	return result, nil
+}
+
 func (r *Runner) PricesSyncAll(ctx context.Context, cfg prices.SyncAllConfig) (*prices.SyncAllResult, error) {
 	result, err := r.pricesService.SyncAll(ctx, cfg)
 	if err != nil {

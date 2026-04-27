@@ -39,6 +39,9 @@ func (c *Client) GetTransactionsForPage(ctx context.Context, params *ApartmentSe
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
+	if err := c.limiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("wait for prices request budget: %w", err)
+	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("perform request: %w", err)

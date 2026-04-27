@@ -8,6 +8,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
+	syncjobs "koditon/internal/sync/jobs"
 )
 
 const (
@@ -19,21 +20,8 @@ func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Messag
 	logger := logging.With(c.logger,
 		slog.String("task_type", msg.Data.TaskType),
 		slog.String("entity_id", msg.Data.EntityID),
-		slog.Int64("sync_task_id", msg.Data.SyncTaskID),
 	)
-	var err error
-	switch msg.Data.TaskType {
-	case TaskTypeFrontdoorSitemapSync:
-		err = c.handleFrontdoorSitemapSync(ctx, logger, msg)
-	case TaskTypeFrontdoorSync:
-		err = c.handleFrontdoorEntitySync(ctx, logger, msg)
-	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown frontdoor task type: %s", msg.Data.TaskType), "unrecognized task type")
-	}
-	if err != nil {
-		return classifyError(err)
-	}
-	return nil
+	return c.handleSyncJobTask(ctx, "frontdoor", logger, msg, c.runFrontdoorSyncJob)
 }
 
 func (c *Consumer) handleFrontdoorSitemapSync(ctx context.Context, logger *slog.Logger, _ taskqueue.Message) error {
@@ -69,20 +57,25 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 	return nil
 }
 
-func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, queue *taskqueue.Queue, entityID, taskType string) error {
-	task, err := c.queries.UpsertFrontdoorSyncTask(ctx, db.UpsertFrontdoorSyncTaskParams{
-		FrontdoorSyncTaskEntityID:    entityID,
-		FrontdoorSyncTaskType:        taskType,
-		FrontdoorSyncTaskPriority:    int32(taskqueue.PriorityNormal),
-		FrontdoorSyncTaskMaxAttempts: int32(3),
-	})
-	if err != nil {
-		return nil // ON CONFLICT DO NOTHING - active task already exists for this entity
-	}
-	_, err = queue.Send(ctx, taskqueue.MessageData{
-		SyncTaskID: task.FrontdoorSyncTaskID,
-		EntityID:   entityID,
-		TaskType:   taskType,
+func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, _ *taskqueue.Queue, entityID, taskType string) error {
+	_, err := c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "frontdoor",
+		Kind:        taskType,
+		EntityID:    entityID,
+		Priority:    int32(taskqueue.PriorityNormal),
+		MaxAttempts: 3,
 	})
 	return err
+}
+
+func (c *Consumer) runFrontdoorSyncJob(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	msg := taskqueue.Message{Data: taskqueue.MessageData{EntityID: job.SyncJobEntityID, TaskType: job.SyncJobKind}}
+	switch job.SyncJobKind {
+	case TaskTypeFrontdoorSitemapSync:
+		return c.handleFrontdoorSitemapSync(ctx, logger, msg)
+	case TaskTypeFrontdoorSync:
+		return c.handleFrontdoorEntitySync(ctx, logger, msg)
+	default:
+		return taskqueue.NewPermanentError(fmt.Errorf("unknown frontdoor sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
+	}
 }

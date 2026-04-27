@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"koditon/internal/platform/pgmq"
@@ -27,10 +28,10 @@ const (
 var ErrNoRows = pgmq.ErrNoRows
 
 type MessageData struct {
-	SyncTaskID int64  `json:"sync_task_id"`
-	EntityID   string `json:"entity_id"`
-	TaskType   string `json:"task_type"`
-	Attempt    int32  `json:"attempt"`
+	SyncJobID *uuid.UUID `json:"sync_job_id,omitempty"`
+	EntityID  string     `json:"entity_id"`
+	TaskType  string     `json:"task_type"`
+	Attempt   int32      `json:"attempt"`
 }
 
 type Message struct {
@@ -64,23 +65,6 @@ func (q *Queue) EnsureQueue(ctx context.Context) error {
 		return fmt.Errorf("create queue %s: %w", q.name, err)
 	}
 	return nil
-}
-
-func (q *Queue) Send(ctx context.Context, data MessageData) (int64, error) {
-	return q.SendWithDelay(ctx, data, 0)
-}
-
-func (q *Queue) SendWithDelay(ctx context.Context, data MessageData, delay time.Duration) (int64, error) {
-	msgJSON, err := json.Marshal(data)
-	if err != nil {
-		return 0, fmt.Errorf("marshal message: %w", err)
-	}
-	delaySecs := max(int(delay.Seconds()), 0)
-	msgID, err := q.pgmqClient.SendWithDelay(ctx, q.name, json.RawMessage(msgJSON), delaySecs)
-	if err != nil {
-		return 0, fmt.Errorf("send to queue %s: %w", q.name, err)
-	}
-	return msgID, nil
 }
 
 func (q *Queue) Read(ctx context.Context, visibilityTimeout time.Duration) (*Message, error) {

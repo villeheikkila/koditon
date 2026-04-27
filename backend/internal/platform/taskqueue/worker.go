@@ -16,15 +16,6 @@ import (
 
 type TaskHandler func(ctx context.Context, msg Message) error
 
-// StatusCallbacks allows the consumer to hook into task lifecycle events
-// to update the sync_tasks table status accordingly.
-type StatusCallbacks struct {
-	OnProcessing func(ctx context.Context, pendingTaskID int64) error
-	OnCompleted  func(ctx context.Context, pendingTaskID int64) error
-	OnFailed     func(ctx context.Context, pendingTaskID int64, errMsg string) error
-	OnRetry      func(ctx context.Context, pendingTaskID int64, errMsg string) error
-}
-
 type WorkerConfig struct {
 	VisibilityTimeout time.Duration
 	PollInterval      time.Duration
@@ -33,7 +24,6 @@ type WorkerConfig struct {
 	MaxRetryDelay     time.Duration
 	MaxAttempts       int32
 	Logger            *slog.Logger
-	Callbacks         *StatusCallbacks
 }
 
 func DefaultWorkerConfig() WorkerConfig {
@@ -126,7 +116,7 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	taskLogger := w.logger.With(
 		logging.Args(
 			logging.Op("task.process"),
-			slog.Int64("sync_task_id", msg.Data.SyncTaskID),
+			slog.Any("sync_job_id", msg.Data.SyncJobID),
 			slog.String("entity_id", msg.Data.EntityID),
 			slog.String("task_type", msg.Data.TaskType),
 			slog.Int("attempt", int(msg.Data.Attempt)),
@@ -135,14 +125,6 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 		)...,
 	)
 	taskLogger.InfoContext(ctx, "task received")
-
-	// Mark pending task as processing
-	if cb := w.config.Callbacks; cb != nil && cb.OnProcessing != nil && msg.Data.SyncTaskID > 0 {
-		if err := cb.OnProcessing(ctx, msg.Data.SyncTaskID); err != nil {
-			taskLogger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", logging.Outcome(logging.OutcomeError), slog.String("status", "processing"), logging.Error(err))
-		}
-	}
-
 	taskCtx, cancel := context.WithTimeout(ctx, w.config.TaskTimeout)
 	startTime := time.Now()
 	processingErr := w.executeHandler(taskCtx, taskLogger, *msg)
@@ -159,14 +141,6 @@ func (w *Worker) processNext(ctx context.Context) (err error) {
 	if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
 		taskLogger.LogAttrs(ctx, slog.LevelError, "task ack failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
 	}
-
-	// Mark pending task as completed
-	if cb := w.config.Callbacks; cb != nil && cb.OnCompleted != nil && msg.Data.SyncTaskID > 0 {
-		if err := cb.OnCompleted(ctx, msg.Data.SyncTaskID); err != nil {
-			taskLogger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", logging.Outcome(logging.OutcomeError), slog.String("status", "completed"), logging.Error(err))
-		}
-	}
-
 	return nil
 }
 
@@ -195,39 +169,23 @@ func (w *Worker) handleFailure(ctx context.Context, logger *slog.Logger, msg Mes
 		logging.Outcome(outcomeForTaskFailure(shouldRetry)),
 	)
 
-	// Always delete the current message from pgmq
-	if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
-		logger.LogAttrs(ctx, slog.LevelWarn, "task ack failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
+	if !shouldRetry || msg.Data.SyncJobID == nil {
+		if err := w.queue.Delete(ctx, msg.MessageID); err != nil {
+			logger.LogAttrs(ctx, slog.LevelWarn, "task ack failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
+		}
 	}
-
-	errMsg := processingErr.Error()
-	cb := w.config.Callbacks
 
 	if shouldRetry {
 		retryDelay := w.calculateRetryDelay(int(nextAttempt), processingErr)
 		logger.LogAttrs(ctx, slog.LevelInfo, "task retry scheduled", slog.Int64("retry_delay_ms", retryDelay.Milliseconds()), logging.Outcome(logging.OutcomeRetry))
-
-		// Reset pending task to pending so it remains the source of truth
-		if cb != nil && cb.OnRetry != nil && msg.Data.SyncTaskID > 0 {
-			if err := cb.OnRetry(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
-				logger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", slog.String("status", "pending"), logging.Outcome(logging.OutcomeError), logging.Error(err))
-			}
+		if msg.Data.SyncJobID == nil {
+			return
 		}
-
-		retryData := msg.Data
-		retryData.Attempt = nextAttempt
-		if _, err := w.queue.SendWithDelay(ctx, retryData, retryDelay); err != nil {
-			logger.LogAttrs(ctx, slog.LevelError, "task retry enqueue failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
+		if _, err := w.queue.pgmqClient.SetVisibilityTimeout(ctx, w.queue.Name(), msg.MessageID, int64(retryDelay.Seconds())); err != nil {
+			logger.LogAttrs(ctx, slog.LevelError, "task visibility update failed", logging.Outcome(logging.OutcomeError), logging.Error(err))
 		}
 	} else {
 		logger.LogAttrs(ctx, slog.LevelError, "task failed permanently", logging.Outcome(logging.OutcomeError))
-
-		// Mark pending task as failed
-		if cb != nil && cb.OnFailed != nil && msg.Data.SyncTaskID > 0 {
-			if err := cb.OnFailed(ctx, msg.Data.SyncTaskID, errMsg); err != nil {
-				logger.LogAttrs(ctx, slog.LevelWarn, "task status update failed", slog.String("status", "failed"), logging.Outcome(logging.OutcomeError), logging.Error(err))
-			}
-		}
 	}
 }
 

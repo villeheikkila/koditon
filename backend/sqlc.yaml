@@ -14,6 +14,7 @@ sql:
       - db/queries/prices
       - db/queries/runtime
       - db/queries/shortcut
+      - db/queries/syncjobs
     gen:
       go:
         out: internal/db
