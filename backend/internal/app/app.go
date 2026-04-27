@@ -21,7 +21,6 @@ import (
 	"koditon/internal/platform/buildinfo"
 	"koditon/internal/platform/config"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/requestid"
 	"koditon/internal/platform/runtimecfg"
 	"koditon/internal/platform/runtimekv"
 	"koditon/internal/platform/schema"
@@ -359,7 +358,6 @@ func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 			handler,
 		)
 	}
-	handler = requestid.NewHandler(handler)
 	return slog.New(handler)
 }
 

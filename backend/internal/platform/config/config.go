@@ -332,10 +332,6 @@ type AppleAuthConfig struct {
 	WebRedirectURI string
 }
 
-func (c AppleAuthConfig) IsConfigured() bool {
-	return c.BundleID != "" && c.TeamID != "" && c.PrivateKeyID != "" && c.PrivateKey != ""
-}
-
 func (c Config) Validate() error {
 	var errs []error
 	requireValue(&errs, "APP_HOST", c.Host)

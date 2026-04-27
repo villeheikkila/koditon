@@ -17,13 +17,6 @@ type VerifyError struct {
 	Cause   error
 }
 
-func (e *VerifyError) Error() string {
-	if e == nil {
-		return ""
-	}
-	return e.Message
-}
-
 type VerifyResult struct {
 	Context  context.Context
 	AuthType string

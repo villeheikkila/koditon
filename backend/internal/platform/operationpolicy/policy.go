@@ -63,16 +63,8 @@ func (p CachePolicy) HTTPEnabled() bool {
 	return p.HTTP.Enabled()
 }
 
-func (p CachePolicy) ServerEnabled() bool {
-	return p.Server.Enabled()
-}
-
 func (p HTTPCachePolicy) Enabled() bool {
 	return p.Scope != CacheScopeNone && p.MaxAge > 0
-}
-
-func (p ServerCachePolicy) Enabled() bool {
-	return p.Store != ServerCacheStoreNone && p.TTL > 0
 }
 
 var (
@@ -90,23 +82,6 @@ var (
 		TTL:   5 * time.Minute,
 	}
 
-	readSearchPolicy = Policy{
-		Timeout:          4 * time.Second,
-		MaxAttempts:      2,
-		RetryBaseBackoff: 120 * time.Millisecond,
-		RetryableStatuses: []int{
-			429,
-			502,
-			503,
-			504,
-		},
-		RetryJitter:          true,
-		RetryTransportErrors: true,
-		RateLimit:            120,
-		RateWindow:           time.Minute,
-		Mutation:             false,
-		IdempotencyTTL:       idempotencyTTL,
-	}
 	checkInWritePolicy = Policy{
 		Timeout:          8 * time.Second,
 		MaxAttempts:      1,
@@ -212,13 +187,6 @@ var (
 		IdempotencyTTL:       idempotencyTTL,
 	}
 )
-
-var mcpToolPolicies = map[string]Policy{
-	"koditon_search_products":               readSearchPolicy,
-	"koditon_create_check_in":               requireIdempotency(checkInWritePolicy),
-	"koditon_request_check_in_image_upload": checkInUploadRequestPolicy,
-	"koditon_confirm_check_in_image_upload": requireIdempotency(checkInUploadConfirmPolicy),
-}
 
 var apiOperationPolicies = map[string]Policy{
 	"config":                     withCache(defaultReadLikePostPolicy, CachePolicy{HTTP: catalogHTTPCache, Server: configServerCache}),
@@ -358,14 +326,6 @@ var mutationOperationIDs = map[string]struct{}{
 	"sub-brand-edit-suggestion-create":       {},
 	"subcategory-create":                     {},
 	"verify":                                 {},
-}
-
-func ForMCPTool(name string) (Policy, bool) {
-	policy, ok := mcpToolPolicies[strings.TrimSpace(name)]
-	if !ok {
-		return Policy{}, false
-	}
-	return policy, true
 }
 
 func ForAPIOperation(operationID string) (Policy, bool) {

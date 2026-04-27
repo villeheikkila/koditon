@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"slices"
 
 	"koditon/internal/platform/util"
 )
@@ -33,32 +32,4 @@ func GetClaimsFromContext(ctx context.Context) *AccessTokenClaims {
 		return nil
 	}
 	return claims
-}
-
-func GetSessionIDFromContext(ctx context.Context) string {
-	sessionID, ok := ctx.Value(ContextKeySessionID).(string)
-	if !ok {
-		return ""
-	}
-	return sessionID
-}
-
-func GetRoles(ctx context.Context) []string {
-	claims := GetClaimsFromContext(ctx)
-	if claims == nil {
-		return nil
-	}
-	return claims.Roles
-}
-
-func GetFeatureFlags(ctx context.Context) []string {
-	claims := GetClaimsFromContext(ctx)
-	if claims == nil {
-		return nil
-	}
-	return claims.FeatureFlags
-}
-
-func HasRole(ctx context.Context, role string) bool {
-	return slices.Contains(GetRoles(ctx), role)
 }

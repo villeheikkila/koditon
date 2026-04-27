@@ -16,8 +16,6 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.1.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/modelcontextprotocol/go-sdk v1.5.0
-	github.com/oschwald/geoip2-golang/v2 v2.1.0
-	github.com/resend/resend-go/v3 v3.6.0
 	github.com/revrost/go-openrouter v1.2.0
 	github.com/sahilm/fuzzy v0.1.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
@@ -58,7 +56,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect

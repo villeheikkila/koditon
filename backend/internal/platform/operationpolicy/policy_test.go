@@ -2,19 +2,6 @@ package operationpolicy
 
 import "testing"
 
-func TestForMCPTool(t *testing.T) {
-	policy, ok := ForMCPTool("koditon_search_products")
-	if !ok {
-		t.Fatal("expected policy for koditon_search_products")
-	}
-	if policy.RateLimit <= 0 {
-		t.Fatalf("unexpected rate limit: %d", policy.RateLimit)
-	}
-	if policy.MaxAttempts < 1 {
-		t.Fatalf("unexpected max attempts: %d", policy.MaxAttempts)
-	}
-}
-
 func TestForAPIOperation(t *testing.T) {
 	policy, ok := ForAPIOperation("oauth-token-create")
 	if !ok {
@@ -34,7 +21,7 @@ func TestForAPIOperationServerCachePolicy(t *testing.T) {
 	if !ok {
 		t.Fatal("expected policy for config")
 	}
-	if !policy.Cache.ServerEnabled() {
+	if policy.Cache.Server.Store == ServerCacheStoreNone || policy.Cache.Server.TTL <= 0 {
 		t.Fatal("expected server cache policy to be enabled")
 	}
 	if policy.Cache.Server.Store != ServerCacheStorePostgres {

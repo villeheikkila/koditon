@@ -40,15 +40,6 @@ func (e *HTTPStatusError) IsNotFound() bool {
 	return e.StatusCode == http.StatusNotFound
 }
 
-// IsHTTPStatusError checks if an error is an HTTPStatusError and returns it.
-func IsHTTPStatusError(err error) (*HTTPStatusError, bool) {
-	var httpErr *HTTPStatusError
-	if errors.As(err, &httpErr) {
-		return httpErr, true
-	}
-	return nil, false
-}
-
 type BuildingType string
 
 const (

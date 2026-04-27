@@ -40,14 +40,6 @@ func (e *HTTPStatusError) Error() string {
 	return fmt.Sprintf("shortcut: HTTP %d: %s", e.StatusCode, e.Body)
 }
 
-func IsHTTPStatusError(err error) (*HTTPStatusError, bool) {
-	var httpErr *HTTPStatusError
-	if errors.As(err, &httpErr) {
-		return httpErr, true
-	}
-	return nil, false
-}
-
 type Tokens struct {
 	Loaded string
 	CUID   string

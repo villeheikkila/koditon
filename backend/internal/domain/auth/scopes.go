@@ -79,10 +79,6 @@ func LimitScopes(available []string, limit []string) []string {
 	return limited
 }
 
-func HasScopeForRoles(roles []string, required string) bool {
-	return HasScopes(ScopesForRoles(roles), []string{required})
-}
-
 func ValidateRequestedScopes(requested, clientAllowed, userAllowed []string) error {
 	if len(requested) == 0 {
 		return nil
