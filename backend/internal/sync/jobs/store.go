@@ -119,6 +119,13 @@ type ReapResult struct {
 	FinalizedAttempts int64
 }
 
+type ListFilter struct {
+	Status   string
+	Provider string
+	Kind     string
+	Limit    int32
+}
+
 func NewStore(logger *slog.Logger, pool *pgxpool.Pool) *Store {
 	if logger == nil {
 		logger = slog.Default()
@@ -466,6 +473,26 @@ func (s *Store) GetSnapshot(ctx context.Context, jobID uuid.UUID) (JobSnapshot, 
 	return JobSnapshot{Job: job, Attempts: attempts}, nil
 }
 
+func (s *Store) List(ctx context.Context, filter ListFilter) ([]db.SyncJob, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	jobs, err := s.queries.ListSyncJobs(ctx, db.ListSyncJobsParams{
+		SyncJobStatus:   optionalString(filter.Status),
+		SyncJobProvider: optionalString(filter.Provider),
+		SyncJobKind:     optionalString(filter.Kind),
+		LimitCount:      limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list sync jobs: %w", err)
+	}
+	return jobs, nil
+}
+
 func sendJobMessage(ctx context.Context, qtx *db.Queries, queueName string, job db.SyncJob, delaySeconds int) (int64, error) {
 	msg, err := json.Marshal(taskqueue.MessageData{SyncJobID: &job.SyncJobID, EntityID: job.SyncJobEntityID, TaskType: job.SyncJobKind})
 	if err != nil {
@@ -569,4 +596,12 @@ func stringPtr(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func optionalString(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

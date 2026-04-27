@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"koditon/internal/sync/prices"
 )
@@ -11,9 +12,11 @@ type TransactionsFlags struct {
 	City   string
 	Search string
 	Limit  int
+	Out    io.Writer
 }
 
 func RunTransactions(ctx context.Context, svc *prices.Service, f TransactionsFlags) error {
+	out := resolveOutput(f.Out)
 	if f.City == "" {
 		return fmt.Errorf("--city is required")
 	}
@@ -27,11 +30,11 @@ func RunTransactions(ctx context.Context, svc *prices.Service, f TransactionsFla
 		return fmt.Errorf("transactions: %w", err)
 	}
 
-	fmt.Println(headerStyle.Render(fmt.Sprintf("%d transactions found", len(rows))))
-	fmt.Println()
+	fmt.Fprintln(out, headerStyle.Render(fmt.Sprintf("%d transactions found", len(rows))))
+	fmt.Fprintln(out)
 
 	if len(rows) == 0 {
-		fmt.Println(mutedStyle.Render("No transactions found."))
+		fmt.Fprintln(out, mutedStyle.Render("No transactions found."))
 		return nil
 	}
 
@@ -51,12 +54,12 @@ func RunTransactions(ctx context.Context, svc *prices.Service, f TransactionsFla
 		})
 	}
 
-	fmt.Print(renderTable(headers, tableRows))
+	fmt.Fprint(out, renderTable(headers, tableRows))
 
-	fmt.Println()
-	fmt.Println(mutedStyle.Render(fmt.Sprintf("City: %s", f.City)))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, mutedStyle.Render(fmt.Sprintf("City: %s", f.City)))
 	if f.Search != "" {
-		fmt.Println(mutedStyle.Render(fmt.Sprintf("Search: %s", f.Search)))
+		fmt.Fprintln(out, mutedStyle.Render(fmt.Sprintf("Search: %s", f.Search)))
 	}
 
 	return nil

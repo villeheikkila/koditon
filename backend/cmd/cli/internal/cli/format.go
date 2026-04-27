@@ -13,6 +13,18 @@ var (
 	mutedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
+func SetColorEnabled(enabled bool) {
+	if enabled {
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
+		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("75"))
+		mutedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		return
+	}
+	headerStyle = lipgloss.NewStyle()
+	labelStyle = lipgloss.NewStyle()
+	mutedStyle = lipgloss.NewStyle()
+}
+
 func formatPrice(p *int64) string {
 	if p == nil {
 		return "-"

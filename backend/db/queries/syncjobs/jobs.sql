@@ -82,6 +82,15 @@ SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_j
 FROM public.sync_jobs
 WHERE sync_job_dedup_key = sqlc.arg(sync_job_dedup_key);
 
+-- name: ListSyncJobs :many
+SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
+FROM public.sync_jobs
+WHERE (sqlc.narg(sync_job_status)::text IS NULL OR sync_job_status = sqlc.narg(sync_job_status))
+  AND (sqlc.narg(sync_job_provider)::text IS NULL OR sync_job_provider = sqlc.narg(sync_job_provider))
+  AND (sqlc.narg(sync_job_kind)::text IS NULL OR sync_job_kind = sqlc.narg(sync_job_kind))
+ORDER BY sync_job_updated_at DESC, sync_job_created_at DESC
+LIMIT sqlc.arg(limit_count);
+
 -- name: ListDuePendingSyncJobsForReconcile :many
 SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
 FROM public.sync_jobs

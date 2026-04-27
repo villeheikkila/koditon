@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"strings"
 	"time"
@@ -26,9 +27,11 @@ type SearchFlags struct {
 	Page            int
 	PublishedAfter  string
 	PublishedBefore string
+	Out             io.Writer
 }
 
 func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
+	out := resolveOutput(f.Out)
 	params := ads.SearchParams{
 		Query:       f.Query,
 		Source:      f.Source,
@@ -81,11 +84,11 @@ func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
 
 	totalPages := max(int(math.Ceil(float64(result.Total)/float64(result.PageSize))), 1)
 
-	fmt.Println(headerStyle.Render(fmt.Sprintf("Found %d results (page %d of %d)", result.Total, result.Page, totalPages)))
-	fmt.Println()
+	fmt.Fprintln(out, headerStyle.Render(fmt.Sprintf("Found %d results (page %d of %d)", result.Total, result.Page, totalPages)))
+	fmt.Fprintln(out)
 
 	if len(result.Rows) == 0 {
-		fmt.Println(mutedStyle.Render("No results found."))
+		fmt.Fprintln(out, mutedStyle.Render("No results found."))
 		return nil
 	}
 
@@ -104,10 +107,10 @@ func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
 		})
 	}
 
-	fmt.Print(renderTable(headers, rows))
+	fmt.Fprint(out, renderTable(headers, rows))
 
 	if len(result.Rows) > 0 {
-		fmt.Println()
+		fmt.Fprintln(out)
 		var filters []string
 		if f.City != "" {
 			filters = append(filters, "city="+f.City)
@@ -122,7 +125,7 @@ func RunSearch(ctx context.Context, svc *ads.Service, f SearchFlags) error {
 		if len(filters) > 0 {
 			filterStr = " [" + strings.Join(filters, ", ") + "]"
 		}
-		fmt.Println(mutedStyle.Render(fmt.Sprintf("Showing %d of %d%s", len(result.Rows), result.Total, filterStr)))
+		fmt.Fprintln(out, mutedStyle.Render(fmt.Sprintf("Showing %d of %d%s", len(result.Rows), result.Total, filterStr)))
 	}
 
 	return nil

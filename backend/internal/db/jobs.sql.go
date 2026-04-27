@@ -287,6 +287,73 @@ func (q *Queries) ListDuePendingSyncJobsForReconcile(ctx context.Context, arg Li
 	return items, nil
 }
 
+const listSyncJobs = `-- name: ListSyncJobs :many
+SELECT sync_job_id, sync_job_provider, sync_job_kind, sync_job_entity_id, sync_job_dedup_key, sync_job_status, sync_job_priority, sync_job_attempt_count, sync_job_max_attempts, sync_job_run_after, sync_job_capacity_class, sync_job_payload, sync_job_checkpoint, sync_job_result, sync_job_last_error, sync_job_last_error_code, sync_job_last_http_status, sync_job_last_pgmq_message_id, sync_job_claim_token, sync_job_created_at, sync_job_updated_at, sync_job_last_enqueued_at, sync_job_last_started_at, sync_job_last_finished_at
+FROM public.sync_jobs
+WHERE ($1::text IS NULL OR sync_job_status = $1)
+  AND ($2::text IS NULL OR sync_job_provider = $2)
+  AND ($3::text IS NULL OR sync_job_kind = $3)
+ORDER BY sync_job_updated_at DESC, sync_job_created_at DESC
+LIMIT $4
+`
+
+type ListSyncJobsParams struct {
+	SyncJobStatus   *string `json:"sync_job_status"`
+	SyncJobProvider *string `json:"sync_job_provider"`
+	SyncJobKind     *string `json:"sync_job_kind"`
+	LimitCount      int32   `json:"limit_count"`
+}
+
+func (q *Queries) ListSyncJobs(ctx context.Context, arg ListSyncJobsParams) ([]SyncJob, error) {
+	rows, err := q.db.Query(ctx, listSyncJobs,
+		arg.SyncJobStatus,
+		arg.SyncJobProvider,
+		arg.SyncJobKind,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SyncJob{}
+	for rows.Next() {
+		var i SyncJob
+		if err := rows.Scan(
+			&i.SyncJobID,
+			&i.SyncJobProvider,
+			&i.SyncJobKind,
+			&i.SyncJobEntityID,
+			&i.SyncJobDedupKey,
+			&i.SyncJobStatus,
+			&i.SyncJobPriority,
+			&i.SyncJobAttemptCount,
+			&i.SyncJobMaxAttempts,
+			&i.SyncJobRunAfter,
+			&i.SyncJobCapacityClass,
+			&i.SyncJobPayload,
+			&i.SyncJobCheckpoint,
+			&i.SyncJobResult,
+			&i.SyncJobLastError,
+			&i.SyncJobLastErrorCode,
+			&i.SyncJobLastHttpStatus,
+			&i.SyncJobLastPgmqMessageID,
+			&i.SyncJobClaimToken,
+			&i.SyncJobCreatedAt,
+			&i.SyncJobUpdatedAt,
+			&i.SyncJobLastEnqueuedAt,
+			&i.SyncJobLastStartedAt,
+			&i.SyncJobLastFinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markSyncJobFinal = `-- name: MarkSyncJobFinal :execrows
 UPDATE public.sync_jobs
 SET sync_job_status = $1,

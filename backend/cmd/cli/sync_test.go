@@ -1,59 +1,106 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
-	"time"
 
 	"koditon/cmd/cli/internal/cli"
+	"koditon/internal/db"
+	syncjobs "koditon/internal/sync/jobs"
 )
 
-func TestResolveSyncFlagsAliases(t *testing.T) {
+func TestRootHelpListsCanonicalCommands(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name     string
-		args     []string
-		provider string
-		kind     string
-		entityID string
-	}{
-		{name: "frontdoor sitemap", args: []string{"frontdoor", "sitemap"}, provider: "frontdoor", kind: "frontdoor_sitemap_sync", entityID: "frontdoor:sitemap"},
-		{name: "frontdoor ad", args: []string{"frontdoor", "ad", "abc123"}, provider: "frontdoor", kind: "frontdoor_sync", entityID: "ad:abc123"},
-		{name: "shortcut buildings", args: []string{"shortcut", "buildings"}, provider: "shortcut", kind: "shortcut_buildings_sitemap_sync", entityID: "shortcut:buildings_sitemap"},
-		{name: "prices city", args: []string{"prices", "city", "Helsinki"}, provider: "prices", kind: "prices_sync", entityID: "city:Helsinki"},
-		{name: "postal all", args: []string{"postal", "all"}, provider: "postal", kind: "postal_sync", entityID: "postal:all"},
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := resolveSyncFlags(tc.args, cli.SyncFlags{Watch: true, Interval: time.Second})
-			if err != nil {
-				t.Fatalf("resolveSyncFlags returned error: %v", err)
-			}
-			if got.Provider != tc.provider || got.Kind != tc.kind || got.EntityID != tc.entityID {
-				t.Fatalf("got provider=%q kind=%q entity=%q", got.Provider, got.Kind, got.EntityID)
-			}
-			if !got.Watch || got.Interval != time.Second {
-				t.Fatalf("flags were not preserved: %#v", got)
-			}
-		})
+	out := stdout.String()
+	for _, want := range []string{"search", "detail", "transactions", "sync", "api-query", "--json", "--no-color"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
 	}
 }
 
-func TestResolveSyncFlagsGeneric(t *testing.T) {
+func TestSyncHelpListsCanonicalSubcommands(t *testing.T) {
 	t.Parallel()
-	got, err := resolveSyncFlags(nil, cli.SyncFlags{Provider: "prices", Kind: "prices_sync", EntityID: "city:Espoo"})
-	if err != nil {
-		t.Fatalf("resolveSyncFlags returned error: %v", err)
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"sync", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
 	}
-	if got.Provider != "prices" || got.Kind != "prices_sync" || got.EntityID != "city:Espoo" {
-		t.Fatalf("unexpected flags: %#v", got)
+	out := stdout.String()
+	for _, want := range []string{"enqueue", "status", "list", "maintenance", "run"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
 	}
 }
 
-func TestResolveSyncFlagsRejectsPartialGeneric(t *testing.T) {
+func TestSyncRunHelpListsWorkerFlags(t *testing.T) {
 	t.Parallel()
-	_, err := resolveSyncFlags(nil, cli.SyncFlags{Provider: "prices", Kind: "prices_sync"})
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"sync", "run", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	out := stdout.String()
+	for _, want := range []string{"--workers", "--maintenance", "--maintenance-interval", "--stale-after", "--maintenance-limit"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
+	}
+}
+
+func TestLegacySyncShorthandIsRejected(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"sync", "prices", "city", "Helsinki"})
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateSyncJobTarget(t *testing.T) {
+	t.Parallel()
+	if err := validateSyncJobTarget("prices", "prices_sync"); err != nil {
+		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	}
+	err := validateSyncJobTarget("prices", "frontdoor_sync")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "not valid") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFormatSyncJobSnapshot(t *testing.T) {
+	t.Parallel()
+	snapshot := syncjobs.JobSnapshot{Job: db.SyncJob{
+		SyncJobProvider:     "prices",
+		SyncJobKind:         "prices_sync",
+		SyncJobEntityID:     "city:Helsinki",
+		SyncJobStatus:       syncjobs.StatusPending,
+		SyncJobAttemptCount: 0,
+		SyncJobMaxAttempts:  3,
+	}}
+	got := cli.FormatSyncJobSnapshot(snapshot)
+	for _, want := range []string{"status=pending", "provider=prices", "kind=prices_sync", "entity=city:Helsinki", "attempts=0/3"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected %q in %q", want, got)
+		}
 	}
 }
