@@ -192,12 +192,6 @@ func (p shortcutAdPayloadV1Wire) validate(expectedAdID int64) (int64, error) {
 	if err := p.Address.Validate(); err != nil {
 		return 0, err
 	}
-	if err := p.PriceData.Validate(); err != nil {
-		return 0, err
-	}
-	if err := p.AdData.Validate(); err != nil {
-		return 0, err
-	}
 	if !p.HasBuildingData() {
 		return 0, payloadError("missing building data")
 	}
@@ -232,34 +226,18 @@ func (p shortcutAdPayloadV1Wire) BuildingExternalID() *int64 {
 }
 
 func (p addressPayloadV1) Validate() error {
-	if !p.Street.HasText() && !p.FormattedAddress.Valid() {
-		return payloadError("address missing street")
-	}
-	if !p.City.HasText() {
-		return payloadError("address missing city")
-	}
-	if !p.ZipCode.HasText() {
-		return payloadError("address missing postal code")
+	if !p.HasAddressSignal() {
+		return payloadError("address missing usable text")
 	}
 	return nil
 }
 
-func (p pricePayloadV1) Validate() error {
-	if !p.HasUsablePrice() {
-		return payloadError("price data missing price")
-	}
-	return nil
+func (p addressPayloadV1) HasAddressSignal() bool {
+	return p.Street.HasText() || p.City.HasText() || p.ZipCode.HasText() || p.FormattedAddress.Valid()
 }
 
 func (p pricePayloadV1) HasUsablePrice() bool {
 	return anyFloatLike(p.PriceSell, p.Price, p.PriceDebtFree, p.RentPerMonth, p.RentPerDay, p.RentPerWeek, p.RentPerWeekend, p.RentPerYear)
-}
-
-func (p adDataPayloadV1) Validate() error {
-	if !p.HasUsableSize() {
-		return payloadError("ad data missing size")
-	}
-	return nil
 }
 
 func (p adDataPayloadV1) HasUsableSize() bool {

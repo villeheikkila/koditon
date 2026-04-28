@@ -167,6 +167,26 @@ func TestValidateShortcutAdPayloadV1AcceptsSizeTotalFallback(t *testing.T) {
 	}
 }
 
+func TestValidateShortcutAdPayloadV1AcceptsPartialLiveRows(t *testing.T) {
+	t.Parallel()
+	cases := map[string][]byte{
+		"missing price":  []byte(`{"cardId":129,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{},"adData":{"size":1},"buildingData":{}}`),
+		"missing size":   []byte(`{"cardId":129,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{},"buildingData":{}}`),
+		"missing city":   []byte(`{"cardId":129,"cardType":100,"address":{"street":"A","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
+		"missing postal": []byte(`{"cardId":129,"cardType":100,"address":{"street":"A","city":"B"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
+		"missing street": []byte(`{"cardId":129,"cardType":100,"address":{"city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
+		"formatted only": []byte(`{"cardId":129,"cardType":100,"address":{"formattedAddress":"A, B"},"priceData":{},"adData":{},"buildingData":{}}`),
+	}
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := ValidateShortcutAdPayloadV1(raw, 129); err != nil {
+				t.Fatalf("expected valid payload: %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateShortcutAdPayloadV1RejectsMalformedOptionalDetails(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
@@ -198,8 +218,6 @@ func TestValidateShortcutAdPayloadV1RejectsInvalidPayloads(t *testing.T) {
 		"missing id":        []byte(`{"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
 		"id mismatch":       []byte(`{"cardId":999,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
 		"missing address":   []byte(`{"cardId":123,"cardType":100,"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
-		"missing price":     []byte(`{"cardId":123,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{},"adData":{"size":1},"buildingData":{}}`),
-		"missing ad data":   []byte(`{"cardId":123,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"buildingData":{}}`),
 		"missing building":  []byte(`{"cardId":123,"cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1}}`),
 		"malformed numeric": []byte(`{"cardId":"abc","cardType":100,"address":{"street":"A","city":"B","zipCode":"00100"},"priceData":{"price":1},"adData":{"size":1},"buildingData":{}}`),
 	}

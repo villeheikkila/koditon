@@ -17,6 +17,8 @@ import (
 
 	frontdoorclient "koditon/internal/clients/frontdoor"
 	shortcutclient "koditon/internal/clients/shortcut"
+	frontdoorpayload "koditon/internal/providers/frontdoor"
+	shortcutpayload "koditon/internal/providers/shortcut"
 )
 
 type providerConfig struct {
@@ -83,6 +85,7 @@ func printAPIQueryUsage() {
 	_, _ = fmt.Fprintln(output, "  building-page --url <url>")
 	_, _ = fmt.Fprintln(output, "  sitemap")
 	_, _ = fmt.Fprintln(output, "  profile-schema [--cache-dir .cache/frontdoor-schema] [--sample-size 100] [--fetch-missing]")
+	_, _ = fmt.Fprintln(output, "  validate-stored-ads [--limit N] [--fail-fast]")
 	_, _ = fmt.Fprintln(output)
 	_, _ = fmt.Fprintln(output, "Shortcut queries:")
 	_, _ = fmt.Fprintln(output, "  ad --id <numeric-id>")
@@ -91,6 +94,7 @@ func printAPIQueryUsage() {
 	_, _ = fmt.Fprintln(output, "  building-data --location-id <id>")
 	_, _ = fmt.Fprintln(output, "  search-apartments --location-card-id <id> --location-card-type <type> --location-name <name> [--card-type sale|rent] [--page N] [--page-size N]")
 	_, _ = fmt.Fprintln(output, "  sitemap")
+	_, _ = fmt.Fprintln(output, "  validate-stored-ads [--limit N] [--fail-fast]")
 	_, _ = fmt.Fprintln(output)
 	_, _ = fmt.Fprintln(output, "Common flags: --compact --timeout 30s")
 }
@@ -109,6 +113,8 @@ func runFrontdoorAPIQuery(ctx context.Context, args []string, stdout io.Writer, 
 		return runFrontdoorSitemapQuery(ctx, args[1:], stdout, cfg)
 	case "profile-schema":
 		return runFrontdoorProfileSchemaQuery(ctx, args[1:], stdout, cfg)
+	case "validate-stored-ads":
+		return runFrontdoorValidateStoredAdsQuery(ctx, args[1:], stdout, cfg)
 	default:
 		return fmt.Errorf("unknown frontdoor api query: %s", query)
 	}
@@ -409,6 +415,95 @@ LIMIT $1`, limit)
 	return ids, nil
 }
 
+type storedAdValidationResult struct {
+	Provider string                    `json:"provider"`
+	Table    string                    `json:"table"`
+	Total    int64                     `json:"total"`
+	Valid    int64                     `json:"valid"`
+	Invalid  int64                     `json:"invalid"`
+	Limited  bool                      `json:"limited"`
+	Limit    int                       `json:"limit,omitempty"`
+	Errors   []storedAdValidationError `json:"errors,omitempty"`
+	Duration string                    `json:"duration"`
+}
+
+type storedAdValidationError struct {
+	ID    string `json:"id"`
+	Error string `json:"error"`
+}
+
+func runFrontdoorValidateStoredAdsQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
+	fs, opts := newAPIFlagSet("api-query frontdoor validate-stored-ads")
+	limit := fs.Int("limit", 0, "Maximum rows to validate; 0 validates all rows")
+	maxErrors := fs.Int("max-errors", 20, "Maximum row errors to include in output")
+	failFast := fs.Bool("fail-fast", false, "Stop at the first invalid row")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *limit < 0 {
+		return fmt.Errorf("--limit must be non-negative")
+	}
+	if *maxErrors < 0 {
+		return fmt.Errorf("--max-errors must be non-negative")
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	result, err := validateStoredFrontdoorAds(reqCtx, cfg, *limit, *maxErrors, *failFast)
+	if err != nil {
+		return err
+	}
+	return writeJSON(stdout, result, opts.Compact)
+}
+
+func validateStoredFrontdoorAds(ctx context.Context, cfg providerConfig, limit, maxErrors int, failFast bool) (storedAdValidationResult, error) {
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return storedAdValidationResult{}, fmt.Errorf("missing required provider env vars: DATABASE_URL")
+	}
+	start := time.Now()
+	result := storedAdValidationResult{Provider: "frontdoor", Table: "frontdoor_ads", Limited: limit > 0, Limit: limit}
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return result, fmt.Errorf("connect database: %w", err)
+	}
+	defer pool.Close()
+	query := `
+SELECT frontdoor_ad_external_id, frontdoor_ad_data
+FROM public.frontdoor_ads
+WHERE frontdoor_ad_data IS NOT NULL
+ORDER BY frontdoor_ad_id`
+	var rows pgxRows
+	if limit > 0 {
+		rows, err = pool.Query(ctx, query+"\nLIMIT $1", limit)
+	} else {
+		rows, err = pool.Query(ctx, query)
+	}
+	if err != nil {
+		return result, fmt.Errorf("query frontdoor ads: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var raw json.RawMessage
+		if err := rows.Scan(&id, &raw); err != nil {
+			return result, fmt.Errorf("scan frontdoor ad: %w", err)
+		}
+		result.Total++
+		ad, _, err := frontdoorpayload.DecodeStoredAd(raw)
+		if err == nil && ad.FriendlyID != "" && ad.FriendlyID != id {
+			err = fmt.Errorf("friendlyId mismatch: row=%s payload=%s", id, ad.FriendlyID)
+		}
+		recordStoredAdValidation(&result, id, err, maxErrors)
+		if err != nil && failFast {
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate frontdoor ads: %w", err)
+	}
+	result.Duration = time.Since(start).String()
+	return result, nil
+}
+
 func runShortcutAPIQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cli api-query shortcut <ad|locations|buildings|building-data|search-apartments|sitemap> [flags]")
@@ -427,6 +522,8 @@ func runShortcutAPIQuery(ctx context.Context, args []string, stdout io.Writer, c
 		return runShortcutSearchApartmentsQuery(ctx, args[1:], stdout, cfg)
 	case "sitemap":
 		return runShortcutSitemapQuery(ctx, args[1:], stdout, cfg)
+	case "validate-stored-ads":
+		return runShortcutValidateStoredAdsQuery(ctx, args[1:], stdout, cfg)
 	default:
 		return fmt.Errorf("unknown shortcut api query: %s", query)
 	}
@@ -564,6 +661,96 @@ func runShortcutSitemapQuery(ctx context.Context, args []string, stdout io.Write
 		return err
 	}
 	return writeJSON(stdout, shortcutSitemapOutput(entries), opts.Compact)
+}
+
+func runShortcutValidateStoredAdsQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
+	fs, opts := newAPIFlagSet("api-query shortcut validate-stored-ads")
+	limit := fs.Int("limit", 0, "Maximum rows to validate; 0 validates all rows")
+	maxErrors := fs.Int("max-errors", 20, "Maximum row errors to include in output")
+	failFast := fs.Bool("fail-fast", false, "Stop at the first invalid row")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *limit < 0 {
+		return fmt.Errorf("--limit must be non-negative")
+	}
+	if *maxErrors < 0 {
+		return fmt.Errorf("--max-errors must be non-negative")
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	result, err := validateStoredShortcutAds(reqCtx, cfg, *limit, *maxErrors, *failFast)
+	if err != nil {
+		return err
+	}
+	return writeJSON(stdout, result, opts.Compact)
+}
+
+func validateStoredShortcutAds(ctx context.Context, cfg providerConfig, limit, maxErrors int, failFast bool) (storedAdValidationResult, error) {
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return storedAdValidationResult{}, fmt.Errorf("missing required provider env vars: DATABASE_URL")
+	}
+	start := time.Now()
+	result := storedAdValidationResult{Provider: "shortcut", Table: "shortcut_ads", Limited: limit > 0, Limit: limit}
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return result, fmt.Errorf("connect database: %w", err)
+	}
+	defer pool.Close()
+	query := `
+SELECT shortcut_ad_id, shortcut_ad_data
+FROM public.shortcut_ads
+WHERE shortcut_ad_data IS NOT NULL
+ORDER BY shortcut_ad_id`
+	var rows pgxRows
+	if limit > 0 {
+		rows, err = pool.Query(ctx, query+"\nLIMIT $1", limit)
+	} else {
+		rows, err = pool.Query(ctx, query)
+	}
+	if err != nil {
+		return result, fmt.Errorf("query shortcut ads: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var raw json.RawMessage
+		if err := rows.Scan(&id, &raw); err != nil {
+			return result, fmt.Errorf("scan shortcut ad: %w", err)
+		}
+		result.Total++
+		ad, _, err := shortcutpayload.DecodeStoredAd(raw)
+		if err == nil && ad.AdID != id {
+			err = fmt.Errorf("ad id mismatch: row=%d payload=%d", id, ad.AdID)
+		}
+		recordStoredAdValidation(&result, strconv.FormatInt(id, 10), err, maxErrors)
+		if err != nil && failFast {
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate shortcut ads: %w", err)
+	}
+	result.Duration = time.Since(start).String()
+	return result, nil
+}
+
+type pgxRows interface {
+	Close()
+	Err() error
+	Next() bool
+	Scan(dest ...any) error
+}
+
+func recordStoredAdValidation(result *storedAdValidationResult, id string, err error, maxErrors int) {
+	if err == nil {
+		result.Valid++
+		return
+	}
+	result.Invalid++
+	if len(result.Errors) < maxErrors {
+		result.Errors = append(result.Errors, storedAdValidationError{ID: id, Error: err.Error()})
+	}
 }
 
 func newAPIFlagSet(name string) (*flag.FlagSet, *apiQueryOptions) {
