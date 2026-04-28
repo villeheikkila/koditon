@@ -202,6 +202,7 @@ type Shore struct {
 	ShoreRightType  *string `json:"shoreRightType"`
 	Description     *string `json:"description"`
 	WatercourseName *string `json:"watercourseName"`
+	OnIsland        *bool   `json:"onIsland"`
 }
 
 type PropertyImage struct {
@@ -228,22 +229,23 @@ type PeriodicCharge struct {
 }
 
 type Plot struct {
-	AdditionalBuildingsDescription *string                   `json:"additionalBuildingsDescription"`
-	ConstructionRightDTO           map[string]NumberOrString `json:"constructionRightDTO"`
-	ElectricConnectionTransferred  *bool                     `json:"electricConnectionTransferred"`
-	EncumberanceInfo               *string                   `json:"encumberanceInfo"`
-	HoldingType                    *string                   `json:"holdingType"`
-	PlotArea                       *float64                  `json:"plotArea"`
-	PlotName                       *string                   `json:"plotName"`
-	PlotNumber                     *string                   `json:"plotNumber"`
-	PlotType                       *string                   `json:"plotType"`
-	RentalAgreementDTO             *RentalAgreement          `json:"rentalAgreementDTO"`
-	ZoningAspectTypes              []string                  `json:"zoningAspectTypes"`
-	ZoningInfo                     *string                   `json:"zoningInfo"`
-	Area                           *int                      `json:"area"`
-	ENumber                        *float64                  `json:"eNumber"`
-	RentalAgreementType            *string                   `json:"rentalAgreementType"`
-	RentingType                    *string                   `json:"rentingType"`
+	AdditionalBuildingsDescription   *string                   `json:"additionalBuildingsDescription"`
+	ConstructionRightDTO             map[string]NumberOrString `json:"constructionRightDTO"`
+	ElectricConnectionTransferred    *bool                     `json:"electricConnectionTransferred"`
+	EncumberanceInfo                 *string                   `json:"encumberanceInfo"`
+	HoldingType                      *string                   `json:"holdingType"`
+	PlotArea                         *float64                  `json:"plotArea"`
+	PlotName                         *string                   `json:"plotName"`
+	PlotNumber                       *string                   `json:"plotNumber"`
+	PlotType                         *string                   `json:"plotType"`
+	RentalAgreementDTO               *RentalAgreement          `json:"rentalAgreementDTO"`
+	UsageAndTransferRestrictionsInfo *string                   `json:"usageAndTransferRestrictionsInfo"`
+	ZoningAspectTypes                []string                  `json:"zoningAspectTypes"`
+	ZoningInfo                       *string                   `json:"zoningInfo"`
+	Area                             *int                      `json:"area"`
+	ENumber                          *float64                  `json:"eNumber"`
+	RentalAgreementType              *string                   `json:"rentalAgreementType"`
+	RentingType                      *string                   `json:"rentingType"`
 }
 
 type HousingCompany struct {
