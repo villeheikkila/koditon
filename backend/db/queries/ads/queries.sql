@@ -416,6 +416,7 @@ SELECT
     fba.frontdoor_building_announcement_room_structure,
     fba.frontdoor_building_announcement_property_type,
     fba.frontdoor_building_announcement_property_subtype,
+    fba.frontdoor_building_announcement_main_image_uri,
     fba.frontdoor_building_announcement_published,
     fba.frontdoor_building_announcement_rent_period,
     fba.frontdoor_building_announcement_rental_unique_no,

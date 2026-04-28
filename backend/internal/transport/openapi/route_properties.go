@@ -13,17 +13,17 @@ import (
 )
 
 type propertySearchInput struct {
-	Query    string   `query:"q"         doc:"Free text search"`
-	Source   string   `query:"source"    doc:"Source filter: shortcut, frontdoor, or all"`
-	City     string   `query:"city"      doc:"City / municipality filter"`
-	Postal   string   `query:"postal"    doc:"Postal code prefix filter"`
-	MinPrice *int64   `query:"min_price" doc:"Minimum price (EUR)"`
-	MaxPrice *int64   `query:"max_price" doc:"Maximum price (EUR)"`
-	MinArea  *float64 `query:"min_area"  doc:"Minimum area (m²)"`
-	MaxArea  *float64 `query:"max_area"  doc:"Maximum area (m²)"`
-	Sort     string   `query:"sort"      doc:"Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"`
-	Page     int32    `query:"page"      doc:"Page number (1-based)" minimum:"1"`
-	PageSize int32    `query:"page_size" doc:"Results per page: 25, 50, or 100"`
+	Query    string  `query:"q"         doc:"Free text search"`
+	Source   string  `query:"source"    doc:"Source filter: shortcut, frontdoor, or all"`
+	City     string  `query:"city"      doc:"City / municipality filter"`
+	Postal   string  `query:"postal"    doc:"Postal code prefix filter"`
+	MinPrice int64   `query:"min_price" doc:"Minimum price (EUR, 0 = no minimum)"`
+	MaxPrice int64   `query:"max_price" doc:"Maximum price (EUR, 0 = no maximum)"`
+	MinArea  float64 `query:"min_area"  doc:"Minimum area (m², 0 = no minimum)"`
+	MaxArea  float64 `query:"max_area"  doc:"Maximum area (m², 0 = no maximum)"`
+	Sort     string  `query:"sort"      doc:"Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"`
+	Page     int32   `query:"page"      doc:"Page number (1-based)" minimum:"1"`
+	PageSize int32   `query:"page_size" doc:"Results per page: 25, 50, or 100"`
 }
 
 type propertyDetailInput struct {
@@ -142,5 +142,19 @@ func propertySearchParams(input *propertySearchInput) properties.SearchParams {
 	if pageSize <= 0 {
 		pageSize = 25
 	}
-	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: input.MinPrice, MaxPrice: input.MaxPrice, MinArea: input.MinArea, MaxArea: input.MaxArea, Sort: input.Sort, Page: page, PageSize: pageSize}
+	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), Sort: input.Sort, Page: page, PageSize: pageSize}
+}
+
+func positiveInt64Ptr(value int64) *int64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func positiveFloat64Ptr(value float64) *float64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
 }

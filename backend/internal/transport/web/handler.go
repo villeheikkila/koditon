@@ -38,7 +38,7 @@ func NewHandler(adsService *ads.Service, shortcutBase, frontdoorBase string, log
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /detail/{id...}", h.handleDetail)
-	mux.HandleFunc("GET /", h.handleIndex)
+	mux.HandleFunc("/", h.handleIndex)
 }
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {

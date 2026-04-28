@@ -212,14 +212,14 @@ func (r listingSearchRow) toSaleSummary() SaleListingSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return SaleListingSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Location: location, Property: PropertyDetails{RoomLayout: r.RoomLayout, AreaM2: r.Area}, SaleTerms: SaleTerms{AskingPrice: r.Price}, BuildingIdentity: identity, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}
+	return SaleListingSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, AreaM2: r.Area}, Building: BuildingDetails{Identity: identity, Location: location}, Commercial: CommercialDetails{AskingPrice: r.Price, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func (r listingSearchRow) toRentalSummary() RentalSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return RentalSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Location: location, Property: PropertyDetails{RoomLayout: r.RoomLayout, AreaM2: r.Area}, RentalTerms: RentalTerms{Rent: r.Price, RentPeriod: "month"}, BuildingIdentity: identity, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}
+	return RentalSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, AreaM2: r.Area}, Building: BuildingDetails{Identity: identity, Location: location}, Commercial: CommercialDetails{Rent: r.Price, RentPeriod: "month", LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func parseTimeString(value *string) *time.Time {
