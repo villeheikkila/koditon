@@ -52,12 +52,21 @@ func (c frontdoorSchemaCache) writeSitemapEntries(entries []frontdoorclient.Site
 }
 
 func (c frontdoorSchemaCache) readOrFetchAd(ctx context.Context, client *frontdoorclient.Client, friendlyID string, fetchMissing, refresh bool) ([]byte, bool, error) {
-	path := filepath.Join(c.dir, "ad", safeCacheName(friendlyID)+".json")
+	path := filepath.Join(c.dir, "ad-raw", safeCacheName(friendlyID)+".json")
 	if !refresh {
 		if data, err := os.ReadFile(path); err == nil {
 			return data, false, nil
 		} else if !os.IsNotExist(err) {
 			return nil, false, fmt.Errorf("read cached frontdoor ad %s: %w", path, err)
+		}
+		legacyPath := filepath.Join(c.dir, "ad", safeCacheName(friendlyID)+".json")
+		if data, err := os.ReadFile(legacyPath); err == nil {
+			if writeErr := writeRawFile(path, data); writeErr != nil {
+				return nil, false, writeErr
+			}
+			return data, false, nil
+		} else if !os.IsNotExist(err) {
+			return nil, false, fmt.Errorf("read cached legacy frontdoor ad %s: %w", legacyPath, err)
 		}
 	}
 	if !fetchMissing && !refresh {
@@ -71,6 +80,11 @@ func (c frontdoorSchemaCache) readOrFetchAd(ctx context.Context, client *frontdo
 		return nil, false, err
 	}
 	return data, true, nil
+}
+
+func (c frontdoorSchemaCache) writeQuicktypeAd(dir, friendlyID string, data []byte) error {
+	path := filepath.Join(dir, "ad-raw", safeCacheName(friendlyID)+".json")
+	return writeRawFile(path, data)
 }
 
 func (c frontdoorSchemaCache) readOrFetchBuildingState(ctx context.Context, client *frontdoorclient.Client, pageURL string, fetchMissing, refresh bool) ([]byte, bool, error) {
@@ -124,21 +138,39 @@ type cachedFrontdoorSitemapEntry struct {
 }
 
 type frontdoorSchemaProfileResult struct {
-	CacheDir        string        `json:"cacheDir"`
-	Processed       int           `json:"processed"`
-	Fetched         int           `json:"fetched"`
-	AdSamples       int           `json:"adSamples"`
-	BuildingSamples int           `json:"buildingSamples"`
-	Ads             schemaProfile `json:"ads"`
-	BuildingStates  schemaProfile `json:"buildingStates"`
+	CacheDir         string        `json:"cacheDir"`
+	AdSource         string        `json:"adSource"`
+	Processed        int           `json:"processed"`
+	Fetched          int           `json:"fetched"`
+	ErrorCount       int           `json:"errorCount,omitempty"`
+	Errors           []string      `json:"errors,omitempty"`
+	CandidateIDs     int           `json:"candidateIds,omitempty"`
+	QuicktypeSamples int           `json:"quicktypeSamples,omitempty"`
+	AdSamples        int           `json:"adSamples"`
+	BuildingSamples  int           `json:"buildingSamples"`
+	Ads              schemaProfile `json:"ads"`
+	BuildingStates   schemaProfile `json:"buildingStates"`
 }
 
 func newFrontdoorSchemaProfileResult(cacheDir string, includeExamples bool) *frontdoorSchemaProfileResult {
 	return &frontdoorSchemaProfileResult{
 		CacheDir:       cacheDir,
+		AdSource:       "sitemap",
 		Ads:            newSchemaProfile(includeExamples),
 		BuildingStates: newSchemaProfile(includeExamples),
 	}
+}
+
+func (r *frontdoorSchemaProfileResult) recordError(err error) {
+	r.ErrorCount++
+	if len(r.Errors) >= 10 {
+		return
+	}
+	message := strings.TrimSpace(err.Error())
+	if len(message) > 240 {
+		message = message[:240]
+	}
+	r.Errors = append(r.Errors, message)
 }
 
 type schemaProfile struct {

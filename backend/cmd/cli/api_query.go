@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	frontdoorclient "koditon/internal/clients/frontdoor"
@@ -28,6 +29,7 @@ type providerConfig struct {
 	FrontdoorUserAgent   string
 	FrontdoorCookie      string
 	FrontdoorSitemapBase string
+	DatabaseURL          string
 }
 
 type apiQueryOptions struct {
@@ -68,6 +70,7 @@ func providerConfigFromEnv(getenv func(string) string) providerConfig {
 		FrontdoorUserAgent:   strings.TrimSpace(getenv("FRONTDOOR_USER_AGENT")),
 		FrontdoorCookie:      strings.TrimSpace(getenv("FRONTDOOR_COOKIE")),
 		FrontdoorSitemapBase: strings.TrimSpace(getenv("FRONTDOOR_SITEMAP_BASE_URL")),
+		DatabaseURL:          strings.TrimSpace(getenv("DATABASE_URL")),
 	}
 }
 
@@ -176,10 +179,13 @@ func runFrontdoorSitemapQuery(ctx context.Context, args []string, stdout io.Writ
 func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {
 	fs, opts := newAPIFlagSet("api-query frontdoor profile-schema")
 	cacheDir := fs.String("cache-dir", ".cache/frontdoor-schema", "Directory for cached Frontdoor schema fixtures")
-	sampleSize := fs.Int("sample-size", 100, "Maximum sitemap entries to profile")
+	sampleSize := fs.Int("sample-size", 100, "Maximum entries to profile")
+	adSource := fs.String("ad-source", "sitemap", "Ad ID source: sitemap or db")
 	fetchMissing := fs.Bool("fetch-missing", false, "Fetch missing cache entries from the Frontdoor API")
 	refresh := fs.Bool("refresh", false, "Refetch entries even when cached")
 	examples := fs.Bool("examples", false, "Include scalar examples from cached payloads in the schema profile")
+	quicktypeDir := fs.String("quicktype-dir", "", "Optional directory to copy profiled raw ad samples for quicktype")
+	skipErrors := fs.Bool("skip-errors", true, "Skip individual ad/building fetch or profile errors")
 	delay := fs.Duration("delay", 100*time.Millisecond, "Delay between live fetches")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -189,9 +195,8 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 	}
 	if *fetchMissing || *refresh {
 		if err := requireProviderValues(map[string]string{
-			"FRONTDOOR_BASE_URL":         cfg.FrontdoorBaseURL,
-			"FRONTDOOR_SITEMAP_BASE_URL": cfg.FrontdoorSitemapBase,
-			"FRONTDOOR_USER_AGENT":       cfg.FrontdoorUserAgent,
+			"FRONTDOOR_BASE_URL":   cfg.FrontdoorBaseURL,
+			"FRONTDOOR_USER_AGENT": cfg.FrontdoorUserAgent,
 		}); err != nil {
 			return err
 		}
@@ -200,6 +205,13 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 	client := frontdoorclient.New(cfg.FrontdoorBaseURL, cfg.FrontdoorUserAgent, cfg.FrontdoorCookie, cfg.FrontdoorSitemapBase)
 	reqCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
+	switch strings.ToLower(strings.TrimSpace(*adSource)) {
+	case "db":
+		return runFrontdoorProfileSchemaFromDB(reqCtx, stdout, cfg, cache, client, *sampleSize, *fetchMissing, *refresh, *examples, *skipErrors, *delay, *quicktypeDir, opts.Compact)
+	case "sitemap":
+	default:
+		return fmt.Errorf("--ad-source must be sitemap or db")
+	}
 	entries, err := cache.readSitemapEntries()
 	if err != nil {
 		if !*fetchMissing && !*refresh {
@@ -207,6 +219,9 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 		}
 	}
 	if *refresh || len(entries) == 0 {
+		if err := requireProviderValues(map[string]string{"FRONTDOOR_SITEMAP_BASE_URL": cfg.FrontdoorSitemapBase}); err != nil {
+			return err
+		}
 		entries, err = client.GetSitemapEntries(reqCtx)
 		if err != nil {
 			return err
@@ -224,19 +239,37 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 		case frontdoorclient.EntryTypeAd:
 			raw, fetched, err := cache.readOrFetchAd(reqCtx, client, entry.ID, *fetchMissing, *refresh)
 			if err != nil {
+				if *skipErrors {
+					result.recordError(err)
+					continue
+				}
 				return err
+			}
+			if *quicktypeDir != "" {
+				if err := cache.writeQuicktypeAd(*quicktypeDir, entry.ID, raw); err != nil {
+					return err
+				}
+				result.QuicktypeSamples++
 			}
 			if fetched {
 				result.Fetched++
 				sleepContext(reqCtx, *delay)
 			}
 			if err := result.Ads.ProfileJSON(raw); err != nil {
+				if *skipErrors {
+					result.recordError(fmt.Errorf("profile frontdoor ad %s: %w", entry.ID, err))
+					continue
+				}
 				return fmt.Errorf("profile frontdoor ad %s: %w", entry.ID, err)
 			}
 			result.AdSamples++
 		case frontdoorclient.EntryTypeBuilding:
 			raw, fetched, err := cache.readOrFetchBuildingState(reqCtx, client, entry.URL.String(), *fetchMissing, *refresh)
 			if err != nil {
+				if *skipErrors {
+					result.recordError(err)
+					continue
+				}
 				return err
 			}
 			if fetched {
@@ -244,6 +277,10 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 				sleepContext(reqCtx, *delay)
 			}
 			if err := result.BuildingStates.ProfileJSON(raw); err != nil {
+				if *skipErrors {
+					result.recordError(fmt.Errorf("profile frontdoor building %s: %w", entry.ID, err))
+					continue
+				}
 				return fmt.Errorf("profile frontdoor building %s: %w", entry.ID, err)
 			}
 			result.BuildingSamples++
@@ -253,6 +290,123 @@ func runFrontdoorProfileSchemaQuery(ctx context.Context, args []string, stdout i
 	result.Ads.Finalize()
 	result.BuildingStates.Finalize()
 	return writeJSON(stdout, result, opts.Compact)
+}
+
+func runFrontdoorProfileSchemaFromDB(ctx context.Context, stdout io.Writer, cfg providerConfig, cache frontdoorSchemaCache, client *frontdoorclient.Client, sampleSize int, fetchMissing, refresh, examples, skipErrors bool, delay time.Duration, quicktypeDir string, compact bool) error {
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("missing required provider env vars: DATABASE_URL")
+	}
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
+	defer pool.Close()
+	ids, err := frontdoorAdIDsFromDB(ctx, pool, sampleSize)
+	if err != nil {
+		return err
+	}
+	result := newFrontdoorSchemaProfileResult(cache.dir, examples)
+	result.AdSource = "db"
+	result.CandidateIDs = len(ids)
+	for _, id := range ids {
+		if result.Processed >= sampleSize {
+			break
+		}
+		raw, fetched, err := cache.readOrFetchAd(ctx, client, id, fetchMissing, refresh)
+		if err != nil {
+			if skipErrors {
+				result.recordError(err)
+				continue
+			}
+			return err
+		}
+		if quicktypeDir != "" {
+			if err := cache.writeQuicktypeAd(quicktypeDir, id, raw); err != nil {
+				return err
+			}
+			result.QuicktypeSamples++
+		}
+		if fetched {
+			result.Fetched++
+			sleepContext(ctx, delay)
+		}
+		if err := result.Ads.ProfileJSON(raw); err != nil {
+			if skipErrors {
+				result.recordError(fmt.Errorf("profile frontdoor ad %s: %w", id, err))
+				continue
+			}
+			return fmt.Errorf("profile frontdoor ad %s: %w", id, err)
+		}
+		result.AdSamples++
+		result.Processed++
+	}
+	result.Ads.Finalize()
+	result.BuildingStates.Finalize()
+	return writeJSON(stdout, result, compact)
+}
+
+func frontdoorAdIDsFromDB(ctx context.Context, pool *pgxpool.Pool, limit int) ([]string, error) {
+	rows, err := pool.Query(ctx, `
+WITH candidates AS (
+    SELECT frontdoor_ad_external_id, 0 AS bucket, frontdoor_ad_last_seen_at AS seen_at
+    FROM public.frontdoor_ads
+    WHERE frontdoor_ad_data IS NOT NULL
+    ORDER BY frontdoor_ad_last_seen_at DESC
+    LIMIT $1
+), older AS (
+    SELECT frontdoor_ad_external_id, 1 AS bucket, frontdoor_ad_first_seen_at AS seen_at
+    FROM public.frontdoor_ads
+    WHERE frontdoor_ad_data IS NOT NULL
+    ORDER BY frontdoor_ad_first_seen_at ASC
+    LIMIT greatest($1 / 4, 1)
+), rich AS (
+    SELECT frontdoor_ad_external_id, 2 AS bucket, frontdoor_ad_last_seen_at AS seen_at
+    FROM public.frontdoor_ads
+    WHERE frontdoor_ad_data IS NOT NULL
+      AND (
+        frontdoor_ad_data ? 'previousPrice'
+        OR frontdoor_ad_data ? 'openBiddingTargetUrl'
+        OR frontdoor_ad_data ? 'apartmentsInHousingCompany'
+        OR frontdoor_ad_data ? 'showings'
+        OR frontdoor_ad_data ? 'links'
+      )
+    ORDER BY frontdoor_ad_last_seen_at DESC
+    LIMIT greatest($1 / 2, 1)
+), randoms AS (
+    SELECT frontdoor_ad_external_id, 3 AS bucket, frontdoor_ad_last_seen_at AS seen_at
+    FROM public.frontdoor_ads
+    WHERE frontdoor_ad_data IS NOT NULL
+    ORDER BY md5(frontdoor_ad_external_id)
+    LIMIT greatest($1 / 2, 1)
+)
+SELECT DISTINCT ON (frontdoor_ad_external_id) frontdoor_ad_external_id
+FROM (
+    SELECT * FROM candidates
+    UNION ALL SELECT * FROM older
+    UNION ALL SELECT * FROM rich
+    UNION ALL SELECT * FROM randoms
+) all_candidates
+ORDER BY frontdoor_ad_external_id, bucket, seen_at DESC
+LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query frontdoor ad ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan frontdoor ad id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate frontdoor ad ids: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("no frontdoor ad ids found in database")
+	}
+	return ids, nil
 }
 
 func runShortcutAPIQuery(ctx context.Context, args []string, stdout io.Writer, cfg providerConfig) error {

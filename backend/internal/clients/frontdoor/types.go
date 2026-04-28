@@ -6,13 +6,14 @@ import (
 )
 
 type AdResponse struct {
-	ID                               int                      `json:"id"`
+	ID                               int64                    `json:"id"`
 	FriendlyID                       string                   `json:"friendlyId"`
 	Status                           string                   `json:"status"`
 	Text                             *string                  `json:"text"`
-	CreationTime                     *int                     `json:"creationTime"`
-	ModificationTime                 *int                     `json:"modificationTime"`
-	PublishingTime                   int                      `json:"publishingTime"`
+	CreationTime                     *int64                   `json:"creationTime"`
+	ModificationTime                 *int64                   `json:"modificationTime"`
+	PublishingTime                   int64                    `json:"publishingTime"`
+	UnpublishingTime                 *int64                   `json:"unpublishingTime"`
 	AvailabilityDescription          *string                  `json:"availabilityDescription"`
 	MapVisible                       *bool                    `json:"mapVisible"`
 	SellingPrice                     *float64                 `json:"sellingPrice"`
@@ -24,7 +25,7 @@ type AdResponse struct {
 	HasPdfBrochure                   *bool                    `json:"hasPdfBrochure"`
 	AnnouncementContactInfo          *ContactInfo             `json:"announcementContactInfo"`
 	Property                         Property                 `json:"property"`
-	ResidenceDetails                 ResidenceDetails         `json:"residenceDetailsDTO"`
+	ResidenceDetails                 *ResidenceDetails        `json:"residenceDetailsDTO"`
 	CanReceiveLeads                  *bool                    `json:"canReceiveLeads"`
 	LeadOptions                      *LeadOptions             `json:"leadOptions"`
 	AnnouncementOriginDetails        *AnnouncementOrigin      `json:"announcementOriginDetails"`
@@ -43,21 +44,22 @@ type AdResponse struct {
 	OpenBiddingStartingDebtFreePrice *float64                 `json:"openBiddingStartingDebtFreePrice"`
 	OpenBiddingStartingSellingPrice  *float64                 `json:"openBiddingStartingSellingPrice"`
 	OpenBiddingTargetURL             *string                  `json:"openBiddingTargetUrl"`
+	OpenBiddingLatestOffer           *int64                   `json:"openBiddingLatestOffer"`
 	PreviousPrice                    *PreviousPrice           `json:"previousPrice"`
 	PurchasingShareOfPlot            *float64                 `json:"purchasingShareOfPlot"`
 }
 
 type Link struct {
-	ID     int     `json:"id"`
-	LinkID *int    `json:"linkId"`
+	ID     int64   `json:"id"`
+	LinkID *int64  `json:"linkId"`
 	Type   *string `json:"type"`
 	Title  *string `json:"title"`
 	URL    string  `json:"url"`
 }
 
 type AdditionalAnnouncement struct {
-	ID     int     `json:"id"`
-	LinkID int     `json:"linkId"`
+	ID     int64   `json:"id"`
+	LinkID int64   `json:"linkId"`
 	Title  *string `json:"title"`
 	Type   string  `json:"type"`
 	URL    string  `json:"url"`
@@ -66,7 +68,7 @@ type AdditionalAnnouncement struct {
 type ApartmentInCompany struct {
 	AvailabilityDescription *string  `json:"availabilityDescription"`
 	DebfFreePrice           *float64 `json:"debfFreePrice"`
-	FloorLevel              *int     `json:"floorLevel"`
+	FloorLevel              *int64   `json:"floorLevel"`
 	FriendlyID              *string  `json:"friendlyId"`
 	LivingArea              *float64 `json:"livingArea"`
 	PropertySubtype         *string  `json:"propertySubtype"`
@@ -83,13 +85,13 @@ type PreviousPrice struct {
 }
 
 type Showing struct {
-	EndTime          *int    `json:"endTime"`
-	ID               *int    `json:"id"`
+	EndTime          *int64  `json:"endTime"`
+	ID               *int64  `json:"id"`
 	Info             *string `json:"info"`
 	IntroducerName   *string `json:"introducerName"`
 	IntroducerPhone  *string `json:"introducerPhone"`
-	ModificationTime *int    `json:"modificationTime"`
-	StartTime        *int    `json:"startTime"`
+	ModificationTime *int64  `json:"modificationTime"`
+	StartTime        *int64  `json:"startTime"`
 }
 
 type ContactInfo struct {
@@ -99,16 +101,17 @@ type ContactInfo struct {
 	Title                      *string `json:"title"`
 	ImageURI                   *string `json:"imageUri"`
 	IsPrivateSeller            bool    `json:"isPrivateSeller"`
+	IsPremiumRealtor           bool    `json:"isPremiumRealtor"`
 	OfficeName                 *string `json:"officeName"`
-	OfficeID                   *int    `json:"officeId"`
-	OfficeNumber               *int    `json:"officeNumber"`
+	OfficeID                   *int64  `json:"officeId"`
+	OfficeNumber               *int64  `json:"officeNumber"`
 	OfficeLogoURI              *string `json:"officeLogoUri"`
 	OfficeStreetAddressLineOne *string `json:"officeStreetAddressLineOne"`
 	OfficePostCode             *string `json:"officePostCode"`
 	OfficePostOffice           *string `json:"officePostOffice"`
 	OfficeMunicipality         *string `json:"officeMunicipality"`
 	OfficeCountry              *string `json:"officeCountry"`
-	CustomerGroupID            *int    `json:"customerGroupId"`
+	CustomerGroupID            *int64  `json:"customerGroupId"`
 	CustomerGroupName          *string `json:"customerGroupName"`
 	OfficePhoneNumber          *string `json:"officePhoneNumber"`
 	OfficeMobilePhoneNumber    *string `json:"officeMobilePhoneNumber"`
@@ -117,7 +120,7 @@ type ContactInfo struct {
 
 type Property struct {
 	SpecificType                         string                   `json:"specificType"`
-	ID                                   int                      `json:"id"`
+	ID                                   int64                    `json:"id"`
 	PropertyType                         string                   `json:"propertyType"`
 	GeoCode                              *GeoCode                 `json:"geoCode"`
 	Country                              NamedItem                `json:"country"`
@@ -158,6 +161,8 @@ type Property struct {
 	LotRentalAgreement                   *string                  `json:"lotRentalAgreement"`
 	ManagementChargesAdditionalInfo      *string                  `json:"managementChargesAdditionalInfo"`
 	Plot                                 *Plot                    `json:"plot"`
+	PlotPropertyType                     *string                  `json:"plotPropertyType"`
+	LeisurePropertyType                  *string                  `json:"leisurePropertyType"`
 	PlotShareRedeemed                    *bool                    `json:"plotShareRedeemed"`
 	RenovationsDoneDescription           *string                  `json:"renovationsDoneDescription"`
 	RenovationsPlannedDescription        *string                  `json:"renovationsPlannedDescription"`
@@ -187,34 +192,39 @@ type PostCode struct {
 }
 
 type Yard struct {
-	ID               int     `json:"id"`
+	ID               int64   `json:"id"`
 	ViewsDescription *string `json:"viewsDescription"`
 }
 
 type Shore struct {
-	ID             int     `json:"id"`
-	ShoreType      *string `json:"shoreType"`
-	ShoreRightType *string `json:"shoreRightType"`
+	ID              int64   `json:"id"`
+	ShoreType       *string `json:"shoreType"`
+	ShoreRightType  *string `json:"shoreRightType"`
+	Description     *string `json:"description"`
+	WatercourseName *string `json:"watercourseName"`
 }
 
 type PropertyImage struct {
-	ID                int                  `json:"id"`
+	ID                int64                `json:"id"`
 	PropertyImageType string               `json:"propertyImageType"`
-	Ordinal           int                  `json:"ordinal"`
+	Ordinal           int64                `json:"ordinal"`
 	Image             PropertyImageDetails `json:"image"`
 }
 
 type PropertyImageDetails struct {
-	ID   int     `json:"id"`
-	UUID *string `json:"uuid"`
-	URI  string  `json:"uri"`
+	ID          int64   `json:"id"`
+	UUID        *string `json:"uuid"`
+	URI         string  `json:"uri"`
+	Description *string `json:"description"`
 }
 
 type PeriodicCharge struct {
-	ID             int      `json:"id"`
-	PeriodicCharge string   `json:"periodicCharge"`
-	Price          *float64 `json:"price"`
-	ChargePeriod   *string  `json:"chargePeriod"`
+	ID                    int64    `json:"id"`
+	PeriodicCharge        string   `json:"periodicCharge"`
+	Price                 *float64 `json:"price"`
+	ChargePeriod          *string  `json:"chargePeriod"`
+	IncludedInOverallCost *bool    `json:"includedInOverallCost"`
+	BasedOnConsumption    *bool    `json:"basedOnConsumption"`
 }
 
 type Plot struct {
@@ -237,16 +247,16 @@ type Plot struct {
 }
 
 type HousingCompany struct {
-	ID                              *int                `json:"id"`
+	ID                              *int64              `json:"id"`
 	Name                            *string             `json:"name"`
 	Manager                         *string             `json:"manager"`
 	Maintainer                      *string             `json:"maintainer"`
 	RenovationsDoneDescription      *string             `json:"renovationsDoneDescription"`
 	RenovationsPlannedDescription   *string             `json:"renovationsPlannedDescription"`
 	OtherInfo                       *string             `json:"otherInfo"`
-	ApartmentCount                  *int                `json:"apartmentCount"`
+	ApartmentCount                  *int64              `json:"apartmentCount"`
 	FloorCount                      *float64            `json:"floorCount"`
-	BusinessPremiseCount            *int                `json:"businessPremiseCount"`
+	BusinessPremiseCount            *int64              `json:"businessPremiseCount"`
 	CarStorageDescription           *string             `json:"carStorageDescription"`
 	ConnectivityFeaturesDescription *string             `json:"connectivityFeaturesDescription"`
 	MaintenanceResponsibilityType   *string             `json:"maintenanceResponsibilityType"`
@@ -256,11 +266,12 @@ type HousingCompany struct {
 	GeoCode                         *GeoCode            `json:"geoCode"`
 	BusinessID                      *string             `json:"businessId"`
 	ParkingSpaces                   map[string]int      `json:"parkingSpaces"`
-	UsageStartYear                  *int                `json:"usageStartYear"`
+	UsageStartYear                  *int64              `json:"usageStartYear"`
+	Builder                         *string             `json:"builder"`
 }
 
 type HousingCompanyPlot struct {
-	ID                            int              `json:"id"`
+	ID                            int64            `json:"id"`
 	PlotNumber                    *string          `json:"plotNumber"`
 	PlotArea                      *float64         `json:"plotArea"`
 	HoldingType                   string           `json:"holdingType"`
@@ -272,25 +283,25 @@ type HousingCompanyPlot struct {
 }
 
 type EnergyCertificate struct {
-	ID                           int     `json:"id"`
+	ID                           int64   `json:"id"`
 	EnergyCertificateType        *string `json:"energyCertificateType"`
 	EnergyCertificateDescription *string `json:"energyCertificateDescription"`
 }
 
 type RentalAgreement struct {
-	ID                      int      `json:"id"`
+	ID                      int64    `json:"id"`
 	RentalAgreementType     string   `json:"rentalAgreementType"`
 	RentingType             string   `json:"rentingType"`
 	ChargePeriod            *string  `json:"chargePeriod"`
-	EndDate                 *int     `json:"endDate"`
+	EndDate                 *int64   `json:"endDate"`
 	OwnerDescription        *string  `json:"ownerDescription"`
 	Rent                    *float64 `json:"rent"`
 	RentalPeriodDescription *string  `json:"rentalPeriodDescription"`
 }
 
 type ResidenceDetails struct {
-	TotalRoomCount                                    *int                      `json:"totalRoomCount"`
-	BedroomCount                                      *int                      `json:"bedroomCount"`
+	TotalRoomCount                                    *int64                    `json:"totalRoomCount"`
+	BedroomCount                                      *int64                    `json:"bedroomCount"`
 	VentilationSystemType                             *string                   `json:"ventilationSystemType"`
 	VentilationSystemDescription                      *string                   `json:"ventilationSystemDescription"`
 	HeatingSystemsDescription                         *string                   `json:"heatingSystemsDescription"`
@@ -313,7 +324,8 @@ type ResidenceDetails struct {
 	KichenDescription                                 *string                   `json:"kitchenDescription"`
 	BathroomDescription                               *string                   `json:"bathroomDescription"`
 	StorageSpaceDescription                           *string                   `json:"storageSpaceDescription"`
-	ConstructionFinishedYear                          *int                      `json:"constructionFinishedYear"`
+	ConstructionFinishedYear                          *int64                    `json:"constructionFinishedYear"`
+	ConstructionStartedYear                           *int64                    `json:"constructionStartedYear"`
 	ToiletDescription                                 *string                   `json:"toiletDescription"`
 	FloorMaterialsDescription                         *string                   `json:"floorMaterialsDescription"`
 	WallMaterialsDescription                          *string                   `json:"wallMaterialsDescription"`
@@ -331,26 +343,27 @@ type ResidenceDetails struct {
 	OtherSpaceDescription                             *string                   `json:"otherSpaceDescription"`
 	ResidentialFloorCountType                         *string                   `json:"residentialFloorCountType"`
 	SaunaDescription                                  *string                   `json:"saunaDescription"`
-	ToiletCount                                       *int                      `json:"toiletCount"`
-	UsageStartedYear                                  *int                      `json:"usageStartedYear"`
+	ToiletCount                                       *int64                    `json:"toiletCount"`
+	UsageStartedYear                                  *int64                    `json:"usageStartedYear"`
 	UtilityRoomDescription                            *string                   `json:"utilityRoomDescription"`
 }
 
 type ApartmentInfo struct {
-	ID                      int      `json:"id"`
+	ID                      int64    `json:"id"`
 	FloorLevel              *float64 `json:"floorLevel"`
 	FloorPositionInHighrise *string  `json:"floorPositionInHighrise"`
 }
 
 type Inspection struct {
-	ID                          int     `json:"id"`
+	ID                          int64   `json:"id"`
 	OverallCondition            *string `json:"overallCondition"`
 	OverallConditionDescription *string `json:"overallConditionDescription"`
 	AsbestosMapping             *bool   `json:"asbestosMapping"`
 	AsbestosMappingDescription  *string `json:"asbestosMappingDescription"`
-	ConditionInspectionDate     *int    `json:"conditionInspectionDate"`
+	ConditionInspectionDate     *int64  `json:"conditionInspectionDate"`
 	ConditionInspectionDone     *bool   `json:"conditionInspectionDone"`
 	HumidityInspectionDone      *bool   `json:"humidityInspectionDone"`
+	HumidityInspectionDate      *int64  `json:"humidityInspectionDate"`
 }
 
 type LeadOptions struct {
@@ -364,7 +377,7 @@ type LeadOptions struct {
 type AnnouncementOrigin struct {
 	CustomerItemCode       *string `json:"customerItemCode"`
 	SupplierIdentifier     *string `json:"supplierIdentifier"`
-	DTSIntegrationSourceID *int    `json:"dtsIntegrationSourceId"`
+	DTSIntegrationSourceID *int64  `json:"dtsIntegrationSourceId"`
 }
 
 type PreparsedInfo struct {
@@ -374,38 +387,48 @@ type PreparsedInfo struct {
 }
 
 type ImageIDs struct {
-	MainImageID       *int  `json:"mainImageId"`
-	Sorted            []int `json:"sorted"`
-	FloorPlanImageIDs []int `json:"floorPlanImageIds"`
+	MainImageID       *int64  `json:"mainImageId"`
+	Sorted            []int64 `json:"sorted"`
+	FloorPlanImageIDs []int64 `json:"floorPlanImageIds"`
 }
 
 type ProductEffects struct {
-	OfficeLogo                   *OfficeLogo         `json:"officeLogo"`
-	BackgroundTexture            map[string]string   `json:"backgroundTexture"`
-	BrandColors                  *BrandColors        `json:"brandColors"`
-	PromotionalImage             *PromotionalImage   `json:"promotionalImage"`
-	Chat                         *Chat               `json:"chat"`
-	AdSlots                      *AdSlots            `json:"adSlots"`
-	ItemPageMobileAd             *ItemPageMobileAd   `json:"itemPageMobileAd"`
-	ItemPageImageConfiguration   *ImageConfiguration `json:"itemPageImageConfiguration"`
-	ItemPageAlsoForSale          *AlsoForSale        `json:"itemPageAlsoForSale"`
-	ListPageImageConfiguration   *ImageConfiguration `json:"listPageImageConfiguration"`
-	OfficePageLink               map[string]string   `json:"officePageLink"`
-	OpenBidding                  *OpenBidding        `json:"openBidding"`
-	VideoMainImage               *VideoMainImage     `json:"videoMainImage"`
-	LoanCalculator               *FeatureEnabled     `json:"loanCalculator"`
-	RenovationCalculator         *FeatureEnabled     `json:"renovationCalculator"`
-	MovingCalculator             *FeatureEnabled     `json:"movingCalculator"`
-	OtherServicesAd              *FeatureEnabled     `json:"otherServicesAd"`
-	LargerImages                 map[string]bool     `json:"largerImages"`
-	RakennuttajanStudio          map[string]string   `json:"rakennuttajanStudio"`
-	RealtorExtensions            map[string]bool     `json:"realtorExtensions"`
-	VirtualPresentationMainImage *FeatureEnabled     `json:"virtualPresentationMainImage"`
+	OfficeLogo                   *OfficeLogo          `json:"officeLogo"`
+	BackgroundTexture            *BackgroundTexture   `json:"backgroundTexture"`
+	BrandColors                  *BrandColors         `json:"brandColors"`
+	PromotionalImage             *PromotionalImage    `json:"promotionalImage"`
+	Chat                         *Chat                `json:"chat"`
+	AdSlots                      *AdSlots             `json:"adSlots"`
+	ItemPageMobileAd             *ItemPageMobileAd    `json:"itemPageMobileAd"`
+	ItemPageImageConfiguration   *ImageConfiguration  `json:"itemPageImageConfiguration"`
+	ItemPageAlsoForSale          *AlsoForSale         `json:"itemPageAlsoForSale"`
+	ListPageImageConfiguration   *ImageConfiguration  `json:"listPageImageConfiguration"`
+	OfficePageLink               *OfficePageLink      `json:"officePageLink"`
+	OpenBidding                  *OpenBidding         `json:"openBidding"`
+	VideoMainImage               *VideoMainImage      `json:"videoMainImage"`
+	LoanCalculator               *FeatureEnabled      `json:"loanCalculator"`
+	RenovationCalculator         *FeatureEnabled      `json:"renovationCalculator"`
+	MovingCalculator             *FeatureEnabled      `json:"movingCalculator"`
+	OtherServicesAd              *FeatureEnabled      `json:"otherServicesAd"`
+	ListPagePremiumCard          *FeatureEnabled      `json:"listPagePremiumCard"`
+	ItemPagePremiumFeatures      *FeatureEnabled      `json:"itemPagePremiumFeatures"`
+	LargerImages                 *LargerImages        `json:"largerImages"`
+	RakennuttajanStudio          *RakennuttajanStudio `json:"rakennuttajanStudio"`
+	RealtorExtensions            *RealtorExtensions   `json:"realtorExtensions"`
+	VirtualPresentationMainImage *FeatureEnabled      `json:"virtualPresentationMainImage"`
+}
+
+type BackgroundTexture struct {
+	ImageURL *string `json:"imageUrl"`
 }
 
 type OfficeLogo struct {
 	FilePath  *string `json:"filePath"`
 	TargetURL *string `json:"targetUrl"`
+}
+
+type OfficePageLink struct {
+	ShortURLName *string `json:"shortUrlName"`
 }
 
 type BrandColors struct {
@@ -448,7 +471,7 @@ type ImageConfiguration struct {
 
 type AlsoForSale struct {
 	Scope           *string `json:"scope"`
-	CustomerGroupID int     `json:"customerGroupId"`
+	CustomerGroupID int64   `json:"customerGroupId"`
 }
 
 type OpenBidding struct {
@@ -465,6 +488,20 @@ type VideoMainImage struct {
 	Enabled bool `json:"enabled"`
 }
 
+type LargerImages struct {
+	LargerImagesEnabled        bool `json:"largerImagesEnabled"`
+	VideoEnabled               bool `json:"videoEnabled"`
+	VirtualPresentationEnabled bool `json:"virtualPresentationEnabled"`
+}
+
+type RakennuttajanStudio struct {
+	ID string `json:"id"`
+}
+
+type RealtorExtensions struct {
+	ContactCardEnabled bool `json:"contactCardEnabled"`
+}
+
 type FeatureEnabled struct {
 	Enabled        bool    `json:"enabled"`
 	BankName       *string `json:"bankName"`
@@ -472,7 +509,7 @@ type FeatureEnabled struct {
 }
 
 type NumberOrString struct {
-	IntValue    *int
+	IntValue    *int64
 	DoubleValue *float64
 	StringValue *string
 }
@@ -481,15 +518,15 @@ func (n *NumberOrString) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
-	var intValue int
+	var intValue int64
 	if err := json.Unmarshal(data, &intValue); err == nil {
 		n.IntValue = &intValue
 		return nil
 	}
 	var floatValue float64
 	if err := json.Unmarshal(data, &floatValue); err == nil {
-		if floatValue == float64(int(floatValue)) {
-			intValue := int(floatValue)
+		if floatValue == float64(int64(floatValue)) {
+			intValue := int64(floatValue)
 			n.IntValue = &intValue
 		} else {
 			n.DoubleValue = &floatValue
