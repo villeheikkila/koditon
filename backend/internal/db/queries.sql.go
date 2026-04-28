@@ -578,6 +578,8 @@ SELECT
     fba.frontdoor_building_announcement_property_type,
     fba.frontdoor_building_announcement_property_subtype,
     fba.frontdoor_building_announcement_published,
+    fba.frontdoor_building_announcement_rent_period,
+    fba.frontdoor_building_announcement_rental_unique_no,
     fb.frontdoor_building_id,
     fb.frontdoor_building_url,
     fb.frontdoor_building_housing_company_id,
@@ -634,6 +636,8 @@ type GetFrontdoorAnnouncementUnifiedDetailRow struct {
 	FrontdoorBuildingAnnouncementPropertyType    *string         `json:"frontdoor_building_announcement_property_type"`
 	FrontdoorBuildingAnnouncementPropertySubtype *string         `json:"frontdoor_building_announcement_property_subtype"`
 	FrontdoorBuildingAnnouncementPublished       *bool           `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod      *string         `json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo  *int32          `json:"frontdoor_building_announcement_rental_unique_no"`
 	FrontdoorBuildingID                          uuid.UUID       `json:"frontdoor_building_id"`
 	FrontdoorBuildingUrl                         *string         `json:"frontdoor_building_url"`
 	FrontdoorBuildingHousingCompanyID            *int64          `json:"frontdoor_building_housing_company_id"`
@@ -664,6 +668,8 @@ func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, ann
 		&i.FrontdoorBuildingAnnouncementPropertyType,
 		&i.FrontdoorBuildingAnnouncementPropertySubtype,
 		&i.FrontdoorBuildingAnnouncementPublished,
+		&i.FrontdoorBuildingAnnouncementRentPeriod,
+		&i.FrontdoorBuildingAnnouncementRentalUniqueNo,
 		&i.FrontdoorBuildingID,
 		&i.FrontdoorBuildingUrl,
 		&i.FrontdoorBuildingHousingCompanyID,

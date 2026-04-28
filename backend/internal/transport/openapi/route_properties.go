@@ -1,0 +1,146 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"koditon/internal/domain/ads"
+	"koditon/internal/domain/properties"
+	"koditon/internal/platform/logging"
+)
+
+type propertySearchInput struct {
+	Query    string   `query:"q"         doc:"Free text search"`
+	Source   string   `query:"source"    doc:"Source filter: shortcut, frontdoor, or all"`
+	City     string   `query:"city"      doc:"City / municipality filter"`
+	Postal   string   `query:"postal"    doc:"Postal code prefix filter"`
+	MinPrice *int64   `query:"min_price" doc:"Minimum price (EUR)"`
+	MaxPrice *int64   `query:"max_price" doc:"Maximum price (EUR)"`
+	MinArea  *float64 `query:"min_area"  doc:"Minimum area (m²)"`
+	MaxArea  *float64 `query:"max_area"  doc:"Maximum area (m²)"`
+	Sort     string   `query:"sort"      doc:"Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"`
+	Page     int32    `query:"page"      doc:"Page number (1-based)" minimum:"1"`
+	PageSize int32    `query:"page_size" doc:"Results per page: 25, 50, or 100"`
+}
+
+type propertyDetailInput struct {
+	CanonicalID string `path:"canonical_id" required:"true" doc:"Canonical ID"`
+}
+
+type resolveCanonicalIDInput struct {
+	URL string `query:"url" required:"true" doc:"Source URL"`
+}
+
+type resolveCanonicalIDOutput struct {
+	Body struct {
+		CanonicalID string `json:"canonical_id"`
+		Source      string `json:"source"`
+		Kind        string `json:"kind"`
+		NativeID    string `json:"native_id"`
+	}
+}
+
+type saleListingsSearchOutput struct {
+	Body properties.Page[properties.SaleListingSummary]
+}
+
+type rentalsSearchOutput struct {
+	Body properties.Page[properties.RentalSummary]
+}
+
+type saleListingDetailOutput struct {
+	Body properties.SaleListing
+}
+
+type rentalDetailOutput struct {
+	Body properties.Rental
+}
+
+type buildingDetailOutput struct {
+	Body properties.Building
+}
+
+func (a *API) saleListingsSearchHandler(ctx context.Context, input *propertySearchInput) (*saleListingsSearchOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.sale_listings_search"))
+	page, err := a.propertiesService.SearchSaleListings(ctx, propertySearchParams(input))
+	if err != nil {
+		logger.ErrorContext(ctx, "sale listing search failed", "error", err, "query", input.Query, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("sale listing search failed")
+	}
+	return &saleListingsSearchOutput{Body: page}, nil
+}
+
+func (a *API) rentalsSearchHandler(ctx context.Context, input *propertySearchInput) (*rentalsSearchOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.rentals_search"))
+	page, err := a.propertiesService.SearchRentals(ctx, propertySearchParams(input))
+	if err != nil {
+		logger.ErrorContext(ctx, "rental search failed", "error", err, "query", input.Query, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("rental search failed")
+	}
+	return &rentalsSearchOutput{Body: page}, nil
+}
+
+func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetailInput) (*saleListingDetailOutput, error) {
+	listing, err := a.propertiesService.SaleListingByID(ctx, input.CanonicalID, "", "")
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		return nil, huma.Error400BadRequest("invalid sale listing canonical ID")
+	}
+	return &saleListingDetailOutput{Body: listing}, nil
+}
+
+func (a *API) rentalDetailHandler(ctx context.Context, input *propertyDetailInput) (*rentalDetailOutput, error) {
+	rental, err := a.propertiesService.RentalByID(ctx, input.CanonicalID, "", "")
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("rental not found")
+		}
+		return nil, huma.Error400BadRequest("invalid rental canonical ID")
+	}
+	return &rentalDetailOutput{Body: rental}, nil
+}
+
+func (a *API) buildingDetailHandler(ctx context.Context, input *propertyDetailInput) (*buildingDetailOutput, error) {
+	building, err := a.propertiesService.BuildingByID(ctx, input.CanonicalID, "", "")
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("building not found")
+		}
+		return nil, huma.Error400BadRequest("invalid building canonical ID")
+	}
+	return &buildingDetailOutput{Body: building}, nil
+}
+
+func (a *API) resolveCanonicalIDHandler(ctx context.Context, input *resolveCanonicalIDInput) (*resolveCanonicalIDOutput, error) {
+	if !strings.HasPrefix(strings.TrimSpace(input.URL), "http://") && !strings.HasPrefix(strings.TrimSpace(input.URL), "https://") {
+		return nil, huma.Error400BadRequest("url must be an http or https source URL")
+	}
+	canonicalID, err := ads.ResolveInput(input.URL, a.cfg.Shortcut.SitemapBase, a.cfg.Frontdoor.SitemapBase)
+	if err != nil {
+		return nil, huma.Error400BadRequest("invalid source URL")
+	}
+	source, kind, nativeID, err := ads.ParseCanonicalID(canonicalID)
+	if err != nil {
+		return nil, huma.Error400BadRequest("resolved invalid canonical ID")
+	}
+	out := &resolveCanonicalIDOutput{}
+	out.Body.CanonicalID = canonicalID
+	out.Body.Source = source
+	out.Body.Kind = kind
+	out.Body.NativeID = nativeID
+	return out, nil
+}
+
+func propertySearchParams(input *propertySearchInput) properties.SearchParams {
+	page := max(input.Page, 1)
+	pageSize := input.PageSize
+	if pageSize <= 0 {
+		pageSize = 25
+	}
+	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: input.MinPrice, MaxPrice: input.MaxPrice, MinArea: input.MinArea, MaxArea: input.MaxArea, Sort: input.Sort, Page: page, PageSize: pageSize}
+}

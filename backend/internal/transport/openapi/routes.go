@@ -68,6 +68,42 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search ads and buildings by free text, address, city, postal code, price, and area"
 		op.Tags = []string{"Entity"}
 	})
+	huma.Get(api, "/api/v1/sale-listings", a.saleListingsSearchHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-search"
+		op.Summary = "Search sale listings"
+		op.Description = "Search sale listings using the shared provider-neutral sale listing model"
+		op.Tags = []string{"Sale Listings"}
+	})
+	huma.Get(api, "/api/v1/sale-listings/{canonical_id}", a.saleListingDetailHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-detail"
+		op.Summary = "Get sale listing detail"
+		op.Description = "Fetch a sale listing by canonical ID"
+		op.Tags = []string{"Sale Listings"}
+	})
+	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
+		op.OperationID = "rentals-search"
+		op.Summary = "Search rentals"
+		op.Description = "Search rentals using the shared provider-neutral rental model"
+		op.Tags = []string{"Rentals"}
+	})
+	huma.Get(api, "/api/v1/rentals/{canonical_id}", a.rentalDetailHandler, func(op *huma.Operation) {
+		op.OperationID = "rentals-detail"
+		op.Summary = "Get rental detail"
+		op.Description = "Fetch a rental by canonical ID"
+		op.Tags = []string{"Rentals"}
+	})
+	huma.Get(api, "/api/v1/buildings/{canonical_id}", a.buildingDetailHandler, func(op *huma.Operation) {
+		op.OperationID = "buildings-detail"
+		op.Summary = "Get building detail"
+		op.Description = "Fetch building details by canonical ID"
+		op.Tags = []string{"Buildings"}
+	})
+	huma.Get(api, "/api/v1/resolve", a.resolveCanonicalIDHandler, func(op *huma.Operation) {
+		op.OperationID = "resolve-canonical-id"
+		op.Summary = "Resolve source URL"
+		op.Description = "Resolve a source URL into a canonical ID for use with detail endpoints"
+		op.Tags = []string{"Entity"}
+	})
 	huma.Post(api, "/auth/apple", a.appleWebAuthHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-apple-web"
 		op.Summary = "Sign in with Apple (web)"

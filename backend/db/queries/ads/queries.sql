@@ -417,6 +417,8 @@ SELECT
     fba.frontdoor_building_announcement_property_type,
     fba.frontdoor_building_announcement_property_subtype,
     fba.frontdoor_building_announcement_published,
+    fba.frontdoor_building_announcement_rent_period,
+    fba.frontdoor_building_announcement_rental_unique_no,
     fb.frontdoor_building_id,
     fb.frontdoor_building_url,
     fb.frontdoor_building_housing_company_id,

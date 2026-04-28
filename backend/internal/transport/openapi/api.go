@@ -11,6 +11,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/auth"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/config"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -19,15 +20,16 @@ import (
 )
 
 type API struct {
-	logger        *slog.Logger
-	cfg           config.Config
-	pool          *pgxpool.Pool
-	pricesQueries *db.Queries
-	postalQueries *db.Queries
-	authService   *auth.Service
-	adsService    *ads.Service
-	shortcutAPI   *shortcutclient.Client
-	frontdoorAPI  *frontdoorclient.Client
+	logger            *slog.Logger
+	cfg               config.Config
+	pool              *pgxpool.Pool
+	pricesQueries     *db.Queries
+	postalQueries     *db.Queries
+	authService       *auth.Service
+	adsService        *ads.Service
+	propertiesService *properties.Service
+	shortcutAPI       *shortcutclient.Client
+	frontdoorAPI      *frontdoorclient.Client
 }
 
 func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service, adsService *ads.Service) *API {
@@ -72,15 +74,16 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		cfg.Frontdoor.SitemapBase,
 	)
 	return &API{
-		logger:        logger.With("component", "api"),
-		cfg:           cfg,
-		pool:          pool,
-		pricesQueries: db.New(pool),
-		postalQueries: db.New(pool),
-		authService:   authService,
-		adsService:    adsService,
-		shortcutAPI:   shortcutClient,
-		frontdoorAPI:  frontdoorClient,
+		logger:            logger.With("component", "api"),
+		cfg:               cfg,
+		pool:              pool,
+		pricesQueries:     db.New(pool),
+		postalQueries:     db.New(pool),
+		authService:       authService,
+		adsService:        adsService,
+		propertiesService: properties.NewService(pool),
+		shortcutAPI:       shortcutClient,
+		frontdoorAPI:      frontdoorClient,
 	}
 }
 
