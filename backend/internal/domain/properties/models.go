@@ -3,6 +3,9 @@ package properties
 import (
 	"encoding/json"
 	"time"
+
+	frontdoorpayload "koditon/internal/providers/frontdoor"
+	shortcutpayload "koditon/internal/providers/shortcut"
 )
 
 type SearchParams struct {
@@ -286,13 +289,18 @@ type BuildingRenovation struct {
 
 type rawMap map[string]any
 
-func parseRaw(payload json.RawMessage) rawMap {
-	if len(payload) == 0 {
+func parseShortcutRaw(payload json.RawMessage) rawMap {
+	_, out, err := shortcutpayload.DecodeStoredAd(payload)
+	if err != nil {
 		return nil
 	}
-	var out map[string]any
-	if err := json.Unmarshal(payload, &out); err != nil {
+	return rawMap(out)
+}
+
+func parseFrontdoorRaw(payload json.RawMessage) rawMap {
+	_, out, err := frontdoorpayload.DecodeStoredAd(payload)
+	if err != nil {
 		return nil
 	}
-	return out
+	return rawMap(out)
 }

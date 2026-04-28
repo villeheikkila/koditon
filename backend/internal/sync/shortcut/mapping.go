@@ -4,6 +4,7 @@ import (
 	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
+	shortcutpayload "koditon/internal/providers/shortcut"
 
 	"github.com/google/uuid"
 )
@@ -21,7 +22,7 @@ func mapBatchUpsertBuildingsFromSitemapParams(entries []client.ShortcutSitemapEn
 	}
 }
 
-func mapBatchUpsertAdsFromSitemapParams(entries []client.ShortcutSitemapEntry, adTypes []AdType) db.BatchUpsertShortcutAdsFromSitemapParams {
+func mapBatchUpsertAdsFromSitemapParams(entries []client.ShortcutSitemapEntry, adTypes []shortcutpayload.AdType) db.BatchUpsertShortcutAdsFromSitemapParams {
 	ids := make([]int64, len(entries))
 	urls := make([]string, len(entries))
 	types := make([]string, len(entries))

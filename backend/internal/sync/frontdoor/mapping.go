@@ -6,6 +6,7 @@ import (
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
+	frontdoorpayload "koditon/internal/providers/frontdoor"
 
 	"github.com/google/uuid"
 )
@@ -31,7 +32,7 @@ func mapBatchUpsertBuildingsFromSitemapParams(entries []client.SitemapEntry) []s
 	return urls
 }
 
-func mapAdParams(friendlyID string, ad *client.AdResponse) db.UpdateFrontdoorAdDataParams {
+func mapAdParams(friendlyID string, ad *frontdoorpayload.AdResponse) db.UpdateFrontdoorAdDataParams {
 	params := db.UpdateFrontdoorAdDataParams{
 		FrontdoorAdExternalID: friendlyID,
 	}
@@ -41,7 +42,7 @@ func mapAdParams(friendlyID string, ad *client.AdResponse) db.UpdateFrontdoorAdD
 	return params
 }
 
-func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyResponse) db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {
+func mapBuildingParams(housingCompanyID int64, data *frontdoorpayload.HousingCompanyResponse) db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {
 	p := db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams{
 		FrontdoorBuildingHousingCompanyID: new(housingCompanyID),
 	}
@@ -145,7 +146,7 @@ func mapBuildingParams(housingCompanyID int64, data *client.HousingCompanyRespon
 	return p
 }
 
-func mapAnnouncementParams(ann client.Announcement, buildingID uuid.UUID) db.UpsertFrontdoorBuildingAnnouncementParams {
+func mapAnnouncementParams(ann frontdoorpayload.Announcement, buildingID uuid.UUID) db.UpsertFrontdoorBuildingAnnouncementParams {
 	return db.UpsertFrontdoorBuildingAnnouncementParams{
 		FrontdoorBuildingAnnouncementExternalID:               util.Int32Ptr(ann.ID),
 		FrontdoorBuildingAnnouncementFriendlyID:               ann.FriendlyID,

@@ -8,7 +8,7 @@ import (
 )
 
 func saleFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcutAdUnifiedDetailRow) SaleListing {
-	payload := parseRaw(row.ShortcutAdData)
+	payload := parseShortcutRaw(row.ShortcutAdData)
 	location := Location{StreetAddress: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal)}
 	source := shortcutAdSource(canonicalID, nativeID, row)
 	property := shortcutProperty(payload, row)
@@ -22,7 +22,7 @@ func saleFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcutA
 }
 
 func rentalFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcutAdUnifiedDetailRow) Rental {
-	payload := parseRaw(row.ShortcutAdData)
+	payload := parseShortcutRaw(row.ShortcutAdData)
 	location := Location{StreetAddress: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal)}
 	source := shortcutAdSource(canonicalID, nativeID, row)
 	property := shortcutProperty(payload, row)
@@ -36,7 +36,7 @@ func rentalFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcu
 }
 
 func saleFromFrontdoorAd(canonicalID string, nativeID string, row db.GetFrontdoorAdUnifiedDetailRow) SaleListing {
-	payload := parseRaw(row.FrontdoorAdData)
+	payload := parseFrontdoorRaw(row.FrontdoorAdData)
 	location := Location{StreetAddress: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Latitude: float64Path(payload, "property", "geoCode", "latitude"), Longitude: float64Path(payload, "property", "geoCode", "longitude")}
 	source := frontdoorAdSource(canonicalID, nativeID, row, payload)
 	property := frontdoorProperty(payload, row)

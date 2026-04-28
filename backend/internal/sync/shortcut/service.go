@@ -2,7 +2,6 @@ package shortcut
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,16 +11,10 @@ import (
 	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
+	shortcutpayload "koditon/internal/providers/shortcut"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-)
-
-type AdType string
-
-const (
-	AdTypeListing AdType = "listing"
-	AdTypeRental  AdType = "rental"
 )
 
 type Service struct {
@@ -123,19 +116,19 @@ func (s *Service) SyncSitemap(ctx context.Context) (buildingIDs []string, adIDs 
 	if len(adEntries) > 0 {
 		seenAdIDs := make(map[int]struct{})
 		validEntries := make([]client.ShortcutSitemapEntry, 0, len(adEntries))
-		validAdTypes := make([]AdType, 0, len(adEntries))
+		validAdTypes := make([]shortcutpayload.AdType, 0, len(adEntries))
 		for _, entry := range adEntries {
 			if _, seen := seenAdIDs[entry.ID]; seen {
 				logger.DebugContext(ctx, "duplicate ad id in sitemap, skipping", "ad_id", entry.ID)
 				continue
 			}
 			seenAdIDs[entry.ID] = struct{}{}
-			var adType AdType
+			var adType shortcutpayload.AdType
 			switch entry.Type {
 			case client.SitemapURLTypeListing:
-				adType = AdTypeListing
+				adType = shortcutpayload.AdTypeListing
 			case client.SitemapURLTypeRental:
-				adType = AdTypeRental
+				adType = shortcutpayload.AdTypeRental
 			default:
 				logger.WarnContext(ctx, "unknown ad type from sitemap, skipping", "ad_id", entry.ID, "type", entry.Type)
 				continue
@@ -163,7 +156,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err != nil {
 		return fmt.Errorf("fetch ad data (ad_id=%d): %w", adID, err)
 	}
-	payload, err := ValidateShortcutAdPayloadV1(adData, adID)
+	payload, err := shortcutpayload.ValidateShortcutAdPayloadV1(adData, adID)
 	if err != nil {
 		return fmt.Errorf("validate ad data (ad_id=%d): %w", adID, err)
 	}
@@ -277,11 +270,8 @@ func (s *Service) DescribeBuilding(ctx context.Context, buildingID uuid.UUID) (s
 }
 
 func extractAdTitle(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(data, &payload); err != nil {
+	payload, err := shortcutpayload.DecodeAdRaw(data)
+	if err != nil {
 		return ""
 	}
 	candidates := []string{
@@ -292,7 +282,7 @@ func extractAdTitle(data []byte) string {
 		"description",
 	}
 	for _, key := range candidates {
-		if value := nestedString(payload, key); value != "" {
+		if value := nestedString(map[string]any(payload), key); value != "" {
 			return value
 		}
 	}

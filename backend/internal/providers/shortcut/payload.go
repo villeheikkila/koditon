@@ -13,12 +13,48 @@ const ShortcutAdPayloadSchemaVersion int16 = 1
 
 var ErrInvalidShortcutAdPayload = errors.New("invalid shortcut ad payload")
 
+type AdType string
+
+const (
+	AdTypeListing AdType = "listing"
+	AdTypeRental  AdType = "rental"
+)
+
 type ShortcutAdPayloadV1 struct {
 	AdID               int64
 	AdType             AdType
 	BuildingExternalID *int64
 	Raw                json.RawMessage
 	SchemaVersion      int16
+}
+
+type RawAd map[string]any
+
+func DecodeStoredAd(raw json.RawMessage) (*ShortcutAdPayloadV1, RawAd, error) {
+	payload, err := ValidateShortcutAdPayloadV1(raw, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	rawAd, err := DecodeAdRaw(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	return payload, rawAd, nil
+}
+
+func DecodeAdRaw(data []byte) (RawAd, error) {
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil, payloadError("empty payload")
+	}
+	var ad RawAd
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&ad); err != nil {
+		return nil, payloadError(fmt.Sprintf("decode raw payload: %v", err))
+	}
+	if err := ensureObjectRoot(data); err != nil {
+		return nil, err
+	}
+	return ad, nil
 }
 
 type shortcutAdPayloadV1Wire struct {

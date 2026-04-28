@@ -16,6 +16,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
+	frontdoorpayload "koditon/internal/providers/frontdoor"
+	shortcutpayload "koditon/internal/providers/shortcut"
 )
 
 type SearchParams struct {
@@ -548,7 +550,7 @@ func buildRawPayload(payload []byte) RawPayload {
 }
 
 func normalizedFromShortcutAdDetail(canonicalID, source, kind string, canonical UnifiedCanonicalFields, row db.GetShortcutAdUnifiedDetailRow) NormalizedDetailFields {
-	payload := parseJSONMap(row.ShortcutAdData)
+	payload := parseShortcutJSONMap(row.ShortcutAdData)
 	return NormalizedDetailFields{
 		CanonicalID:              canonicalID,
 		Source:                   source,
@@ -585,7 +587,7 @@ func normalizedFromShortcutAdDetail(canonicalID, source, kind string, canonical 
 }
 
 func normalizedFromFrontdoorAdDetail(canonicalID, source, kind string, canonical UnifiedCanonicalFields, row db.GetFrontdoorAdUnifiedDetailRow) NormalizedDetailFields {
-	payload := parseJSONMap(row.FrontdoorAdData)
+	payload := parseFrontdoorJSONMap(row.FrontdoorAdData)
 	return NormalizedDetailFields{
 		CanonicalID:              canonicalID,
 		Source:                   source,
@@ -630,6 +632,22 @@ func parseJSONMap(payload []byte) map[string]any {
 		return nil
 	}
 	return out
+}
+
+func parseShortcutJSONMap(payload []byte) map[string]any {
+	_, out, err := shortcutpayload.DecodeStoredAd(payload)
+	if err != nil {
+		return nil
+	}
+	return map[string]any(out)
+}
+
+func parseFrontdoorJSONMap(payload []byte) map[string]any {
+	_, out, err := frontdoorpayload.DecodeStoredAd(payload)
+	if err != nil {
+		return nil
+	}
+	return map[string]any(out)
 }
 
 func valueAtPath(value any, path ...string) string {

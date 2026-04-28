@@ -16,6 +16,7 @@ import (
 
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/sitemap"
+	frontdoorpayload "koditon/internal/providers/frontdoor"
 )
 
 const (
@@ -102,16 +103,12 @@ func New(baseURL, userAgent, cookie, sitemapBaseURL string) *Client {
 	}
 }
 
-func (c *Client) GetAdByFriendlyID(ctx context.Context, friendlyID string) (*AdResponse, error) {
+func (c *Client) GetAdByFriendlyID(ctx context.Context, friendlyID string) (*frontdoorpayload.AdResponse, error) {
 	body, err := c.GetAdRawByFriendlyID(ctx, friendlyID)
 	if err != nil {
 		return nil, err
 	}
-	var ad AdResponse
-	if err := json.Unmarshal(body, &ad); err != nil {
-		return nil, fmt.Errorf("decode ad response: %w", err)
-	}
-	return &ad, nil
+	return frontdoorpayload.DecodeAd(body)
 }
 
 func (c *Client) GetAdRawByFriendlyID(ctx context.Context, friendlyID string) ([]byte, error) {
@@ -153,7 +150,7 @@ func (c *Client) GetAdRawByFriendlyID(ctx context.Context, friendlyID string) ([
 	return body, nil
 }
 
-func (c *Client) GetBuildingPageData(ctx context.Context, pageURL string) (*HousingCompanyResponse, error) {
+func (c *Client) GetBuildingPageData(ctx context.Context, pageURL string) (*frontdoorpayload.HousingCompanyResponse, error) {
 	body, err := c.GetBuildingPageRaw(ctx, pageURL)
 	if err != nil {
 		return nil, err
@@ -162,7 +159,7 @@ func (c *Client) GetBuildingPageData(ctx context.Context, pageURL string) (*Hous
 	if err != nil {
 		return nil, err
 	}
-	var respPayload HousingCompanyResponse
+	var respPayload frontdoorpayload.HousingCompanyResponse
 	if err := json.Unmarshal(raw, &respPayload); err != nil {
 		return nil, fmt.Errorf("decode housing company response: %w", err)
 	}

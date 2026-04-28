@@ -1,6 +1,7 @@
 package shortcut
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -40,6 +41,27 @@ func TestValidateShortcutAdPayloadV1AcceptsNumericAndStringValues(t *testing.T) 
 	}
 	if payload.BuildingExternalID == nil || *payload.BuildingExternalID != 987 {
 		t.Fatalf("expected building external id 987, got %v", payload.BuildingExternalID)
+	}
+}
+
+func TestDecodeStoredAd(t *testing.T) {
+	raw := json.RawMessage(`{
+		"cardId": 123,
+		"cardType": 100,
+		"address": {"street": {"name": "Street"}, "city": {"name": "City"}, "zipCode": {"name": "00100"}},
+		"priceData": {"priceSell": 200000},
+		"adData": {"size": 50},
+		"buildingData": {"buildingId": 456}
+	}`)
+	payload, rawAd, err := DecodeStoredAd(raw)
+	if err != nil {
+		t.Fatalf("decode stored ad: %v", err)
+	}
+	if payload.AdID != 123 {
+		t.Fatalf("unexpected ad id: %d", payload.AdID)
+	}
+	if rawAd["cardId"] == nil {
+		t.Fatalf("expected raw card id")
 	}
 }
 

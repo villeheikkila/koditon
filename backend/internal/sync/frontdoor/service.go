@@ -10,6 +10,7 @@ import (
 
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
+	frontdoorpayload "koditon/internal/providers/frontdoor"
 )
 
 type Service struct {
@@ -154,7 +155,7 @@ func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (ur
 	return *building.FrontdoorBuildingUrl, hcID, nil
 }
 
-func extractHousingCompanyID(data *client.HousingCompanyResponse) int64 {
+func extractHousingCompanyID(data *frontdoorpayload.HousingCompanyResponse) int64 {
 	if data == nil || data.HousingCompanyPage == nil || data.HousingCompanyPage.Response == nil {
 		return 0
 	}
@@ -165,7 +166,7 @@ func extractHousingCompanyID(data *client.HousingCompanyResponse) int64 {
 	return int64(*hca.HousingCompany.ID)
 }
 
-func (s *Service) upsertBuildingData(ctx context.Context, housingCompanyID int64, buildingData *client.HousingCompanyResponse) error {
+func (s *Service) upsertBuildingData(ctx context.Context, housingCompanyID int64, buildingData *frontdoorpayload.HousingCompanyResponse) error {
 	params := mapBuildingParams(housingCompanyID, buildingData)
 	if err := s.queries.UpdateFrontdoorBuildingDetailsByHousingCompanyID(ctx, params); err != nil {
 		return fmt.Errorf("update building details: %w", err)
@@ -173,7 +174,7 @@ func (s *Service) upsertBuildingData(ctx context.Context, housingCompanyID int64
 	return nil
 }
 
-func (s *Service) upsertBuildingAnnouncements(ctx context.Context, housingCompanyID int64, announcements []client.Announcement) error {
+func (s *Service) upsertBuildingAnnouncements(ctx context.Context, housingCompanyID int64, announcements []frontdoorpayload.Announcement) error {
 	if len(announcements) == 0 {
 		return nil
 	}
@@ -202,12 +203,12 @@ func valueOrEmpty(s *string) string {
 	return *s
 }
 
-func extractAnnouncements(building *client.HousingCompanyResponse) []client.Announcement {
+func extractAnnouncements(building *frontdoorpayload.HousingCompanyResponse) []frontdoorpayload.Announcement {
 	if building == nil || building.KsaHousingCompanyPage == nil || building.KsaHousingCompanyPage.Response == nil {
 		return nil
 	}
 	resp := building.KsaHousingCompanyPage.Response
-	var announcements []client.Announcement
+	var announcements []frontdoorpayload.Announcement
 	announcements = append(announcements, resp.UnpublishedAnnouncements...)
 	announcements = append(announcements, resp.UnpublishedRentalAnnouncements...)
 	announcements = append(announcements, resp.PublishedAnnouncements...)
@@ -215,9 +216,9 @@ func extractAnnouncements(building *client.HousingCompanyResponse) []client.Anno
 	return filterUniqueAnnouncements(announcements)
 }
 
-func filterUniqueAnnouncements(announcements []client.Announcement) []client.Announcement {
+func filterUniqueAnnouncements(announcements []frontdoorpayload.Announcement) []frontdoorpayload.Announcement {
 	seen := make(map[string]bool)
-	var unique []client.Announcement
+	var unique []frontdoorpayload.Announcement
 	for _, announcement := range announcements {
 		id := int64(0)
 		if announcement.ID != nil {
