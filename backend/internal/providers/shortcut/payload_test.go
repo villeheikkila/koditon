@@ -48,7 +48,7 @@ func TestDecodeStoredAd(t *testing.T) {
 	raw := json.RawMessage(`{
 		"cardId": 123,
 		"cardType": 100,
-		"address": {"street": {"name": "Street"}, "city": {"name": "City"}, "zipCode": {"name": "00100"}},
+		"address": {"street": {"name": "Street"}, "streetNumber": "1", "buildingLetter": "B", "city": {"name": "City"}, "zipCode": {"name": "00100"}},
 		"priceData": {"priceSell": 200000},
 		"adData": {"size": 50},
 		"buildingData": {"buildingId": 456}
@@ -62,6 +62,12 @@ func TestDecodeStoredAd(t *testing.T) {
 	}
 	if rawAd["cardId"] == nil {
 		t.Fatalf("expected raw card id")
+	}
+	if payload.Address.StreetNumber == nil || *payload.Address.StreetNumber != "1" {
+		t.Fatalf("expected street number 1, got %v", payload.Address.StreetNumber)
+	}
+	if payload.Address.BuildingLetter == nil || *payload.Address.BuildingLetter != "B" {
+		t.Fatalf("expected building letter B, got %v", payload.Address.BuildingLetter)
 	}
 }
 

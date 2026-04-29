@@ -61,7 +61,7 @@ func (s *Service) SearchRentals(ctx context.Context, params SearchParams) (Page[
 }
 
 func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (SaleListing, error) {
-	canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase)
+	canonicalID, err := s.resolveListingInput(ctx, input, "sale", shortcutBase, frontdoorBase)
 	if err != nil {
 		return SaleListing{}, err
 	}
@@ -108,7 +108,7 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 }
 
 func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (Rental, error) {
-	canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase)
+	canonicalID, err := s.resolveListingInput(ctx, input, "rental", shortcutBase, frontdoorBase)
 	if err != nil {
 		return Rental{}, err
 	}
@@ -149,7 +149,7 @@ func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase str
 }
 
 func (s *Service) BuildingByID(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (Building, error) {
-	canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase)
+	canonicalID, err := s.resolveBuildingInput(ctx, input, shortcutBase, frontdoorBase)
 	if err != nil {
 		return Building{}, err
 	}
@@ -183,6 +183,32 @@ func (s *Service) BuildingByID(ctx context.Context, input string, shortcutBase s
 	}
 }
 
+func (s *Service) resolveListingInput(ctx context.Context, input string, listingType string, shortcutBase string, frontdoorBase string) (string, error) {
+	if canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase); err == nil {
+		return canonicalID, nil
+	}
+	query := resolveSaleListingPublicIDSQL
+	if listingType == "rental" {
+		query = resolveRentalPublicIDSQL
+	}
+	var canonicalID string
+	if err := s.db.QueryRow(ctx, query, strings.TrimSpace(input)).Scan(&canonicalID); err != nil {
+		return "", mapNotFound(err)
+	}
+	return canonicalID, nil
+}
+
+func (s *Service) resolveBuildingInput(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (string, error) {
+	if canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase); err == nil {
+		return canonicalID, nil
+	}
+	var canonicalID string
+	if err := s.db.QueryRow(ctx, resolveBuildingPublicIDSQL, strings.TrimSpace(input)).Scan(&canonicalID); err != nil {
+		return "", mapNotFound(err)
+	}
+	return canonicalID, nil
+}
+
 func mapNotFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
@@ -195,6 +221,7 @@ type listingSearchRow struct {
 	Kind               string
 	NativeID           string
 	CanonicalID        string
+	PublicID           string
 	URL                string
 	Headline           string
 	Address            string
@@ -203,6 +230,15 @@ type listingSearchRow struct {
 	Price              *int64
 	Area               *float64
 	RoomLayout         string
+	PricePerM2         *float64
+	DebtFreePrice      *int64
+	DebtShareAmount    *int64
+	RoomsCount         *int32
+	FloorLevel         *int32
+	TotalFloors        *int32
+	BuildYear          *int32
+	Condition          *string
+	EnergyClass        *string
 	LastSeenAt         *string
 	PublishedAt        *string
 	BuildingKeyAddress string
@@ -212,14 +248,14 @@ func (r listingSearchRow) toSaleSummary() SaleListingSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return SaleListingSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, AreaM2: r.Area}, Building: BuildingDetails{Identity: identity, Location: location}, Commercial: CommercialDetails{AskingPrice: r.Price, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
+	return SaleListingSummary{ID: r.PublicID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, RoomsCount: r.RoomsCount, AreaM2: r.Area, FloorLevel: r.FloorLevel, Condition: valueOrEmpty(r.Condition)}, Building: BuildingDetails{Identity: identity, Location: location, BuildYear: r.BuildYear, FloorCount: r.TotalFloors, EnergyClass: valueOrEmpty(r.EnergyClass)}, Commercial: CommercialDetails{AskingPrice: r.Price, DebtFreePrice: r.DebtFreePrice, DebtShareAmount: r.DebtShareAmount, PricePerSquareMeter: r.PricePerM2, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func (r listingSearchRow) toRentalSummary() RentalSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return RentalSummary{ID: r.CanonicalID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, AreaM2: r.Area}, Building: BuildingDetails{Identity: identity, Location: location}, Commercial: CommercialDetails{Rent: r.Price, RentPeriod: "month", LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
+	return RentalSummary{ID: r.PublicID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, AreaM2: r.Area}, Building: BuildingDetails{Identity: identity, Location: location}, Commercial: CommercialDetails{Rent: r.Price, RentPeriod: "month", LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func parseTimeString(value *string) *time.Time {

@@ -1018,7 +1018,39 @@ min_area?: number;
  */
 max_area?: number;
 /**
- * Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc
+ * Minimum price per square meter (EUR/m², 0 = no minimum)
+ */
+min_price_per_m2?: number;
+/**
+ * Maximum price per square meter (EUR/m², 0 = no maximum)
+ */
+max_price_per_m2?: number;
+/**
+ * Exact room count (0 = no filter)
+ */
+rooms?: number;
+/**
+ * Exact floor level (0 = no filter)
+ */
+floor?: number;
+/**
+ * Minimum build year (0 = no minimum)
+ */
+min_build_year?: number;
+/**
+ * Maximum build year (0 = no maximum)
+ */
+max_build_year?: number;
+/**
+ * Condition text filter
+ */
+condition?: string;
+/**
+ * Energy class text filter
+ */
+energy_class?: string;
+/**
+ * Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc
  */
 sort?: string;
 /**
@@ -1073,7 +1105,39 @@ min_area?: number;
  */
 max_area?: number;
 /**
- * Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc
+ * Minimum price per square meter (EUR/m², 0 = no minimum)
+ */
+min_price_per_m2?: number;
+/**
+ * Maximum price per square meter (EUR/m², 0 = no maximum)
+ */
+max_price_per_m2?: number;
+/**
+ * Exact room count (0 = no filter)
+ */
+rooms?: number;
+/**
+ * Exact floor level (0 = no filter)
+ */
+floor?: number;
+/**
+ * Minimum build year (0 = no minimum)
+ */
+min_build_year?: number;
+/**
+ * Maximum build year (0 = no maximum)
+ */
+max_build_year?: number;
+/**
+ * Condition text filter
+ */
+condition?: string;
+/**
+ * Energy class text filter
+ */
+energy_class?: string;
+/**
+ * Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc
  */
 sort?: string;
 /**
@@ -2042,7 +2106,7 @@ export function useAvailabilityTypes<TData = Awaited<ReturnType<typeof availabil
 
 
 /**
- * Fetch building details by canonical ID
+ * Fetch building details by public ID, canonical ID, or source URL
  * @summary Get building detail
  */
 export type buildingsDetailResponse200 = {
@@ -2064,17 +2128,17 @@ export type buildingsDetailResponseError = (buildingsDetailResponseDefault) & {
 
 export type buildingsDetailResponse = (buildingsDetailResponseSuccess | buildingsDetailResponseError)
 
-export const getBuildingsDetailUrl = (canonicalId: string,) => {
+export const getBuildingsDetailUrl = (id: string,) => {
 
 
 
 
-  return `/api/v1/buildings/${canonicalId}`
+  return `/api/v1/buildings/${id}`
 }
 
-export const buildingsDetail = async (canonicalId: string, options?: RequestInit): Promise<buildingsDetailResponse> => {
+export const buildingsDetail = async (id: string, options?: RequestInit): Promise<buildingsDetailResponse> => {
 
-  return customInstance<buildingsDetailResponse>(getBuildingsDetailUrl(canonicalId),
+  return customInstance<buildingsDetailResponse>(getBuildingsDetailUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2087,29 +2151,29 @@ export const buildingsDetail = async (canonicalId: string, options?: RequestInit
 
 
 
-export const getBuildingsDetailQueryKey = (canonicalId: string,) => {
+export const getBuildingsDetailQueryKey = (id: string,) => {
     return [
-    `/api/v1/buildings/${canonicalId}`
+    `/api/v1/buildings/${id}`
     ] as const;
     }
 
 
-export const getBuildingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getBuildingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getBuildingsDetailQueryKey(canonicalId);
+  const queryKey =  queryOptions?.queryKey ?? getBuildingsDetailQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildingsDetail>>> = ({ signal }) => buildingsDetail(canonicalId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildingsDetail>>> = ({ signal }) => buildingsDetail(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type BuildingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof buildingsDetail>>>
@@ -2117,7 +2181,7 @@ export type BuildingsDetailQueryError = ErrorType<ErrorModel>
 
 
 export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof buildingsDetail>>,
           TError,
@@ -2127,7 +2191,7 @@ export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDe
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof buildingsDetail>>,
           TError,
@@ -2137,7 +2201,7 @@ export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDe
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -2145,11 +2209,11 @@ export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDe
  */
 
 export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getBuildingsDetailQueryOptions(canonicalId,options)
+  const queryOptions = getBuildingsDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2872,7 +2936,7 @@ export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch
 
 
 /**
- * Fetch a rental by canonical ID
+ * Fetch a rental by public ID, canonical ID, or source URL
  * @summary Get rental detail
  */
 export type rentalsDetailResponse200 = {
@@ -2894,17 +2958,17 @@ export type rentalsDetailResponseError = (rentalsDetailResponseDefault) & {
 
 export type rentalsDetailResponse = (rentalsDetailResponseSuccess | rentalsDetailResponseError)
 
-export const getRentalsDetailUrl = (canonicalId: string,) => {
+export const getRentalsDetailUrl = (id: string,) => {
 
 
 
 
-  return `/api/v1/rentals/${canonicalId}`
+  return `/api/v1/rentals/${id}`
 }
 
-export const rentalsDetail = async (canonicalId: string, options?: RequestInit): Promise<rentalsDetailResponse> => {
+export const rentalsDetail = async (id: string, options?: RequestInit): Promise<rentalsDetailResponse> => {
 
-  return customInstance<rentalsDetailResponse>(getRentalsDetailUrl(canonicalId),
+  return customInstance<rentalsDetailResponse>(getRentalsDetailUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2917,29 +2981,29 @@ export const rentalsDetail = async (canonicalId: string, options?: RequestInit):
 
 
 
-export const getRentalsDetailQueryKey = (canonicalId: string,) => {
+export const getRentalsDetailQueryKey = (id: string,) => {
     return [
-    `/api/v1/rentals/${canonicalId}`
+    `/api/v1/rentals/${id}`
     ] as const;
     }
 
 
-export const getRentalsDetailQueryOptions = <TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getRentalsDetailQueryOptions = <TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getRentalsDetailQueryKey(canonicalId);
+  const queryKey =  queryOptions?.queryKey ?? getRentalsDetailQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsDetail>>> = ({ signal }) => rentalsDetail(canonicalId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsDetail>>> = ({ signal }) => rentalsDetail(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type RentalsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof rentalsDetail>>>
@@ -2947,7 +3011,7 @@ export type RentalsDetailQueryError = ErrorType<ErrorModel>
 
 
 export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof rentalsDetail>>,
           TError,
@@ -2957,7 +3021,7 @@ export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof rentalsDetail>>,
           TError,
@@ -2967,7 +3031,7 @@ export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -2975,11 +3039,11 @@ export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail
  */
 
 export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getRentalsDetailQueryOptions(canonicalId,options)
+  const queryOptions = getRentalsDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3243,7 +3307,7 @@ export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleList
 
 
 /**
- * Fetch a sale listing by canonical ID
+ * Fetch a sale listing by public ID, canonical ID, or source URL
  * @summary Get sale listing detail
  */
 export type saleListingsDetailResponse200 = {
@@ -3265,17 +3329,17 @@ export type saleListingsDetailResponseError = (saleListingsDetailResponseDefault
 
 export type saleListingsDetailResponse = (saleListingsDetailResponseSuccess | saleListingsDetailResponseError)
 
-export const getSaleListingsDetailUrl = (canonicalId: string,) => {
+export const getSaleListingsDetailUrl = (id: string,) => {
 
 
 
 
-  return `/api/v1/sale-listings/${canonicalId}`
+  return `/api/v1/sale-listings/${id}`
 }
 
-export const saleListingsDetail = async (canonicalId: string, options?: RequestInit): Promise<saleListingsDetailResponse> => {
+export const saleListingsDetail = async (id: string, options?: RequestInit): Promise<saleListingsDetailResponse> => {
 
-  return customInstance<saleListingsDetailResponse>(getSaleListingsDetailUrl(canonicalId),
+  return customInstance<saleListingsDetailResponse>(getSaleListingsDetailUrl(id),
   {
     ...options,
     method: 'GET'
@@ -3288,29 +3352,29 @@ export const saleListingsDetail = async (canonicalId: string, options?: RequestI
 
 
 
-export const getSaleListingsDetailQueryKey = (canonicalId: string,) => {
+export const getSaleListingsDetailQueryKey = (id: string,) => {
     return [
-    `/api/v1/sale-listings/${canonicalId}`
+    `/api/v1/sale-listings/${id}`
     ] as const;
     }
 
 
-export const getSaleListingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getSaleListingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getSaleListingsDetailQueryKey(canonicalId);
+  const queryKey =  queryOptions?.queryKey ?? getSaleListingsDetailQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsDetail>>> = ({ signal }) => saleListingsDetail(canonicalId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsDetail>>> = ({ signal }) => saleListingsDetail(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type SaleListingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsDetail>>>
@@ -3318,7 +3382,7 @@ export type SaleListingsDetailQueryError = ErrorType<ErrorModel>
 
 
 export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof saleListingsDetail>>,
           TError,
@@ -3328,7 +3392,7 @@ export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleList
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof saleListingsDetail>>,
           TError,
@@ -3338,7 +3402,7 @@ export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleList
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -3346,11 +3410,11 @@ export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleList
  */
 
 export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getSaleListingsDetailQueryOptions(canonicalId,options)
+  const queryOptions = getSaleListingsDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

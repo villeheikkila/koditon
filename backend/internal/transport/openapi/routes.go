@@ -74,10 +74,10 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search sale listings using the shared provider-neutral sale listing model"
 		op.Tags = []string{"Sale Listings"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/{canonical_id}", a.saleListingDetailHandler, func(op *huma.Operation) {
+	huma.Get(api, "/api/v1/sale-listings/{id}", a.saleListingDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-detail"
 		op.Summary = "Get sale listing detail"
-		op.Description = "Fetch a sale listing by canonical ID"
+		op.Description = "Fetch a sale listing by public ID, canonical ID, or source URL"
 		op.Tags = []string{"Sale Listings"}
 	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
@@ -86,16 +86,16 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search rentals using the shared provider-neutral rental model"
 		op.Tags = []string{"Rentals"}
 	})
-	huma.Get(api, "/api/v1/rentals/{canonical_id}", a.rentalDetailHandler, func(op *huma.Operation) {
+	huma.Get(api, "/api/v1/rentals/{id}", a.rentalDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-detail"
 		op.Summary = "Get rental detail"
-		op.Description = "Fetch a rental by canonical ID"
+		op.Description = "Fetch a rental by public ID, canonical ID, or source URL"
 		op.Tags = []string{"Rentals"}
 	})
-	huma.Get(api, "/api/v1/buildings/{canonical_id}", a.buildingDetailHandler, func(op *huma.Operation) {
+	huma.Get(api, "/api/v1/buildings/{id}", a.buildingDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "buildings-detail"
 		op.Summary = "Get building detail"
-		op.Description = "Fetch building details by canonical ID"
+		op.Description = "Fetch building details by public ID, canonical ID, or source URL"
 		op.Tags = []string{"Buildings"}
 	})
 	huma.Get(api, "/api/v1/resolve", a.resolveCanonicalIDHandler, func(op *huma.Operation) {

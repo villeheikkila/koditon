@@ -13,21 +13,29 @@ import (
 )
 
 type propertySearchInput struct {
-	Query    string  `query:"q"         doc:"Free text search"`
-	Source   string  `query:"source"    doc:"Source filter: shortcut, frontdoor, or all"`
-	City     string  `query:"city"      doc:"City / municipality filter"`
-	Postal   string  `query:"postal"    doc:"Postal code prefix filter"`
-	MinPrice int64   `query:"min_price" doc:"Minimum price (EUR, 0 = no minimum)"`
-	MaxPrice int64   `query:"max_price" doc:"Maximum price (EUR, 0 = no maximum)"`
-	MinArea  float64 `query:"min_area"  doc:"Minimum area (m², 0 = no minimum)"`
-	MaxArea  float64 `query:"max_area"  doc:"Maximum area (m², 0 = no maximum)"`
-	Sort     string  `query:"sort"      doc:"Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"`
-	Page     int32   `query:"page"      doc:"Page number (1-based)" minimum:"1"`
-	PageSize int32   `query:"page_size" doc:"Results per page: 25, 50, or 100"`
+	Query         string  `query:"q"                doc:"Free text search"`
+	Source        string  `query:"source"           doc:"Source filter: shortcut, frontdoor, or all"`
+	City          string  `query:"city"             doc:"City / municipality filter"`
+	Postal        string  `query:"postal"           doc:"Postal code prefix filter"`
+	MinPrice      int64   `query:"min_price"        doc:"Minimum price (EUR, 0 = no minimum)"`
+	MaxPrice      int64   `query:"max_price"        doc:"Maximum price (EUR, 0 = no maximum)"`
+	MinArea       float64 `query:"min_area"         doc:"Minimum area (m², 0 = no minimum)"`
+	MaxArea       float64 `query:"max_area"         doc:"Maximum area (m², 0 = no maximum)"`
+	MinPricePerM2 float64 `query:"min_price_per_m2" doc:"Minimum price per square meter (EUR/m², 0 = no minimum)"`
+	MaxPricePerM2 float64 `query:"max_price_per_m2" doc:"Maximum price per square meter (EUR/m², 0 = no maximum)"`
+	Rooms         int32   `query:"rooms"            doc:"Exact room count (0 = no filter)"`
+	Floor         int32   `query:"floor"            doc:"Exact floor level (0 = no filter)"`
+	MinBuildYear  int32   `query:"min_build_year"   doc:"Minimum build year (0 = no minimum)"`
+	MaxBuildYear  int32   `query:"max_build_year"   doc:"Maximum build year (0 = no maximum)"`
+	Condition     string  `query:"condition"        doc:"Condition text filter"`
+	EnergyClass   string  `query:"energy_class"     doc:"Energy class text filter"`
+	Sort          string  `query:"sort"             doc:"Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"`
+	Page          int32   `query:"page"             doc:"Page number (1-based)" minimum:"1"`
+	PageSize      int32   `query:"page_size"        doc:"Results per page: 25, 50, or 100"`
 }
 
 type propertyDetailInput struct {
-	CanonicalID string `path:"canonical_id" required:"true" doc:"Canonical ID"`
+	ID string `path:"id" required:"true" doc:"Public ID, canonical ID, or source URL"`
 }
 
 type resolveCanonicalIDInput struct {
@@ -84,7 +92,7 @@ func (a *API) rentalsSearchHandler(ctx context.Context, input *propertySearchInp
 }
 
 func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetailInput) (*saleListingDetailOutput, error) {
-	listing, err := a.propertiesService.SaleListingByID(ctx, input.CanonicalID, "", "")
+	listing, err := a.propertiesService.SaleListingByID(ctx, input.ID, "", "")
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("sale listing not found")
@@ -95,7 +103,7 @@ func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetai
 }
 
 func (a *API) rentalDetailHandler(ctx context.Context, input *propertyDetailInput) (*rentalDetailOutput, error) {
-	rental, err := a.propertiesService.RentalByID(ctx, input.CanonicalID, "", "")
+	rental, err := a.propertiesService.RentalByID(ctx, input.ID, "", "")
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("rental not found")
@@ -106,7 +114,7 @@ func (a *API) rentalDetailHandler(ctx context.Context, input *propertyDetailInpu
 }
 
 func (a *API) buildingDetailHandler(ctx context.Context, input *propertyDetailInput) (*buildingDetailOutput, error) {
-	building, err := a.propertiesService.BuildingByID(ctx, input.CanonicalID, "", "")
+	building, err := a.propertiesService.BuildingByID(ctx, input.ID, "", "")
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("building not found")
@@ -142,7 +150,7 @@ func propertySearchParams(input *propertySearchInput) properties.SearchParams {
 	if pageSize <= 0 {
 		pageSize = 25
 	}
-	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), Sort: input.Sort, Page: page, PageSize: pageSize}
+	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), MinPricePerM2: positiveFloat64Ptr(input.MinPricePerM2), MaxPricePerM2: positiveFloat64Ptr(input.MaxPricePerM2), Rooms: positiveInt32Ptr(input.Rooms), Floor: positiveInt32Ptr(input.Floor), MinBuildYear: positiveInt32Ptr(input.MinBuildYear), MaxBuildYear: positiveInt32Ptr(input.MaxBuildYear), Condition: input.Condition, EnergyClass: input.EnergyClass, Sort: input.Sort, Page: page, PageSize: pageSize}
 }
 
 func positiveInt64Ptr(value int64) *int64 {
@@ -153,6 +161,13 @@ func positiveInt64Ptr(value int64) *int64 {
 }
 
 func positiveFloat64Ptr(value float64) *float64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func positiveInt32Ptr(value int32) *int32 {
 	if value <= 0 {
 		return nil
 	}

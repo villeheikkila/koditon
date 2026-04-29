@@ -23,9 +23,20 @@ const (
 type ShortcutAdPayloadV1 struct {
 	AdID               int64
 	AdType             AdType
+	Address            ShortcutAddressPayloadV1
 	BuildingExternalID *int64
 	Raw                json.RawMessage
 	SchemaVersion      int16
+}
+
+// ShortcutAddressPayloadV1 contains structured address fields used for matching.
+type ShortcutAddressPayloadV1 struct {
+	StreetName       *string
+	StreetNumber     *string
+	BuildingLetter   *string
+	City             *string
+	Postal           *string
+	FormattedAddress *string
 }
 
 type RawAd map[string]any
@@ -79,6 +90,8 @@ type addressPayloadV1 struct {
 	Street           addressEntryPayloadV1 `json:"street"`
 	City             addressEntryPayloadV1 `json:"city"`
 	ZipCode          addressEntryPayloadV1 `json:"zipCode"`
+	StreetNumber     StringLike            `json:"streetNumber"`
+	BuildingLetter   StringLike            `json:"buildingLetter"`
 	FormattedAddress StringLike            `json:"formattedAddress"`
 }
 
@@ -175,7 +188,7 @@ func ValidateShortcutAdPayloadV1(raw json.RawMessage, expectedAdID int64) (*Shor
 	if err != nil {
 		return nil, err
 	}
-	return &ShortcutAdPayloadV1{AdID: adID, AdType: adType, BuildingExternalID: wire.BuildingExternalID(), Raw: raw, SchemaVersion: ShortcutAdPayloadSchemaVersion}, nil
+	return &ShortcutAdPayloadV1{AdID: adID, AdType: adType, Address: wire.Address.Payload(), BuildingExternalID: wire.BuildingExternalID(), Raw: raw, SchemaVersion: ShortcutAdPayloadSchemaVersion}, nil
 }
 
 func (p shortcutAdPayloadV1Wire) validate(expectedAdID int64) (int64, error) {
@@ -233,7 +246,18 @@ func (p addressPayloadV1) Validate() error {
 }
 
 func (p addressPayloadV1) HasAddressSignal() bool {
-	return p.Street.HasText() || p.City.HasText() || p.ZipCode.HasText() || p.FormattedAddress.Valid()
+	return p.Street.HasText() || p.City.HasText() || p.ZipCode.HasText() || p.StreetNumber.Valid() || p.BuildingLetter.Valid() || p.FormattedAddress.Valid()
+}
+
+func (p addressPayloadV1) Payload() ShortcutAddressPayloadV1 {
+	return ShortcutAddressPayloadV1{
+		StreetName:       p.Street.TextPtr(),
+		StreetNumber:     p.StreetNumber.Ptr(),
+		BuildingLetter:   p.BuildingLetter.Ptr(),
+		City:             p.City.TextPtr(),
+		Postal:           p.ZipCode.TextPtr(),
+		FormattedAddress: p.FormattedAddress.Ptr(),
+	}
 }
 
 func (p pricePayloadV1) HasUsablePrice() bool {
@@ -394,6 +418,13 @@ func (s StringLike) Valid() bool {
 	return s.valid
 }
 
+func (s StringLike) Ptr() *string {
+	if !s.valid {
+		return nil
+	}
+	return &s.value
+}
+
 func (a *addressEntryPayloadV1) UnmarshalJSON(data []byte) error {
 	if isJSONNull(data) {
 		*a = addressEntryPayloadV1{}
@@ -413,6 +444,19 @@ func (a *addressEntryPayloadV1) UnmarshalJSON(data []byte) error {
 
 func (a addressEntryPayloadV1) HasText() bool {
 	return a.Raw.Valid() || a.Name.Valid() || a.Value.Valid()
+}
+
+func (a addressEntryPayloadV1) TextPtr() *string {
+	if value, ok := a.Name.String(); ok {
+		return &value
+	}
+	if value, ok := a.Value.String(); ok {
+		return &value
+	}
+	if value, ok := a.Raw.String(); ok {
+		return &value
+	}
+	return nil
 }
 
 func firstIntLike(values ...IntLike) (int64, bool) {

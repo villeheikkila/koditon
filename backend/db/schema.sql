@@ -475,6 +475,107 @@ create table public.roles (
   role_id bigint generated always as identity not null constraint roles_pkey primary key
 );
 
+create table public.sale_listing_plot_type_aliases (
+  sale_listing_plot_type_alias text not null constraint sale_listing_plot_type_aliases_pkey primary key,
+  sale_listing_plot_type_code text not null,
+  sale_listing_plot_type_label text not null
+);
+
+create table public.sale_listing_property_type_aliases (
+  sale_listing_property_type_alias text not null constraint sale_listing_property_type_aliases_pkey primary key,
+  sale_listing_property_type_code text not null,
+  sale_listing_property_type_label text not null
+);
+
+create table public.sale_listing_room_category_aliases (
+  sale_listing_room_category_alias text not null constraint sale_listing_room_category_aliases_pkey primary key,
+  sale_listing_room_category_code text not null,
+  sale_listing_room_category_label text not null
+);
+
+create table public.sale_listings (
+  sale_listing_id uuid default gen_random_uuid() not null constraint sale_listings_pkey primary key,
+  sale_listing_public_id text not null constraint sale_listings_public_id_key unique,
+  shortcut_ad_id bigint constraint sale_listings_shortcut_ad_id_fkey references shortcut_ads(shortcut_ad_id) ON DELETE SET NULL,
+  frontdoor_ad_id uuid constraint sale_listings_frontdoor_ad_id_fkey references frontdoor_ads(frontdoor_ad_id) ON DELETE SET NULL,
+  frontdoor_building_announcement_id uuid constraint sale_listings_frontdoor_building_announcement_id_fkey references frontdoor_building_announcements(frontdoor_building_announcement_id) ON DELETE SET NULL,
+  prices_transaction_id uuid constraint sale_listings_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE SET NULL,
+  sale_listing_source_provider text not null,
+  sale_listing_source_kind text not null,
+  sale_listing_native_id text not null,
+  sale_listing_canonical_id text not null constraint sale_listings_canonical_id_key unique,
+  sale_listing_url text,
+  sale_listing_headline text not null,
+  sale_listing_street_address text,
+  sale_listing_city text,
+  sale_listing_postal text,
+  sale_listing_asking_price bigint,
+  sale_listing_area_value double precision,
+  sale_listing_room_layout text,
+  sale_listing_last_seen_at timestamp with time zone,
+  sale_listing_published_at timestamp with time zone,
+  sale_listing_search_text text,
+  sale_listing_created_at timestamp with time zone default now() not null,
+  sale_listing_updated_at timestamp with time zone default now() not null,
+  sale_listing_street_name text,
+  sale_listing_street_number text,
+  sale_listing_building_letter text,
+  sale_listing_apartment text,
+  sale_listing_street_name_norm text,
+  sale_listing_street_number_norm text,
+  sale_listing_building_letter_norm text,
+  sale_listing_city_norm text,
+  sale_listing_postal_norm text,
+  sale_listing_address_norm text,
+  sale_listing_address_components jsonb,
+  sale_listing_building_match_key text,
+  sale_listing_street_match_key text,
+  sale_listing_unit_match_key text,
+  sale_listing_price_per_m2 double precision,
+  sale_listing_debt_free_price bigint,
+  sale_listing_debt_share_amount bigint,
+  sale_listing_rooms_count integer,
+  sale_listing_floor_level integer,
+  sale_listing_total_floors integer,
+  sale_listing_build_year integer,
+  sale_listing_condition text,
+  sale_listing_energy_class text,
+  sale_listing_description_text text,
+  sale_listing_property_type_raw text,
+  sale_listing_property_type_code text,
+  sale_listing_room_category_code text,
+  sale_listing_floor_text text,
+  sale_listing_elevator boolean,
+  sale_listing_plot_type_raw text,
+  sale_listing_plot_type_code text,
+  constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
+  constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
+  constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
+);
+
+CREATE INDEX idx_sale_listings_area ON public.sale_listings USING btree (sale_listing_area_value);
+CREATE INDEX idx_sale_listings_build_year ON public.sale_listings USING btree (sale_listing_build_year);
+CREATE INDEX idx_sale_listings_building_match_key ON public.sale_listings USING btree (sale_listing_building_match_key);
+CREATE INDEX idx_sale_listings_city ON public.sale_listings USING btree (sale_listing_city);
+CREATE INDEX idx_sale_listings_elevator ON public.sale_listings USING btree (sale_listing_elevator);
+CREATE INDEX idx_sale_listings_floor_level ON public.sale_listings USING btree (sale_listing_floor_level);
+CREATE INDEX idx_sale_listings_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at DESC);
+CREATE INDEX idx_sale_listings_plot_type_code ON public.sale_listings USING btree (sale_listing_plot_type_code);
+CREATE INDEX idx_sale_listings_postal ON public.sale_listings USING btree (sale_listing_postal);
+CREATE INDEX idx_sale_listings_price ON public.sale_listings USING btree (sale_listing_asking_price);
+CREATE INDEX idx_sale_listings_price_per_m2 ON public.sale_listings USING btree (sale_listing_price_per_m2);
+CREATE INDEX idx_sale_listings_property_type_code ON public.sale_listings USING btree (sale_listing_property_type_code);
+CREATE INDEX idx_sale_listings_room_category_code ON public.sale_listings USING btree (sale_listing_room_category_code);
+CREATE INDEX idx_sale_listings_rooms_count ON public.sale_listings USING btree (sale_listing_rooms_count);
+CREATE INDEX idx_sale_listings_search_trgm ON public.sale_listings USING gin (lower(sale_listing_search_text) gin_trgm_ops);
+CREATE INDEX idx_sale_listings_source ON public.sale_listings USING btree (sale_listing_source_provider, sale_listing_source_kind);
+CREATE INDEX idx_sale_listings_street_match_key ON public.sale_listings USING btree (sale_listing_street_match_key);
+CREATE INDEX idx_sale_listings_unit_match_key ON public.sale_listings USING btree (sale_listing_unit_match_key);
+CREATE UNIQUE INDEX sale_listings_frontdoor_ad_id_key ON public.sale_listings USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_frontdoor_building_announcement_id_key ON public.sale_listings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_prices_transaction_id_key ON public.sale_listings USING btree (prices_transaction_id) WHERE (prices_transaction_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_shortcut_ad_id_key ON public.sale_listings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
+
 create table public.schema_migrations (
   version integer not null constraint schema_migrations_pkey primary key
 );

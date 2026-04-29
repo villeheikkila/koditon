@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   useBuildingsDetail,
   useRentalsDetail,
@@ -10,25 +10,31 @@ import {
 
 type ListingDetail = SaleListing | Rental
 
-export default function DetailPage() {
-  const [searchParams] = useSearchParams()
-  const id = searchParams.get('id') ?? ''
-  const kind = id.split(':')[1] ?? ''
-  const isBuilding = kind === 'building'
-  const sale = useSaleListingsDetail(id, { query: { enabled: !!id && !isBuilding, retry: false } })
-  const rental = useRentalsDetail(id, { query: { enabled: !!id && !isBuilding && sale.isError, retry: false } })
-  const building = useBuildingsDetail(id, { query: { enabled: !!id && isBuilding, retry: false } })
+interface DetailPageProps {
+  kind: 'listing' | 'rental' | 'building'
+}
+
+export default function DetailPage({ kind }: DetailPageProps) {
+  const params = useParams()
+  const id = params.id ? decodeURIComponent(params.id) : ''
+  const sale = useSaleListingsDetail(id, { query: { enabled: !!id && kind === 'listing', retry: false } })
+  const rental = useRentalsDetail(id, { query: { enabled: !!id && kind === 'rental', retry: false } })
+  const building = useBuildingsDetail(id, { query: { enabled: !!id && kind === 'building', retry: false } })
 
   if (!id) return <div className="error-screen">Missing entity ID</div>
-  if (isBuilding) {
+  if (kind === 'building') {
     if (building.isPending) return <Loading />
     if (building.isError || !building.data?.data) return <ErrorMessage error={building.error} />
     return <BuildingView building={building.data.data as Building} />
   }
-  if (sale.isPending || (sale.isError && rental.isPending)) return <Loading />
-  const detail = (sale.data?.data ?? rental.data?.data) as ListingDetail | undefined
-  if (!detail) return <ErrorMessage error={rental.error ?? sale.error} />
-  return <ListingView detail={detail} />
+  if (kind === 'rental') {
+    if (rental.isPending) return <Loading />
+    if (rental.isError || !rental.data?.data) return <ErrorMessage error={rental.error} />
+    return <ListingView detail={rental.data.data as Rental} kind="rental" />
+  }
+  if (sale.isPending) return <Loading />
+  if (sale.isError || !sale.data?.data) return <ErrorMessage error={sale.error} />
+  return <ListingView detail={sale.data.data as SaleListing} kind="listing" />
 }
 
 function Loading() {
@@ -49,7 +55,7 @@ function ErrorMessage({ error }: { error: unknown }) {
   )
 }
 
-function ListingView({ detail: d }: { detail: ListingDetail }) {
+function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listing' | 'rental' }) {
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -57,6 +63,7 @@ function ListingView({ detail: d }: { detail: ListingDetail }) {
   const location = unit.location
   const charges = commercial.charges
   const price = commercial.asking_price ?? commercial.rent
+  const isRental = kind === 'rental'
   const title = [unit.room_layout, unit.area_m2 != null && `${unit.area_m2.toFixed(1)} m²`]
     .filter(Boolean).join(', ')
   const mainImage = d.media?.main_image?.variants?.gallery || d.media?.main_image?.variants?.large || d.media?.main_image?.url
@@ -75,6 +82,7 @@ function ListingView({ detail: d }: { detail: ListingDetail }) {
         {mainImage && <img className="listing-main-image" src={mainImage} alt="" />}
         <div className="listing-header">
           <div className="listing-header-main">
+            <div className={`listing-type-pill listing-type-pill--${kind}`}>{isRental ? 'Rental' : 'Sale listing'}</div>
             <h1 className="listing-title">{location.street_address || d.headline}</h1>
             {title && <div className="listing-subtitle">{title}</div>}
             <div className="listing-location">
@@ -84,6 +92,11 @@ function ListingView({ detail: d }: { detail: ListingDetail }) {
           <div className="listing-header-price">
             {price != null && (
               <div className="listing-price-main">{fmtPrice(price)}</div>
+            )}
+            {isRental && commercial.rent_period && (
+              <div className="listing-price-sub">
+                Rent period {commercial.rent_period}
+              </div>
             )}
             {commercial.debt_free_price != null && commercial.debt_free_price !== commercial.asking_price && (
               <div className="listing-price-sub">
@@ -113,15 +126,20 @@ function ListingView({ detail: d }: { detail: ListingDetail }) {
             </Section>
           )}
           {(commercial.debt_share_amount != null || charges?.maintenance_monthly != null ||
-            charges?.total_monthly != null || charges?.water != null || texts?.charges) && (
+            charges?.total_monthly != null || charges?.water != null || commercial.security_deposit ||
+            commercial.minimum_term_months != null || commercial.pets_allowed != null || texts?.charges) && (
             <Section title="Pricing & Charges">
               <div className="listing-table">
-                {commercial.asking_price != null && <Row label="Asking price" value={fmtPrice(commercial.asking_price)} highlight />}
+                {commercial.rent != null && <Row label="Rent" value={`${fmtPrice(commercial.rent)}${commercial.rent_period ? ` / ${commercial.rent_period}` : ''}`} highlight />}
+                {commercial.asking_price != null && <Row label="Asking price" value={fmtPrice(commercial.asking_price)} highlight={!isRental} />}
                 {commercial.debt_free_price != null && <Row label="Debt-free price" value={fmtPrice(commercial.debt_free_price)} />}
                 {commercial.debt_share_amount != null && <Row label="Debt share" value={fmtPrice(commercial.debt_share_amount)} />}
                 {charges?.maintenance_monthly != null && <Row label="Maintenance charge" value={`${fmtEur(charges.maintenance_monthly)} / mo`} />}
                 {charges?.total_monthly != null && charges.total_monthly !== charges.maintenance_monthly && <Row label="Total monthly charge" value={`${fmtEur(charges.total_monthly)} / mo`} />}
                 {charges?.water != null && <Row label="Water charge" value={`${fmtEur(charges.water)} / mo`} />}
+                {commercial.security_deposit && <Row label="Security deposit" value={commercial.security_deposit} />}
+                {commercial.minimum_term_months != null && <Row label="Minimum term" value={`${commercial.minimum_term_months} months`} />}
+                {commercial.pets_allowed != null && <Row label="Pets allowed" value={commercial.pets_allowed ? 'Yes' : 'No'} />}
               </div>
               {texts?.charges && <TextBlock text={texts.charges} muted />}
             </Section>

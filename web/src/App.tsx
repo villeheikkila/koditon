@@ -24,7 +24,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
-        <Route path="/detail" element={<DetailPage />} />
+        <Route path="/listing/:id" element={<DetailPage kind="listing" />} />
+        <Route path="/rental/:id" element={<DetailPage kind="rental" />} />
+        <Route path="/building/:id" element={<DetailPage kind="building" />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
         <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />

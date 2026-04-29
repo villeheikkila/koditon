@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AuthSignupEmailToken struct {
@@ -92,6 +93,10 @@ type FrontdoorAd struct {
 	FrontdoorAdPageNotFound             bool            `json:"frontdoor_ad_page_not_found"`
 	FrontdoorAdPublishingTime           *time.Time      `json:"frontdoor_ad_publishing_time"`
 	PostalPostalCodeID                  *uuid.UUID      `json:"postal_postal_code_id"`
+	FrontdoorAdAddress                  *string         `json:"frontdoor_ad_address"`
+	FrontdoorAdArea                     pgtype.Numeric  `json:"frontdoor_ad_area"`
+	FrontdoorAdRoomLayout               *string         `json:"frontdoor_ad_room_layout"`
+	FrontdoorAdAskingPrice              pgtype.Numeric  `json:"frontdoor_ad_asking_price"`
 	FrontdoorAdStreetAddress            *string         `json:"frontdoor_ad_street_address"`
 	FrontdoorAdCity                     *string         `json:"frontdoor_ad_city"`
 	FrontdoorAdPostal                   *string         `json:"frontdoor_ad_postal"`
@@ -400,25 +405,87 @@ type RoleFeatureFlag struct {
 	RoleID int64 `json:"role_id"`
 }
 
-type RuntimeIdempotencyKey struct {
-	Scope           string     `json:"scope"`
-	Actor           string     `json:"actor"`
-	IdempotencyKey  string     `json:"idempotency_key"`
-	RequestHash     string     `json:"request_hash"`
-	ResponsePayload []byte     `json:"response_payload"`
-	LockExpiresAt   time.Time  `json:"lock_expires_at"`
-	ResultExpiresAt time.Time  `json:"result_expires_at"`
-	CompletedAt     *time.Time `json:"completed_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-}
-
 type RuntimeKvStore struct {
 	KvKey     string    `json:"kv_key"`
 	KvValue   []byte    `json:"kv_value"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type SaleListing struct {
+	SaleListingID                   uuid.UUID       `json:"sale_listing_id"`
+	SaleListingPublicID             string          `json:"sale_listing_public_id"`
+	ShortcutAdID                    *int64          `json:"shortcut_ad_id"`
+	FrontdoorAdID                   *uuid.UUID      `json:"frontdoor_ad_id"`
+	FrontdoorBuildingAnnouncementID *uuid.UUID      `json:"frontdoor_building_announcement_id"`
+	PricesTransactionID             *uuid.UUID      `json:"prices_transaction_id"`
+	SaleListingSourceProvider       string          `json:"sale_listing_source_provider"`
+	SaleListingSourceKind           string          `json:"sale_listing_source_kind"`
+	SaleListingNativeID             string          `json:"sale_listing_native_id"`
+	SaleListingCanonicalID          string          `json:"sale_listing_canonical_id"`
+	SaleListingUrl                  *string         `json:"sale_listing_url"`
+	SaleListingHeadline             string          `json:"sale_listing_headline"`
+	SaleListingStreetAddress        *string         `json:"sale_listing_street_address"`
+	SaleListingCity                 *string         `json:"sale_listing_city"`
+	SaleListingPostal               *string         `json:"sale_listing_postal"`
+	SaleListingAskingPrice          *int64          `json:"sale_listing_asking_price"`
+	SaleListingAreaValue            *float64        `json:"sale_listing_area_value"`
+	SaleListingRoomLayout           *string         `json:"sale_listing_room_layout"`
+	SaleListingLastSeenAt           *time.Time      `json:"sale_listing_last_seen_at"`
+	SaleListingPublishedAt          *time.Time      `json:"sale_listing_published_at"`
+	SaleListingSearchText           *string         `json:"sale_listing_search_text"`
+	SaleListingCreatedAt            time.Time       `json:"sale_listing_created_at"`
+	SaleListingUpdatedAt            time.Time       `json:"sale_listing_updated_at"`
+	SaleListingStreetName           *string         `json:"sale_listing_street_name"`
+	SaleListingStreetNumber         *string         `json:"sale_listing_street_number"`
+	SaleListingBuildingLetter       *string         `json:"sale_listing_building_letter"`
+	SaleListingApartment            *string         `json:"sale_listing_apartment"`
+	SaleListingStreetNameNorm       *string         `json:"sale_listing_street_name_norm"`
+	SaleListingStreetNumberNorm     *string         `json:"sale_listing_street_number_norm"`
+	SaleListingBuildingLetterNorm   *string         `json:"sale_listing_building_letter_norm"`
+	SaleListingCityNorm             *string         `json:"sale_listing_city_norm"`
+	SaleListingPostalNorm           *string         `json:"sale_listing_postal_norm"`
+	SaleListingAddressNorm          *string         `json:"sale_listing_address_norm"`
+	SaleListingAddressComponents    json.RawMessage `json:"sale_listing_address_components"`
+	SaleListingBuildingMatchKey     *string         `json:"sale_listing_building_match_key"`
+	SaleListingStreetMatchKey       *string         `json:"sale_listing_street_match_key"`
+	SaleListingUnitMatchKey         *string         `json:"sale_listing_unit_match_key"`
+	SaleListingPricePerM2           *float64        `json:"sale_listing_price_per_m2"`
+	SaleListingDebtFreePrice        *int64          `json:"sale_listing_debt_free_price"`
+	SaleListingDebtShareAmount      *int64          `json:"sale_listing_debt_share_amount"`
+	SaleListingRoomsCount           *int32          `json:"sale_listing_rooms_count"`
+	SaleListingFloorLevel           *int32          `json:"sale_listing_floor_level"`
+	SaleListingTotalFloors          *int32          `json:"sale_listing_total_floors"`
+	SaleListingBuildYear            *int32          `json:"sale_listing_build_year"`
+	SaleListingCondition            *string         `json:"sale_listing_condition"`
+	SaleListingEnergyClass          *string         `json:"sale_listing_energy_class"`
+	SaleListingDescriptionText      *string         `json:"sale_listing_description_text"`
+	SaleListingPropertyTypeRaw      *string         `json:"sale_listing_property_type_raw"`
+	SaleListingPropertyTypeCode     *string         `json:"sale_listing_property_type_code"`
+	SaleListingRoomCategoryCode     *string         `json:"sale_listing_room_category_code"`
+	SaleListingFloorText            *string         `json:"sale_listing_floor_text"`
+	SaleListingElevator             *bool           `json:"sale_listing_elevator"`
+	SaleListingPlotTypeRaw          *string         `json:"sale_listing_plot_type_raw"`
+	SaleListingPlotTypeCode         *string         `json:"sale_listing_plot_type_code"`
+}
+
+type SaleListingPlotTypeAlias struct {
+	SaleListingPlotTypeAlias string `json:"sale_listing_plot_type_alias"`
+	SaleListingPlotTypeCode  string `json:"sale_listing_plot_type_code"`
+	SaleListingPlotTypeLabel string `json:"sale_listing_plot_type_label"`
+}
+
+type SaleListingPropertyTypeAlias struct {
+	SaleListingPropertyTypeAlias string `json:"sale_listing_property_type_alias"`
+	SaleListingPropertyTypeCode  string `json:"sale_listing_property_type_code"`
+	SaleListingPropertyTypeLabel string `json:"sale_listing_property_type_label"`
+}
+
+type SaleListingRoomCategoryAlias struct {
+	SaleListingRoomCategoryAlias string `json:"sale_listing_room_category_alias"`
+	SaleListingRoomCategoryCode  string `json:"sale_listing_room_category_code"`
+	SaleListingRoomCategoryLabel string `json:"sale_listing_room_category_label"`
 }
 
 type SchemaMigration struct {
@@ -434,6 +501,10 @@ type ShortcutAd struct {
 	ShortcutAdData                     json.RawMessage `json:"shortcut_ad_data"`
 	ShortcutAdUpdatedAt                *time.Time      `json:"shortcut_ad_updated_at"`
 	ShortcutBuildingID                 *uuid.UUID      `json:"shortcut_building_id"`
+	ShortcutAdAddress                  *string         `json:"shortcut_ad_address"`
+	ShortcutAdArea                     pgtype.Numeric  `json:"shortcut_ad_area"`
+	ShortcutAdRoomLayout               *string         `json:"shortcut_ad_room_layout"`
+	ShortcutAdAskingPrice              pgtype.Numeric  `json:"shortcut_ad_asking_price"`
 	ShortcutAdStreetAddress            *string         `json:"shortcut_ad_street_address"`
 	ShortcutAdCity                     *string         `json:"shortcut_ad_city"`
 	ShortcutAdPostal                   *string         `json:"shortcut_ad_postal"`
@@ -530,14 +601,6 @@ type ShortcutToken struct {
 	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
 	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
-}
-
-type SpatialRefSy struct {
-	Srid      int32   `json:"srid"`
-	AuthName  *string `json:"auth_name"`
-	AuthSrid  *int32  `json:"auth_srid"`
-	Srtext    *string `json:"srtext"`
-	Proj4text *string `json:"proj4text"`
 }
 
 type SyncJob struct {

@@ -9,7 +9,16 @@ export default function HomePage() {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed) return
-    navigate('/detail?' + new URLSearchParams({ id: trimmed }))
+    const id = encodeURIComponent(trimmed)
+    if (trimmed.startsWith('b_') || trimmed.split(':')[1] === 'building') {
+      navigate(`/building/${id}`)
+      return
+    }
+    if (trimmed.startsWith('r_')) {
+      navigate(`/rental/${id}`)
+      return
+    }
+    navigate(`/listing/${id}`)
   }
 
   return (
@@ -19,12 +28,12 @@ export default function HomePage() {
           <span className="header-logo-dot" style={{ width: 10, height: 10 }} />
           Koditon
         </div>
-        <p className="home-desc">Look up Finnish real estate ad and building details by canonical ID or source URL.</p>
+        <p className="home-desc">Look up Finnish real estate listing and building details by ID or source URL.</p>
         <form className="home-search-form" onSubmit={handleSearch}>
           <input
             className="filter-input home-search-input"
             type="text"
-            placeholder="shortcut:ad:12345  or  https://..."
+            placeholder="l_abc123...  or  https://..."
             value={input}
             onChange={e => setInput(e.target.value)}
             autoFocus
@@ -34,7 +43,7 @@ export default function HomePage() {
           </button>
         </form>
         <p className="home-hint">
-          Examples: <code>shortcut:ad:12345</code>, <code>frontdoor:building:uuid</code>
+          Examples: <code>l_abc123...</code>, <code>b_abc123...</code>
         </p>
       </div>
     </div>

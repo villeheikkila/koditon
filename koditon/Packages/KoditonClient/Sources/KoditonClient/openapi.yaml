@@ -2158,13 +2158,13 @@ components:
       description: OAuth 2.0 access token
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8090/oauth/authorize
+          authorizationUrl: http://localhost:8089/oauth/authorize
           scopes:
             core:read: core:read
             mcp:core:read: mcp:core:read
             profile:read: profile:read
             profile:write: profile:write
-          tokenUrl: http://localhost:8090/oauth/token
+          tokenUrl: http://localhost:8089/oauth/token
       type: oauth2
 info:
   title: Koditon API
@@ -2341,17 +2341,17 @@ paths:
       summary: List available apartment types
       x-koditon-scopes:
         - core:read
-  /api/v1/buildings/{canonical_id}:
+  /api/v1/buildings/{id}:
     get:
-      description: Fetch building details by canonical ID
+      description: Fetch building details by public ID, canonical ID, or source URL
       operationId: buildings-detail
       parameters:
-        - description: Canonical ID
+        - description: Public ID, canonical ID, or source URL
           in: path
-          name: canonical_id
+          name: id
           required: true
           schema:
-            description: Canonical ID
+            description: Public ID, canonical ID, or source URL
             type: string
       responses:
         "200":
@@ -2624,12 +2624,74 @@ paths:
             description: Maximum area (m², 0 = no maximum)
             format: double
             type: number
-        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+        - description: Minimum price per square meter (EUR/m², 0 = no minimum)
+          explode: false
+          in: query
+          name: min_price_per_m2
+          schema:
+            description: Minimum price per square meter (EUR/m², 0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum price per square meter (EUR/m², 0 = no maximum)
+          explode: false
+          in: query
+          name: max_price_per_m2
+          schema:
+            description: Maximum price per square meter (EUR/m², 0 = no maximum)
+            format: double
+            type: number
+        - description: Exact room count (0 = no filter)
+          explode: false
+          in: query
+          name: rooms
+          schema:
+            description: Exact room count (0 = no filter)
+            format: int32
+            type: integer
+        - description: Exact floor level (0 = no filter)
+          explode: false
+          in: query
+          name: floor
+          schema:
+            description: Exact floor level (0 = no filter)
+            format: int32
+            type: integer
+        - description: Minimum build year (0 = no minimum)
+          explode: false
+          in: query
+          name: min_build_year
+          schema:
+            description: Minimum build year (0 = no minimum)
+            format: int32
+            type: integer
+        - description: Maximum build year (0 = no maximum)
+          explode: false
+          in: query
+          name: max_build_year
+          schema:
+            description: Maximum build year (0 = no maximum)
+            format: int32
+            type: integer
+        - description: Condition text filter
+          explode: false
+          in: query
+          name: condition
+          schema:
+            description: Condition text filter
+            type: string
+        - description: Energy class text filter
+          explode: false
+          in: query
+          name: energy_class
+          schema:
+            description: Energy class text filter
+            type: string
+        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+            description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
             type: string
         - description: Page number (1-based)
           explode: false
@@ -2664,17 +2726,17 @@ paths:
       summary: Search rentals
       tags:
         - Rentals
-  /api/v1/rentals/{canonical_id}:
+  /api/v1/rentals/{id}:
     get:
-      description: Fetch a rental by canonical ID
+      description: Fetch a rental by public ID, canonical ID, or source URL
       operationId: rentals-detail
       parameters:
-        - description: Canonical ID
+        - description: Public ID, canonical ID, or source URL
           in: path
-          name: canonical_id
+          name: id
           required: true
           schema:
-            description: Canonical ID
+            description: Public ID, canonical ID, or source URL
             type: string
       responses:
         "200":
@@ -2786,12 +2848,74 @@ paths:
             description: Maximum area (m², 0 = no maximum)
             format: double
             type: number
-        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+        - description: Minimum price per square meter (EUR/m², 0 = no minimum)
+          explode: false
+          in: query
+          name: min_price_per_m2
+          schema:
+            description: Minimum price per square meter (EUR/m², 0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum price per square meter (EUR/m², 0 = no maximum)
+          explode: false
+          in: query
+          name: max_price_per_m2
+          schema:
+            description: Maximum price per square meter (EUR/m², 0 = no maximum)
+            format: double
+            type: number
+        - description: Exact room count (0 = no filter)
+          explode: false
+          in: query
+          name: rooms
+          schema:
+            description: Exact room count (0 = no filter)
+            format: int32
+            type: integer
+        - description: Exact floor level (0 = no filter)
+          explode: false
+          in: query
+          name: floor
+          schema:
+            description: Exact floor level (0 = no filter)
+            format: int32
+            type: integer
+        - description: Minimum build year (0 = no minimum)
+          explode: false
+          in: query
+          name: min_build_year
+          schema:
+            description: Minimum build year (0 = no minimum)
+            format: int32
+            type: integer
+        - description: Maximum build year (0 = no maximum)
+          explode: false
+          in: query
+          name: max_build_year
+          schema:
+            description: Maximum build year (0 = no maximum)
+            format: int32
+            type: integer
+        - description: Condition text filter
+          explode: false
+          in: query
+          name: condition
+          schema:
+            description: Condition text filter
+            type: string
+        - description: Energy class text filter
+          explode: false
+          in: query
+          name: energy_class
+          schema:
+            description: Energy class text filter
+            type: string
+        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+            description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
             type: string
         - description: Page number (1-based)
           explode: false
@@ -2826,17 +2950,17 @@ paths:
       summary: Search sale listings
       tags:
         - Sale Listings
-  /api/v1/sale-listings/{canonical_id}:
+  /api/v1/sale-listings/{id}:
     get:
-      description: Fetch a sale listing by canonical ID
+      description: Fetch a sale listing by public ID, canonical ID, or source URL
       operationId: sale-listings-detail
       parameters:
-        - description: Canonical ID
+        - description: Public ID, canonical ID, or source URL
           in: path
-          name: canonical_id
+          name: id
           required: true
           schema:
-            description: Canonical ID
+            description: Public ID, canonical ID, or source URL
             type: string
       responses:
         "200":

@@ -1027,6 +1027,31 @@ td.dim { color: var(--text-3); font-size: 12px; }
 
 .listing-header-main { flex: 1; min-width: 0; }
 
+.listing-type-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.listing-type-pill--listing {
+  background: color-mix(in srgb, #c7a566 13%, transparent);
+  color: #b88a2b;
+  border: 1px solid color-mix(in srgb, #c7a566 28%, transparent);
+}
+
+.listing-type-pill--rental {
+  background: color-mix(in srgb, #54a59a 13%, transparent);
+  color: #3f9288;
+  border: 1px solid color-mix(in srgb, #54a59a 28%, transparent);
+}
+
 .listing-title {
   font-size: 22px;
   font-weight: 650;
@@ -1498,6 +1523,12 @@ td.dim { color: var(--text-3); font-size: 12px; }
   background: var(--surface-3);
   color: var(--text-3);
   border: 1px solid var(--border);
+}
+
+.search-badge--mode-listings {
+  background: color-mix(in srgb, #c7a566 13%, transparent);
+  color: #b88a2b;
+  border: 1px solid color-mix(in srgb, #c7a566 28%, transparent);
 }
 
 .search-card-sub {

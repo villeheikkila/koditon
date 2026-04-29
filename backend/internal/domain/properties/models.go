@@ -17,6 +17,14 @@ type SearchParams struct {
 	MaxPrice        *int64
 	MinArea         *float64
 	MaxArea         *float64
+	MinPricePerM2   *float64
+	MaxPricePerM2   *float64
+	Rooms           *int32
+	Floor           *int32
+	MinBuildYear    *int32
+	MaxBuildYear    *int32
+	Condition       string
+	EnergyClass     string
 	Page            int32
 	PageSize        int32
 	Sort            string

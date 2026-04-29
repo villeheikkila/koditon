@@ -20,7 +20,7 @@ func saleFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcutA
 	commercial.FixedTerm = nil
 	commercial.Furnished = nil
 	commercial.PetsAllowed = nil
-	sale := SaleListing{ID: canonicalID, Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: shortcutUnit(payload, row, location), Building: shortcutAdBuilding(row, payload, location), Site: shortcutSite(payload, row), Commercial: commercial, Texts: shortcutTexts(payload, row)}
+	sale := SaleListing{ID: publicID("l", canonicalID), Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: shortcutUnit(payload, row, location), Building: shortcutAdBuilding(row, payload, location), Site: shortcutSite(payload, row), Commercial: commercial, Texts: shortcutTexts(payload, row)}
 	sale.Media = shortcutMedia(payload)
 	sale.Contacts = shortcutContacts(payload)
 	sale.Links = shortcutLinks(payload)
@@ -35,7 +35,7 @@ func rentalFromShortcutAd(canonicalID string, nativeID string, row db.GetShortcu
 	commercial.AskingPrice = nil
 	commercial.DebtFreePrice = nil
 	commercial.DebtShareAmount = nil
-	rental := Rental{ID: canonicalID, Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: shortcutUnit(payload, row, location), Building: shortcutAdBuilding(row, payload, location), Site: shortcutSite(payload, row), Commercial: commercial, Texts: shortcutTexts(payload, row)}
+	rental := Rental{ID: publicID("r", canonicalID), Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: shortcutUnit(payload, row, location), Building: shortcutAdBuilding(row, payload, location), Site: shortcutSite(payload, row), Commercial: commercial, Texts: shortcutTexts(payload, row)}
 	rental.Media = shortcutMedia(payload)
 	rental.Contacts = shortcutContacts(payload)
 	rental.Links = shortcutLinks(payload)
@@ -46,7 +46,7 @@ func saleFromFrontdoorAd(canonicalID string, nativeID string, row db.GetFrontdoo
 	payload := parseFrontdoorRaw(row.FrontdoorAdData)
 	location := Location{StreetAddress: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Latitude: float64Path(payload, "property", "geoCode", "latitude"), Longitude: float64Path(payload, "property", "geoCode", "longitude")}
 	source := frontdoorAdSource(canonicalID, nativeID, row, payload)
-	sale := SaleListing{ID: canonicalID, Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: frontdoorUnit(payload, row, location), Building: frontdoorAdBuilding(row, payload, location, nativeID), Site: frontdoorSite(payload, row), Commercial: frontdoorCommercial(payload, row, source), Texts: frontdoorTexts(payload, row)}
+	sale := SaleListing{ID: publicID("l", canonicalID), Source: source, Headline: firstNonEmpty(location.StreetAddress, nativeID), Unit: frontdoorUnit(payload, row, location), Building: frontdoorAdBuilding(row, payload, location, nativeID), Site: frontdoorSite(payload, row), Commercial: frontdoorCommercial(payload, row, source), Texts: frontdoorTexts(payload, row)}
 	sale.Media = frontdoorMedia(payload)
 	sale.Contacts = frontdoorContacts(payload)
 	sale.Showings = frontdoorShowings(payload)
@@ -58,7 +58,7 @@ func saleFromFrontdoorAnnouncement(canonicalID string, nativeID string, row db.G
 	location := frontdoorAnnouncementLocation(row)
 	source := frontdoorAnnouncementSource(canonicalID, nativeID, row)
 	building := frontdoorAnnouncementBuilding(row, location)
-	sale := SaleListing{ID: canonicalID, Source: source, Headline: firstNonEmpty(location.StreetAddress, valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), nativeID), Unit: UnitDetails{Location: location, PropertyType: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType), PropertySubtype: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype), RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), AreaM2: row.FrontdoorBuildingAnnouncementArea}, Building: building, Commercial: CommercialDetails{AskingPrice: float64ToInt64(row.FrontdoorBuildingAnnouncementSearchPrice), LastSeenAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), PublishedAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), IsCompanyAnnouncement: ptrBool(true)}}
+	sale := SaleListing{ID: publicID("l", canonicalID), Source: source, Headline: firstNonEmpty(location.StreetAddress, valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), nativeID), Unit: UnitDetails{Location: location, PropertyType: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType), PropertySubtype: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype), RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), AreaM2: row.FrontdoorBuildingAnnouncementArea}, Building: building, Commercial: CommercialDetails{AskingPrice: float64ToInt64(row.FrontdoorBuildingAnnouncementSearchPrice), LastSeenAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), PublishedAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), IsCompanyAnnouncement: ptrBool(true)}}
 	sale.Media = frontdoorAnnouncementMedia(valueOrEmpty(row.FrontdoorBuildingAnnouncementMainImageUri))
 	return sale
 }
@@ -67,7 +67,7 @@ func rentalFromFrontdoorAnnouncement(canonicalID string, nativeID string, row db
 	location := frontdoorAnnouncementLocation(row)
 	source := frontdoorAnnouncementSource(canonicalID, nativeID, row)
 	building := frontdoorAnnouncementBuilding(row, location)
-	rental := Rental{ID: canonicalID, Source: source, Headline: firstNonEmpty(location.StreetAddress, valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), nativeID), Unit: UnitDetails{Location: location, PropertyType: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType), PropertySubtype: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype), RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), AreaM2: row.FrontdoorBuildingAnnouncementArea}, Building: building, Commercial: CommercialDetails{Rent: float64ToInt64(row.FrontdoorBuildingAnnouncementSearchPrice), RentPeriod: valueOrEmpty(row.FrontdoorBuildingAnnouncementRentPeriod), LastSeenAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), PublishedAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), IsCompanyAnnouncement: ptrBool(true)}}
+	rental := Rental{ID: publicID("r", canonicalID), Source: source, Headline: firstNonEmpty(location.StreetAddress, valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), nativeID), Unit: UnitDetails{Location: location, PropertyType: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType), PropertySubtype: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype), RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), AreaM2: row.FrontdoorBuildingAnnouncementArea}, Building: building, Commercial: CommercialDetails{Rent: float64ToInt64(row.FrontdoorBuildingAnnouncementSearchPrice), RentPeriod: valueOrEmpty(row.FrontdoorBuildingAnnouncementRentPeriod), LastSeenAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), PublishedAt: timePtr(row.FrontdoorBuildingAnnouncementLastSeenAt), IsCompanyAnnouncement: ptrBool(true)}}
 	rental.Media = frontdoorAnnouncementMedia(valueOrEmpty(row.FrontdoorBuildingAnnouncementMainImageUri))
 	return rental
 }
@@ -77,7 +77,7 @@ func buildingFromShortcut(canonicalID string, nativeID string, row db.GetShortcu
 	source := ListingSource{Provider: "shortcut", Kind: "building", CanonicalID: canonicalID, NativeID: nativeID, ExternalID: strconv.FormatInt(row.ShortcutBuildingExternalID, 10), URL: row.ShortcutBuildingUrl, OriginalURL: row.ShortcutBuildingUrl, LastSeenAt: timePtr(row.ShortcutBuildingUpdatedAt), Flags: map[string]bool{"page_not_found": boolPtrValue(row.ShortcutBuildingPageNotFound)}}
 	identity := computedBuildingIdentity("shortcut", "building", nativeID, location, valueOrEmpty(row.ShortcutBuildingHousingCompany), "", strconv.FormatInt(row.ShortcutBuildingExternalID, 10))
 	details := BuildingDetails{Identity: identity, Location: location, HousingCompany: valueOrEmpty(row.ShortcutBuildingHousingCompany), BuildingType: valueOrEmpty(row.ShortcutBuildingBuildingType), BuildingSubtype: valueOrEmpty(row.ShortcutBuildingBuildingSubtype), ConstructionYear: row.ShortcutBuildingConstructionYear, FloorCount: row.ShortcutBuildingFloorCount, ApartmentCount: row.ShortcutBuildingApartmentCount, Heating: valueOrEmpty(row.ShortcutBuildingHeatingSystem), Elevator: boolTextPtr(row.ShortcutBuildingHasElevator), Sauna: boolTextPtr(row.ShortcutBuildingHasSauna)}
-	return Building{ID: identity.Key, Details: details, Site: SiteDetails{PlotType: valueOrEmpty(row.ShortcutBuildingPlotType)}, SourceRecords: []ListingSource{source}}
+	return Building{ID: publicID("b", canonicalID), Details: details, Site: SiteDetails{PlotType: valueOrEmpty(row.ShortcutBuildingPlotType)}, SourceRecords: []ListingSource{source}}
 }
 
 func buildingFromFrontdoor(canonicalID string, nativeID string, row db.GetFrontdoorBuildingUnifiedDetailRow) Building {
@@ -85,7 +85,7 @@ func buildingFromFrontdoor(canonicalID string, nativeID string, row db.GetFrontd
 	source := ListingSource{Provider: "frontdoor", Kind: "building", CanonicalID: canonicalID, NativeID: nativeID, ExternalID: formatInt64(row.FrontdoorBuildingHousingCompanyID), FriendlyID: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID), URL: valueOrEmpty(row.FrontdoorBuildingUrl), OriginalURL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: timePtr(row.FrontdoorBuildingLastSeenAt)}
 	identity := computedBuildingIdentity("frontdoor", "building", nativeID, location, valueOrEmpty(row.FrontdoorBuildingCompanyName), valueOrEmpty(row.FrontdoorBuildingBusinessID), formatInt64(row.FrontdoorBuildingHousingCompanyID))
 	details := BuildingDetails{Identity: identity, Location: location, HousingCompany: valueOrEmpty(row.FrontdoorBuildingCompanyName), BusinessID: valueOrEmpty(row.FrontdoorBuildingBusinessID), BuildYear: row.FrontdoorBuildingBuildYear, FloorCount: row.FrontdoorBuildingFloorCount, ApartmentCount: row.FrontdoorBuildingApartmentCount, EnergyClass: valueOrEmpty(row.FrontdoorBuildingEnergyCertificateCode), Heating: valueOrEmpty(row.FrontdoorBuildingHeating), Elevator: row.FrontdoorBuildingHasElevator, Sauna: row.FrontdoorBuildingHasSauna}
-	return Building{ID: identity.Key, Details: details, SourceRecords: []ListingSource{source}}
+	return Building{ID: publicID("b", canonicalID), Details: details, SourceRecords: []ListingSource{source}}
 }
 
 func shortcutAdSource(canonicalID string, nativeID string, row db.GetShortcutAdUnifiedDetailRow) ListingSource {

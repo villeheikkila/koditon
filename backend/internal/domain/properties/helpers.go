@@ -1,6 +1,7 @@
 package properties
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -11,8 +12,22 @@ import (
 	"unicode"
 )
 
+func publicID(prefix, canonicalID string) string {
+	sum := md5Hex(canonicalID)
+	if len(sum) > 16 {
+		sum = sum[:16]
+	}
+	return prefix + "_" + sum
+}
+
+func md5Hex(value string) string {
+	// #nosec G401 -- public IDs are non-security identifiers that mirror Postgres md5().
+	sum := md5.Sum([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
 func normalizeParams(params SearchParams) SearchParams {
-	out := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
+	out := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, MinPricePerM2: params.MinPricePerM2, MaxPricePerM2: params.MaxPricePerM2, Rooms: params.Rooms, Floor: params.Floor, MinBuildYear: params.MinBuildYear, MaxBuildYear: params.MaxBuildYear, Condition: strings.TrimSpace(params.Condition), EnergyClass: strings.TrimSpace(params.EnergyClass), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
 	if out.Page < 1 {
 		out.Page = 1
 	}
@@ -30,7 +45,7 @@ func normalizeSource(source string) string {
 
 func normalizeSort(sort string) string {
 	switch strings.ToLower(strings.TrimSpace(sort)) {
-	case "price_asc", "price_desc", "area_asc", "area_desc", "seen_desc":
+	case "price_asc", "price_desc", "area_asc", "area_desc", "price_m2_asc", "price_m2_desc", "build_year_desc", "seen_desc":
 		return strings.ToLower(strings.TrimSpace(sort))
 	default:
 		return "seen_desc"
