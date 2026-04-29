@@ -19,8 +19,18 @@ export const customInstance = async <T>(
   } else {
     data = await response.text()
   }
-
+  if (!response.ok) {
+    const detail = errorDetail(data) ?? `Request failed: ${response.status}`
+    throw new Error(detail)
+  }
   return { data, status: response.status, headers: response.headers } as T
+}
+
+function errorDetail(data: unknown): string | null {
+  if (typeof data !== 'object' || data == null) return null
+  if ('detail' in data && data.detail != null) return String(data.detail)
+  if ('error_description' in data && data.error_description != null) return String(data.error_description)
+  return null
 }
 
 export type ErrorType<E> = E

@@ -94,10 +94,6 @@ func (s *Service) RequestAuthentication(ctx context.Context, rawEmail string) er
 	if s.queries == nil {
 		return fmt.Errorf("queries not configured")
 	}
-	if s.emailService == nil {
-		return email.ErrSenderNotConfigured
-	}
-
 	targetEmail, err := NormalizeEmail(rawEmail)
 	if err != nil {
 		return err
@@ -123,7 +119,13 @@ func (s *Service) RequestAuthentication(ctx context.Context, rawEmail string) er
 
 	confirmURL := s.confirmURL(rawToken)
 	if s.emitConsoleLink {
-		fmt.Printf("[email-auth] email=%s confirm_url=%s\n", targetEmail, confirmURL)
+		s.logger.WarnContext(ctx, "email authentication code issued", "email", targetEmail, "code", rawToken, "confirm_url", confirmURL, "expires_at", expiresAt)
+	}
+	if s.emailService == nil {
+		if s.emitConsoleLink {
+			return nil
+		}
+		return email.ErrSenderNotConfigured
 	}
 	if err := s.emailService.Send(ctx, email.Message{
 		To:      []string{targetEmail},
@@ -234,7 +236,7 @@ func (s *Service) ConsumeAuthenticationTicket(ctx context.Context, rawTicket str
 func (s *Service) confirmURL(rawToken string) string {
 	base := strings.TrimRight(s.webBaseURL, "/")
 	if base != "" {
-		return base + "/auth/email/confirm/" + rawToken
+		return base + "/email/confirm/" + rawToken
 	}
 	publicAPI := strings.TrimRight(s.publicAPIURL, "/")
 	if publicAPI != "" {

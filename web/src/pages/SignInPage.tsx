@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { passkeySignIn, appleSignIn, isAppleSignInConfigured } from '../lib/auth'
+import { passkeySignIn, appleSignIn, isAppleSignInConfigured, requestEmailSignIn } from '../lib/auth'
 
 interface Props {
   onSignIn: () => void
@@ -8,6 +8,8 @@ interface Props {
 export default function SignInPage({ onSignIn }: Props) {
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [appleState, setAppleState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [emailState, setEmailState] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
+  const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const appleConfigured = isAppleSignInConfigured()
 
@@ -37,8 +39,23 @@ export default function SignInPage({ onSignIn }: Props) {
     }
   }
 
+  async function handleEmailSignIn(event: React.FormEvent) {
+    event.preventDefault()
+    setEmailState('loading')
+    setError(null)
+    try {
+      await requestEmailSignIn(email.trim())
+      setEmailState('sent')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Email sign in failed'
+      setError(msg)
+      setEmailState('error')
+    }
+  }
+
   const isLoading = state === 'loading'
   const isAppleLoading = appleState === 'loading'
+  const isEmailLoading = emailState === 'loading'
 
   return (
     <div className="signin-layout">
@@ -48,6 +65,32 @@ export default function SignInPage({ onSignIn }: Props) {
           Koditon
         </div>
         <p className="signin-desc">Finnish real estate price data</p>
+
+        <form className="signin-email-form" onSubmit={handleEmailSignIn}>
+          <input
+            className="signin-email-input"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+            disabled={isEmailLoading}
+          />
+          <button className="passkey-btn" type="submit" disabled={isEmailLoading || !email.trim()}>
+            {isEmailLoading ? (
+              <>
+                <div className="spinner" style={{ width: 14, height: 14 }} />
+                Sending…
+              </>
+            ) : emailState === 'sent' ? (
+              'Check your email'
+            ) : (
+              'Continue with email'
+            )}
+          </button>
+        </form>
+
+        <div className="signin-divider">or</div>
 
         <button
           className="passkey-btn"
@@ -66,10 +109,6 @@ export default function SignInPage({ onSignIn }: Props) {
             </>
           )}
         </button>
-
-        {appleConfigured && (
-          <div className="signin-divider">or</div>
-        )}
 
         {appleConfigured && (
           <button
@@ -96,7 +135,7 @@ export default function SignInPage({ onSignIn }: Props) {
         )}
 
         <p className="signin-hint">
-          Use your device biometrics or security key to sign in.
+          Use email first. Add a passkey later from account settings.
         </p>
       </div>
     </div>

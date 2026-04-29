@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { keepPreviousData } from '@tanstack/react-query'
 import Nav from '../components/Nav'
-import { useSearch, type SearchParams, type SearchRow } from '../api/search'
+import { useSaleListingsSearch, type PageSaleListingSummary, type SaleListingSummary, type SaleListingsSearchParams } from '../api/koditon'
 
 const PAGE_SIZE = 25
 
@@ -9,13 +10,6 @@ const SOURCE_OPTIONS = [
   { value: '', label: 'All sources' },
   { value: 'shortcut', label: 'Shortcut' },
   { value: 'frontdoor', label: 'Frontdoor' },
-]
-
-const KIND_OPTIONS = [
-  { value: '', label: 'All types' },
-  { value: 'ad', label: 'Ad' },
-  { value: 'building', label: 'Building' },
-  { value: 'announcement', label: 'Announcement' },
 ]
 
 const SORT_OPTIONS = [
@@ -47,7 +41,6 @@ export default function SearchPage() {
   const [city, setCity]       = useState(() => urlParams.get('city') ?? '')
   const [postal, setPostal]   = useState(() => urlParams.get('postal') ?? '')
   const [source, setSource]   = useState(() => urlParams.get('source') ?? '')
-  const [kind, setKind]       = useState(() => urlParams.get('kind') ?? '')
   const [minPrice, setMinPrice] = useState(() => urlParams.get('min_price') ?? '')
   const [maxPrice, setMaxPrice] = useState(() => urlParams.get('max_price') ?? '')
   const [minArea, setMinArea]   = useState(() => urlParams.get('min_area') ?? '')
@@ -66,7 +59,6 @@ export default function SearchPage() {
     if (dCity)    p.city    = dCity
     if (dPostal)  p.postal  = dPostal
     if (source)   p.source  = source
-    if (kind)     p.kind    = kind
     if (minPrice) p.min_price = minPrice
     if (maxPrice) p.max_price = maxPrice
     if (minArea)  p.min_area  = minArea
@@ -74,31 +66,15 @@ export default function SearchPage() {
     if (sort !== 'seen_desc') p.sort = sort
     if (page > 1) p.page = String(page)
     setUrlParams(p, { replace: true })
-  }, [dQuery, dCity, dPostal, source, kind, minPrice, maxPrice, minArea, maxArea, sort, page])
+  }, [dQuery, dCity, dPostal, source, minPrice, maxPrice, minArea, maxArea, sort, page, setUrlParams])
 
-  // Reset page when filters change
-  const prevFilters = useRef({ dQuery, dCity, dPostal, source, kind, minPrice, maxPrice, minArea, maxArea, sort })
-  useEffect(() => {
-    const prev = prevFilters.current
-    if (
-      prev.dQuery !== dQuery || prev.dCity !== dCity || prev.dPostal !== dPostal ||
-      prev.source !== source || prev.kind !== kind ||
-      prev.minPrice !== minPrice || prev.maxPrice !== maxPrice ||
-      prev.minArea !== minArea || prev.maxArea !== maxArea || prev.sort !== sort
-    ) {
-      setPage(1)
-      prevFilters.current = { dQuery, dCity, dPostal, source, kind, minPrice, maxPrice, minArea, maxArea, sort }
-    }
-  }, [dQuery, dCity, dPostal, source, kind, minPrice, maxPrice, minArea, maxArea, sort])
+  const hasFilters = !!(dQuery || dCity || dPostal || source || minPrice || maxPrice || minArea || maxArea)
 
-  const hasFilters = !!(dQuery || dCity || dPostal || source || kind || minPrice || maxPrice || minArea || maxArea)
-
-  const params: SearchParams = {
+  const params: SaleListingsSearchParams = {
     q:         dQuery   || undefined,
     city:      dCity    || undefined,
     postal:    dPostal  || undefined,
     source:    source   || undefined,
-    kind:      kind     || undefined,
     min_price: minPrice ? Number(minPrice) : undefined,
     max_price: maxPrice ? Number(maxPrice) : undefined,
     min_area:  minArea  ? Number(minArea)  : undefined,
@@ -108,22 +84,35 @@ export default function SearchPage() {
     page_size: PAGE_SIZE,
   }
 
-  const { data, isPending, isPlaceholderData } = useSearch(params, hasFilters)
+  const { data, isPending, isPlaceholderData } = useSaleListingsSearch(params, {
+    query: {
+      enabled: hasFilters,
+      placeholderData: keepPreviousData,
+      staleTime: 30_000,
+    },
+  })
 
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
+  const pageData = data?.data as PageSaleListingSummary | undefined
+  const rows = pageData?.rows ?? []
+  const totalPages = pageData ? Math.ceil(pageData.total / PAGE_SIZE) : 0
 
   function clearAll() {
     setQuery(''); setCity(''); setPostal('')
-    setSource(''); setKind('')
+    setSource('')
     setMinPrice(''); setMaxPrice(''); setMinArea(''); setMaxArea('')
     setSort('seen_desc'); setPage(1)
+  }
+
+  function updateFilter(setter: (value: string) => void, value: string) {
+    setter(value)
+    setPage(1)
   }
 
   return (
     <div className="search-layout">
       <Nav actions={
-        data && hasFilters
-          ? <span className="search-total">{data.total.toLocaleString('fi-FI')} results</span>
+        pageData && hasFilters
+          ? <span className="search-total">{pageData.total.toLocaleString('fi-FI')} results</span>
           : undefined
       } />
 
@@ -137,7 +126,7 @@ export default function SearchPage() {
               type="text"
               placeholder="Address, area, description…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => updateFilter(setQuery, e.target.value)}
               autoFocus
             />
           </div>
@@ -150,7 +139,7 @@ export default function SearchPage() {
                 type="text"
                 placeholder="Helsinki"
                 value={city}
-                onChange={e => setCity(e.target.value)}
+                onChange={e => updateFilter(setCity, e.target.value)}
               />
             </div>
             <div className="search-filter-group">
@@ -160,7 +149,7 @@ export default function SearchPage() {
                 type="text"
                 placeholder="001…"
                 value={postal}
-                onChange={e => setPostal(e.target.value)}
+                onChange={e => updateFilter(setPostal, e.target.value)}
               />
             </div>
           </div>
@@ -170,14 +159,8 @@ export default function SearchPage() {
           <div className="search-filter-row">
             <div className="search-filter-group">
               <label className="search-filter-label">Source</label>
-              <select className="search-select" value={source} onChange={e => setSource(e.target.value)}>
+              <select className="search-select" value={source} onChange={e => updateFilter(setSource, e.target.value)}>
                 {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="search-filter-group">
-              <label className="search-filter-label">Type</label>
-              <select className="search-select" value={kind} onChange={e => setKind(e.target.value)}>
-                {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -192,7 +175,7 @@ export default function SearchPage() {
                 type="number"
                 placeholder="Min"
                 value={minPrice}
-                onChange={e => setMinPrice(e.target.value)}
+                onChange={e => updateFilter(setMinPrice, e.target.value)}
                 min={0}
               />
               <span className="search-range-sep">–</span>
@@ -201,7 +184,7 @@ export default function SearchPage() {
                 type="number"
                 placeholder="Max"
                 value={maxPrice}
-                onChange={e => setMaxPrice(e.target.value)}
+                onChange={e => updateFilter(setMaxPrice, e.target.value)}
                 min={0}
               />
             </div>
@@ -215,7 +198,7 @@ export default function SearchPage() {
                 type="number"
                 placeholder="Min"
                 value={minArea}
-                onChange={e => setMinArea(e.target.value)}
+                onChange={e => updateFilter(setMinArea, e.target.value)}
                 min={0}
               />
               <span className="search-range-sep">–</span>
@@ -224,7 +207,7 @@ export default function SearchPage() {
                 type="number"
                 placeholder="Max"
                 value={maxArea}
-                onChange={e => setMaxArea(e.target.value)}
+                onChange={e => updateFilter(setMaxArea, e.target.value)}
                 min={0}
               />
             </div>
@@ -234,7 +217,7 @@ export default function SearchPage() {
 
           <div className="search-filter-group">
             <label className="search-filter-label">Sort by</label>
-            <select className="search-select" value={sort} onChange={e => setSort(e.target.value)}>
+            <select className="search-select" value={sort} onChange={e => updateFilter(setSort, e.target.value)}>
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
@@ -258,13 +241,13 @@ export default function SearchPage() {
             <div className="search-loading">
               <div className="spinner" />
             </div>
-          ) : !data || data.rows.length === 0 ? (
+          ) : !pageData || rows.length === 0 ? (
             <div className="search-no-results">No listings found</div>
           ) : (
             <>
               <div className={`search-grid${isPlaceholderData ? ' search-grid--faded' : ''}`}>
-                {data.rows.map(row => (
-                  <SearchCard key={row.canonical_id} row={row} />
+                {rows.map(row => (
+                  <SearchCard key={row.id} row={row} />
                 ))}
               </div>
 
@@ -297,32 +280,35 @@ export default function SearchPage() {
   )
 }
 
-function SearchCard({ row }: { row: SearchRow }) {
+function SearchCard({ row }: { row: SaleListingSummary }) {
   const navigate = useNavigate()
-  const title = row.address || row.headline || row.canonical_id
-  const sub = [row.room_layout, row.area != null ? `${row.area.toFixed(1)} m²` : null]
+  const locationData = row.unit.location
+  const title = locationData.street_address || row.headline || row.id
+  const sub = [row.unit.room_layout, row.unit.area_m2 != null ? `${row.unit.area_m2.toFixed(1)} m²` : null]
     .filter(Boolean).join(' · ')
-  const location = [row.postal, row.city].filter(Boolean).join(' ')
+  const location = [locationData.postal, locationData.city].filter(Boolean).join(' ')
+  const image = row.media?.main_image?.variants?.card || row.media?.main_image?.url
 
   return (
     <div
       className="search-card"
-      onClick={() => navigate('/detail?' + new URLSearchParams({ id: row.canonical_id }))}
+      onClick={() => navigate('/detail?' + new URLSearchParams({ id: row.id }))}
       role="button"
       tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && navigate('/detail?' + new URLSearchParams({ id: row.canonical_id }))}
+      onKeyDown={e => e.key === 'Enter' && navigate('/detail?' + new URLSearchParams({ id: row.id }))}
     >
+      {image && <img className="search-card-image" src={image} alt="" loading="lazy" />}
       <div className="search-card-header">
         <div className="search-card-title">{title}</div>
         <div className="search-card-badges">
-          <span className={`search-badge search-badge--${row.source}`}>{row.source}</span>
-          {row.kind !== 'ad' && <span className="search-badge search-badge--kind">{row.kind}</span>}
+          <span className={`search-badge search-badge--${row.source.provider}`}>{row.source.provider}</span>
+          {row.source.kind !== 'ad' && <span className="search-badge search-badge--kind">{row.source.kind}</span>}
         </div>
       </div>
       {sub && <div className="search-card-sub">{sub}</div>}
       {location && <div className="search-card-location">{location}</div>}
-      {row.price != null && (
-        <div className="search-card-price">{fmtPrice(row.price)}</div>
+      {row.commercial.asking_price != null && (
+        <div className="search-card-price">{fmtPrice(row.commercial.asking_price)}</div>
       )}
     </div>
   )

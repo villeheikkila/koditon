@@ -1,3 +1,13 @@
+import {
+  authAppleWeb,
+  authEmailConfirm,
+  authEmailRequest,
+  authPasskeyAuthenticate,
+  authPasskeyAuthenticateOptions,
+  authPasskeyRegisterFinish,
+  authPasskeyRegisterOptions,
+} from '../api/koditon'
+
 const TOKEN_KEY = 'koditon_access_token'
 const DEVICE_ID_KEY = 'koditon_device_id'
 
@@ -23,77 +33,50 @@ export function getOrCreateDeviceId(): string {
 }
 
 export async function passkeySignIn(): Promise<void> {
-  // 1. Get challenge options from server
-  const optionsRes = await fetch('/auth/passkey/authenticate/options', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: '{}',
-  })
-  if (!optionsRes.ok) throw new Error('Failed to get passkey options')
-  const { challenge_id, options } = await optionsRes.json()
-
-  // 2. Run WebAuthn ceremony
+  const optionsRes = await authPasskeyAuthenticateOptions()
+  if (optionsRes.status !== 200) throw new Error('Failed to get passkey options')
+  const { challenge_id, options } = optionsRes.data
   const credential = await navigator.credentials.get({
-    publicKey: decodePasskeyOptions(options),
+    publicKey: decodePasskeyOptions(options as Record<string, unknown>),
   }) as PublicKeyCredential | null
   if (!credential) throw new Error('No credential returned')
-
-  // 3. Exchange credential for tokens
-  const tokenRes = await fetch('/auth/passkey/authenticate', {
-    method: 'POST',
+  const tokenRes = await authPasskeyAuthenticate({
+    challenge_id,
+    credential_json: JSON.stringify(encodeCredential(credential)),
+  }, {
     headers: {
-      'Content-Type': 'application/json',
       'X-Device-ID': getOrCreateDeviceId(),
     },
-    body: JSON.stringify({
-      challenge_id,
-      credential_json: JSON.stringify(encodeCredential(credential)),
-    }),
   })
-  if (!tokenRes.ok) {
-    const err = await tokenRes.json().catch(() => ({}))
-    throw new Error(err?.detail ?? 'Passkey authentication failed')
-  }
-  const tokens = await tokenRes.json()
-  setToken(tokens.access_token)
+  if (tokenRes.status !== 200) throw new Error('Passkey authentication failed')
+  setToken(tokenRes.data.access_token)
 }
 
 export async function passkeyRegisterBegin(): Promise<{ challenge_id: string; options: PublicKeyCredentialCreationOptions }> {
   const token = getToken()
-  const res = await fetch('/auth/passkey/register/options', {
-    method: 'POST',
+  const res = await authPasskeyRegisterOptions({
     headers: {
-      'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: '{}',
   })
-  if (!res.ok) throw new Error('Failed to get registration options')
-  const { challenge_id, options } = await res.json()
-  return { challenge_id, options: decodePasskeyCreationOptions(options) }
+  if (res.status !== 200) throw new Error('Failed to get registration options')
+  const { challenge_id, options } = res.data
+  return { challenge_id, options: decodePasskeyCreationOptions(options as Record<string, unknown>) }
 }
 
 export async function passkeyRegisterFinish(challengeId: string, credential: PublicKeyCredential): Promise<string> {
   const token = getToken()
-  const res = await fetch('/auth/passkey/register/finish', {
-    method: 'POST',
+  const res = await authPasskeyRegisterFinish({
+    challenge_id: challengeId,
+    credential_json: JSON.stringify(encodeCredential(credential)),
+  }, {
     headers: {
-      'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      challenge_id: challengeId,
-      credential_json: JSON.stringify(encodeCredential(credential)),
-    }),
   })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.detail ?? 'Passkey registration failed')
-  }
-  const data = await res.json()
-  return data.credential_id
+  if (res.status !== 200) throw new Error('Passkey registration failed')
+  return res.data.credential_id
 }
-
 
 // Apple JS SDK type declaration
 declare const AppleID: {
@@ -126,21 +109,27 @@ export async function appleSignIn(): Promise<void> {
 
   const response = await AppleID.auth.signIn()
   const code = response.authorization.code
-
-  const tokenRes = await fetch('/auth/apple', {
-    method: 'POST',
+  const tokenRes = await authAppleWeb({ code }, {
     headers: {
-      'Content-Type': 'application/json',
       'X-Device-ID': getOrCreateDeviceId(),
     },
-    body: JSON.stringify({ code }),
   })
-  if (!tokenRes.ok) {
-    const err = await tokenRes.json().catch(() => ({}))
-    throw new Error(err?.detail ?? 'Apple Sign In failed')
-  }
-  const tokens = await tokenRes.json()
-  setToken(tokens.access_token)
+  if (tokenRes.status !== 200) throw new Error('Apple Sign In failed')
+  setToken(tokenRes.data.access_token)
+}
+
+export async function requestEmailSignIn(email: string): Promise<void> {
+  await authEmailRequest({ email })
+}
+
+export async function confirmEmailSignIn(token: string): Promise<void> {
+  const tokenRes = await authEmailConfirm({ token }, {
+    headers: {
+      'X-Device-ID': getOrCreateDeviceId(),
+    },
+  })
+  if (tokenRes.status !== 200) throw new Error('Email sign in failed')
+  setToken(tokenRes.data.access_token)
 }
 
 export function isAppleSignInConfigured(): boolean {

@@ -37,14 +37,22 @@ export default function DashboardPage({ onSignOut }: { onSignOut: () => void }) 
   const { data: catRes } = useAvailabilityCategories()
   const { data: typeRes } = useAvailabilityTypes()
 
-  const municipalities: AvailableMunicipality[] =
-    locRes?.status === 200 ? (locRes.data.municipalities ?? []) : []
-  const allPostalCodes: AvailablePostalCode[] =
-    locRes?.status === 200 ? (locRes.data.postal_codes ?? []) : []
-  const categories: TranslatedValue[] =
-    catRes?.status === 200 ? (catRes.data.categories ?? []) : []
-  const types: TranslatedValue[] =
-    typeRes?.status === 200 ? (typeRes.data.types ?? []) : []
+  const municipalities: AvailableMunicipality[] = useMemo(
+    () => locRes?.status === 200 ? (locRes.data.municipalities ?? []) : [],
+    [locRes],
+  )
+  const allPostalCodes: AvailablePostalCode[] = useMemo(
+    () => locRes?.status === 200 ? (locRes.data.postal_codes ?? []) : [],
+    [locRes],
+  )
+  const categories: TranslatedValue[] = useMemo(
+    () => catRes?.status === 200 ? (catRes.data.categories ?? []) : [],
+    [catRes],
+  )
+  const types: TranslatedValue[] = useMemo(
+    () => typeRes?.status === 200 ? (typeRes.data.types ?? []) : [],
+    [typeRes],
+  )
 
   const postalCodesForMunicipality = useMemo(() =>
     selectedMunicipality
@@ -67,8 +75,10 @@ export default function DashboardPage({ onSignOut }: { onSignOut: () => void }) 
     query: { enabled: !!selectedMunicipality },
   })
 
-  const transactions: PricesTransaction[] =
-    txRes?.status === 200 ? (txRes.data.transactions ?? []) : []
+  const transactions: PricesTransaction[] = useMemo(
+    () => txRes?.status === 200 ? (txRes.data.transactions ?? []) : [],
+    [txRes],
+  )
 
   const stats = useMemo(() => ({
     count: transactions.length,
@@ -79,7 +89,11 @@ export default function DashboardPage({ onSignOut }: { onSignOut: () => void }) 
 
   function toggleSet<T>(set: Set<T>, value: T): Set<T> {
     const next = new Set(set)
-    next.has(value) ? next.delete(value) : next.add(value)
+    if (next.has(value)) {
+      next.delete(value)
+    } else {
+      next.add(value)
+    }
     return next
   }
 

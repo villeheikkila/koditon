@@ -1,35 +1,516 @@
 components:
+  examples:
+    OAuthClientRegistrationRequestDefault:
+      value:
+        client_name: ChatGPT MCP Client
+        logo_uri: https://chatgpt.com/favicon.ico
+        redirect_uris:
+          - https://chat.openai.com/aip/callback
+        scope: mcp:core:read
+        token_endpoint_auth_method: none
+    OAuthDeviceAuthorizationRequestDefault:
+      value:
+        client_id: koditon-cli
+        scope: mcp:core:read
+    OAuthRevokeRequestDefault:
+      value:
+        token: refresh-token-value
+        token_type_hint: refresh_token
+    OAuthTokenRequestAuthorizationCode:
+      value:
+        client_id: koditon-apple
+        code: auth-code-value
+        code_verifier: pkce-verifier
+        grant_type: authorization_code
+        redirect_uri: koditon://oauth/callback
+    OAuthTokenRequestDeviceCode:
+      value:
+        client_id: koditon-cli
+        device_code: device-code-value
+        grant_type: urn:ietf:params:oauth:grant-type:device_code
+    OAuthTokenRequestRefreshToken:
+      value:
+        client_id: koditon-apple
+        grant_type: refresh_token
+        refresh_token: refresh-token-value
+  requestBodies:
+    OAuthClientRegistrationRequest:
+      content:
+        application/json:
+          examples:
+            default:
+              $ref: "#/components/examples/OAuthClientRegistrationRequestDefault"
+          schema:
+            properties:
+              client_name:
+                type: string
+              logo_uri:
+                format: uri
+                type: string
+              redirect_uris:
+                items:
+                  type: string
+                type: array
+              scope:
+                type: string
+              token_endpoint_auth_method:
+                enum:
+                  - none
+                type: string
+            required:
+              - redirect_uris
+            type: object
+      required: true
+    OAuthDeviceAuthorizationRequest:
+      content:
+        application/x-www-form-urlencoded:
+          examples:
+            device_authorization_default:
+              $ref: "#/components/examples/OAuthDeviceAuthorizationRequestDefault"
+          schema:
+            properties:
+              client_id:
+                description: OAuth client ID.
+                type: string
+              client_secret:
+                description: OAuth client secret for confidential clients.
+                type: string
+              resource:
+                description: Protected resource identifier from discovery metadata.
+                type: string
+              scope:
+                description: Requested scopes separated by spaces.
+                type: string
+            required:
+              - client_id
+            type: object
+      required: true
+    OAuthHandoffDecisionRequest:
+      content:
+        application/json:
+          schema:
+            properties:
+              handoff_id:
+                description: Authorization handoff identifier.
+                format: uuid
+                type: string
+            required:
+              - handoff_id
+            type: object
+      required: true
+    OAuthHandoffResolveRequest:
+      content:
+        application/json:
+          schema:
+            properties:
+              handoff_token:
+                description: Authorization handoff token from the browser or app link.
+                type: string
+              user_code:
+                description: User-entered handoff code.
+                type: string
+            type: object
+      required: true
+    OAuthRevokeRequest:
+      content:
+        application/x-www-form-urlencoded:
+          examples:
+            default:
+              $ref: "#/components/examples/OAuthRevokeRequestDefault"
+          schema:
+            properties:
+              token:
+                description: The token to revoke.
+                type: string
+              token_type_hint:
+                description: "Optional hint: 'refresh_token' or 'access_token'."
+                type: string
+            required:
+              - token
+            type: object
+      required: true
+    OAuthTokenRequest:
+      content:
+        application/x-www-form-urlencoded:
+          examples:
+            authorization_code:
+              $ref: "#/components/examples/OAuthTokenRequestAuthorizationCode"
+            device_code:
+              $ref: "#/components/examples/OAuthTokenRequestDeviceCode"
+            refresh_token:
+              $ref: "#/components/examples/OAuthTokenRequestRefreshToken"
+          schema:
+            properties:
+              client_id:
+                description: OAuth client ID.
+                type: string
+              client_secret:
+                description: OAuth client secret for confidential clients.
+                type: string
+              code:
+                description: Authorization code.
+                type: string
+              code_verifier:
+                description: PKCE verifier.
+                type: string
+              device_code:
+                description: Device code.
+                type: string
+              grant_type:
+                enum:
+                  - authorization_code
+                  - refresh_token
+                  - urn:ietf:params:oauth:grant-type:device_code
+                type: string
+              redirect_uri:
+                description: Redirect URI matching authorization request.
+                type: string
+              refresh_token:
+                description: Refresh token.
+                type: string
+              resource:
+                description: Protected resource identifier from discovery metadata.
+                type: string
+              scope:
+                description: Requested scopes separated by spaces.
+                type: string
+            required:
+              - grant_type
+            type: object
+      required: true
+  responses:
+    OAuthAuthorizationServerMetadata:
+      content:
+        application/json:
+          schema:
+            properties:
+              authorization_endpoint:
+                description: Authorization endpoint URL.
+                type: string
+              code_challenge_methods_supported:
+                items:
+                  type: string
+                type: array
+              device_authorization_endpoint:
+                description: Device authorization endpoint URL.
+                type: string
+              grant_types_supported:
+                items:
+                  type: string
+                type: array
+              issuer:
+                description: Authorization server issuer.
+                type: string
+              jwks_uri:
+                description: JWKS endpoint URL.
+                type: string
+              registration_endpoint:
+                description: Dynamic client registration endpoint URL.
+                type: string
+              response_types_supported:
+                items:
+                  type: string
+                type: array
+              revocation_endpoint:
+                description: Token revocation endpoint URL (RFC 7009).
+                type: string
+              scopes_supported:
+                items:
+                  type: string
+                type: array
+              token_endpoint:
+                description: Token endpoint URL.
+                type: string
+              token_endpoint_auth_methods_supported:
+                items:
+                  type: string
+                type: array
+            required:
+              - issuer
+              - authorization_endpoint
+              - token_endpoint
+              - device_authorization_endpoint
+              - jwks_uri
+              - scopes_supported
+              - response_types_supported
+              - grant_types_supported
+              - token_endpoint_auth_methods_supported
+              - code_challenge_methods_supported
+            type: object
+      description: OAuth authorization server metadata.
+    OAuthClientRegistrationSuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              client_id:
+                type: string
+              client_id_issued_at:
+                format: int64
+                type: integer
+              client_name:
+                type: string
+              grant_types:
+                items:
+                  type: string
+                type: array
+              logo_uri:
+                format: uri
+                type: string
+              redirect_uris:
+                items:
+                  type: string
+                type: array
+              response_types:
+                items:
+                  type: string
+                type: array
+              scope:
+                type: string
+              token_endpoint_auth_method:
+                type: string
+            required:
+              - client_id
+              - client_id_issued_at
+              - redirect_uris
+              - token_endpoint_auth_method
+              - grant_types
+              - response_types
+              - scope
+            type: object
+      description: OAuth dynamic client registration response.
+    OAuthDeviceAuthorizationSuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              device_code:
+                description: Device code for token polling.
+                type: string
+              expires_in:
+                description: Expiration in seconds.
+                format: int64
+                type: integer
+              interval:
+                description: Recommended polling interval in seconds.
+                format: int64
+                type: integer
+              user_code:
+                description: User-entered verification code.
+                type: string
+              verification_uri:
+                description: Verification URL for user interaction.
+                type: string
+              verification_uri_complete:
+                description: Verification URL with user code prefilled.
+                type: string
+            required:
+              - device_code
+              - user_code
+              - verification_uri
+              - verification_uri_complete
+              - expires_in
+              - interval
+            type: object
+      description: OAuth device authorization response.
+    OAuthError:
+      content:
+        application/json:
+          schema:
+            properties:
+              error:
+                description: OAuth error code.
+                type: string
+              error_code:
+                description: Optional app-specific error code.
+                type: string
+              error_description:
+                description: Human-readable OAuth error description.
+                type: string
+            required:
+              - error
+              - error_description
+            type: object
+      description: OAuth error response.
+    OAuthHandoffApproveSuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              ok:
+                type: boolean
+              redirect_url:
+                description: OAuth redirect URL with the generated authorization code.
+                type: string
+            required:
+              - ok
+              - redirect_url
+            type: object
+      description: OAuth authorization handoff approval response.
+    OAuthHandoffDenySuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              ok:
+                type: boolean
+            required:
+              - ok
+            type: object
+      description: OAuth authorization handoff denial response.
+    OAuthHandoffResolveSuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              client_display_name:
+                description: Display name for the OAuth client.
+                type: string
+              client_id:
+                description: OAuth client ID.
+                type: string
+              expires_at_unix:
+                format: int64
+                type: integer
+              handoff_id:
+                format: uuid
+                type: string
+              redirect_host:
+                description: Redirect URI host.
+                type: string
+              scopes:
+                items:
+                  type: string
+                type: array
+            required:
+              - handoff_id
+              - client_id
+              - client_display_name
+              - redirect_host
+              - scopes
+              - expires_at_unix
+            type: object
+      description: OAuth authorization handoff response.
+    OAuthJWKS:
+      content:
+        application/json:
+          schema:
+            properties:
+              keys:
+                items:
+                  additionalProperties: true
+                  type: object
+                type: array
+            required:
+              - keys
+            type: object
+      description: OAuth JWKS response.
+    OAuthProtectedResourceMetadata:
+      content:
+        application/json:
+          schema:
+            properties:
+              authorization_servers:
+                items:
+                  type: string
+                type: array
+              bearer_methods_supported:
+                items:
+                  type: string
+                type: array
+              resource:
+                description: Protected resource identifier.
+                type: string
+              resource_name:
+                description: Display name for the protected resource.
+                type: string
+              scopes_supported:
+                items:
+                  type: string
+                type: array
+            required:
+              - resource
+              - authorization_servers
+              - scopes_supported
+              - bearer_methods_supported
+              - resource_name
+            type: object
+      description: OAuth protected resource metadata.
+    OAuthTokenSuccess:
+      content:
+        application/json:
+          schema:
+            properties:
+              access_token:
+                description: Bearer access token.
+                type: string
+              expires_in:
+                description: Access token expiration in seconds.
+                format: int64
+                type: integer
+              refresh_token:
+                description: Refresh token.
+                type: string
+              refresh_token_expires_in:
+                description: Refresh token expiration in seconds.
+                format: int64
+                type: integer
+              scope:
+                description: Granted scopes separated by spaces.
+                type: string
+              session_id:
+                description: Associated device session identifier when available.
+                format: uuid
+                type: string
+              token_type:
+                description: Token type.
+                type: string
+            required:
+              - token_type
+              - access_token
+              - expires_in
+              - refresh_token
+              - refresh_token_expires_in
+              - scope
+            type: object
+      description: OAuth token response.
   schemas:
-    AuthTokensResponse:
+    AppleWebAuthInputBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/AuthTokensResponse.json
+            - https://example.com/schemas/AppleWebAuthInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        code:
+          type: string
+      required:
+        - code
+      type: object
+    AppleWebAuthOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AppleWebAuthOutputBody.json
           format: uri
           readOnly: true
           type: string
         access_token:
-          description: JWT access token for API authentication
           type: string
         access_token_expires_at:
-          description: Unix timestamp when access token expires
           format: int64
           type: integer
-        is_new_user:
-          description: Whether this is a newly created user
-          type: boolean
         refresh_token:
-          description: JWT refresh token for obtaining new access tokens
           type: string
         refresh_token_expires_at:
-          description: Unix timestamp when refresh token expires
           format: int64
           type: integer
         user_id:
-          description: User ID
-          format: uuid
           type: string
       required:
         - access_token
@@ -37,7 +518,6 @@ components:
         - refresh_token
         - refresh_token_expires_at
         - user_id
-        - is_new_user
       type: object
     AvailableCategoriesOutputBody:
       additionalProperties: false
@@ -157,25 +637,501 @@ components:
       required:
         - types
       type: object
-    CurrentUserOutputBody:
+    Building:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/CurrentUserOutputBody.json
+            - https://example.com/schemas/Building.json
           format: uri
           readOnly: true
           type: string
-        feature_flags:
-          description: List of enabled feature flags for the user
+        details:
+          $ref: "#/components/schemas/BuildingDetails"
+        id:
+          type: string
+        insights:
+          $ref: "#/components/schemas/BuildingInsights"
+        metadata:
+          additionalProperties: {}
+          type: object
+        related:
+          $ref: "#/components/schemas/RelatedListings"
+        site:
+          $ref: "#/components/schemas/SiteDetails"
+        source_records:
           items:
-            type: string
+            $ref: "#/components/schemas/ListingSource"
           type:
             - array
             - "null"
+        texts:
+          $ref: "#/components/schemas/TextSections"
       required:
-        - feature_flags
+        - id
+        - details
+        - source_records
+      type: object
+    BuildingDetails:
+      additionalProperties: false
+      properties:
+        apartment_count:
+          format: int32
+          type: integer
+        build_year:
+          format: int32
+          type: integer
+        building_material:
+          type: string
+        building_subtype:
+          type: string
+        building_type:
+          type: string
+        business_id:
+          type: string
+        business_premise_count:
+          format: int32
+          type: integer
+        car_storage:
+          type: string
+        common_areas:
+          type: string
+        connectivity:
+          type: string
+        construction_year:
+          format: int32
+          type: integer
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor_count:
+          format: int32
+          type: integer
+        frame_construction_method:
+          type: string
+        heating:
+          type: string
+        heating_description:
+          type: string
+        heating_fuel:
+          type: string
+        housing_company:
+          type: string
+        identity:
+          $ref: "#/components/schemas/BuildingIdentity"
+        location:
+          $ref: "#/components/schemas/Location"
+        maintenance_responsibility:
+          type: string
+        management_method:
+          type: string
+        other_info:
+          type: string
+        property_manager:
+          type: string
+        renovations:
+          items:
+            $ref: "#/components/schemas/BuildingRenovation"
+          type:
+            - array
+            - "null"
+        roof_material:
+          type: string
+        roof_type:
+          type: string
+        sauna:
+          type: boolean
+        wall_structure:
+          type: string
+      required:
+        - identity
+        - location
+      type: object
+    BuildingIdentity:
+      additionalProperties: false
+      properties:
+        confidence:
+          format: double
+          type: number
+        inputs:
+          additionalProperties:
+            type: string
+          type: object
+        key:
+          type: string
+        sources:
+          items:
+            $ref: "#/components/schemas/BuildingSourceID"
+          type:
+            - array
+            - "null"
+        strategy:
+          type: string
+      required:
+        - key
+        - strategy
+        - confidence
+      type: object
+    BuildingInsights:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/Insight"
+          type:
+            - array
+            - "null"
+      type: object
+    BuildingRenovation:
+      additionalProperties: false
+      properties:
+        done:
+          type: boolean
+        kind:
+          type: string
+        year:
+          format: int32
+          type: integer
+      required:
+        - kind
+      type: object
+    BuildingSourceID:
+      additionalProperties: false
+      properties:
+        external_id:
+          type: string
+        kind:
+          type: string
+        native_id:
+          type: string
+        provider:
+          type: string
+      required:
+        - provider
+        - kind
+        - native_id
+      type: object
+    Charges:
+      additionalProperties: false
+      properties:
+        electricity:
+          type: string
+        heating:
+          type: string
+        maintenance_monthly:
+          format: double
+          type: number
+        notes:
+          type: string
+        parking:
+          format: double
+          type: number
+        sauna:
+          format: double
+          type: number
+        total_monthly:
+          format: double
+          type: number
+        water:
+          format: double
+          type: number
+      type: object
+    CommercialDetails:
+      additionalProperties: false
+      properties:
+        asking_price:
+          format: int64
+          type: integer
+        available_from:
+          type: string
+        booking_status:
+          type: string
+        can_receive_leads:
+          type: boolean
+        charges:
+          $ref: "#/components/schemas/Charges"
+        days_on_market:
+          format: int32
+          type: integer
+        debt_free_price:
+          format: int64
+          type: integer
+        debt_share_additional_info:
+          type: string
+        debt_share_amount:
+          format: int64
+          type: integer
+        development_phase:
+          type: string
+        fees_info:
+          type: string
+        financing_fee_interest_only_end_date:
+          type: string
+        financing_fee_interest_only_period:
+          type: string
+        financing_fee_interest_only_start_date:
+          type: string
+        first_seen_at:
+          format: date-time
+          type: string
+        fixed_term:
+          type: boolean
+        furnished:
+          type: boolean
+        is_company_announcement:
+          type: boolean
+        last_seen_at:
+          format: date-time
+          type: string
+        lead_options:
+          additionalProperties:
+            type: boolean
+          type: object
+        main_image_hidden:
+          type: boolean
+        map_visible:
+          type: boolean
+        minimum_term_months:
+          format: int32
+          type: integer
+        new_development:
+          type: boolean
+        notify_price_changed:
+          type: boolean
+        open_bidding_in_use:
+          type: boolean
+        open_bidding_latest_offer:
+          format: int64
+          type: integer
+        open_bidding_starting_debt_free_price:
+          format: int64
+          type: integer
+        open_bidding_starting_selling_price:
+          format: int64
+          type: integer
+        open_bidding_target_url:
+          type: string
+        other_terms:
+          type: string
+        ownership_type:
+          type: string
+        pets_allowed:
+          type: boolean
+        previous_asking_price:
+          format: int64
+          type: integer
+        previous_debt_free_price:
+          format: int64
+          type: integer
+        price_per_m2:
+          format: double
+          type: number
+        published_at:
+          format: date-time
+          type: string
+        rent:
+          format: int64
+          type: integer
+        rent_period:
+          type: string
+        security_deposit:
+          type: string
+        show_bidding_indicators:
+          type: boolean
+        status:
+          type: string
+        unpublished_at:
+          format: date-time
+          type: string
+      type: object
+    Contact:
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        office_name:
+          type: string
+        phone:
+          type: string
+        title:
+          type: string
+      type: object
+    DetailFieldOutput:
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+      required:
+        - label
+        - value
+      type: object
+    EmailAuthConfirmInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/EmailAuthConfirmInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        token:
+          type: string
+      required:
+        - token
+      type: object
+    EmailAuthRequestInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/EmailAuthRequestInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          format: email
+          type: string
+      required:
+        - email
+      type: object
+    EmailAuthRequestOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/EmailAuthRequestOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        ok:
+          type: boolean
+      required:
+        - ok
+      type: object
+    EntityDetailOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/EntityDetailOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        additional_info_text:
+          type: string
+        area_m2:
+          format: double
+          type: number
+        asking_price:
+          format: int64
+          type: integer
+        availability_text:
+          type: string
+        build_year:
+          format: int32
+          type: integer
+        canonical_extra:
+          items:
+            $ref: "#/components/schemas/DetailFieldOutput"
+          type:
+            - array
+            - "null"
+        canonical_id:
+          type: string
+        charges_text:
+          type: string
+        city:
+          type: string
+        condition:
+          type: string
+        debt_free_price:
+          format: int64
+          type: integer
+        debt_share_amount:
+          format: int64
+          type: integer
+        description_text:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor_level:
+          format: int32
+          type: integer
+        headline:
+          type: string
+        kind:
+          type: string
+        last_seen_at:
+          format: date-time
+          type: string
+        maintenance_charge_monthly:
+          format: double
+          type: number
+        native_id:
+          type: string
+        plot_type:
+          type: string
+        postal:
+          type: string
+        price_per_m2:
+          format: double
+          type: number
+        related:
+          items:
+            $ref: "#/components/schemas/DetailFieldOutput"
+          type:
+            - array
+            - "null"
+        renovations_done_text:
+          type: string
+        renovations_planned_text:
+          type: string
+        room_layout:
+          type: string
+        rooms_count:
+          format: int32
+          type: integer
+        sauna:
+          type: boolean
+        source:
+          type: string
+        source_specific:
+          items:
+            $ref: "#/components/schemas/DetailFieldOutput"
+          type:
+            - array
+            - "null"
+        street_address:
+          type: string
+        total_charge_monthly:
+          format: double
+          type: number
+        total_floors:
+          format: int32
+          type: integer
+        url:
+          type: string
+        water_charge:
+          format: double
+          type: number
+      required:
+        - canonical_id
+        - source
+        - kind
+        - native_id
+        - headline
       type: object
     ErrorDetail:
       additionalProperties: false
@@ -236,20 +1192,323 @@ components:
           format: uri
           type: string
       type: object
-    HealthResponse:
+    Image:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        id:
+          type: string
+        ordinal:
+          format: int32
+          type: integer
+        provider:
+          type: string
+        provider_id:
+          type: string
+        role:
+          type: string
+        tags:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        url:
+          type: string
+        variants:
+          additionalProperties:
+            type: string
+          type: object
+      required:
+        - url
+      type: object
+    Insight:
+      additionalProperties: false
+      properties:
+        confidence:
+          format: double
+          type: number
+        key:
+          type: string
+        source:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+      type: object
+    Link:
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+        url:
+          type: string
+      required:
+        - url
+      type: object
+    ListingInsights:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/Insight"
+          type:
+            - array
+            - "null"
+      type: object
+    ListingSource:
+      additionalProperties: false
+      properties:
+        canonical_id:
+          type: string
+        external_id:
+          type: string
+        first_seen_at:
+          format: date-time
+          type: string
+        flags:
+          additionalProperties:
+            type: boolean
+          type: object
+        friendly_id:
+          type: string
+        kind:
+          type: string
+        last_seen_at:
+          format: date-time
+          type: string
+        metadata:
+          additionalProperties: {}
+          type: object
+        native_id:
+          type: string
+        original_url:
+          type: string
+        provider:
+          type: string
+        published_at:
+          format: date-time
+          type: string
+        status:
+          type: string
+        url:
+          type: string
+      required:
+        - provider
+        - kind
+        - canonical_id
+        - native_id
+      type: object
+    Location:
+      additionalProperties: false
+      properties:
+        city:
+          type: string
+        district:
+          type: string
+        latitude:
+          format: double
+          type: number
+        longitude:
+          format: double
+          type: number
+        postal:
+          type: string
+        street_address:
+          type: string
+      type: object
+    Media:
+      additionalProperties: false
+      properties:
+        images:
+          items:
+            $ref: "#/components/schemas/Image"
+          type:
+            - array
+            - "null"
+        main_image:
+          $ref: "#/components/schemas/Image"
+      type: object
+    PageRentalSummary:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/HealthResponse.json
+            - https://example.com/schemas/PageRentalSummary.json
           format: uri
           readOnly: true
           type: string
-        status:
+        page:
+          format: int32
+          type: integer
+        page_size:
+          format: int32
+          type: integer
+        rows:
+          items:
+            $ref: "#/components/schemas/RentalSummary"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - rows
+        - total
+        - page
+        - page_size
+      type: object
+    PageSaleListingSummary:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PageSaleListingSummary.json
+          format: uri
+          readOnly: true
+          type: string
+        page:
+          format: int32
+          type: integer
+        page_size:
+          format: int32
+          type: integer
+        rows:
+          items:
+            $ref: "#/components/schemas/SaleListingSummary"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - rows
+        - total
+        - page
+        - page_size
+      type: object
+    PasskeyAuthInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyAuthInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        challenge_id:
+          type: string
+        credential_json:
           type: string
       required:
-        - status
+        - challenge_id
+        - credential_json
+      type: object
+    PasskeyAuthOptionsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyAuthOptionsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        challenge_id:
+          type: string
+        options: {}
+      required:
+        - challenge_id
+        - options
+      type: object
+    PasskeyAuthOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyAuthOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        access_token:
+          type: string
+        access_token_expires_at:
+          format: int64
+          type: integer
+        refresh_token:
+          type: string
+        refresh_token_expires_at:
+          format: int64
+          type: integer
+        user_id:
+          type: string
+      required:
+        - access_token
+        - access_token_expires_at
+        - refresh_token
+        - refresh_token_expires_at
+        - user_id
+      type: object
+    PasskeyRegisterFinishInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyRegisterFinishInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        challenge_id:
+          type: string
+        credential_json:
+          type: string
+      required:
+        - challenge_id
+        - credential_json
+      type: object
+    PasskeyRegisterFinishOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyRegisterFinishOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        credential_id:
+          type: string
+      required:
+        - credential_id
+      type: object
+    PasskeyRegisterOptionsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PasskeyRegisterOptionsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        challenge_id:
+          type: string
+        options: {}
+      required:
+        - challenge_id
+        - options
       type: object
     PingRequest:
       additionalProperties: false
@@ -433,101 +1692,382 @@ components:
       required:
         - transactions
       type: object
-    RefreshTokensInputBody:
+    RelatedListing:
       additionalProperties: false
       properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/RefreshTokensInputBody.json
-          format: uri
-          readOnly: true
+        address:
           type: string
-        refresh_token:
-          description: Refresh token obtained from sign-in
+        area_m2:
+          format: double
+          type: number
+        friendly_id:
           type: string
-      required:
-        - refresh_token
-      type: object
-    RefreshTokensOutputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/RefreshTokensOutputBody.json
-          format: uri
-          readOnly: true
+        id:
           type: string
-        access_token:
-          description: New JWT access token
+        kind:
           type: string
-        access_token_expires_at:
-          description: Unix timestamp when access token expires
+        main_image:
+          $ref: "#/components/schemas/Image"
+        price:
           format: int64
           type: integer
-        refresh_token:
-          description: New JWT refresh token
-          type: string
-        refresh_token_expires_at:
-          description: Unix timestamp when refresh token expires
-          format: int64
-          type: integer
-        user_id:
-          description: User ID
-          format: uuid
-          type: string
-      required:
-        - access_token
-        - access_token_expires_at
-        - refresh_token
-        - refresh_token_expires_at
-        - user_id
-      type: object
-    SignInAnonymousInputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/SignInAnonymousInputBody.json
-          format: uri
-          readOnly: true
-          type: string
-      type: object
-    SignInWithAppleInputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/SignInWithAppleInputBody.json
-          format: uri
-          readOnly: true
-          type: string
-        authorization_code:
-          description: Authorization code from Apple Sign In
-          type: string
-        nonce:
-          description: Nonce used in the Apple Sign In request
-          type: string
-      required:
-        - authorization_code
-      type: object
-    SignOutOutputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/SignOutOutputBody.json
-          format: uri
-          readOnly: true
-          type: string
-        success:
+        published:
           type: boolean
+        rent_period:
+          type: string
+        room_layout:
+          type: string
       required:
-        - success
+        - id
+      type: object
+    RelatedListings:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/RelatedListing"
+          type:
+            - array
+            - "null"
+      type: object
+    Rental:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Rental.json
+          format: uri
+          readOnly: true
+          type: string
+        building:
+          $ref: "#/components/schemas/BuildingDetails"
+        commercial:
+          $ref: "#/components/schemas/CommercialDetails"
+        contacts:
+          items:
+            $ref: "#/components/schemas/Contact"
+          type:
+            - array
+            - "null"
+        headline:
+          type: string
+        id:
+          type: string
+        insights:
+          $ref: "#/components/schemas/ListingInsights"
+        links:
+          items:
+            $ref: "#/components/schemas/Link"
+          type:
+            - array
+            - "null"
+        media:
+          $ref: "#/components/schemas/Media"
+        showings:
+          items:
+            $ref: "#/components/schemas/Showing"
+          type:
+            - array
+            - "null"
+        site:
+          $ref: "#/components/schemas/SiteDetails"
+        source:
+          $ref: "#/components/schemas/ListingSource"
+        texts:
+          $ref: "#/components/schemas/TextSections"
+        unit:
+          $ref: "#/components/schemas/UnitDetails"
+      required:
+        - id
+        - source
+        - headline
+        - unit
+        - building
+        - commercial
+      type: object
+    RentalSummary:
+      additionalProperties: false
+      properties:
+        building:
+          $ref: "#/components/schemas/BuildingDetails"
+        commercial:
+          $ref: "#/components/schemas/CommercialDetails"
+        headline:
+          type: string
+        id:
+          type: string
+        media:
+          $ref: "#/components/schemas/Media"
+        site:
+          $ref: "#/components/schemas/SiteDetails"
+        source:
+          $ref: "#/components/schemas/ListingSource"
+        unit:
+          $ref: "#/components/schemas/UnitDetails"
+      required:
+        - id
+        - source
+        - headline
+        - unit
+        - building
+        - commercial
+      type: object
+    ResolveCanonicalIDOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ResolveCanonicalIDOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        canonical_id:
+          type: string
+        kind:
+          type: string
+        native_id:
+          type: string
+        source:
+          type: string
+      required:
+        - canonical_id
+        - source
+        - kind
+        - native_id
+      type: object
+    SaleListing:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SaleListing.json
+          format: uri
+          readOnly: true
+          type: string
+        building:
+          $ref: "#/components/schemas/BuildingDetails"
+        commercial:
+          $ref: "#/components/schemas/CommercialDetails"
+        contacts:
+          items:
+            $ref: "#/components/schemas/Contact"
+          type:
+            - array
+            - "null"
+        headline:
+          type: string
+        id:
+          type: string
+        insights:
+          $ref: "#/components/schemas/ListingInsights"
+        links:
+          items:
+            $ref: "#/components/schemas/Link"
+          type:
+            - array
+            - "null"
+        media:
+          $ref: "#/components/schemas/Media"
+        showings:
+          items:
+            $ref: "#/components/schemas/Showing"
+          type:
+            - array
+            - "null"
+        site:
+          $ref: "#/components/schemas/SiteDetails"
+        source:
+          $ref: "#/components/schemas/ListingSource"
+        texts:
+          $ref: "#/components/schemas/TextSections"
+        unit:
+          $ref: "#/components/schemas/UnitDetails"
+      required:
+        - id
+        - source
+        - headline
+        - unit
+        - building
+        - commercial
+      type: object
+    SaleListingSummary:
+      additionalProperties: false
+      properties:
+        building:
+          $ref: "#/components/schemas/BuildingDetails"
+        commercial:
+          $ref: "#/components/schemas/CommercialDetails"
+        headline:
+          type: string
+        id:
+          type: string
+        media:
+          $ref: "#/components/schemas/Media"
+        site:
+          $ref: "#/components/schemas/SiteDetails"
+        source:
+          $ref: "#/components/schemas/ListingSource"
+        unit:
+          $ref: "#/components/schemas/UnitDetails"
+      required:
+        - id
+        - source
+        - headline
+        - unit
+        - building
+        - commercial
+      type: object
+    SearchOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SearchOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        page:
+          format: int32
+          type: integer
+        page_size:
+          format: int32
+          type: integer
+        rows:
+          items:
+            $ref: "#/components/schemas/SearchResultRow"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - rows
+        - total
+        - page
+        - page_size
+      type: object
+    SearchResultRow:
+      additionalProperties: false
+      properties:
+        address:
+          type: string
+        area:
+          format: double
+          type: number
+        canonical_id:
+          type: string
+        city:
+          type: string
+        headline:
+          type: string
+        kind:
+          type: string
+        last_seen_at:
+          format: date-time
+          type: string
+        postal:
+          type: string
+        price:
+          format: int64
+          type: integer
+        room_layout:
+          type: string
+        source:
+          type: string
+        url:
+          type: string
+      required:
+        - canonical_id
+        - source
+        - kind
+      type: object
+    Showing:
+      additionalProperties: false
+      properties:
+        end_at:
+          format: date-time
+          type: string
+        info:
+          type: string
+        start_at:
+          format: date-time
+          type: string
+      type: object
+    SiteDetails:
+      additionalProperties: false
+      properties:
+        driving_directions:
+          type: string
+        lot_redemption_info:
+          type: string
+        lot_rental_agreement:
+          type: string
+        plot_area_m2:
+          format: double
+          type: number
+        plot_ownership_type:
+          type: string
+        plot_type:
+          type: string
+        road_access:
+          type: string
+        services:
+          type: string
+        sewer:
+          type: string
+        shore:
+          type: string
+        transport:
+          type: string
+        water_supply:
+          type: string
+        water_supply_types:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        yard:
+          type: string
+        zoning:
+          type: string
+      type: object
+    TextSections:
+      additionalProperties: false
+      properties:
+        additional_info:
+          type: string
+        amenities:
+          type: string
+        area:
+          type: string
+        availability:
+          type: string
+        bathroom:
+          type: string
+        building:
+          type: string
+        charges:
+          type: string
+        description:
+          type: string
+        kitchen:
+          type: string
+        materials:
+          type: string
+        renovations_done:
+          type: string
+        renovations_planned:
+          type: string
+        storage:
+          type: string
+        transport:
+          type: string
       type: object
     TranslatedValue:
       additionalProperties: false
@@ -540,194 +2080,175 @@ components:
         - value
         - translation
       type: object
-    PasskeyAuthOptionsOutput:
+    UnitDetails:
       additionalProperties: false
       properties:
-        challenge_id:
+        appliances:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        area_m2:
+          format: double
+          type: number
+        availability:
           type: string
-        options:
-          type: object
-      required:
-        - challenge_id
-        - options
-      type: object
-    PasskeyAuthInput:
-      additionalProperties: false
-      properties:
-        challenge_id:
+        balcony:
+          type: boolean
+        balcony_description:
           type: string
-        credential_json:
+        bathroom_description:
           type: string
-      required:
-        - challenge_id
-        - credential_json
-      type: object
-    PasskeyAuthOutput:
-      additionalProperties: false
-      properties:
-        access_token:
-          type: string
-        access_token_expires_at:
-          format: int64
+        bedrooms_count:
+          format: int32
           type: integer
-        refresh_token:
+        condition:
           type: string
-        refresh_token_expires_at:
-          format: int64
+        features:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        floor_level:
+          format: int32
           type: integer
-        user_id:
+        floor_materials_description:
+          type: string
+        kitchen_description:
+          type: string
+        living_area_m2:
+          format: double
+          type: number
+        location:
+          $ref: "#/components/schemas/Location"
+        other_area_m2:
+          format: double
+          type: number
+        parking:
+          type: string
+        property_subtype:
+          type: string
+        property_type:
+          type: string
+        room_layout:
+          type: string
+        rooms_count:
+          format: int32
+          type: integer
+        sauna:
+          type: boolean
+        sauna_description:
+          type: string
+        storage_description:
+          type: string
+        total_area_m2:
+          format: double
+          type: number
+        views_description:
+          type: string
+        wall_materials_description:
           type: string
       required:
-        - access_token
-        - access_token_expires_at
-        - refresh_token
-        - refresh_token_expires_at
-        - user_id
-      type: object
-    PasskeyRegisterFinishInput:
-      additionalProperties: false
-      properties:
-        challenge_id:
-          type: string
-        credential_json:
-          type: string
-      required:
-        - challenge_id
-        - credential_json
-      type: object
-    PasskeyRegisterFinishOutput:
-      additionalProperties: false
-      properties:
-        credential_id:
-          type: string
-      required:
-        - credential_id
+        - location
       type: object
   securitySchemes:
     bearer:
-      bearerFormat: JWT
-      description: JWT access token obtained from sign-in
-      scheme: bearer
-      type: http
+      description: OAuth 2.0 access token
+      flows:
+        authorizationCode:
+          authorizationUrl: http://localhost:8090/oauth/authorize
+          scopes:
+            core:read: core:read
+            mcp:core:read: mcp:core:read
+            profile:read: profile:read
+            profile:write: profile:write
+          tokenUrl: http://localhost:8090/oauth/token
+      type: oauth2
 info:
   title: Koditon API
   version: 0.1.0
 openapi: 3.1.0
 paths:
-  /auth/passkey/authenticate/options:
-    post:
-      description: Returns a WebAuthn challenge and credential request options for passkey sign-in
-      operationId: auth-passkey-authenticate-options
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-        required: true
+  /.well-known/oauth-authorization-server:
+    get:
+      operationId: oauth-authorization-server-metadata-get
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PasskeyAuthOptionsOutput"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Begin passkey authentication
+          $ref: "#/components/responses/OAuthAuthorizationServerMetadata"
+      summary: Get OAuth authorization server metadata
       tags:
-        - Authentication
-  /auth/passkey/authenticate:
-    post:
-      description: Verify the passkey credential and return access tokens
-      operationId: auth-passkey-authenticate
-      parameters:
-        - in: header
-          name: X-Device-ID
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PasskeyAuthInput"
-        required: true
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: false
+        retry:
+          backoff:
+            base_delay_ms: 120
+            jitter: full
+            strategy: exponential
+          max_attempts: 2
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 502
+              - 503
+              - 504
+            transport_errors: true
+  /.well-known/oauth-protected-resource:
+    get:
+      operationId: oauth-protected-resource-metadata-root-get
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PasskeyAuthOutput"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Complete passkey authentication
+          $ref: "#/components/responses/OAuthProtectedResourceMetadata"
+      summary: Get OAuth protected resource metadata (root)
       tags:
-        - Authentication
-  /auth/passkey/register/options:
-    post:
-      description: Returns a WebAuthn challenge and credential creation options to register a new passkey
-      operationId: auth-passkey-register-options
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-        required: true
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: false
+        retry:
+          backoff:
+            base_delay_ms: 120
+            jitter: full
+            strategy: exponential
+          max_attempts: 2
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 502
+              - 503
+              - 504
+            transport_errors: true
+  /.well-known/oauth-protected-resource/mcp:
+    get:
+      operationId: oauth-protected-resource-metadata-get
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PasskeyAuthOptionsOutput"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      security:
-        - bearer: []
-      summary: Begin passkey registration
+          $ref: "#/components/responses/OAuthProtectedResourceMetadata"
+      summary: Get OAuth protected resource metadata
       tags:
-        - Authentication
-  /auth/passkey/register/finish:
-    post:
-      description: Save the new passkey credential for the authenticated user
-      operationId: auth-passkey-register-finish
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PasskeyRegisterFinishInput"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PasskeyRegisterFinishOutput"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      security:
-        - bearer: []
-      summary: Complete passkey registration
-      tags:
-        - Authentication
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: false
+        retry:
+          backoff:
+            base_delay_ms: 120
+            jitter: full
+            strategy: exponential
+          max_attempts: 2
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 502
+              - 503
+              - 504
+            transport_errors: true
   /api/v1/availability/categories:
     get:
       description: Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)
@@ -746,8 +2267,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List available building categories
+      x-koditon-scopes:
+        - core:read
   /api/v1/availability/locations:
     get:
       description: Returns only locations that have price transaction data available
@@ -766,8 +2290,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List municipalities and postal codes with price data
+      x-koditon-scopes:
+        - core:read
   /api/v1/availability/plots:
     get:
       description: Returns distinct plot ownership types (e.g., Oma, Vuokra)
@@ -786,8 +2313,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List available plot ownership types
+      x-koditon-scopes:
+        - core:read
   /api/v1/availability/types:
     get:
       description: Returns distinct apartment types (e.g., Yksiö, Kaksio, Kolmio)
@@ -806,8 +2336,68 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List available apartment types
+      x-koditon-scopes:
+        - core:read
+  /api/v1/buildings/{canonical_id}:
+    get:
+      description: Fetch building details by canonical ID
+      operationId: buildings-detail
+      parameters:
+        - description: Canonical ID
+          in: path
+          name: canonical_id
+          required: true
+          schema:
+            description: Canonical ID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Building"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get building detail
+      tags:
+        - Buildings
+  /api/v1/entity:
+    get:
+      description: Fetch canonical detail for an ad or building by canonical ID or source URL
+      operationId: entity-detail
+      parameters:
+        - description: Canonical ID or source URL
+          explode: false
+          in: query
+          name: id
+          required: true
+          schema:
+            description: Canonical ID or source URL
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityDetailOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get entity detail
+      tags:
+        - Entity
   /api/v1/ping:
     post:
       operationId: ping
@@ -831,8 +2421,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: Echo a message
+      x-koditon-scopes:
+        - core:read
   /api/v1/postal/cities:
     get:
       operationId: postal-cities
@@ -850,8 +2443,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List postal municipalities with postal codes
+      x-koditon-scopes:
+        - core:read
   /api/v1/prices/transactions:
     get:
       operationId: prices-transactions
@@ -882,8 +2478,11 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List price transactions by municipality and postal code
+      x-koditon-scopes:
+        - core:read
   /api/v1/prices/transactions/filtered:
     get:
       description: Query transactions with multiple postal codes, categories, types, and area ranges
@@ -955,37 +2554,106 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
+        - bearer:
+            - core:read
       summary: List price transactions with advanced filters
-  /auth/anonymous:
-    post:
-      description: Create an anonymous user and obtain access and refresh tokens
-      operationId: auth-sign-in-anonymous
+      x-koditon-scopes:
+        - core:read
+  /api/v1/rentals:
+    get:
+      description: Search rentals using the shared provider-neutral rental model
+      operationId: rentals-search
       parameters:
-        - description: Device identifier for session tracking
-          in: header
-          name: X-Device-ID
-          required: true
+        - description: Free text search
+          explode: false
+          in: query
+          name: q
           schema:
-            description: Device identifier for session tracking
-            format: uuid
+            description: Free text search
             type: string
-        - in: header
-          name: User-Agent
+        - description: "Source filter: shortcut, frontdoor, or all"
+          explode: false
+          in: query
+          name: source
           schema:
+            description: "Source filter: shortcut, frontdoor, or all"
             type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SignInAnonymousInputBody"
-        required: true
+        - description: City / municipality filter
+          explode: false
+          in: query
+          name: city
+          schema:
+            description: City / municipality filter
+            type: string
+        - description: Postal code prefix filter
+          explode: false
+          in: query
+          name: postal
+          schema:
+            description: Postal code prefix filter
+            type: string
+        - description: Minimum price (EUR, 0 = no minimum)
+          explode: false
+          in: query
+          name: min_price
+          schema:
+            description: Minimum price (EUR, 0 = no minimum)
+            format: int64
+            type: integer
+        - description: Maximum price (EUR, 0 = no maximum)
+          explode: false
+          in: query
+          name: max_price
+          schema:
+            description: Maximum price (EUR, 0 = no maximum)
+            format: int64
+            type: integer
+        - description: Minimum area (m², 0 = no minimum)
+          explode: false
+          in: query
+          name: min_area
+          schema:
+            description: Minimum area (m², 0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum area (m², 0 = no maximum)
+          explode: false
+          in: query
+          name: max_area
+          schema:
+            description: Maximum area (m², 0 = no maximum)
+            format: double
+            type: number
+        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+            type: string
+        - description: Page number (1-based)
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: Page number (1-based)
+            format: int32
+            minimum: 1
+            type: integer
+        - description: "Results per page: 25, 50, or 100"
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: "Results per page: 25, 50, or 100"
+            format: int32
+            type: integer
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthTokensResponse"
+                $ref: "#/components/schemas/PageRentalSummary"
           description: OK
         default:
           content:
@@ -993,38 +2661,332 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Sign in anonymously
+      summary: Search rentals
       tags:
-        - Authentication
+        - Rentals
+  /api/v1/rentals/{canonical_id}:
+    get:
+      description: Fetch a rental by canonical ID
+      operationId: rentals-detail
+      parameters:
+        - description: Canonical ID
+          in: path
+          name: canonical_id
+          required: true
+          schema:
+            description: Canonical ID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rental"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get rental detail
+      tags:
+        - Rentals
+  /api/v1/resolve:
+    get:
+      description: Resolve a source URL into a canonical ID for use with detail endpoints
+      operationId: resolve-canonical-id
+      parameters:
+        - description: Source URL
+          explode: false
+          in: query
+          name: url
+          required: true
+          schema:
+            description: Source URL
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveCanonicalIDOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Resolve source URL
+      tags:
+        - Entity
+  /api/v1/sale-listings:
+    get:
+      description: Search sale listings using the shared provider-neutral sale listing model
+      operationId: sale-listings-search
+      parameters:
+        - description: Free text search
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Free text search
+            type: string
+        - description: "Source filter: shortcut, frontdoor, or all"
+          explode: false
+          in: query
+          name: source
+          schema:
+            description: "Source filter: shortcut, frontdoor, or all"
+            type: string
+        - description: City / municipality filter
+          explode: false
+          in: query
+          name: city
+          schema:
+            description: City / municipality filter
+            type: string
+        - description: Postal code prefix filter
+          explode: false
+          in: query
+          name: postal
+          schema:
+            description: Postal code prefix filter
+            type: string
+        - description: Minimum price (EUR, 0 = no minimum)
+          explode: false
+          in: query
+          name: min_price
+          schema:
+            description: Minimum price (EUR, 0 = no minimum)
+            format: int64
+            type: integer
+        - description: Maximum price (EUR, 0 = no maximum)
+          explode: false
+          in: query
+          name: max_price
+          schema:
+            description: Maximum price (EUR, 0 = no maximum)
+            format: int64
+            type: integer
+        - description: Minimum area (m², 0 = no minimum)
+          explode: false
+          in: query
+          name: min_area
+          schema:
+            description: Minimum area (m², 0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum area (m², 0 = no maximum)
+          explode: false
+          in: query
+          name: max_area
+          schema:
+            description: Maximum area (m², 0 = no maximum)
+            format: double
+            type: number
+        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+            type: string
+        - description: Page number (1-based)
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: Page number (1-based)
+            format: int32
+            minimum: 1
+            type: integer
+        - description: "Results per page: 25, 50, or 100"
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: "Results per page: 25, 50, or 100"
+            format: int32
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageSaleListingSummary"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Search sale listings
+      tags:
+        - Sale Listings
+  /api/v1/sale-listings/{canonical_id}:
+    get:
+      description: Fetch a sale listing by canonical ID
+      operationId: sale-listings-detail
+      parameters:
+        - description: Canonical ID
+          in: path
+          name: canonical_id
+          required: true
+          schema:
+            description: Canonical ID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleListing"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get sale listing detail
+      tags:
+        - Sale Listings
+  /api/v1/search:
+    get:
+      description: Search ads and buildings by free text, address, city, postal code, price, and area
+      operationId: search
+      parameters:
+        - description: Free text search
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Free text search
+            type: string
+        - description: "Source filter: shortcut, frontdoor, or all"
+          explode: false
+          in: query
+          name: source
+          schema:
+            description: "Source filter: shortcut, frontdoor, or all"
+            type: string
+        - description: "Kind filter: ad, announcement, building, or all"
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: "Kind filter: ad, announcement, building, or all"
+            type: string
+        - description: City / municipality filter
+          explode: false
+          in: query
+          name: city
+          schema:
+            description: City / municipality filter
+            type: string
+        - description: Postal code prefix filter
+          explode: false
+          in: query
+          name: postal
+          schema:
+            description: Postal code prefix filter
+            type: string
+        - description: Minimum asking price (EUR, 0 = no minimum)
+          explode: false
+          in: query
+          name: min_price
+          schema:
+            description: Minimum asking price (EUR, 0 = no minimum)
+            format: int64
+            type: integer
+        - description: Maximum asking price (EUR, 0 = no maximum)
+          explode: false
+          in: query
+          name: max_price
+          schema:
+            description: Maximum asking price (EUR, 0 = no maximum)
+            format: int64
+            type: integer
+        - description: Minimum area (m², 0 = no minimum)
+          explode: false
+          in: query
+          name: min_area
+          schema:
+            description: Minimum area (m², 0 = no minimum)
+            format: double
+            type: number
+        - description: Maximum area (m², 0 = no maximum)
+          explode: false
+          in: query
+          name: max_area
+          schema:
+            description: Maximum area (m², 0 = no maximum)
+            format: double
+            type: number
+        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: "Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc"
+            type: string
+        - description: Page number (1-based)
+          explode: false
+          in: query
+          name: page
+          schema:
+            description: Page number (1-based)
+            format: int32
+            minimum: 1
+            type: integer
+        - description: "Results per page: 25, 50, or 100"
+          explode: false
+          in: query
+          name: page_size
+          schema:
+            description: "Results per page: 25, 50, or 100"
+            format: int32
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Search entities
+      tags:
+        - Entity
   /auth/apple:
     post:
-      description: Exchange an Apple authorization code for access and refresh tokens
-      operationId: auth-sign-in-with-apple
+      description: Exchange an Apple authorization code for access tokens
+      operationId: auth-apple-web
       parameters:
-        - description: Device identifier for session tracking
-          in: header
-          name: X-Device-ID
-          required: true
-          schema:
-            description: Device identifier for session tracking
-            format: uuid
-            type: string
         - in: header
-          name: User-Agent
+          name: X-Device-ID
           schema:
             type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SignInWithAppleInputBody"
+              $ref: "#/components/schemas/AppleWebAuthInputBody"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthTokensResponse"
+                $ref: "#/components/schemas/AppleWebAuthOutputBody"
           description: OK
         default:
           content:
@@ -1032,74 +2994,133 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Sign in with Apple
+      summary: Sign in with Apple (web)
       tags:
         - Authentication
-  /auth/me:
-    get:
-      description: Returns information about the authenticated user including feature flags
-      operationId: auth-get-current-user
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CurrentUserOutputBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      security:
-        - bearer: []
-      summary: Get current user info
-      tags:
-        - Authentication
-  /auth/refresh:
+  /auth/email/confirm:
     post:
-      description: Exchange a refresh token for new access and refresh tokens
-      operationId: auth-refresh-tokens
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RefreshTokensInputBody"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RefreshTokensOutputBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Refresh tokens
-      tags:
-        - Authentication
-  /auth/sign-out:
-    post:
-      description: Revoke the current session
-      operationId: auth-sign-out
+      description: Exchange an email sign-in token for access tokens
+      operationId: auth-email-confirm
       parameters:
-        - description: Session ID to revoke (uses current session if not provided)
-          in: header
-          name: X-Session-ID
+        - in: header
+          name: X-Device-ID
           schema:
-            description: Session ID to revoke (uses current session if not provided)
             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailAuthConfirmInputBody"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SignOutOutputBody"
+                $ref: "#/components/schemas/PasskeyAuthOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Confirm email sign-in
+      tags:
+        - Authentication
+  /auth/email/request:
+    post:
+      description: Send a sign-in link to the requested email address
+      operationId: auth-email-request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailAuthRequestInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailAuthRequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Request email sign-in link
+      tags:
+        - Authentication
+  /auth/passkey/authenticate:
+    post:
+      description: Verify the passkey credential and return access tokens
+      operationId: auth-passkey-authenticate
+      parameters:
+        - in: header
+          name: X-Device-ID
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyAuthInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyAuthOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Complete passkey authentication
+      tags:
+        - Authentication
+  /auth/passkey/authenticate/options:
+    post:
+      description: Returns a WebAuthn challenge and options for passkey sign-in
+      operationId: auth-passkey-authenticate-options
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyAuthOptionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Begin passkey authentication
+      tags:
+        - Authentication
+  /auth/passkey/register/finish:
+    post:
+      description: Save the new passkey credential for the authenticated user
+      operationId: auth-passkey-register-finish
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyRegisterFinishInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasskeyRegisterFinishOutputBody"
           description: OK
         default:
           content:
@@ -1108,19 +3129,23 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       security:
-        - bearer: []
-      summary: Sign out
+        - bearer:
+            - profile:write
+      summary: Complete passkey registration
       tags:
         - Authentication
-  /healthz:
-    get:
-      operationId: healthz
+      x-koditon-scopes:
+        - profile:write
+  /auth/passkey/register/options:
+    post:
+      description: Returns a WebAuthn challenge and options to register a new passkey
+      operationId: auth-passkey-register-options
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
+                $ref: "#/components/schemas/PasskeyRegisterOptionsOutputBody"
           description: OK
         default:
           content:
@@ -1128,4 +3153,360 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Health check
+      security:
+        - bearer:
+            - profile:write
+      summary: Begin passkey registration
+      tags:
+        - Authentication
+      x-koditon-scopes:
+        - profile:write
+  /oauth/authorize/handoff/approve:
+    post:
+      operationId: oauth-authorize-handoff-approve
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                handoff_id:
+                  description: Authorization handoff identifier.
+                  format: uuid
+                  type: string
+              required:
+                - handoff_id
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthHandoffApproveSuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "401":
+          $ref: "#/components/responses/OAuthError"
+        "404":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      security:
+        - bearer: []
+      summary: Approve OAuth authorization handoff
+      tags:
+        - OAuth
+        - Auth
+  /oauth/authorize/handoff/deny:
+    post:
+      operationId: oauth-authorize-handoff-deny
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                handoff_id:
+                  description: Authorization handoff identifier.
+                  format: uuid
+                  type: string
+              required:
+                - handoff_id
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthHandoffDenySuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "401":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      security:
+        - bearer: []
+      summary: Deny OAuth authorization handoff
+      tags:
+        - OAuth
+        - Auth
+  /oauth/authorize/handoff/resolve:
+    post:
+      operationId: oauth-authorize-handoff-resolve
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                handoff_token:
+                  description: Authorization handoff token from the browser or app link.
+                  type: string
+                user_code:
+                  description: User-entered handoff code.
+                  type: string
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthHandoffResolveSuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "401":
+          $ref: "#/components/responses/OAuthError"
+        "404":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      security:
+        - bearer: []
+      summary: Resolve OAuth authorization handoff
+      tags:
+        - OAuth
+        - Auth
+  /oauth/device_authorization:
+    post:
+      operationId: oauth-device-authorization-create
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: OAuth client ID.
+                  type: string
+                client_secret:
+                  description: OAuth client secret for confidential clients.
+                  type: string
+                resource:
+                  description: Protected resource identifier from discovery metadata.
+                  type: string
+                scope:
+                  description: Requested scopes separated by spaces.
+                  type: string
+              required:
+                - client_id
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthDeviceAuthorizationSuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "401":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      summary: Create OAuth device authorization request
+      tags:
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: true
+        retry:
+          backoff:
+            base_delay_ms: 0
+            jitter: none
+            strategy: exponential
+          max_attempts: 1
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 503
+            transport_errors: false
+  /oauth/jwks:
+    get:
+      operationId: oauth-jwks-get
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthJWKS"
+      summary: Get JSON Web Key Set
+      tags:
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: false
+        retry:
+          backoff:
+            base_delay_ms: 120
+            jitter: full
+            strategy: exponential
+          max_attempts: 2
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 502
+              - 503
+              - 504
+            transport_errors: true
+  /oauth/register:
+    post:
+      description: Registers an external OAuth client for authorization code + PKCE flows.
+      operationId: oauth-client-register-create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                client_name:
+                  type: string
+                logo_uri:
+                  format: uri
+                  type: string
+                redirect_uris:
+                  items:
+                    type: string
+                  type: array
+                scope:
+                  type: string
+                token_endpoint_auth_method:
+                  enum:
+                    - none
+                  type: string
+              required:
+                - redirect_uris
+              type: object
+        required: true
+      responses:
+        "201":
+          $ref: "#/components/responses/OAuthClientRegistrationSuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "403":
+          $ref: "#/components/responses/OAuthError"
+        "429":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      summary: Register OAuth client dynamically
+      tags:
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: true
+        retry:
+          backoff:
+            base_delay_ms: 0
+            jitter: none
+            strategy: exponential
+          max_attempts: 1
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 503
+            transport_errors: false
+  /oauth/revoke:
+    post:
+      description: Revokes a refresh token. Access tokens (JWTs) cannot be revoked server-side and expire naturally. Returns 200 OK even if the token is already invalid.
+      operationId: oauth-revoke-create
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                token:
+                  description: The token to revoke.
+                  type: string
+                token_type_hint:
+                  description: "Optional hint: 'refresh_token' or 'access_token'."
+                  type: string
+              required:
+                - token
+              type: object
+        required: true
+      responses:
+        "200":
+          description: Token revoked successfully (or was already invalid).
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      summary: Revoke an OAuth token (RFC 7009)
+      tags:
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: true
+        retry:
+          backoff:
+            base_delay_ms: 120
+            jitter: full
+            strategy: exponential
+          max_attempts: 2
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 502
+              - 503
+              - 504
+            transport_errors: true
+  /oauth/token:
+    post:
+      operationId: oauth-token-create
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: OAuth client ID.
+                  type: string
+                client_secret:
+                  description: OAuth client secret for confidential clients.
+                  type: string
+                code:
+                  description: Authorization code.
+                  type: string
+                code_verifier:
+                  description: PKCE verifier.
+                  type: string
+                device_code:
+                  description: Device code.
+                  type: string
+                grant_type:
+                  enum:
+                    - authorization_code
+                    - refresh_token
+                    - urn:ietf:params:oauth:grant-type:device_code
+                  type: string
+                redirect_uri:
+                  description: Redirect URI matching authorization request.
+                  type: string
+                refresh_token:
+                  description: Refresh token.
+                  type: string
+                resource:
+                  description: Protected resource identifier from discovery metadata.
+                  type: string
+                scope:
+                  description: Requested scopes separated by spaces.
+                  type: string
+              required:
+                - grant_type
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/OAuthTokenSuccess"
+        "400":
+          $ref: "#/components/responses/OAuthError"
+        "401":
+          $ref: "#/components/responses/OAuthError"
+        "500":
+          $ref: "#/components/responses/OAuthError"
+      summary: Exchange OAuth token grants
+      tags:
+        - OAuth
+        - Auth
+      x-koditon-operation-policy:
+        mutation: true
+        retry:
+          backoff:
+            base_delay_ms: 0
+            jitter: none
+            strategy: exponential
+          max_attempts: 1
+          respect_retry_after_header: true
+          retry_on:
+            http_status_codes:
+              - 429
+              - 503
+            transport_errors: false

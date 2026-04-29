@@ -86,9 +86,9 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 			return nil, fmt.Errorf("create apple web client: %w", err)
 		}
 	}
-	var passkeyService *passkey.Service
+	var passkeyService passkeyCeremonyService
 	if cfg.Auth.Passkey != nil {
-		passkeyService, err = passkey.NewService(passkey.Config{
+		service, err := passkey.NewService(passkey.Config{
 			RPID:          cfg.Auth.Passkey.RPID,
 			RPDisplayName: cfg.Auth.Passkey.RPDisplayName,
 			RPOrigins:     cfg.Auth.Passkey.RPOrigins,
@@ -96,6 +96,7 @@ func NewService(ctx context.Context, cfg ServiceConfig) (*Service, error) {
 		if err != nil {
 			return nil, fmt.Errorf("create passkey service: %w", err)
 		}
+		passkeyService = service
 	}
 	logger := cfg.Logger
 	if logger == nil {

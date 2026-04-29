@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { getToken, clearToken } from './lib/auth'
 import SignInPage from './pages/SignInPage'
@@ -6,18 +6,19 @@ import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
 import SearchPage from './pages/SearchPage'
 import OAuthAuthorizePage from './pages/OAuthAuthorizePage'
+import EmailConfirmPage from './pages/EmailConfirmPage'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => !!getToken())
 
-  function handleSignIn() {
+  const handleSignIn = useCallback(function handleSignIn() {
     setAuthenticated(true)
-  }
+  }, [])
 
-  function handleSignOut() {
+  const handleSignOut = useCallback(function handleSignOut() {
     clearToken()
     setAuthenticated(false)
-  }
+  }, [])
 
   return (
     <BrowserRouter>
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/detail" element={<DetailPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
+        <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />
 
         {/* Auth-gated root */}
         <Route

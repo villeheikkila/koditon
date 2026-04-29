@@ -18,8 +18,10 @@ import (
 
 	db "koditon/internal/db"
 	"koditon/internal/domain/auth"
+	"koditon/internal/domain/emailauth"
 	"koditon/internal/platform/buildinfo"
 	"koditon/internal/platform/config"
+	"koditon/internal/platform/email"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/runtimecfg"
 	"koditon/internal/platform/runtimekv"
@@ -188,17 +190,34 @@ func run(
 		lifecycle.Defer("auth service", func(context.Context) error {
 			return authService.Close()
 		})
-		srv := server.New(logger, cfg, pool, authService)
+		emailService := email.NewService(email.NewLoggerSender(logger.With("component", "email")))
+		if cfg.Email.ResendAPIKey != "" {
+			resendSender, err := email.NewResendSender(cfg.Email.ResendAPIKey, cfg.Email.ResendFromEmail, cfg.Email.ResendFromName)
+			if err != nil {
+				return fmt.Errorf("create resend email sender: %w", err)
+			}
+			emailService = email.NewService(resendSender)
+		}
+		emailAuthService := emailauth.NewService(emailauth.ServiceConfig{
+			Logger:          logger,
+			Queries:         db.New(pool),
+			EmailService:    emailService,
+			HTTP:            runtimecfg.HTTPConfig{APIPublicBaseURL: cfg.APIPublicBaseURL, WebBaseURL: cfg.WebBaseURL},
+			EmitConsoleLink: cfg.Environment == config.EnvDevelopment,
+		})
+		srv := server.New(logger, cfg, pool, authService, emailAuthService)
 		mux := http.NewServeMux()
 		health.New(pool, cfg.Mode, info).Register(mux)
+		var oauthHandler *oauthapi.Handler
 		if cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != "" {
-			oauthHandler, err := oauthapi.New(logger, oauthapi.Config{
+			oauthHandler, err = oauthapi.New(logger, oauthapi.Config{
 				HTTP: runtimecfg.HTTPConfig{
 					APIPublicBaseURL:      cfg.APIPublicBaseURL,
 					WebBaseURL:            cfg.WebBaseURL,
 					OAuthCookieSigningKey: cfg.Auth.OAuthCookieKey,
 				},
-				Queries: db.New(pool),
+				Queries:   db.New(pool),
+				EmailAuth: emailAuthService,
 			}, authService, nil)
 			if err != nil {
 				return fmt.Errorf("create oauth handler: %w", err)
@@ -213,6 +232,9 @@ func run(
 		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)
+		if oauthHandler != nil {
+			oauthHandler.RegisterRoutes(api)
+		}
 		httpServer = &http.Server{
 			Addr:              net.JoinHostPort(cfg.Host, cfg.Port),
 			Handler:           srv.Handler(mux, api),

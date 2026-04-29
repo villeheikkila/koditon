@@ -52,20 +52,19 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
-export interface AuthTokensResponse {
+export interface AppleWebAuthInputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** JWT access token for API authentication */
+  code: string;
+}
+
+export interface AppleWebAuthOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
   access_token: string;
-  /** Unix timestamp when access token expires */
   access_token_expires_at: number;
-  /** Whether this is a newly created user */
-  is_new_user: boolean;
-  /** JWT refresh token for obtaining new access tokens */
   refresh_token: string;
-  /** Unix timestamp when refresh token expires */
   refresh_token_expires_at: number;
-  /** User ID */
   user_id: string;
 }
 
@@ -119,14 +118,324 @@ export interface AvailableTypesOutputBody {
   types: TranslatedValue[] | null;
 }
 
-export interface CurrentUserOutputBody {
+export type BuildingMetadata = {[key: string]: unknown};
+
+export interface BuildingSourceID {
+  external_id?: string;
+  kind: string;
+  native_id: string;
+  provider: string;
+}
+
+export type BuildingIdentityInputs = {[key: string]: string};
+
+export interface BuildingIdentity {
+  confidence: number;
+  inputs?: BuildingIdentityInputs;
+  key: string;
+  /** @nullable */
+  sources?: BuildingSourceID[] | null;
+  strategy: string;
+}
+
+export interface Location {
+  city?: string;
+  district?: string;
+  latitude?: number;
+  longitude?: number;
+  postal?: string;
+  street_address?: string;
+}
+
+export interface BuildingRenovation {
+  done?: boolean;
+  kind: string;
+  year?: number;
+}
+
+export interface BuildingDetails {
+  apartment_count?: number;
+  build_year?: number;
+  building_material?: string;
+  building_subtype?: string;
+  building_type?: string;
+  business_id?: string;
+  business_premise_count?: number;
+  car_storage?: string;
+  common_areas?: string;
+  connectivity?: string;
+  construction_year?: number;
+  elevator?: boolean;
+  energy_class?: string;
+  floor_count?: number;
+  frame_construction_method?: string;
+  heating?: string;
+  heating_description?: string;
+  heating_fuel?: string;
+  housing_company?: string;
+  identity: BuildingIdentity;
+  location: Location;
+  maintenance_responsibility?: string;
+  management_method?: string;
+  other_info?: string;
+  property_manager?: string;
+  /** @nullable */
+  renovations?: BuildingRenovation[] | null;
+  roof_material?: string;
+  roof_type?: string;
+  sauna?: boolean;
+  wall_structure?: string;
+}
+
+export interface Insight {
+  confidence?: number;
+  key: string;
+  source?: string;
+  value: string;
+}
+
+export interface BuildingInsights {
+  /** @nullable */
+  items?: Insight[] | null;
+}
+
+export type ImageVariants = {[key: string]: string};
+
+export interface Image {
+  description?: string;
+  id?: string;
+  ordinal?: number;
+  provider?: string;
+  provider_id?: string;
+  role?: string;
+  /** @nullable */
+  tags?: string[] | null;
+  url: string;
+  variants?: ImageVariants;
+}
+
+export interface RelatedListing {
+  address?: string;
+  area_m2?: number;
+  friendly_id?: string;
+  id: string;
+  kind?: string;
+  main_image?: Image;
+  price?: number;
+  published?: boolean;
+  rent_period?: string;
+  room_layout?: string;
+}
+
+export interface RelatedListings {
+  /** @nullable */
+  items?: RelatedListing[] | null;
+}
+
+export interface SiteDetails {
+  driving_directions?: string;
+  lot_redemption_info?: string;
+  lot_rental_agreement?: string;
+  plot_area_m2?: number;
+  plot_ownership_type?: string;
+  plot_type?: string;
+  road_access?: string;
+  services?: string;
+  sewer?: string;
+  shore?: string;
+  transport?: string;
+  water_supply?: string;
+  /** @nullable */
+  water_supply_types?: string[] | null;
+  yard?: string;
+  zoning?: string;
+}
+
+export type ListingSourceFlags = {[key: string]: boolean};
+
+export type ListingSourceMetadata = {[key: string]: unknown};
+
+export interface ListingSource {
+  canonical_id: string;
+  external_id?: string;
+  first_seen_at?: string;
+  flags?: ListingSourceFlags;
+  friendly_id?: string;
+  kind: string;
+  last_seen_at?: string;
+  metadata?: ListingSourceMetadata;
+  native_id: string;
+  original_url?: string;
+  provider: string;
+  published_at?: string;
+  status?: string;
+  url?: string;
+}
+
+export interface TextSections {
+  additional_info?: string;
+  amenities?: string;
+  area?: string;
+  availability?: string;
+  bathroom?: string;
+  building?: string;
+  charges?: string;
+  description?: string;
+  kitchen?: string;
+  materials?: string;
+  renovations_done?: string;
+  renovations_planned?: string;
+  storage?: string;
+  transport?: string;
+}
+
+export interface Building {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /**
-     * List of enabled feature flags for the user
-     * @nullable
-     */
-  feature_flags: string[] | null;
+  details: BuildingDetails;
+  id: string;
+  insights?: BuildingInsights;
+  metadata?: BuildingMetadata;
+  related?: RelatedListings;
+  site?: SiteDetails;
+  /** @nullable */
+  source_records: ListingSource[] | null;
+  texts?: TextSections;
+}
+
+export interface Charges {
+  electricity?: string;
+  heating?: string;
+  maintenance_monthly?: number;
+  notes?: string;
+  parking?: number;
+  sauna?: number;
+  total_monthly?: number;
+  water?: number;
+}
+
+export type CommercialDetailsLeadOptions = {[key: string]: boolean};
+
+export interface CommercialDetails {
+  asking_price?: number;
+  available_from?: string;
+  booking_status?: string;
+  can_receive_leads?: boolean;
+  charges?: Charges;
+  days_on_market?: number;
+  debt_free_price?: number;
+  debt_share_additional_info?: string;
+  debt_share_amount?: number;
+  development_phase?: string;
+  fees_info?: string;
+  financing_fee_interest_only_end_date?: string;
+  financing_fee_interest_only_period?: string;
+  financing_fee_interest_only_start_date?: string;
+  first_seen_at?: string;
+  fixed_term?: boolean;
+  furnished?: boolean;
+  is_company_announcement?: boolean;
+  last_seen_at?: string;
+  lead_options?: CommercialDetailsLeadOptions;
+  main_image_hidden?: boolean;
+  map_visible?: boolean;
+  minimum_term_months?: number;
+  new_development?: boolean;
+  notify_price_changed?: boolean;
+  open_bidding_in_use?: boolean;
+  open_bidding_latest_offer?: number;
+  open_bidding_starting_debt_free_price?: number;
+  open_bidding_starting_selling_price?: number;
+  open_bidding_target_url?: string;
+  other_terms?: string;
+  ownership_type?: string;
+  pets_allowed?: boolean;
+  previous_asking_price?: number;
+  previous_debt_free_price?: number;
+  price_per_m2?: number;
+  published_at?: string;
+  rent?: number;
+  rent_period?: string;
+  security_deposit?: string;
+  show_bidding_indicators?: boolean;
+  status?: string;
+  unpublished_at?: string;
+}
+
+export interface Contact {
+  email?: string;
+  name?: string;
+  office_name?: string;
+  phone?: string;
+  title?: string;
+}
+
+export interface DetailFieldOutput {
+  label: string;
+  value: string;
+}
+
+export interface EmailAuthConfirmInputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  token: string;
+}
+
+export interface EmailAuthRequestInputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  email: string;
+}
+
+export interface EmailAuthRequestOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  ok: boolean;
+}
+
+export interface EntityDetailOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  additional_info_text?: string;
+  area_m2?: number;
+  asking_price?: number;
+  availability_text?: string;
+  build_year?: number;
+  /** @nullable */
+  canonical_extra?: DetailFieldOutput[] | null;
+  canonical_id: string;
+  charges_text?: string;
+  city?: string;
+  condition?: string;
+  debt_free_price?: number;
+  debt_share_amount?: number;
+  description_text?: string;
+  elevator?: boolean;
+  energy_class?: string;
+  floor_level?: number;
+  headline: string;
+  kind: string;
+  last_seen_at?: string;
+  maintenance_charge_monthly?: number;
+  native_id: string;
+  plot_type?: string;
+  postal?: string;
+  price_per_m2?: number;
+  /** @nullable */
+  related?: DetailFieldOutput[] | null;
+  renovations_done_text?: string;
+  renovations_planned_text?: string;
+  room_layout?: string;
+  rooms_count?: number;
+  sauna?: boolean;
+  source: string;
+  /** @nullable */
+  source_specific?: DetailFieldOutput[] | null;
+  street_address?: string;
+  total_charge_monthly?: number;
+  total_floors?: number;
+  url?: string;
+  water_charge?: number;
 }
 
 export interface ErrorDetail {
@@ -158,10 +467,138 @@ export interface ErrorModel {
   type?: string;
 }
 
-export interface HealthResponse {
+export interface Link {
+  title?: string;
+  type?: string;
+  url: string;
+}
+
+export interface ListingInsights {
+  /** @nullable */
+  items?: Insight[] | null;
+}
+
+export interface Media {
+  /** @nullable */
+  images?: Image[] | null;
+  main_image?: Image;
+}
+
+export interface UnitDetails {
+  /** @nullable */
+  appliances?: string[] | null;
+  area_m2?: number;
+  availability?: string;
+  balcony?: boolean;
+  balcony_description?: string;
+  bathroom_description?: string;
+  bedrooms_count?: number;
+  condition?: string;
+  /** @nullable */
+  features?: string[] | null;
+  floor_level?: number;
+  floor_materials_description?: string;
+  kitchen_description?: string;
+  living_area_m2?: number;
+  location: Location;
+  other_area_m2?: number;
+  parking?: string;
+  property_subtype?: string;
+  property_type?: string;
+  room_layout?: string;
+  rooms_count?: number;
+  sauna?: boolean;
+  sauna_description?: string;
+  storage_description?: string;
+  total_area_m2?: number;
+  views_description?: string;
+  wall_materials_description?: string;
+}
+
+export interface RentalSummary {
+  building: BuildingDetails;
+  commercial: CommercialDetails;
+  headline: string;
+  id: string;
+  media?: Media;
+  site?: SiteDetails;
+  source: ListingSource;
+  unit: UnitDetails;
+}
+
+export interface PageRentalSummary {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  status: string;
+  page: number;
+  page_size: number;
+  /** @nullable */
+  rows: RentalSummary[] | null;
+  total: number;
+}
+
+export interface SaleListingSummary {
+  building: BuildingDetails;
+  commercial: CommercialDetails;
+  headline: string;
+  id: string;
+  media?: Media;
+  site?: SiteDetails;
+  source: ListingSource;
+  unit: UnitDetails;
+}
+
+export interface PageSaleListingSummary {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  page: number;
+  page_size: number;
+  /** @nullable */
+  rows: SaleListingSummary[] | null;
+  total: number;
+}
+
+export interface PasskeyAuthInputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  challenge_id: string;
+  credential_json: string;
+}
+
+export interface PasskeyAuthOptionsOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  challenge_id: string;
+  options: unknown;
+}
+
+export interface PasskeyAuthOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  access_token: string;
+  access_token_expires_at: number;
+  refresh_token: string;
+  refresh_token_expires_at: number;
+  user_id: string;
+}
+
+export interface PasskeyRegisterFinishInputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  challenge_id: string;
+  credential_json: string;
+}
+
+export interface PasskeyRegisterFinishOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  credential_id: string;
+}
+
+export interface PasskeyRegisterOptionsOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  challenge_id: string;
+  options: unknown;
 }
 
 export interface PingRequest {
@@ -233,80 +670,283 @@ export interface PricesTransactionsOutputBody {
   transactions: PricesTransaction[] | null;
 }
 
-export interface RefreshTokensInputBody {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  /** Refresh token obtained from sign-in */
-  refresh_token: string;
+export interface Showing {
+  end_at?: string;
+  info?: string;
+  start_at?: string;
 }
 
-export interface RefreshTokensOutputBody {
+export interface Rental {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  /** New JWT access token */
+  building: BuildingDetails;
+  commercial: CommercialDetails;
+  /** @nullable */
+  contacts?: Contact[] | null;
+  headline: string;
+  id: string;
+  insights?: ListingInsights;
+  /** @nullable */
+  links?: Link[] | null;
+  media?: Media;
+  /** @nullable */
+  showings?: Showing[] | null;
+  site?: SiteDetails;
+  source: ListingSource;
+  texts?: TextSections;
+  unit: UnitDetails;
+}
+
+export interface ResolveCanonicalIDOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  canonical_id: string;
+  kind: string;
+  native_id: string;
+  source: string;
+}
+
+export interface SaleListing {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  building: BuildingDetails;
+  commercial: CommercialDetails;
+  /** @nullable */
+  contacts?: Contact[] | null;
+  headline: string;
+  id: string;
+  insights?: ListingInsights;
+  /** @nullable */
+  links?: Link[] | null;
+  media?: Media;
+  /** @nullable */
+  showings?: Showing[] | null;
+  site?: SiteDetails;
+  source: ListingSource;
+  texts?: TextSections;
+  unit: UnitDetails;
+}
+
+export interface SearchResultRow {
+  address?: string;
+  area?: number;
+  canonical_id: string;
+  city?: string;
+  headline?: string;
+  kind: string;
+  last_seen_at?: string;
+  postal?: string;
+  price?: number;
+  room_layout?: string;
+  source: string;
+  url?: string;
+}
+
+export interface SearchOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  page: number;
+  page_size: number;
+  /** @nullable */
+  rows: SearchResultRow[] | null;
+  total: number;
+}
+
+export type OAuthAuthorizationServerMetadataResponse = {
+  /** Authorization endpoint URL. */
+  authorization_endpoint: string;
+  code_challenge_methods_supported: string[];
+  /** Device authorization endpoint URL. */
+  device_authorization_endpoint: string;
+  grant_types_supported: string[];
+  /** Authorization server issuer. */
+  issuer: string;
+  /** JWKS endpoint URL. */
+  jwks_uri: string;
+  /** Dynamic client registration endpoint URL. */
+  registration_endpoint?: string;
+  response_types_supported: string[];
+  /** Token revocation endpoint URL (RFC 7009). */
+  revocation_endpoint?: string;
+  scopes_supported: string[];
+  /** Token endpoint URL. */
+  token_endpoint: string;
+  token_endpoint_auth_methods_supported: string[];
+};
+
+export type OAuthClientRegistrationSuccessResponse = {
+  client_id: string;
+  client_id_issued_at: number;
+  client_name?: string;
+  grant_types: string[];
+  logo_uri?: string;
+  redirect_uris: string[];
+  response_types: string[];
+  scope: string;
+  token_endpoint_auth_method: string;
+};
+
+export type OAuthDeviceAuthorizationSuccessResponse = {
+  /** Device code for token polling. */
+  device_code: string;
+  /** Expiration in seconds. */
+  expires_in: number;
+  /** Recommended polling interval in seconds. */
+  interval: number;
+  /** User-entered verification code. */
+  user_code: string;
+  /** Verification URL for user interaction. */
+  verification_uri: string;
+  /** Verification URL with user code prefilled. */
+  verification_uri_complete: string;
+};
+
+export type OAuthErrorResponse = {
+  /** OAuth error code. */
+  error: string;
+  /** Optional app-specific error code. */
+  error_code?: string;
+  /** Human-readable OAuth error description. */
+  error_description: string;
+};
+
+export type OAuthHandoffApproveSuccessResponse = {
+  ok: boolean;
+  /** OAuth redirect URL with the generated authorization code. */
+  redirect_url: string;
+};
+
+export type OAuthHandoffDenySuccessResponse = {
+  ok: boolean;
+};
+
+export type OAuthHandoffResolveSuccessResponse = {
+  /** Display name for the OAuth client. */
+  client_display_name: string;
+  /** OAuth client ID. */
+  client_id: string;
+  expires_at_unix: number;
+  handoff_id: string;
+  /** Redirect URI host. */
+  redirect_host: string;
+  scopes: string[];
+};
+
+export type OAuthJWKSResponseKeysItem = { [key: string]: unknown };
+
+export type OAuthJWKSResponse = {
+  keys: OAuthJWKSResponseKeysItem[];
+};
+
+export type OAuthProtectedResourceMetadataResponse = {
+  authorization_servers: string[];
+  bearer_methods_supported: string[];
+  /** Protected resource identifier. */
+  resource: string;
+  /** Display name for the protected resource. */
+  resource_name: string;
+  scopes_supported: string[];
+};
+
+export type OAuthTokenSuccessResponse = {
+  /** Bearer access token. */
   access_token: string;
-  /** Unix timestamp when access token expires */
-  access_token_expires_at: number;
-  /** New JWT refresh token */
+  /** Access token expiration in seconds. */
+  expires_in: number;
+  /** Refresh token. */
   refresh_token: string;
-  /** Unix timestamp when refresh token expires */
-  refresh_token_expires_at: number;
-  /** User ID */
-  user_id: string;
-}
+  /** Refresh token expiration in seconds. */
+  refresh_token_expires_in: number;
+  /** Granted scopes separated by spaces. */
+  scope: string;
+  /** Associated device session identifier when available. */
+  session_id?: string;
+  /** Token type. */
+  token_type: string;
+};
 
-export interface SignInAnonymousInputBody {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-}
+export type OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod = typeof OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod[keyof typeof OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod];
 
-export interface SignInWithAppleInputBody {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  /** Authorization code from Apple Sign In */
-  authorization_code: string;
-  /** Nonce used in the Apple Sign In request */
-  nonce?: string;
-}
 
-export interface SignOutOutputBody {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  success: boolean;
-}
+export const OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod = {
+  none: 'none',
+} as const;
 
-export type PasskeyAuthOptionsOutputOptions = { [key: string]: unknown };
+export type OAuthClientRegistrationRequestBody = {
+  client_name?: string;
+  logo_uri?: string;
+  redirect_uris: string[];
+  scope?: string;
+  token_endpoint_auth_method?: OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod;
+};
 
-export interface PasskeyAuthOptionsOutput {
-  challenge_id: string;
-  options: PasskeyAuthOptionsOutputOptions;
-}
+export type OAuthDeviceAuthorizationRequestBody = {
+  /** OAuth client ID. */
+  client_id: string;
+  /** OAuth client secret for confidential clients. */
+  client_secret?: string;
+  /** Protected resource identifier from discovery metadata. */
+  resource?: string;
+  /** Requested scopes separated by spaces. */
+  scope?: string;
+};
 
-export interface PasskeyAuthInput {
-  challenge_id: string;
-  credential_json: string;
-}
+export type OAuthHandoffDecisionRequestBody = {
+  /** Authorization handoff identifier. */
+  handoff_id: string;
+};
 
-export interface PasskeyAuthOutput {
-  access_token: string;
-  access_token_expires_at: number;
-  refresh_token: string;
-  refresh_token_expires_at: number;
-  user_id: string;
-}
+export type OAuthHandoffResolveRequestBody = {
+  /** Authorization handoff token from the browser or app link. */
+  handoff_token?: string;
+  /** User-entered handoff code. */
+  user_code?: string;
+};
 
-export interface PasskeyRegisterFinishInput {
-  challenge_id: string;
-  credential_json: string;
-}
+export type OAuthRevokeRequestBody = {
+  /** The token to revoke. */
+  token: string;
+  /** Optional hint: 'refresh_token' or 'access_token'. */
+  token_type_hint?: string;
+};
 
-export interface PasskeyRegisterFinishOutput {
-  credential_id: string;
-}
+export type OAuthTokenRequestBodyGrantType = typeof OAuthTokenRequestBodyGrantType[keyof typeof OAuthTokenRequestBodyGrantType];
 
-export type AuthPasskeyAuthenticateOptionsBody = { [key: string]: unknown };
 
-export type AuthPasskeyRegisterOptionsBody = { [key: string]: unknown };
+export const OAuthTokenRequestBodyGrantType = {
+  authorization_code: 'authorization_code',
+  refresh_token: 'refresh_token',
+  'urn:ietf:params:oauth:grant-type:device_code': 'urn:ietf:params:oauth:grant-type:device_code',
+} as const;
+
+export type OAuthTokenRequestBody = {
+  /** OAuth client ID. */
+  client_id?: string;
+  /** OAuth client secret for confidential clients. */
+  client_secret?: string;
+  /** Authorization code. */
+  code?: string;
+  /** PKCE verifier. */
+  code_verifier?: string;
+  /** Device code. */
+  device_code?: string;
+  grant_type: OAuthTokenRequestBodyGrantType;
+  /** Redirect URI matching authorization request. */
+  redirect_uri?: string;
+  /** Refresh token. */
+  refresh_token?: string;
+  /** Protected resource identifier from discovery metadata. */
+  resource?: string;
+  /** Requested scopes separated by spaces. */
+  scope?: string;
+};
+
+export type EntityDetailParams = {
+/**
+ * Canonical ID or source URL
+ */
+id: string;
+};
 
 export type PricesTransactionsParams = {
 municipality_id: string;
@@ -344,6 +984,242 @@ max_area?: number;
 limit?: number;
 };
 
+export type RentalsSearchParams = {
+/**
+ * Free text search
+ */
+q?: string;
+/**
+ * Source filter: shortcut, frontdoor, or all
+ */
+source?: string;
+/**
+ * City / municipality filter
+ */
+city?: string;
+/**
+ * Postal code prefix filter
+ */
+postal?: string;
+/**
+ * Minimum price (EUR, 0 = no minimum)
+ */
+min_price?: number;
+/**
+ * Maximum price (EUR, 0 = no maximum)
+ */
+max_price?: number;
+/**
+ * Minimum area (m², 0 = no minimum)
+ */
+min_area?: number;
+/**
+ * Maximum area (m², 0 = no maximum)
+ */
+max_area?: number;
+/**
+ * Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc
+ */
+sort?: string;
+/**
+ * Page number (1-based)
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Results per page: 25, 50, or 100
+ */
+page_size?: number;
+};
+
+export type ResolveCanonicalIdParams = {
+/**
+ * Source URL
+ */
+url: string;
+};
+
+export type SaleListingsSearchParams = {
+/**
+ * Free text search
+ */
+q?: string;
+/**
+ * Source filter: shortcut, frontdoor, or all
+ */
+source?: string;
+/**
+ * City / municipality filter
+ */
+city?: string;
+/**
+ * Postal code prefix filter
+ */
+postal?: string;
+/**
+ * Minimum price (EUR, 0 = no minimum)
+ */
+min_price?: number;
+/**
+ * Maximum price (EUR, 0 = no maximum)
+ */
+max_price?: number;
+/**
+ * Minimum area (m², 0 = no minimum)
+ */
+min_area?: number;
+/**
+ * Maximum area (m², 0 = no maximum)
+ */
+max_area?: number;
+/**
+ * Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc
+ */
+sort?: string;
+/**
+ * Page number (1-based)
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Results per page: 25, 50, or 100
+ */
+page_size?: number;
+};
+
+export type SearchParams = {
+/**
+ * Free text search
+ */
+q?: string;
+/**
+ * Source filter: shortcut, frontdoor, or all
+ */
+source?: string;
+/**
+ * Kind filter: ad, announcement, building, or all
+ */
+kind?: string;
+/**
+ * City / municipality filter
+ */
+city?: string;
+/**
+ * Postal code prefix filter
+ */
+postal?: string;
+/**
+ * Minimum asking price (EUR, 0 = no minimum)
+ */
+min_price?: number;
+/**
+ * Maximum asking price (EUR, 0 = no maximum)
+ */
+max_price?: number;
+/**
+ * Minimum area (m², 0 = no minimum)
+ */
+min_area?: number;
+/**
+ * Maximum area (m², 0 = no maximum)
+ */
+max_area?: number;
+/**
+ * Sort order: price_asc, price_desc, area_asc, area_desc, seen_desc
+ */
+sort?: string;
+/**
+ * Page number (1-based)
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Results per page: 25, 50, or 100
+ */
+page_size?: number;
+};
+
+export type OauthAuthorizeHandoffApproveBody = {
+  /** Authorization handoff identifier. */
+  handoff_id: string;
+};
+
+export type OauthAuthorizeHandoffDenyBody = {
+  /** Authorization handoff identifier. */
+  handoff_id: string;
+};
+
+export type OauthAuthorizeHandoffResolveBody = {
+  /** Authorization handoff token from the browser or app link. */
+  handoff_token?: string;
+  /** User-entered handoff code. */
+  user_code?: string;
+};
+
+export type OauthDeviceAuthorizationCreateBody = {
+  /** OAuth client ID. */
+  client_id: string;
+  /** OAuth client secret for confidential clients. */
+  client_secret?: string;
+  /** Protected resource identifier from discovery metadata. */
+  resource?: string;
+  /** Requested scopes separated by spaces. */
+  scope?: string;
+};
+
+export type OauthClientRegisterCreateBodyTokenEndpointAuthMethod = typeof OauthClientRegisterCreateBodyTokenEndpointAuthMethod[keyof typeof OauthClientRegisterCreateBodyTokenEndpointAuthMethod];
+
+
+export const OauthClientRegisterCreateBodyTokenEndpointAuthMethod = {
+  none: 'none',
+} as const;
+
+export type OauthClientRegisterCreateBody = {
+  client_name?: string;
+  logo_uri?: string;
+  redirect_uris: string[];
+  scope?: string;
+  token_endpoint_auth_method?: OauthClientRegisterCreateBodyTokenEndpointAuthMethod;
+};
+
+export type OauthRevokeCreateBody = {
+  /** The token to revoke. */
+  token: string;
+  /** Optional hint: 'refresh_token' or 'access_token'. */
+  token_type_hint?: string;
+};
+
+export type OauthTokenCreateBodyGrantType = typeof OauthTokenCreateBodyGrantType[keyof typeof OauthTokenCreateBodyGrantType];
+
+
+export const OauthTokenCreateBodyGrantType = {
+  authorization_code: 'authorization_code',
+  refresh_token: 'refresh_token',
+  'urn:ietf:params:oauth:grant-type:device_code': 'urn:ietf:params:oauth:grant-type:device_code',
+} as const;
+
+export type OauthTokenCreateBody = {
+  /** OAuth client ID. */
+  client_id?: string;
+  /** OAuth client secret for confidential clients. */
+  client_secret?: string;
+  /** Authorization code. */
+  code?: string;
+  /** PKCE verifier. */
+  code_verifier?: string;
+  /** Device code. */
+  device_code?: string;
+  grant_type: OauthTokenCreateBodyGrantType;
+  /** Redirect URI matching authorization request. */
+  redirect_uri?: string;
+  /** Refresh token. */
+  refresh_token?: string;
+  /** Protected resource identifier from discovery metadata. */
+  resource?: string;
+  /** Requested scopes separated by spaces. */
+  scope?: string;
+};
+
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
@@ -357,368 +1233,337 @@ export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatus
 
 
 /**
- * Returns a WebAuthn challenge and credential request options for passkey sign-in
- * @summary Begin passkey authentication
+ * @summary Get OAuth authorization server metadata
  */
-export type authPasskeyAuthenticateOptionsResponse200 = {
-  data: PasskeyAuthOptionsOutput
+export type oauthAuthorizationServerMetadataGetResponse200 = {
+  data: OAuthAuthorizationServerMetadataResponse
   status: 200
 }
 
-export type authPasskeyAuthenticateOptionsResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type authPasskeyAuthenticateOptionsResponseSuccess = (authPasskeyAuthenticateOptionsResponse200) & {
+export type oauthAuthorizationServerMetadataGetResponseSuccess = (oauthAuthorizationServerMetadataGetResponse200) & {
   headers: Headers;
 };
-export type authPasskeyAuthenticateOptionsResponseError = (authPasskeyAuthenticateOptionsResponseDefault) & {
-  headers: Headers;
-};
+;
 
-export type authPasskeyAuthenticateOptionsResponse = (authPasskeyAuthenticateOptionsResponseSuccess | authPasskeyAuthenticateOptionsResponseError)
+export type oauthAuthorizationServerMetadataGetResponse = (oauthAuthorizationServerMetadataGetResponseSuccess)
 
-export const getAuthPasskeyAuthenticateOptionsUrl = () => {
+export const getOauthAuthorizationServerMetadataGetUrl = () => {
 
 
 
 
-  return `/auth/passkey/authenticate/options`
+  return `/.well-known/oauth-authorization-server`
 }
 
-export const authPasskeyAuthenticateOptions = async (authPasskeyAuthenticateOptionsBody: AuthPasskeyAuthenticateOptionsBody, options?: RequestInit): Promise<authPasskeyAuthenticateOptionsResponse> => {
+export const oauthAuthorizationServerMetadataGet = async ( options?: RequestInit): Promise<oauthAuthorizationServerMetadataGetResponse> => {
 
-  return customInstance<authPasskeyAuthenticateOptionsResponse>(getAuthPasskeyAuthenticateOptionsUrl(),
+  return customInstance<oauthAuthorizationServerMetadataGetResponse>(getOauthAuthorizationServerMetadataGetUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      authPasskeyAuthenticateOptionsBody,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getAuthPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,{data: BodyType<AuthPasskeyAuthenticateOptionsBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,{data: BodyType<AuthPasskeyAuthenticateOptionsBody>}, TContext> => {
 
-const mutationKey = ['authPasskeyAuthenticateOptions'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, {data: BodyType<AuthPasskeyAuthenticateOptionsBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authPasskeyAuthenticateOptions(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthPasskeyAuthenticateOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>>
-    export type AuthPasskeyAuthenticateOptionsMutationBody = BodyType<AuthPasskeyAuthenticateOptionsBody>
-    export type AuthPasskeyAuthenticateOptionsMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Begin passkey authentication
- */
-export const useAuthPasskeyAuthenticateOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,{data: BodyType<AuthPasskeyAuthenticateOptionsBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>,
-        TError,
-        {data: BodyType<AuthPasskeyAuthenticateOptionsBody>},
-        TContext
-      > => {
-      return useMutation(getAuthPasskeyAuthenticateOptionsMutationOptions(options), queryClient);
+export const getOauthAuthorizationServerMetadataGetQueryKey = () => {
+    return [
+    `/.well-known/oauth-authorization-server`
+    ] as const;
     }
+
+
+export const getOauthAuthorizationServerMetadataGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthAuthorizationServerMetadataGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>> = ({ signal }) => oauthAuthorizationServerMetadataGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type OauthAuthorizationServerMetadataGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>>
+export type OauthAuthorizationServerMetadataGetQueryError = ErrorType<unknown>
+
+
+export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get OAuth authorization server metadata
+ */
+
+export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getOauthAuthorizationServerMetadataGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 /**
- * Verify the passkey credential and return access tokens
- * @summary Complete passkey authentication
+ * @summary Get OAuth protected resource metadata (root)
  */
-export type authPasskeyAuthenticateResponse200 = {
-  data: PasskeyAuthOutput
+export type oauthProtectedResourceMetadataRootGetResponse200 = {
+  data: OAuthProtectedResourceMetadataResponse
   status: 200
 }
 
-export type authPasskeyAuthenticateResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type authPasskeyAuthenticateResponseSuccess = (authPasskeyAuthenticateResponse200) & {
+export type oauthProtectedResourceMetadataRootGetResponseSuccess = (oauthProtectedResourceMetadataRootGetResponse200) & {
   headers: Headers;
 };
-export type authPasskeyAuthenticateResponseError = (authPasskeyAuthenticateResponseDefault) & {
-  headers: Headers;
-};
+;
 
-export type authPasskeyAuthenticateResponse = (authPasskeyAuthenticateResponseSuccess | authPasskeyAuthenticateResponseError)
+export type oauthProtectedResourceMetadataRootGetResponse = (oauthProtectedResourceMetadataRootGetResponseSuccess)
 
-export const getAuthPasskeyAuthenticateUrl = () => {
+export const getOauthProtectedResourceMetadataRootGetUrl = () => {
 
 
 
 
-  return `/auth/passkey/authenticate`
+  return `/.well-known/oauth-protected-resource`
 }
 
-export const authPasskeyAuthenticate = async (passkeyAuthInput: PasskeyAuthInput, options?: RequestInit): Promise<authPasskeyAuthenticateResponse> => {
+export const oauthProtectedResourceMetadataRootGet = async ( options?: RequestInit): Promise<oauthProtectedResourceMetadataRootGetResponse> => {
 
-  return customInstance<authPasskeyAuthenticateResponse>(getAuthPasskeyAuthenticateUrl(),
+  return customInstance<oauthProtectedResourceMetadataRootGetResponse>(getOauthProtectedResourceMetadataRootGetUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      passkeyAuthInput,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getAuthPasskeyAuthenticateMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<PasskeyAuthInput>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<PasskeyAuthInput>}, TContext> => {
 
-const mutationKey = ['authPasskeyAuthenticate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, {data: BodyType<PasskeyAuthInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authPasskeyAuthenticate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthPasskeyAuthenticateMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyAuthenticate>>>
-    export type AuthPasskeyAuthenticateMutationBody = BodyType<PasskeyAuthInput>
-    export type AuthPasskeyAuthenticateMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Complete passkey authentication
- */
-export const useAuthPasskeyAuthenticate = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<PasskeyAuthInput>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authPasskeyAuthenticate>>,
-        TError,
-        {data: BodyType<PasskeyAuthInput>},
-        TContext
-      > => {
-      return useMutation(getAuthPasskeyAuthenticateMutationOptions(options), queryClient);
+export const getOauthProtectedResourceMetadataRootGetQueryKey = () => {
+    return [
+    `/.well-known/oauth-protected-resource`
+    ] as const;
     }
+
+
+export const getOauthProtectedResourceMetadataRootGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthProtectedResourceMetadataRootGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>> = ({ signal }) => oauthProtectedResourceMetadataRootGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type OauthProtectedResourceMetadataRootGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>>
+export type OauthProtectedResourceMetadataRootGetQueryError = ErrorType<unknown>
+
+
+export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get OAuth protected resource metadata (root)
+ */
+
+export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getOauthProtectedResourceMetadataRootGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 /**
- * Returns a WebAuthn challenge and credential creation options to register a new passkey
- * @summary Begin passkey registration
+ * @summary Get OAuth protected resource metadata
  */
-export type authPasskeyRegisterOptionsResponse200 = {
-  data: PasskeyAuthOptionsOutput
+export type oauthProtectedResourceMetadataGetResponse200 = {
+  data: OAuthProtectedResourceMetadataResponse
   status: 200
 }
 
-export type authPasskeyRegisterOptionsResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type authPasskeyRegisterOptionsResponseSuccess = (authPasskeyRegisterOptionsResponse200) & {
+export type oauthProtectedResourceMetadataGetResponseSuccess = (oauthProtectedResourceMetadataGetResponse200) & {
   headers: Headers;
 };
-export type authPasskeyRegisterOptionsResponseError = (authPasskeyRegisterOptionsResponseDefault) & {
-  headers: Headers;
-};
+;
 
-export type authPasskeyRegisterOptionsResponse = (authPasskeyRegisterOptionsResponseSuccess | authPasskeyRegisterOptionsResponseError)
+export type oauthProtectedResourceMetadataGetResponse = (oauthProtectedResourceMetadataGetResponseSuccess)
 
-export const getAuthPasskeyRegisterOptionsUrl = () => {
+export const getOauthProtectedResourceMetadataGetUrl = () => {
 
 
 
 
-  return `/auth/passkey/register/options`
+  return `/.well-known/oauth-protected-resource/mcp`
 }
 
-export const authPasskeyRegisterOptions = async (authPasskeyRegisterOptionsBody: AuthPasskeyRegisterOptionsBody, options?: RequestInit): Promise<authPasskeyRegisterOptionsResponse> => {
+export const oauthProtectedResourceMetadataGet = async ( options?: RequestInit): Promise<oauthProtectedResourceMetadataGetResponse> => {
 
-  return customInstance<authPasskeyRegisterOptionsResponse>(getAuthPasskeyRegisterOptionsUrl(),
+  return customInstance<oauthProtectedResourceMetadataGetResponse>(getOauthProtectedResourceMetadataGetUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      authPasskeyRegisterOptionsBody,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getAuthPasskeyRegisterOptionsMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,{data: BodyType<AuthPasskeyRegisterOptionsBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,{data: BodyType<AuthPasskeyRegisterOptionsBody>}, TContext> => {
 
-const mutationKey = ['authPasskeyRegisterOptions'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, {data: BodyType<AuthPasskeyRegisterOptionsBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authPasskeyRegisterOptions(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthPasskeyRegisterOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>>
-    export type AuthPasskeyRegisterOptionsMutationBody = BodyType<AuthPasskeyRegisterOptionsBody>
-    export type AuthPasskeyRegisterOptionsMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Begin passkey registration
- */
-export const useAuthPasskeyRegisterOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,{data: BodyType<AuthPasskeyRegisterOptionsBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authPasskeyRegisterOptions>>,
-        TError,
-        {data: BodyType<AuthPasskeyRegisterOptionsBody>},
-        TContext
-      > => {
-      return useMutation(getAuthPasskeyRegisterOptionsMutationOptions(options), queryClient);
+export const getOauthProtectedResourceMetadataGetQueryKey = () => {
+    return [
+    `/.well-known/oauth-protected-resource/mcp`
+    ] as const;
     }
 
+
+export const getOauthProtectedResourceMetadataGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthProtectedResourceMetadataGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>> = ({ signal }) => oauthProtectedResourceMetadataGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type OauthProtectedResourceMetadataGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>>
+export type OauthProtectedResourceMetadataGetQueryError = ErrorType<unknown>
+
+
+export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>,
+          TError,
+          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * Save the new passkey credential for the authenticated user
- * @summary Complete passkey registration
+ * @summary Get OAuth protected resource metadata
  */
-export type authPasskeyRegisterFinishResponse200 = {
-  data: PasskeyRegisterFinishOutput
-  status: 200
+
+export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getOauthProtectedResourceMetadataGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
 }
 
-export type authPasskeyRegisterFinishResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type authPasskeyRegisterFinishResponseSuccess = (authPasskeyRegisterFinishResponse200) & {
-  headers: Headers;
-};
-export type authPasskeyRegisterFinishResponseError = (authPasskeyRegisterFinishResponseDefault) & {
-  headers: Headers;
-};
-
-export type authPasskeyRegisterFinishResponse = (authPasskeyRegisterFinishResponseSuccess | authPasskeyRegisterFinishResponseError)
-
-export const getAuthPasskeyRegisterFinishUrl = () => {
 
 
 
-
-  return `/auth/passkey/register/finish`
-}
-
-export const authPasskeyRegisterFinish = async (passkeyRegisterFinishInput: PasskeyRegisterFinishInput, options?: RequestInit): Promise<authPasskeyRegisterFinishResponse> => {
-
-  return customInstance<authPasskeyRegisterFinishResponse>(getAuthPasskeyRegisterFinishUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      passkeyRegisterFinishInput,)
-  }
-);}
-
-
-
-
-export const getAuthPasskeyRegisterFinishMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<PasskeyRegisterFinishInput>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<PasskeyRegisterFinishInput>}, TContext> => {
-
-const mutationKey = ['authPasskeyRegisterFinish'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, {data: BodyType<PasskeyRegisterFinishInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authPasskeyRegisterFinish(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthPasskeyRegisterFinishMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>>
-    export type AuthPasskeyRegisterFinishMutationBody = BodyType<PasskeyRegisterFinishInput>
-    export type AuthPasskeyRegisterFinishMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Complete passkey registration
- */
-export const useAuthPasskeyRegisterFinish = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<PasskeyRegisterFinishInput>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authPasskeyRegisterFinish>>,
-        TError,
-        {data: BodyType<PasskeyRegisterFinishInput>},
-        TContext
-      > => {
-      return useMutation(getAuthPasskeyRegisterFinishMutationOptions(options), queryClient);
-    }
 
 /**
  * Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)
@@ -1197,6 +2042,251 @@ export function useAvailabilityTypes<TData = Awaited<ReturnType<typeof availabil
 
 
 /**
+ * Fetch building details by canonical ID
+ * @summary Get building detail
+ */
+export type buildingsDetailResponse200 = {
+  data: Building
+  status: 200
+}
+
+export type buildingsDetailResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type buildingsDetailResponseSuccess = (buildingsDetailResponse200) & {
+  headers: Headers;
+};
+export type buildingsDetailResponseError = (buildingsDetailResponseDefault) & {
+  headers: Headers;
+};
+
+export type buildingsDetailResponse = (buildingsDetailResponseSuccess | buildingsDetailResponseError)
+
+export const getBuildingsDetailUrl = (canonicalId: string,) => {
+
+
+
+
+  return `/api/v1/buildings/${canonicalId}`
+}
+
+export const buildingsDetail = async (canonicalId: string, options?: RequestInit): Promise<buildingsDetailResponse> => {
+
+  return customInstance<buildingsDetailResponse>(getBuildingsDetailUrl(canonicalId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildingsDetailQueryKey = (canonicalId: string,) => {
+    return [
+    `/api/v1/buildings/${canonicalId}`
+    ] as const;
+    }
+
+
+export const getBuildingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildingsDetailQueryKey(canonicalId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildingsDetail>>> = ({ signal }) => buildingsDetail(canonicalId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type BuildingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof buildingsDetail>>>
+export type BuildingsDetailQueryError = ErrorType<ErrorModel>
+
+
+export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof buildingsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof buildingsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof buildingsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof buildingsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get building detail
+ */
+
+export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getBuildingsDetailQueryOptions(canonicalId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Fetch canonical detail for an ad or building by canonical ID or source URL
+ * @summary Get entity detail
+ */
+export type entityDetailResponse200 = {
+  data: EntityDetailOutputBody
+  status: 200
+}
+
+export type entityDetailResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type entityDetailResponseSuccess = (entityDetailResponse200) & {
+  headers: Headers;
+};
+export type entityDetailResponseError = (entityDetailResponseDefault) & {
+  headers: Headers;
+};
+
+export type entityDetailResponse = (entityDetailResponseSuccess | entityDetailResponseError)
+
+export const getEntityDetailUrl = (params: EntityDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/entity?${stringifiedParams}` : `/api/v1/entity`
+}
+
+export const entityDetail = async (params: EntityDetailParams, options?: RequestInit): Promise<entityDetailResponse> => {
+
+  return customInstance<entityDetailResponse>(getEntityDetailUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getEntityDetailQueryKey = (params?: EntityDetailParams,) => {
+    return [
+    `/api/v1/entity`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getEntityDetailQueryOptions = <TData = Awaited<ReturnType<typeof entityDetail>>, TError = ErrorType<ErrorModel>>(params: EntityDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getEntityDetailQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof entityDetail>>> = ({ signal }) => entityDetail(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type EntityDetailQueryResult = NonNullable<Awaited<ReturnType<typeof entityDetail>>>
+export type EntityDetailQueryError = ErrorType<ErrorModel>
+
+
+export function useEntityDetail<TData = Awaited<ReturnType<typeof entityDetail>>, TError = ErrorType<ErrorModel>>(
+ params: EntityDetailParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof entityDetail>>,
+          TError,
+          Awaited<ReturnType<typeof entityDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useEntityDetail<TData = Awaited<ReturnType<typeof entityDetail>>, TError = ErrorType<ErrorModel>>(
+ params: EntityDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof entityDetail>>,
+          TError,
+          Awaited<ReturnType<typeof entityDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useEntityDetail<TData = Awaited<ReturnType<typeof entityDetail>>, TError = ErrorType<ErrorModel>>(
+ params: EntityDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get entity detail
+ */
+
+export function useEntityDetail<TData = Awaited<ReturnType<typeof entityDetail>>, TError = ErrorType<ErrorModel>>(
+ params: EntityDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof entityDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getEntityDetailQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
  * @summary Echo a message
  */
 export type pingResponse200 = {
@@ -1656,221 +2746,46 @@ export function usePricesTransactionsFiltered<TData = Awaited<ReturnType<typeof 
 
 
 /**
- * Create an anonymous user and obtain access and refresh tokens
- * @summary Sign in anonymously
+ * Search rentals using the shared provider-neutral rental model
+ * @summary Search rentals
  */
-export type authSignInAnonymousResponse200 = {
-  data: AuthTokensResponse
+export type rentalsSearchResponse200 = {
+  data: PageRentalSummary
   status: 200
 }
 
-export type authSignInAnonymousResponseDefault = {
+export type rentalsSearchResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type authSignInAnonymousResponseSuccess = (authSignInAnonymousResponse200) & {
+export type rentalsSearchResponseSuccess = (rentalsSearchResponse200) & {
   headers: Headers;
 };
-export type authSignInAnonymousResponseError = (authSignInAnonymousResponseDefault) & {
+export type rentalsSearchResponseError = (rentalsSearchResponseDefault) & {
   headers: Headers;
 };
 
-export type authSignInAnonymousResponse = (authSignInAnonymousResponseSuccess | authSignInAnonymousResponseError)
+export type rentalsSearchResponse = (rentalsSearchResponseSuccess | rentalsSearchResponseError)
 
-export const getAuthSignInAnonymousUrl = () => {
+export const getRentalsSearchUrl = (params?: RentalsSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
-
-
-  return `/auth/anonymous`
-}
-
-export const authSignInAnonymous = async (signInAnonymousInputBody: NonReadonly<SignInAnonymousInputBody>, options?: RequestInit): Promise<authSignInAnonymousResponse> => {
-
-  return customInstance<authSignInAnonymousResponse>(getAuthSignInAnonymousUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      signInAnonymousInputBody,)
-  }
-);}
-
-
-
-
-export const getAuthSignInAnonymousMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignInAnonymous>>, TError,{data: BodyType<NonReadonly<SignInAnonymousInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authSignInAnonymous>>, TError,{data: BodyType<NonReadonly<SignInAnonymousInputBody>>}, TContext> => {
-
-const mutationKey = ['authSignInAnonymous'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignInAnonymous>>, {data: BodyType<NonReadonly<SignInAnonymousInputBody>>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authSignInAnonymous(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthSignInAnonymousMutationResult = NonNullable<Awaited<ReturnType<typeof authSignInAnonymous>>>
-    export type AuthSignInAnonymousMutationBody = BodyType<NonReadonly<SignInAnonymousInputBody>>
-    export type AuthSignInAnonymousMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Sign in anonymously
- */
-export const useAuthSignInAnonymous = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignInAnonymous>>, TError,{data: BodyType<NonReadonly<SignInAnonymousInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authSignInAnonymous>>,
-        TError,
-        {data: BodyType<NonReadonly<SignInAnonymousInputBody>>},
-        TContext
-      > => {
-      return useMutation(getAuthSignInAnonymousMutationOptions(options), queryClient);
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
     }
+  });
 
-/**
- * Exchange an Apple authorization code for access and refresh tokens
- * @summary Sign in with Apple
- */
-export type authSignInWithAppleResponse200 = {
-  data: AuthTokensResponse
-  status: 200
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/rentals?${stringifiedParams}` : `/api/v1/rentals`
 }
 
-export type authSignInWithAppleResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
+export const rentalsSearch = async (params?: RentalsSearchParams, options?: RequestInit): Promise<rentalsSearchResponse> => {
 
-export type authSignInWithAppleResponseSuccess = (authSignInWithAppleResponse200) & {
-  headers: Headers;
-};
-export type authSignInWithAppleResponseError = (authSignInWithAppleResponseDefault) & {
-  headers: Headers;
-};
-
-export type authSignInWithAppleResponse = (authSignInWithAppleResponseSuccess | authSignInWithAppleResponseError)
-
-export const getAuthSignInWithAppleUrl = () => {
-
-
-
-
-  return `/auth/apple`
-}
-
-export const authSignInWithApple = async (signInWithAppleInputBody: NonReadonly<SignInWithAppleInputBody>, options?: RequestInit): Promise<authSignInWithAppleResponse> => {
-
-  return customInstance<authSignInWithAppleResponse>(getAuthSignInWithAppleUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      signInWithAppleInputBody,)
-  }
-);}
-
-
-
-
-export const getAuthSignInWithAppleMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignInWithApple>>, TError,{data: BodyType<NonReadonly<SignInWithAppleInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authSignInWithApple>>, TError,{data: BodyType<NonReadonly<SignInWithAppleInputBody>>}, TContext> => {
-
-const mutationKey = ['authSignInWithApple'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignInWithApple>>, {data: BodyType<NonReadonly<SignInWithAppleInputBody>>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authSignInWithApple(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthSignInWithAppleMutationResult = NonNullable<Awaited<ReturnType<typeof authSignInWithApple>>>
-    export type AuthSignInWithAppleMutationBody = BodyType<NonReadonly<SignInWithAppleInputBody>>
-    export type AuthSignInWithAppleMutationError = ErrorType<ErrorModel>
-
-    /**
- * @summary Sign in with Apple
- */
-export const useAuthSignInWithApple = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignInWithApple>>, TError,{data: BodyType<NonReadonly<SignInWithAppleInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authSignInWithApple>>,
-        TError,
-        {data: BodyType<NonReadonly<SignInWithAppleInputBody>>},
-        TContext
-      > => {
-      return useMutation(getAuthSignInWithAppleMutationOptions(options), queryClient);
-    }
-
-/**
- * Returns information about the authenticated user including feature flags
- * @summary Get current user info
- */
-export type authGetCurrentUserResponse200 = {
-  data: CurrentUserOutputBody
-  status: 200
-}
-
-export type authGetCurrentUserResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type authGetCurrentUserResponseSuccess = (authGetCurrentUserResponse200) & {
-  headers: Headers;
-};
-export type authGetCurrentUserResponseError = (authGetCurrentUserResponseDefault) & {
-  headers: Headers;
-};
-
-export type authGetCurrentUserResponse = (authGetCurrentUserResponseSuccess | authGetCurrentUserResponseError)
-
-export const getAuthGetCurrentUserUrl = () => {
-
-
-
-
-  return `/auth/me`
-}
-
-export const authGetCurrentUser = async ( options?: RequestInit): Promise<authGetCurrentUserResponse> => {
-
-  return customInstance<authGetCurrentUserResponse>(getAuthGetCurrentUserUrl(),
+  return customInstance<rentalsSearchResponse>(getRentalsSearchUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1883,69 +2798,69 @@ export const authGetCurrentUser = async ( options?: RequestInit): Promise<authGe
 
 
 
-export const getAuthGetCurrentUserQueryKey = () => {
+export const getRentalsSearchQueryKey = (params?: RentalsSearchParams,) => {
     return [
-    `/auth/me`
+    `/api/v1/rentals`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getAuthGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof authGetCurrentUser>>, TError = ErrorType<ErrorModel>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getRentalsSearchQueryOptions = <TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getAuthGetCurrentUserQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getRentalsSearchQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof authGetCurrentUser>>> = ({ signal }) => authGetCurrentUser({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsSearch>>> = ({ signal }) => rentalsSearch(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type AuthGetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof authGetCurrentUser>>>
-export type AuthGetCurrentUserQueryError = ErrorType<ErrorModel>
+export type RentalsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof rentalsSearch>>>
+export type RentalsSearchQueryError = ErrorType<ErrorModel>
 
 
-export function useAuthGetCurrentUser<TData = Awaited<ReturnType<typeof authGetCurrentUser>>, TError = ErrorType<ErrorModel>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData>> & Pick<
+export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  RentalsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authGetCurrentUser>>,
+          Awaited<ReturnType<typeof rentalsSearch>>,
           TError,
-          Awaited<ReturnType<typeof authGetCurrentUser>>
+          Awaited<ReturnType<typeof rentalsSearch>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthGetCurrentUser<TData = Awaited<ReturnType<typeof authGetCurrentUser>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData>> & Pick<
+export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authGetCurrentUser>>,
+          Awaited<ReturnType<typeof rentalsSearch>>,
           TError,
-          Awaited<ReturnType<typeof authGetCurrentUser>>
+          Awaited<ReturnType<typeof rentalsSearch>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthGetCurrentUser<TData = Awaited<ReturnType<typeof authGetCurrentUser>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get current user info
+ * @summary Search rentals
  */
 
-export function useAuthGetCurrentUser<TData = Awaited<ReturnType<typeof authGetCurrentUser>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetCurrentUser>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getAuthGetCurrentUserQueryOptions(options)
+  const queryOptions = getRentalsSearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1957,56 +2872,672 @@ export function useAuthGetCurrentUser<TData = Awaited<ReturnType<typeof authGetC
 
 
 /**
- * Exchange a refresh token for new access and refresh tokens
- * @summary Refresh tokens
+ * Fetch a rental by canonical ID
+ * @summary Get rental detail
  */
-export type authRefreshTokensResponse200 = {
-  data: RefreshTokensOutputBody
+export type rentalsDetailResponse200 = {
+  data: Rental
   status: 200
 }
 
-export type authRefreshTokensResponseDefault = {
+export type rentalsDetailResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type authRefreshTokensResponseSuccess = (authRefreshTokensResponse200) & {
+export type rentalsDetailResponseSuccess = (rentalsDetailResponse200) & {
   headers: Headers;
 };
-export type authRefreshTokensResponseError = (authRefreshTokensResponseDefault) & {
+export type rentalsDetailResponseError = (rentalsDetailResponseDefault) & {
   headers: Headers;
 };
 
-export type authRefreshTokensResponse = (authRefreshTokensResponseSuccess | authRefreshTokensResponseError)
+export type rentalsDetailResponse = (rentalsDetailResponseSuccess | rentalsDetailResponseError)
 
-export const getAuthRefreshTokensUrl = () => {
-
-
+export const getRentalsDetailUrl = (canonicalId: string,) => {
 
 
-  return `/auth/refresh`
+
+
+  return `/api/v1/rentals/${canonicalId}`
 }
 
-export const authRefreshTokens = async (refreshTokensInputBody: NonReadonly<RefreshTokensInputBody>, options?: RequestInit): Promise<authRefreshTokensResponse> => {
+export const rentalsDetail = async (canonicalId: string, options?: RequestInit): Promise<rentalsDetailResponse> => {
 
-  return customInstance<authRefreshTokensResponse>(getAuthRefreshTokensUrl(),
+  return customInstance<rentalsDetailResponse>(getRentalsDetailUrl(canonicalId),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      refreshTokensInputBody,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getAuthRefreshTokensMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefreshTokens>>, TError,{data: BodyType<NonReadonly<RefreshTokensInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authRefreshTokens>>, TError,{data: BodyType<NonReadonly<RefreshTokensInputBody>>}, TContext> => {
 
-const mutationKey = ['authRefreshTokens'];
+export const getRentalsDetailQueryKey = (canonicalId: string,) => {
+    return [
+    `/api/v1/rentals/${canonicalId}`
+    ] as const;
+    }
+
+
+export const getRentalsDetailQueryOptions = <TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getRentalsDetailQueryKey(canonicalId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsDetail>>> = ({ signal }) => rentalsDetail(canonicalId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type RentalsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof rentalsDetail>>>
+export type RentalsDetailQueryError = ErrorType<ErrorModel>
+
+
+export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rentalsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof rentalsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rentalsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof rentalsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get rental detail
+ */
+
+export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getRentalsDetailQueryOptions(canonicalId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Resolve a source URL into a canonical ID for use with detail endpoints
+ * @summary Resolve source URL
+ */
+export type resolveCanonicalIdResponse200 = {
+  data: ResolveCanonicalIDOutputBody
+  status: 200
+}
+
+export type resolveCanonicalIdResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type resolveCanonicalIdResponseSuccess = (resolveCanonicalIdResponse200) & {
+  headers: Headers;
+};
+export type resolveCanonicalIdResponseError = (resolveCanonicalIdResponseDefault) & {
+  headers: Headers;
+};
+
+export type resolveCanonicalIdResponse = (resolveCanonicalIdResponseSuccess | resolveCanonicalIdResponseError)
+
+export const getResolveCanonicalIdUrl = (params: ResolveCanonicalIdParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/resolve?${stringifiedParams}` : `/api/v1/resolve`
+}
+
+export const resolveCanonicalId = async (params: ResolveCanonicalIdParams, options?: RequestInit): Promise<resolveCanonicalIdResponse> => {
+
+  return customInstance<resolveCanonicalIdResponse>(getResolveCanonicalIdUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveCanonicalIdQueryKey = (params?: ResolveCanonicalIdParams,) => {
+    return [
+    `/api/v1/resolve`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getResolveCanonicalIdQueryOptions = <TData = Awaited<ReturnType<typeof resolveCanonicalId>>, TError = ErrorType<ErrorModel>>(params: ResolveCanonicalIdParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getResolveCanonicalIdQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof resolveCanonicalId>>> = ({ signal }) => resolveCanonicalId(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ResolveCanonicalIdQueryResult = NonNullable<Awaited<ReturnType<typeof resolveCanonicalId>>>
+export type ResolveCanonicalIdQueryError = ErrorType<ErrorModel>
+
+
+export function useResolveCanonicalId<TData = Awaited<ReturnType<typeof resolveCanonicalId>>, TError = ErrorType<ErrorModel>>(
+ params: ResolveCanonicalIdParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveCanonicalId>>,
+          TError,
+          Awaited<ReturnType<typeof resolveCanonicalId>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveCanonicalId<TData = Awaited<ReturnType<typeof resolveCanonicalId>>, TError = ErrorType<ErrorModel>>(
+ params: ResolveCanonicalIdParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveCanonicalId>>,
+          TError,
+          Awaited<ReturnType<typeof resolveCanonicalId>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveCanonicalId<TData = Awaited<ReturnType<typeof resolveCanonicalId>>, TError = ErrorType<ErrorModel>>(
+ params: ResolveCanonicalIdParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Resolve source URL
+ */
+
+export function useResolveCanonicalId<TData = Awaited<ReturnType<typeof resolveCanonicalId>>, TError = ErrorType<ErrorModel>>(
+ params: ResolveCanonicalIdParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCanonicalId>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getResolveCanonicalIdQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Search sale listings using the shared provider-neutral sale listing model
+ * @summary Search sale listings
+ */
+export type saleListingsSearchResponse200 = {
+  data: PageSaleListingSummary
+  status: 200
+}
+
+export type saleListingsSearchResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type saleListingsSearchResponseSuccess = (saleListingsSearchResponse200) & {
+  headers: Headers;
+};
+export type saleListingsSearchResponseError = (saleListingsSearchResponseDefault) & {
+  headers: Headers;
+};
+
+export type saleListingsSearchResponse = (saleListingsSearchResponseSuccess | saleListingsSearchResponseError)
+
+export const getSaleListingsSearchUrl = (params?: SaleListingsSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/sale-listings?${stringifiedParams}` : `/api/v1/sale-listings`
+}
+
+export const saleListingsSearch = async (params?: SaleListingsSearchParams, options?: RequestInit): Promise<saleListingsSearchResponse> => {
+
+  return customInstance<saleListingsSearchResponse>(getSaleListingsSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSaleListingsSearchQueryKey = (params?: SaleListingsSearchParams,) => {
+    return [
+    `/api/v1/sale-listings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSaleListingsSearchQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSaleListingsSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsSearch>>> = ({ signal }) => saleListingsSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SaleListingsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsSearch>>>
+export type SaleListingsSearchQueryError = ErrorType<ErrorModel>
+
+
+export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  SaleListingsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsSearch>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsSearch>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search sale listings
+ */
+
+export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSaleListingsSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Fetch a sale listing by canonical ID
+ * @summary Get sale listing detail
+ */
+export type saleListingsDetailResponse200 = {
+  data: SaleListing
+  status: 200
+}
+
+export type saleListingsDetailResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type saleListingsDetailResponseSuccess = (saleListingsDetailResponse200) & {
+  headers: Headers;
+};
+export type saleListingsDetailResponseError = (saleListingsDetailResponseDefault) & {
+  headers: Headers;
+};
+
+export type saleListingsDetailResponse = (saleListingsDetailResponseSuccess | saleListingsDetailResponseError)
+
+export const getSaleListingsDetailUrl = (canonicalId: string,) => {
+
+
+
+
+  return `/api/v1/sale-listings/${canonicalId}`
+}
+
+export const saleListingsDetail = async (canonicalId: string, options?: RequestInit): Promise<saleListingsDetailResponse> => {
+
+  return customInstance<saleListingsDetailResponse>(getSaleListingsDetailUrl(canonicalId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSaleListingsDetailQueryKey = (canonicalId: string,) => {
+    return [
+    `/api/v1/sale-listings/${canonicalId}`
+    ] as const;
+    }
+
+
+export const getSaleListingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSaleListingsDetailQueryKey(canonicalId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsDetail>>> = ({ signal }) => saleListingsDetail(canonicalId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(canonicalId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SaleListingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsDetail>>>
+export type SaleListingsDetailQueryError = ErrorType<ErrorModel>
+
+
+export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get sale listing detail
+ */
+
+export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
+ canonicalId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSaleListingsDetailQueryOptions(canonicalId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Search ads and buildings by free text, address, city, postal code, price, and area
+ * @summary Search entities
+ */
+export type searchResponse200 = {
+  data: SearchOutputBody
+  status: 200
+}
+
+export type searchResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type searchResponseSuccess = (searchResponse200) & {
+  headers: Headers;
+};
+export type searchResponseError = (searchResponseDefault) & {
+  headers: Headers;
+};
+
+export type searchResponse = (searchResponseSuccess | searchResponseError)
+
+export const getSearchUrl = (params?: SearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/search?${stringifiedParams}` : `/api/v1/search`
+}
+
+export const search = async (params?: SearchParams, options?: RequestInit): Promise<searchResponse> => {
+
+  return customInstance<searchResponse>(getSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchQueryKey = (params?: SearchParams,) => {
+    return [
+    `/api/v1/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchQueryOptions = <TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<ErrorModel>>(params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof search>>> = ({ signal }) => search(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchQueryResult = NonNullable<Awaited<ReturnType<typeof search>>>
+export type SearchQueryError = ErrorType<ErrorModel>
+
+
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  SearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof search>>,
+          TError,
+          Awaited<ReturnType<typeof search>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<ErrorModel>>(
+ params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof search>>,
+          TError,
+          Awaited<ReturnType<typeof search>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<ErrorModel>>(
+ params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search entities
+ */
+
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<ErrorModel>>(
+ params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Exchange an Apple authorization code for access tokens
+ * @summary Sign in with Apple (web)
+ */
+export type authAppleWebResponse200 = {
+  data: AppleWebAuthOutputBody
+  status: 200
+}
+
+export type authAppleWebResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authAppleWebResponseSuccess = (authAppleWebResponse200) & {
+  headers: Headers;
+};
+export type authAppleWebResponseError = (authAppleWebResponseDefault) & {
+  headers: Headers;
+};
+
+export type authAppleWebResponse = (authAppleWebResponseSuccess | authAppleWebResponseError)
+
+export const getAuthAppleWebUrl = () => {
+
+
+
+
+  return `/auth/apple`
+}
+
+export const authAppleWeb = async (appleWebAuthInputBody: NonReadonly<AppleWebAuthInputBody>, options?: RequestInit): Promise<authAppleWebResponse> => {
+
+  return customInstance<authAppleWebResponse>(getAuthAppleWebUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      appleWebAuthInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthAppleWebMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authAppleWeb>>, TError,{data: BodyType<NonReadonly<AppleWebAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authAppleWeb>>, TError,{data: BodyType<NonReadonly<AppleWebAuthInputBody>>}, TContext> => {
+
+const mutationKey = ['authAppleWeb'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2016,10 +3547,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authRefreshTokens>>, {data: BodyType<NonReadonly<RefreshTokensInputBody>>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authAppleWeb>>, {data: BodyType<NonReadonly<AppleWebAuthInputBody>>}> = (props) => {
           const {data} = props ?? {};
 
-          return  authRefreshTokens(data,requestOptions)
+          return  authAppleWeb(data,requestOptions)
         }
 
 
@@ -2029,58 +3560,331 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type AuthRefreshTokensMutationResult = NonNullable<Awaited<ReturnType<typeof authRefreshTokens>>>
-    export type AuthRefreshTokensMutationBody = BodyType<NonReadonly<RefreshTokensInputBody>>
-    export type AuthRefreshTokensMutationError = ErrorType<ErrorModel>
+    export type AuthAppleWebMutationResult = NonNullable<Awaited<ReturnType<typeof authAppleWeb>>>
+    export type AuthAppleWebMutationBody = BodyType<NonReadonly<AppleWebAuthInputBody>>
+    export type AuthAppleWebMutationError = ErrorType<ErrorModel>
 
     /**
- * @summary Refresh tokens
+ * @summary Sign in with Apple (web)
  */
-export const useAuthRefreshTokens = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefreshTokens>>, TError,{data: BodyType<NonReadonly<RefreshTokensInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const useAuthAppleWeb = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authAppleWeb>>, TError,{data: BodyType<NonReadonly<AppleWebAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authRefreshTokens>>,
+        Awaited<ReturnType<typeof authAppleWeb>>,
         TError,
-        {data: BodyType<NonReadonly<RefreshTokensInputBody>>},
+        {data: BodyType<NonReadonly<AppleWebAuthInputBody>>},
         TContext
       > => {
-      return useMutation(getAuthRefreshTokensMutationOptions(options), queryClient);
+      return useMutation(getAuthAppleWebMutationOptions(options), queryClient);
     }
 
 /**
- * Revoke the current session
- * @summary Sign out
+ * Exchange an email sign-in token for access tokens
+ * @summary Confirm email sign-in
  */
-export type authSignOutResponse200 = {
-  data: SignOutOutputBody
+export type authEmailConfirmResponse200 = {
+  data: PasskeyAuthOutputBody
   status: 200
 }
 
-export type authSignOutResponseDefault = {
+export type authEmailConfirmResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type authSignOutResponseSuccess = (authSignOutResponse200) & {
+export type authEmailConfirmResponseSuccess = (authEmailConfirmResponse200) & {
   headers: Headers;
 };
-export type authSignOutResponseError = (authSignOutResponseDefault) & {
+export type authEmailConfirmResponseError = (authEmailConfirmResponseDefault) & {
   headers: Headers;
 };
 
-export type authSignOutResponse = (authSignOutResponseSuccess | authSignOutResponseError)
+export type authEmailConfirmResponse = (authEmailConfirmResponseSuccess | authEmailConfirmResponseError)
 
-export const getAuthSignOutUrl = () => {
-
-
+export const getAuthEmailConfirmUrl = () => {
 
 
-  return `/auth/sign-out`
+
+
+  return `/auth/email/confirm`
 }
 
-export const authSignOut = async ( options?: RequestInit): Promise<authSignOutResponse> => {
+export const authEmailConfirm = async (emailAuthConfirmInputBody: NonReadonly<EmailAuthConfirmInputBody>, options?: RequestInit): Promise<authEmailConfirmResponse> => {
 
-  return customInstance<authSignOutResponse>(getAuthSignOutUrl(),
+  return customInstance<authEmailConfirmResponse>(getAuthEmailConfirmUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emailAuthConfirmInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthEmailConfirmMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authEmailConfirm>>, TError,{data: BodyType<NonReadonly<EmailAuthConfirmInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authEmailConfirm>>, TError,{data: BodyType<NonReadonly<EmailAuthConfirmInputBody>>}, TContext> => {
+
+const mutationKey = ['authEmailConfirm'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authEmailConfirm>>, {data: BodyType<NonReadonly<EmailAuthConfirmInputBody>>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authEmailConfirm(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthEmailConfirmMutationResult = NonNullable<Awaited<ReturnType<typeof authEmailConfirm>>>
+    export type AuthEmailConfirmMutationBody = BodyType<NonReadonly<EmailAuthConfirmInputBody>>
+    export type AuthEmailConfirmMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Confirm email sign-in
+ */
+export const useAuthEmailConfirm = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authEmailConfirm>>, TError,{data: BodyType<NonReadonly<EmailAuthConfirmInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authEmailConfirm>>,
+        TError,
+        {data: BodyType<NonReadonly<EmailAuthConfirmInputBody>>},
+        TContext
+      > => {
+      return useMutation(getAuthEmailConfirmMutationOptions(options), queryClient);
+    }
+
+/**
+ * Send a sign-in link to the requested email address
+ * @summary Request email sign-in link
+ */
+export type authEmailRequestResponse200 = {
+  data: EmailAuthRequestOutputBody
+  status: 200
+}
+
+export type authEmailRequestResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authEmailRequestResponseSuccess = (authEmailRequestResponse200) & {
+  headers: Headers;
+};
+export type authEmailRequestResponseError = (authEmailRequestResponseDefault) & {
+  headers: Headers;
+};
+
+export type authEmailRequestResponse = (authEmailRequestResponseSuccess | authEmailRequestResponseError)
+
+export const getAuthEmailRequestUrl = () => {
+
+
+
+
+  return `/auth/email/request`
+}
+
+export const authEmailRequest = async (emailAuthRequestInputBody: NonReadonly<EmailAuthRequestInputBody>, options?: RequestInit): Promise<authEmailRequestResponse> => {
+
+  return customInstance<authEmailRequestResponse>(getAuthEmailRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emailAuthRequestInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthEmailRequestMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authEmailRequest>>, TError,{data: BodyType<NonReadonly<EmailAuthRequestInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authEmailRequest>>, TError,{data: BodyType<NonReadonly<EmailAuthRequestInputBody>>}, TContext> => {
+
+const mutationKey = ['authEmailRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authEmailRequest>>, {data: BodyType<NonReadonly<EmailAuthRequestInputBody>>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authEmailRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthEmailRequestMutationResult = NonNullable<Awaited<ReturnType<typeof authEmailRequest>>>
+    export type AuthEmailRequestMutationBody = BodyType<NonReadonly<EmailAuthRequestInputBody>>
+    export type AuthEmailRequestMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Request email sign-in link
+ */
+export const useAuthEmailRequest = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authEmailRequest>>, TError,{data: BodyType<NonReadonly<EmailAuthRequestInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authEmailRequest>>,
+        TError,
+        {data: BodyType<NonReadonly<EmailAuthRequestInputBody>>},
+        TContext
+      > => {
+      return useMutation(getAuthEmailRequestMutationOptions(options), queryClient);
+    }
+
+/**
+ * Verify the passkey credential and return access tokens
+ * @summary Complete passkey authentication
+ */
+export type authPasskeyAuthenticateResponse200 = {
+  data: PasskeyAuthOutputBody
+  status: 200
+}
+
+export type authPasskeyAuthenticateResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authPasskeyAuthenticateResponseSuccess = (authPasskeyAuthenticateResponse200) & {
+  headers: Headers;
+};
+export type authPasskeyAuthenticateResponseError = (authPasskeyAuthenticateResponseDefault) & {
+  headers: Headers;
+};
+
+export type authPasskeyAuthenticateResponse = (authPasskeyAuthenticateResponseSuccess | authPasskeyAuthenticateResponseError)
+
+export const getAuthPasskeyAuthenticateUrl = () => {
+
+
+
+
+  return `/auth/passkey/authenticate`
+}
+
+export const authPasskeyAuthenticate = async (passkeyAuthInputBody: NonReadonly<PasskeyAuthInputBody>, options?: RequestInit): Promise<authPasskeyAuthenticateResponse> => {
+
+  return customInstance<authPasskeyAuthenticateResponse>(getAuthPasskeyAuthenticateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      passkeyAuthInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthPasskeyAuthenticateMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<NonReadonly<PasskeyAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<NonReadonly<PasskeyAuthInputBody>>}, TContext> => {
+
+const mutationKey = ['authPasskeyAuthenticate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, {data: BodyType<NonReadonly<PasskeyAuthInputBody>>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authPasskeyAuthenticate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthPasskeyAuthenticateMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyAuthenticate>>>
+    export type AuthPasskeyAuthenticateMutationBody = BodyType<NonReadonly<PasskeyAuthInputBody>>
+    export type AuthPasskeyAuthenticateMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Complete passkey authentication
+ */
+export const useAuthPasskeyAuthenticate = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticate>>, TError,{data: BodyType<NonReadonly<PasskeyAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authPasskeyAuthenticate>>,
+        TError,
+        {data: BodyType<NonReadonly<PasskeyAuthInputBody>>},
+        TContext
+      > => {
+      return useMutation(getAuthPasskeyAuthenticateMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns a WebAuthn challenge and options for passkey sign-in
+ * @summary Begin passkey authentication
+ */
+export type authPasskeyAuthenticateOptionsResponse200 = {
+  data: PasskeyAuthOptionsOutputBody
+  status: 200
+}
+
+export type authPasskeyAuthenticateOptionsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authPasskeyAuthenticateOptionsResponseSuccess = (authPasskeyAuthenticateOptionsResponse200) & {
+  headers: Headers;
+};
+export type authPasskeyAuthenticateOptionsResponseError = (authPasskeyAuthenticateOptionsResponseDefault) & {
+  headers: Headers;
+};
+
+export type authPasskeyAuthenticateOptionsResponse = (authPasskeyAuthenticateOptionsResponseSuccess | authPasskeyAuthenticateOptionsResponseError)
+
+export const getAuthPasskeyAuthenticateOptionsUrl = () => {
+
+
+
+
+  return `/auth/passkey/authenticate/options`
+}
+
+export const authPasskeyAuthenticateOptions = async ( options?: RequestInit): Promise<authPasskeyAuthenticateOptionsResponse> => {
+
+  return customInstance<authPasskeyAuthenticateOptionsResponse>(getAuthPasskeyAuthenticateOptionsUrl(),
   {
     ...options,
     method: 'POST'
@@ -2092,11 +3896,11 @@ export const authSignOut = async ( options?: RequestInit): Promise<authSignOutRe
 
 
 
-export const getAuthSignOutMutationOptions = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext> => {
+export const getAuthPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,void, TContext> => {
 
-const mutationKey = ['authSignOut'];
+const mutationKey = ['authPasskeyAuthenticateOptions'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2106,10 +3910,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignOut>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, void> = () => {
 
 
-          return  authSignOut(requestOptions)
+          return  authPasskeyAuthenticateOptions(requestOptions)
         }
 
 
@@ -2119,57 +3923,652 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type AuthSignOutMutationResult = NonNullable<Awaited<ReturnType<typeof authSignOut>>>
+    export type AuthPasskeyAuthenticateOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>>
 
-    export type AuthSignOutMutationError = ErrorType<ErrorModel>
+    export type AuthPasskeyAuthenticateOptionsMutationError = ErrorType<ErrorModel>
 
     /**
- * @summary Sign out
+ * @summary Begin passkey authentication
  */
-export const useAuthSignOut = <TError = ErrorType<ErrorModel>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const useAuthPasskeyAuthenticateOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authSignOut>>,
+        Awaited<ReturnType<typeof authPasskeyAuthenticateOptions>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getAuthSignOutMutationOptions(options), queryClient);
+      return useMutation(getAuthPasskeyAuthenticateOptionsMutationOptions(options), queryClient);
     }
 
 /**
- * @summary Health check
+ * Save the new passkey credential for the authenticated user
+ * @summary Complete passkey registration
  */
-export type healthzResponse200 = {
-  data: HealthResponse
+export type authPasskeyRegisterFinishResponse200 = {
+  data: PasskeyRegisterFinishOutputBody
   status: 200
 }
 
-export type healthzResponseDefault = {
+export type authPasskeyRegisterFinishResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type healthzResponseSuccess = (healthzResponse200) & {
+export type authPasskeyRegisterFinishResponseSuccess = (authPasskeyRegisterFinishResponse200) & {
   headers: Headers;
 };
-export type healthzResponseError = (healthzResponseDefault) & {
+export type authPasskeyRegisterFinishResponseError = (authPasskeyRegisterFinishResponseDefault) & {
   headers: Headers;
 };
 
-export type healthzResponse = (healthzResponseSuccess | healthzResponseError)
+export type authPasskeyRegisterFinishResponse = (authPasskeyRegisterFinishResponseSuccess | authPasskeyRegisterFinishResponseError)
 
-export const getHealthzUrl = () => {
-
-
+export const getAuthPasskeyRegisterFinishUrl = () => {
 
 
-  return `/healthz`
+
+
+  return `/auth/passkey/register/finish`
 }
 
-export const healthz = async ( options?: RequestInit): Promise<healthzResponse> => {
+export const authPasskeyRegisterFinish = async (passkeyRegisterFinishInputBody: NonReadonly<PasskeyRegisterFinishInputBody>, options?: RequestInit): Promise<authPasskeyRegisterFinishResponse> => {
 
-  return customInstance<healthzResponse>(getHealthzUrl(),
+  return customInstance<authPasskeyRegisterFinishResponse>(getAuthPasskeyRegisterFinishUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      passkeyRegisterFinishInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthPasskeyRegisterFinishMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>}, TContext> => {
+
+const mutationKey = ['authPasskeyRegisterFinish'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, {data: BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authPasskeyRegisterFinish(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthPasskeyRegisterFinishMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>>
+    export type AuthPasskeyRegisterFinishMutationBody = BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>
+    export type AuthPasskeyRegisterFinishMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Complete passkey registration
+ */
+export const useAuthPasskeyRegisterFinish = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterFinish>>, TError,{data: BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authPasskeyRegisterFinish>>,
+        TError,
+        {data: BodyType<NonReadonly<PasskeyRegisterFinishInputBody>>},
+        TContext
+      > => {
+      return useMutation(getAuthPasskeyRegisterFinishMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns a WebAuthn challenge and options to register a new passkey
+ * @summary Begin passkey registration
+ */
+export type authPasskeyRegisterOptionsResponse200 = {
+  data: PasskeyRegisterOptionsOutputBody
+  status: 200
+}
+
+export type authPasskeyRegisterOptionsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authPasskeyRegisterOptionsResponseSuccess = (authPasskeyRegisterOptionsResponse200) & {
+  headers: Headers;
+};
+export type authPasskeyRegisterOptionsResponseError = (authPasskeyRegisterOptionsResponseDefault) & {
+  headers: Headers;
+};
+
+export type authPasskeyRegisterOptionsResponse = (authPasskeyRegisterOptionsResponseSuccess | authPasskeyRegisterOptionsResponseError)
+
+export const getAuthPasskeyRegisterOptionsUrl = () => {
+
+
+
+
+  return `/auth/passkey/register/options`
+}
+
+export const authPasskeyRegisterOptions = async ( options?: RequestInit): Promise<authPasskeyRegisterOptionsResponse> => {
+
+  return customInstance<authPasskeyRegisterOptionsResponse>(getAuthPasskeyRegisterOptionsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthPasskeyRegisterOptionsMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,void, TContext> => {
+
+const mutationKey = ['authPasskeyRegisterOptions'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, void> = () => {
+
+
+          return  authPasskeyRegisterOptions(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthPasskeyRegisterOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>>
+
+    export type AuthPasskeyRegisterOptionsMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Begin passkey registration
+ */
+export const useAuthPasskeyRegisterOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPasskeyRegisterOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authPasskeyRegisterOptions>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthPasskeyRegisterOptionsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Approve OAuth authorization handoff
+ */
+export type oauthAuthorizeHandoffApproveResponse200 = {
+  data: OAuthHandoffApproveSuccessResponse
+  status: 200
+}
+
+export type oauthAuthorizeHandoffApproveResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthAuthorizeHandoffApproveResponse401 = {
+  data: OAuthErrorResponse
+  status: 401
+}
+
+export type oauthAuthorizeHandoffApproveResponse404 = {
+  data: OAuthErrorResponse
+  status: 404
+}
+
+export type oauthAuthorizeHandoffApproveResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthAuthorizeHandoffApproveResponseSuccess = (oauthAuthorizeHandoffApproveResponse200) & {
+  headers: Headers;
+};
+export type oauthAuthorizeHandoffApproveResponseError = (oauthAuthorizeHandoffApproveResponse400 | oauthAuthorizeHandoffApproveResponse401 | oauthAuthorizeHandoffApproveResponse404 | oauthAuthorizeHandoffApproveResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeHandoffApproveResponse = (oauthAuthorizeHandoffApproveResponseSuccess | oauthAuthorizeHandoffApproveResponseError)
+
+export const getOauthAuthorizeHandoffApproveUrl = () => {
+
+
+
+
+  return `/oauth/authorize/handoff/approve`
+}
+
+export const oauthAuthorizeHandoffApprove = async (oauthAuthorizeHandoffApproveBody: OauthAuthorizeHandoffApproveBody, options?: RequestInit): Promise<oauthAuthorizeHandoffApproveResponse> => {
+
+  return customInstance<oauthAuthorizeHandoffApproveResponse>(getOauthAuthorizeHandoffApproveUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oauthAuthorizeHandoffApproveBody,)
+  }
+);}
+
+
+
+
+export const getOauthAuthorizeHandoffApproveMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext> => {
+
+const mutationKey = ['oauthAuthorizeHandoffApprove'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, {data: BodyType<OauthAuthorizeHandoffApproveBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthAuthorizeHandoffApprove(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthAuthorizeHandoffApproveMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>>
+    export type OauthAuthorizeHandoffApproveMutationBody = BodyType<OauthAuthorizeHandoffApproveBody>
+    export type OauthAuthorizeHandoffApproveMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Approve OAuth authorization handoff
+ */
+export const useOauthAuthorizeHandoffApprove = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>,
+        TError,
+        {data: BodyType<OauthAuthorizeHandoffApproveBody>},
+        TContext
+      > => {
+      return useMutation(getOauthAuthorizeHandoffApproveMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Deny OAuth authorization handoff
+ */
+export type oauthAuthorizeHandoffDenyResponse200 = {
+  data: OAuthHandoffDenySuccessResponse
+  status: 200
+}
+
+export type oauthAuthorizeHandoffDenyResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthAuthorizeHandoffDenyResponse401 = {
+  data: OAuthErrorResponse
+  status: 401
+}
+
+export type oauthAuthorizeHandoffDenyResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthAuthorizeHandoffDenyResponseSuccess = (oauthAuthorizeHandoffDenyResponse200) & {
+  headers: Headers;
+};
+export type oauthAuthorizeHandoffDenyResponseError = (oauthAuthorizeHandoffDenyResponse400 | oauthAuthorizeHandoffDenyResponse401 | oauthAuthorizeHandoffDenyResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeHandoffDenyResponse = (oauthAuthorizeHandoffDenyResponseSuccess | oauthAuthorizeHandoffDenyResponseError)
+
+export const getOauthAuthorizeHandoffDenyUrl = () => {
+
+
+
+
+  return `/oauth/authorize/handoff/deny`
+}
+
+export const oauthAuthorizeHandoffDeny = async (oauthAuthorizeHandoffDenyBody: OauthAuthorizeHandoffDenyBody, options?: RequestInit): Promise<oauthAuthorizeHandoffDenyResponse> => {
+
+  return customInstance<oauthAuthorizeHandoffDenyResponse>(getOauthAuthorizeHandoffDenyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oauthAuthorizeHandoffDenyBody,)
+  }
+);}
+
+
+
+
+export const getOauthAuthorizeHandoffDenyMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext> => {
+
+const mutationKey = ['oauthAuthorizeHandoffDeny'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, {data: BodyType<OauthAuthorizeHandoffDenyBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthAuthorizeHandoffDeny(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthAuthorizeHandoffDenyMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>>
+    export type OauthAuthorizeHandoffDenyMutationBody = BodyType<OauthAuthorizeHandoffDenyBody>
+    export type OauthAuthorizeHandoffDenyMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Deny OAuth authorization handoff
+ */
+export const useOauthAuthorizeHandoffDeny = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>,
+        TError,
+        {data: BodyType<OauthAuthorizeHandoffDenyBody>},
+        TContext
+      > => {
+      return useMutation(getOauthAuthorizeHandoffDenyMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Resolve OAuth authorization handoff
+ */
+export type oauthAuthorizeHandoffResolveResponse200 = {
+  data: OAuthHandoffResolveSuccessResponse
+  status: 200
+}
+
+export type oauthAuthorizeHandoffResolveResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthAuthorizeHandoffResolveResponse401 = {
+  data: OAuthErrorResponse
+  status: 401
+}
+
+export type oauthAuthorizeHandoffResolveResponse404 = {
+  data: OAuthErrorResponse
+  status: 404
+}
+
+export type oauthAuthorizeHandoffResolveResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthAuthorizeHandoffResolveResponseSuccess = (oauthAuthorizeHandoffResolveResponse200) & {
+  headers: Headers;
+};
+export type oauthAuthorizeHandoffResolveResponseError = (oauthAuthorizeHandoffResolveResponse400 | oauthAuthorizeHandoffResolveResponse401 | oauthAuthorizeHandoffResolveResponse404 | oauthAuthorizeHandoffResolveResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeHandoffResolveResponse = (oauthAuthorizeHandoffResolveResponseSuccess | oauthAuthorizeHandoffResolveResponseError)
+
+export const getOauthAuthorizeHandoffResolveUrl = () => {
+
+
+
+
+  return `/oauth/authorize/handoff/resolve`
+}
+
+export const oauthAuthorizeHandoffResolve = async (oauthAuthorizeHandoffResolveBody: OauthAuthorizeHandoffResolveBody, options?: RequestInit): Promise<oauthAuthorizeHandoffResolveResponse> => {
+
+  return customInstance<oauthAuthorizeHandoffResolveResponse>(getOauthAuthorizeHandoffResolveUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oauthAuthorizeHandoffResolveBody,)
+  }
+);}
+
+
+
+
+export const getOauthAuthorizeHandoffResolveMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext> => {
+
+const mutationKey = ['oauthAuthorizeHandoffResolve'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, {data: BodyType<OauthAuthorizeHandoffResolveBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthAuthorizeHandoffResolve(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthAuthorizeHandoffResolveMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>>
+    export type OauthAuthorizeHandoffResolveMutationBody = BodyType<OauthAuthorizeHandoffResolveBody>
+    export type OauthAuthorizeHandoffResolveMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Resolve OAuth authorization handoff
+ */
+export const useOauthAuthorizeHandoffResolve = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>,
+        TError,
+        {data: BodyType<OauthAuthorizeHandoffResolveBody>},
+        TContext
+      > => {
+      return useMutation(getOauthAuthorizeHandoffResolveMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Create OAuth device authorization request
+ */
+export type oauthDeviceAuthorizationCreateResponse200 = {
+  data: OAuthDeviceAuthorizationSuccessResponse
+  status: 200
+}
+
+export type oauthDeviceAuthorizationCreateResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthDeviceAuthorizationCreateResponse401 = {
+  data: OAuthErrorResponse
+  status: 401
+}
+
+export type oauthDeviceAuthorizationCreateResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthDeviceAuthorizationCreateResponseSuccess = (oauthDeviceAuthorizationCreateResponse200) & {
+  headers: Headers;
+};
+export type oauthDeviceAuthorizationCreateResponseError = (oauthDeviceAuthorizationCreateResponse400 | oauthDeviceAuthorizationCreateResponse401 | oauthDeviceAuthorizationCreateResponse500) & {
+  headers: Headers;
+};
+
+export type oauthDeviceAuthorizationCreateResponse = (oauthDeviceAuthorizationCreateResponseSuccess | oauthDeviceAuthorizationCreateResponseError)
+
+export const getOauthDeviceAuthorizationCreateUrl = () => {
+
+
+
+
+  return `/oauth/device_authorization`
+}
+
+export const oauthDeviceAuthorizationCreate = async (oauthDeviceAuthorizationCreateBody: OauthDeviceAuthorizationCreateBody, options?: RequestInit): Promise<oauthDeviceAuthorizationCreateResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append(`client_id`, oauthDeviceAuthorizationCreateBody.client_id);
+if(oauthDeviceAuthorizationCreateBody.client_secret !== undefined) {
+ formUrlEncoded.append(`client_secret`, oauthDeviceAuthorizationCreateBody.client_secret);
+ }
+if(oauthDeviceAuthorizationCreateBody.resource !== undefined) {
+ formUrlEncoded.append(`resource`, oauthDeviceAuthorizationCreateBody.resource);
+ }
+if(oauthDeviceAuthorizationCreateBody.scope !== undefined) {
+ formUrlEncoded.append(`scope`, oauthDeviceAuthorizationCreateBody.scope);
+ }
+
+  return customInstance<oauthDeviceAuthorizationCreateResponse>(getOauthDeviceAuthorizationCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
+    body:
+      formUrlEncoded,
+  }
+);}
+
+
+
+
+export const getOauthDeviceAuthorizationCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext> => {
+
+const mutationKey = ['oauthDeviceAuthorizationCreate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, {data: BodyType<OauthDeviceAuthorizationCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthDeviceAuthorizationCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthDeviceAuthorizationCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>>
+    export type OauthDeviceAuthorizationCreateMutationBody = BodyType<OauthDeviceAuthorizationCreateBody>
+    export type OauthDeviceAuthorizationCreateMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Create OAuth device authorization request
+ */
+export const useOauthDeviceAuthorizationCreate = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>,
+        TError,
+        {data: BodyType<OauthDeviceAuthorizationCreateBody>},
+        TContext
+      > => {
+      return useMutation(getOauthDeviceAuthorizationCreateMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get JSON Web Key Set
+ */
+export type oauthJwksGetResponse200 = {
+  data: OAuthJWKSResponse
+  status: 200
+}
+
+export type oauthJwksGetResponseSuccess = (oauthJwksGetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type oauthJwksGetResponse = (oauthJwksGetResponseSuccess)
+
+export const getOauthJwksGetUrl = () => {
+
+
+
+
+  return `/oauth/jwks`
+}
+
+export const oauthJwksGet = async ( options?: RequestInit): Promise<oauthJwksGetResponse> => {
+
+  return customInstance<oauthJwksGetResponse>(getOauthJwksGetUrl(),
   {
     ...options,
     method: 'GET'
@@ -2182,71 +4581,411 @@ export const healthz = async ( options?: RequestInit): Promise<healthzResponse> 
 
 
 
-export const getHealthzQueryKey = () => {
+export const getOauthJwksGetQueryKey = () => {
     return [
-    `/healthz`
+    `/oauth/jwks`
     ] as const;
     }
 
 
-export const getHealthzQueryOptions = <TData = Awaited<ReturnType<typeof healthz>>, TError = ErrorType<ErrorModel>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getOauthJwksGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getHealthzQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getOauthJwksGetQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthz>>> = ({ signal }) => healthz({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthJwksGet>>> = ({ signal }) => oauthJwksGet({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type HealthzQueryResult = NonNullable<Awaited<ReturnType<typeof healthz>>>
-export type HealthzQueryError = ErrorType<ErrorModel>
+export type OauthJwksGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthJwksGet>>>
+export type OauthJwksGetQueryError = ErrorType<unknown>
 
 
-export function useHealthz<TData = Awaited<ReturnType<typeof healthz>>, TError = ErrorType<ErrorModel>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData>> & Pick<
+export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof healthz>>,
+          Awaited<ReturnType<typeof oauthJwksGet>>,
           TError,
-          Awaited<ReturnType<typeof healthz>>
+          Awaited<ReturnType<typeof oauthJwksGet>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHealthz<TData = Awaited<ReturnType<typeof healthz>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData>> & Pick<
+export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof healthz>>,
+          Awaited<ReturnType<typeof oauthJwksGet>>,
           TError,
-          Awaited<ReturnType<typeof healthz>>
+          Awaited<ReturnType<typeof oauthJwksGet>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHealthz<TData = Awaited<ReturnType<typeof healthz>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Health check
+ * @summary Get JSON Web Key Set
  */
 
-export function useHealthz<TData = Awaited<ReturnType<typeof healthz>>, TError = ErrorType<ErrorModel>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthz>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getHealthzQueryOptions(options)
+  const queryOptions = getOauthJwksGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+/**
+ * Registers an external OAuth client for authorization code + PKCE flows.
+ * @summary Register OAuth client dynamically
+ */
+export type oauthClientRegisterCreateResponse201 = {
+  data: OAuthClientRegistrationSuccessResponse
+  status: 201
+}
+
+export type oauthClientRegisterCreateResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthClientRegisterCreateResponse403 = {
+  data: OAuthErrorResponse
+  status: 403
+}
+
+export type oauthClientRegisterCreateResponse429 = {
+  data: OAuthErrorResponse
+  status: 429
+}
+
+export type oauthClientRegisterCreateResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthClientRegisterCreateResponseSuccess = (oauthClientRegisterCreateResponse201) & {
+  headers: Headers;
+};
+export type oauthClientRegisterCreateResponseError = (oauthClientRegisterCreateResponse400 | oauthClientRegisterCreateResponse403 | oauthClientRegisterCreateResponse429 | oauthClientRegisterCreateResponse500) & {
+  headers: Headers;
+};
+
+export type oauthClientRegisterCreateResponse = (oauthClientRegisterCreateResponseSuccess | oauthClientRegisterCreateResponseError)
+
+export const getOauthClientRegisterCreateUrl = () => {
+
+
+
+
+  return `/oauth/register`
+}
+
+export const oauthClientRegisterCreate = async (oauthClientRegisterCreateBody: OauthClientRegisterCreateBody, options?: RequestInit): Promise<oauthClientRegisterCreateResponse> => {
+
+  return customInstance<oauthClientRegisterCreateResponse>(getOauthClientRegisterCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oauthClientRegisterCreateBody,)
+  }
+);}
+
+
+
+
+export const getOauthClientRegisterCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext> => {
+
+const mutationKey = ['oauthClientRegisterCreate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, {data: BodyType<OauthClientRegisterCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthClientRegisterCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthClientRegisterCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthClientRegisterCreate>>>
+    export type OauthClientRegisterCreateMutationBody = BodyType<OauthClientRegisterCreateBody>
+    export type OauthClientRegisterCreateMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Register OAuth client dynamically
+ */
+export const useOauthClientRegisterCreate = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthClientRegisterCreate>>,
+        TError,
+        {data: BodyType<OauthClientRegisterCreateBody>},
+        TContext
+      > => {
+      return useMutation(getOauthClientRegisterCreateMutationOptions(options), queryClient);
+    }
+
+/**
+ * Revokes a refresh token. Access tokens (JWTs) cannot be revoked server-side and expire naturally. Returns 200 OK even if the token is already invalid.
+ * @summary Revoke an OAuth token (RFC 7009)
+ */
+export type oauthRevokeCreateResponse200 = {
+  data: void
+  status: 200
+}
+
+export type oauthRevokeCreateResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthRevokeCreateResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthRevokeCreateResponseSuccess = (oauthRevokeCreateResponse200) & {
+  headers: Headers;
+};
+export type oauthRevokeCreateResponseError = (oauthRevokeCreateResponse400 | oauthRevokeCreateResponse500) & {
+  headers: Headers;
+};
+
+export type oauthRevokeCreateResponse = (oauthRevokeCreateResponseSuccess | oauthRevokeCreateResponseError)
+
+export const getOauthRevokeCreateUrl = () => {
+
+
+
+
+  return `/oauth/revoke`
+}
+
+export const oauthRevokeCreate = async (oauthRevokeCreateBody: OauthRevokeCreateBody, options?: RequestInit): Promise<oauthRevokeCreateResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append(`token`, oauthRevokeCreateBody.token);
+if(oauthRevokeCreateBody.token_type_hint !== undefined) {
+ formUrlEncoded.append(`token_type_hint`, oauthRevokeCreateBody.token_type_hint);
+ }
+
+  return customInstance<oauthRevokeCreateResponse>(getOauthRevokeCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
+    body:
+      formUrlEncoded,
+  }
+);}
+
+
+
+
+export const getOauthRevokeCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext> => {
+
+const mutationKey = ['oauthRevokeCreate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthRevokeCreate>>, {data: BodyType<OauthRevokeCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthRevokeCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthRevokeCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthRevokeCreate>>>
+    export type OauthRevokeCreateMutationBody = BodyType<OauthRevokeCreateBody>
+    export type OauthRevokeCreateMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Revoke an OAuth token (RFC 7009)
+ */
+export const useOauthRevokeCreate = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthRevokeCreate>>,
+        TError,
+        {data: BodyType<OauthRevokeCreateBody>},
+        TContext
+      > => {
+      return useMutation(getOauthRevokeCreateMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Exchange OAuth token grants
+ */
+export type oauthTokenCreateResponse200 = {
+  data: OAuthTokenSuccessResponse
+  status: 200
+}
+
+export type oauthTokenCreateResponse400 = {
+  data: OAuthErrorResponse
+  status: 400
+}
+
+export type oauthTokenCreateResponse401 = {
+  data: OAuthErrorResponse
+  status: 401
+}
+
+export type oauthTokenCreateResponse500 = {
+  data: OAuthErrorResponse
+  status: 500
+}
+
+export type oauthTokenCreateResponseSuccess = (oauthTokenCreateResponse200) & {
+  headers: Headers;
+};
+export type oauthTokenCreateResponseError = (oauthTokenCreateResponse400 | oauthTokenCreateResponse401 | oauthTokenCreateResponse500) & {
+  headers: Headers;
+};
+
+export type oauthTokenCreateResponse = (oauthTokenCreateResponseSuccess | oauthTokenCreateResponseError)
+
+export const getOauthTokenCreateUrl = () => {
+
+
+
+
+  return `/oauth/token`
+}
+
+export const oauthTokenCreate = async (oauthTokenCreateBody: OauthTokenCreateBody, options?: RequestInit): Promise<oauthTokenCreateResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+if(oauthTokenCreateBody.client_id !== undefined) {
+ formUrlEncoded.append(`client_id`, oauthTokenCreateBody.client_id);
+ }
+if(oauthTokenCreateBody.client_secret !== undefined) {
+ formUrlEncoded.append(`client_secret`, oauthTokenCreateBody.client_secret);
+ }
+if(oauthTokenCreateBody.code !== undefined) {
+ formUrlEncoded.append(`code`, oauthTokenCreateBody.code);
+ }
+if(oauthTokenCreateBody.code_verifier !== undefined) {
+ formUrlEncoded.append(`code_verifier`, oauthTokenCreateBody.code_verifier);
+ }
+if(oauthTokenCreateBody.device_code !== undefined) {
+ formUrlEncoded.append(`device_code`, oauthTokenCreateBody.device_code);
+ }
+formUrlEncoded.append(`grant_type`, oauthTokenCreateBody.grant_type);
+if(oauthTokenCreateBody.redirect_uri !== undefined) {
+ formUrlEncoded.append(`redirect_uri`, oauthTokenCreateBody.redirect_uri);
+ }
+if(oauthTokenCreateBody.refresh_token !== undefined) {
+ formUrlEncoded.append(`refresh_token`, oauthTokenCreateBody.refresh_token);
+ }
+if(oauthTokenCreateBody.resource !== undefined) {
+ formUrlEncoded.append(`resource`, oauthTokenCreateBody.resource);
+ }
+if(oauthTokenCreateBody.scope !== undefined) {
+ formUrlEncoded.append(`scope`, oauthTokenCreateBody.scope);
+ }
+
+  return customInstance<oauthTokenCreateResponse>(getOauthTokenCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
+    body:
+      formUrlEncoded,
+  }
+);}
+
+
+
+
+export const getOauthTokenCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext> => {
+
+const mutationKey = ['oauthTokenCreate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthTokenCreate>>, {data: BodyType<OauthTokenCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthTokenCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthTokenCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthTokenCreate>>>
+    export type OauthTokenCreateMutationBody = BodyType<OauthTokenCreateBody>
+    export type OauthTokenCreateMutationError = ErrorType<OAuthErrorResponse>
+
+    /**
+ * @summary Exchange OAuth token grants
+ */
+export const useOauthTokenCreate = <TError = ErrorType<OAuthErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof oauthTokenCreate>>,
+        TError,
+        {data: BodyType<OauthTokenCreateBody>},
+        TContext
+      > => {
+      return useMutation(getOauthTokenCreateMutationOptions(options), queryClient);
+    }

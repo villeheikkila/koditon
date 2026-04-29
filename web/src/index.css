@@ -534,6 +534,29 @@ td.dim { color: var(--text-3); font-size: 12px; }
   margin-bottom: 6px;
 }
 
+.signin-email-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signin-email-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  font-family: var(--font);
+  outline: none;
+}
+
+.signin-email-input:focus {
+  border-color: var(--accent);
+}
+
 .passkey-btn {
   width: 100%;
   display: flex;
@@ -991,6 +1014,17 @@ td.dim { color: var(--text-3); font-size: 12px; }
   margin-bottom: 28px;
 }
 
+.listing-main-image {
+  display: block;
+  width: 100%;
+  max-height: 560px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  background: var(--surface-2);
+}
+
 .listing-header-main { flex: 1; min-width: 0; }
 
 .listing-title {
@@ -1387,6 +1421,16 @@ td.dim { color: var(--text-3); font-size: 12px; }
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.search-card-image {
+  width: calc(100% + 32px);
+  height: 150px;
+  object-fit: cover;
+  margin: -14px -16px 10px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
 
 .search-card:hover {

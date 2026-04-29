@@ -99,6 +99,9 @@ type rawConfig struct {
 
 	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN" envDefault:""`
 	TelegramChatID   string `env:"TELEGRAM_CHAT_ID" envDefault:""`
+	ResendAPIKey     string `env:"RESEND_API_KEY" envDefault:""`
+	ResendFromEmail  string `env:"RESEND_FROM_EMAIL" envDefault:""`
+	ResendFromName   string `env:"RESEND_FROM_NAME" envDefault:"Koditon"`
 
 	WebBaseURL               string `env:"WEB_BASE_URL" envDefault:""`
 	WebStaticDir             string `env:"WEB_STATIC_DIR" envDefault:""`
@@ -113,6 +116,7 @@ func (r *rawConfig) sanitize() {
 	r.AuthOAuthCookieKey = sanitizeSecretValue(r.AuthOAuthCookieKey)
 	r.OpenRouterAPIKey = sanitizeSecretValue(r.OpenRouterAPIKey)
 	r.TelegramBotToken = sanitizeSecretValue(r.TelegramBotToken)
+	r.ResendAPIKey = sanitizeSecretValue(r.ResendAPIKey)
 	r.FrontdoorCookie = sanitizeSecretValue(r.FrontdoorCookie)
 
 	if r.AuthApplePrivateKey != "" {
@@ -179,6 +183,11 @@ func (r rawConfig) toConfig() Config {
 			BotToken: r.TelegramBotToken,
 			ChatID:   r.TelegramChatID,
 		},
+		Email: EmailConfig{
+			ResendAPIKey:    r.ResendAPIKey,
+			ResendFromEmail: r.ResendFromEmail,
+			ResendFromName:  r.ResendFromName,
+		},
 		WebBaseURL:               r.WebBaseURL,
 		WebStaticDir:             r.WebStaticDir,
 		MCPAuthToken:             r.MCPAuthToken,
@@ -205,6 +214,7 @@ type Config struct {
 	Frontdoor                FrontdoorConfig
 	OpenRouter               OpenRouterConfig
 	Telegram                 TelegramConfig
+	Email                    EmailConfig
 	WebBaseURL               string
 	WebStaticDir             string
 	MCPAuthToken             string
@@ -308,6 +318,12 @@ type OpenRouterConfig struct {
 type TelegramConfig struct {
 	BotToken string
 	ChatID   string
+}
+
+type EmailConfig struct {
+	ResendAPIKey    string
+	ResendFromEmail string
+	ResendFromName  string
 }
 
 type AuthConfig struct {

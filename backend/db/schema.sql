@@ -99,7 +99,11 @@ create table public.frontdoor_ads (
   frontdoor_ad_processed_at timestamp with time zone,
   frontdoor_ad_page_not_found boolean default false not null,
   frontdoor_ad_publishing_time timestamp with time zone,
-  postal_postal_code_id uuid constraint frontdoor_ads_postal_postal_code_id_fkey references postal_postal_codes(postal_postal_code_id),
+  postal_postal_code_id uuid constraint frontdoor_ads_postal_postal_codes_id_fkey references postal_postal_codes(postal_postal_code_id),
+  frontdoor_ad_address text generated always as ((frontdoor_ad_data #>> '{property,streetAddressFreeForm}'::text[])) stored,
+  frontdoor_ad_area numeric generated always as (((frontdoor_ad_data #>> '{preparsed,area}'::text[]))::numeric) stored,
+  frontdoor_ad_room_layout text generated always as ((frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}'::text[])) stored,
+  frontdoor_ad_asking_price numeric generated always as (COALESCE(((frontdoor_ad_data #>> '{debfFreePrice}'::text[]))::numeric, ((frontdoor_ad_data #>> '{preparsed,price}'::text[]))::numeric)) stored,
   frontdoor_ad_street_address text,
   frontdoor_ad_city text,
   frontdoor_ad_postal text,
@@ -233,7 +237,7 @@ create table public.frontdoor_buildings (
   frontdoor_building_processed_at timestamp with time zone,
   frontdoor_building_housing_company_id bigint constraint frontdoor_buildings_frontdoor_buildings_housing_company_id_key unique,
   frontdoor_building_housing_company_friendly_id text,
-  frontdoor_building_geom geometry(Point,4326)
+  frontdoor_building_geom postgis.geometry(Point,4326)
 );
 
 CREATE UNIQUE INDEX frontdoor_buildings_housing_company_friendly_id_unique ON public.frontdoor_buildings USING btree (frontdoor_building_housing_company_friendly_id) WHERE (frontdoor_building_housing_company_friendly_id IS NOT NULL);
@@ -361,7 +365,7 @@ CREATE INDEX idx_personal_access_tokens_user_id ON public.personal_access_tokens
 
 create table public.postal_ad_areas (
   postal_ad_area_id uuid default uuid_generate_v4() not null constraint postal_ad_areas_pkey primary key,
-  postal_ad_area_code text not null constraint postal_ad_areas_postal_ad_area_code_key unique,
+  postal_ad_area_code text not null constraint postal_ad_areas_postal_ad_areas_code_key unique,
   postal_ad_area_name_fi text not null,
   postal_ad_area_name_sv text,
   postal_ad_area_created_at timestamp with time zone default now() not null,
@@ -370,7 +374,7 @@ create table public.postal_ad_areas (
 
 create table public.postal_municipalities (
   postal_municipality_id uuid default uuid_generate_v4() not null constraint postal_municipalities_pkey primary key,
-  postal_municipality_code text not null constraint postal_municipalities_postal_municipality_code_key unique,
+  postal_municipality_code text not null constraint postal_municipalities_postal_municipalities_code_key unique,
   postal_municipality_name_fi text not null,
   postal_municipality_name_sv text,
   postal_municipality_language_ratio_code text,
@@ -383,15 +387,15 @@ CREATE INDEX idx_postal_municipality_name_fi ON public.postal_municipalities USI
 create table public.postal_postal_codes (
   postal_postal_code_id uuid default uuid_generate_v4() not null constraint postal_postal_codes_pkey primary key,
   postal_postal_code_date date not null,
-  postal_postal_code_code text not null constraint postal_postal_codes_postal_postal_code_code_key unique,
+  postal_postal_code_code text not null constraint postal_postal_codes_postal_postal_codes_code_key unique,
   postal_postal_code_name_fi text not null,
   postal_postal_code_name_sv text,
   postal_postal_code_abbr_fi text,
   postal_postal_code_abbr_sv text,
   postal_postal_code_valid_from date,
   postal_postal_code_type_code text,
-  postal_ad_area_id uuid constraint postal_postal_codes_postal_ad_area_id_fkey references postal_ad_areas(postal_ad_area_id),
-  postal_municipality_id uuid constraint postal_postal_codes_postal_municipality_id_fkey references postal_municipalities(postal_municipality_id),
+  postal_ad_area_id uuid constraint postal_postal_codes_postal_postal_codes_ad_area_id_fkey references postal_ad_areas(postal_ad_area_id),
+  postal_municipality_id uuid constraint postal_postal_codes_postal_postal_codes_municipality_id_fkey references postal_municipalities(postal_municipality_id),
   postal_postal_code_created_at timestamp with time zone default now() not null,
   postal_postal_code_updated_at timestamp with time zone default now() not null,
   postal_postal_code_neighborhood_fi text
@@ -416,7 +420,7 @@ create table public.prices_neighborhoods (
   prices_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhoods_postal_code_id_fkey references prices_postal_codes(prices_postal_code_id),
   prices_neighborhood_created_at timestamp with time zone default now() not null,
   prices_neighborhood_updated_at timestamp with time zone default now() not null,
-  prices_neighborhood_postal_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhood_postal_postal_cod_fkey references postal_postal_codes(postal_postal_code_id),
+  prices_neighborhood_postal_postal_code_id uuid constraint prices_neighborhoods_prices_neighborhoods_posti_postal_cod_fkey references postal_postal_codes(postal_postal_code_id),
   constraint prices_neighborhoods_name_city_unique UNIQUE (prices_neighborhood_name, prices_city_id)
 );
 
@@ -452,6 +456,7 @@ create table public.prices_transactions (
 );
 
 CREATE INDEX idx_prices_transaction_period_identifier ON public.prices_transactions USING btree (prices_transaction_period_identifier);
+CREATE UNIQUE INDEX prices_transactions_unique_key ON public.prices_transactions USING btree (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category) NULLS NOT DISTINCT;
 
 create table public.role_feature_flags (
   flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
@@ -483,6 +488,10 @@ create table public.shortcut_ads (
   shortcut_ad_data jsonb,
   shortcut_ad_updated_at timestamp with time zone default CURRENT_TIMESTAMP,
   shortcut_building_id uuid constraint shortcut_ads_shortcut_ads_building_id_fkey references shortcut_buildings(shortcut_building_id) ON DELETE SET NULL,
+  shortcut_ad_address text generated always as ((shortcut_ad_data #>> '{address,formattedAddress}'::text[])) stored,
+  shortcut_ad_area numeric generated always as (((shortcut_ad_data #>> '{adData,size}'::text[]))::numeric) stored,
+  shortcut_ad_room_layout text generated always as ((shortcut_ad_data #>> '{adData,roomConfiguration}'::text[])) stored,
+  shortcut_ad_asking_price numeric generated always as (COALESCE(((shortcut_ad_data #>> '{priceData,priceSell}'::text[]))::numeric, ((shortcut_ad_data #>> '{priceData,price}'::text[]))::numeric)) stored,
   shortcut_ad_street_address text,
   shortcut_ad_city text,
   shortcut_ad_postal text,
@@ -583,7 +592,7 @@ create table public.shortcut_buildings (
   shortcut_building_page_not_found boolean default false,
   shortcut_building_frame_construction_method text,
   shortcut_building_housing_company text,
-  shortcut_building_geom geometry(Point,4326)
+  shortcut_building_geom postgis.geometry(Point,4326)
 );
 
 CREATE INDEX shortcut_building_geom_idx ON public.shortcut_buildings USING gist (shortcut_building_geom);
@@ -600,15 +609,6 @@ create table public.shortcut_tokens (
 
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
-
-create table public.spatial_ref_sys (
-  srid integer not null constraint spatial_ref_sys_pkey primary key,
-  auth_name character varying(256),
-  auth_srid integer,
-  srtext character varying(2048),
-  proj4text character varying(2048),
-  constraint spatial_ref_sys_srid_check CHECK (((srid > 0) AND (srid <= 998999)))
-);
 
 create table public.sync_job_attempts (
   sync_job_attempt_id bigint generated always as identity not null constraint sync_job_attempts_pkey primary key,
@@ -772,7 +772,7 @@ CREATE INDEX idx_user_roles_role_id ON public.user_roles USING btree (role_id);
 CREATE INDEX idx_user_roles_user_id ON public.user_roles USING btree (user_id);
 
 create table public.users (
-  user_uuid uuid not null constraint users_uuid_key unique,
+  user_uuid uuid default gen_random_uuid() not null constraint users_uuid_key unique,
   user_first_name text,
   user_last_name text,
   user_username text constraint users_username_key unique,
@@ -791,23 +791,6 @@ create table public.users (
 CREATE INDEX idx_users_created_by_private ON public.users USING btree (user_uuid) WHERE (user_is_private = true);
 CREATE UNIQUE INDEX idx_users_user_email_normalized_unique ON public.users USING btree (lower(btrim(user_email))) WHERE (user_email IS NOT NULL);
 CREATE INDEX idx_users_username ON public.users USING btree (user_username);
-
-create table runtime.idempotency_keys (
-  scope text not null,
-  actor text not null,
-  idempotency_key text not null,
-  request_hash text not null,
-  response_payload bytea,
-  lock_expires_at timestamp with time zone not null,
-  result_expires_at timestamp with time zone not null,
-  completed_at timestamp with time zone,
-  created_at timestamp with time zone default now() not null,
-  updated_at timestamp with time zone default now() not null,
-  constraint idempotency_keys_pkey PRIMARY KEY (scope, actor, idempotency_key)
-);
-
-CREATE INDEX runtime_idempotency_keys_lock_expires_at_idx ON runtime.idempotency_keys USING btree (lock_expires_at);
-CREATE INDEX runtime_idempotency_keys_result_expires_at_idx ON runtime.idempotency_keys USING btree (result_expires_at);
 
 create table runtime.kv_store (
   kv_key text not null constraint kv_store_pkey primary key,

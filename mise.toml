@@ -18,11 +18,16 @@ sqlc = "latest"
 [env]
 LOG_LEVEL = "debug"
 APP_ENV      = "development"
-WEB_BASE_URL = "http://localhost:8080"
+WEB_BASE_URL = "http://localhost:5173"
 
 [tasks.dev]
-description = "Ensure local infra is running, verify backend dependencies, and start backend watch mode"
-run = { task = "backend:dev" }
+description = "Start backend and web dev servers"
+depends = ["backend:dev:preflight"]
+run = "mise run backend:dev:watch ::: web:dev"
+
+[tasks."backend:dev:watch"]
+description = "Run backend server with hot reload without preflight"
+run = "mise -C {{config_root}}/backend run dev"
 
 [tasks."infra:local:up"]
 description = "Start local Docker Compose infrastructure"
@@ -95,7 +100,7 @@ run = "echo 'backend preflight complete'"
 [tasks."backend:dev"]
 description = "Ensure local infra is ready and run backend server with hot reload"
 depends = ["backend:dev:preflight"]
-run = "mise -C {{config_root}}/backend run dev"
+run = { task = "backend:dev:watch" }
 
 [tasks."backend:build"]
 description = "Build production binary"

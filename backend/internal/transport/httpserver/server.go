@@ -15,6 +15,7 @@ import (
 
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/auth"
+	"koditon/internal/domain/emailauth"
 	"koditon/internal/platform/config"
 	"koditon/internal/platform/logging"
 	api "koditon/internal/transport/openapi"
@@ -31,9 +32,9 @@ type Server struct {
 	webHandler *web.Handler
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service) *Server {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service, emailAuthService *emailauth.Service) *Server {
 	adsService := ads.NewService(pool)
-	a := api.New(logger, cfg, pool, authService, adsService)
+	a := api.New(logger, cfg, pool, authService, emailAuthService, adsService)
 	webHandler := web.NewHandler(adsService, cfg.Shortcut.SitemapBase, cfg.Frontdoor.SitemapBase, logger)
 	return &Server{
 		logger:     logger.With("component", "server"),

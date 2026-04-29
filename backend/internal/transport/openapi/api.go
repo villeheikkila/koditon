@@ -11,6 +11,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/auth"
+	"koditon/internal/domain/emailauth"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/config"
 
@@ -26,13 +27,14 @@ type API struct {
 	pricesQueries     *db.Queries
 	postalQueries     *db.Queries
 	authService       *auth.Service
+	emailAuthService  *emailauth.Service
 	adsService        *ads.Service
 	propertiesService *properties.Service
 	shortcutAPI       *shortcutclient.Client
 	frontdoorAPI      *frontdoorclient.Client
 }
 
-func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service, adsService *ads.Service) *API {
+func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService *auth.Service, emailAuthService *emailauth.Service, adsService *ads.Service) *API {
 	shortcutQueries := db.New(pool)
 	tokenLoad := func(ctx context.Context) (*shortcutclient.Tokens, error) {
 		dbToken, err := shortcutQueries.GetValidShortcutToken(ctx)
@@ -80,6 +82,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		pricesQueries:     db.New(pool),
 		postalQueries:     db.New(pool),
 		authService:       authService,
+		emailAuthService:  emailAuthService,
 		adsService:        adsService,
 		propertiesService: properties.NewService(pool),
 		shortcutAPI:       shortcutClient,

@@ -2,6 +2,7 @@ package consumers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -170,12 +171,18 @@ func (c *Consumer) runMaintenance(ctx context.Context, cfg Config) {
 func (c *Consumer) runMaintenanceOnce(ctx context.Context, logger *slog.Logger, cfg Config) {
 	reaped, err := c.syncJobs.ReapStaleClaimsWithAttempts(ctx, cfg.MaintenanceStaleAfter, cfg.MaintenanceBatchLimit)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return
+		}
 		logger.WarnContext(ctx, "sync job stale claim recovery failed", "error", err, "outcome", logging.OutcomeError)
 	} else if len(reaped.RecoveredJobs) > 0 || reaped.FinalizedAttempts > 0 {
 		logger.InfoContext(ctx, "sync job stale claims recovered", "jobs", len(reaped.RecoveredJobs), "attempts", reaped.FinalizedAttempts, "outcome", logging.OutcomeSuccess)
 	}
 	reconciled, err := c.syncJobs.ReconcilePendingJobs(ctx, cfg.MaintenanceBatchLimit)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return
+		}
 		logger.WarnContext(ctx, "sync job pending reconciliation failed", "error", err, "outcome", logging.OutcomeError)
 		return
 	}

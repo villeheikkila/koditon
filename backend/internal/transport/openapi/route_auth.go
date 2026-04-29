@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"koditon/internal/domain/auth"
+	"koditon/internal/domain/emailauth"
 	"koditon/internal/platform/logging"
 )
 
@@ -34,6 +35,101 @@ func (a *API) passkeyAuthOptionsHandler(ctx context.Context, _ *struct{}) (*pass
 	out := &passkeyAuthOptionsOutput{}
 	out.Body.ChallengeID = resp.ChallengeID.String()
 	out.Body.Options = resp.Options
+	return out, nil
+}
+
+// --- email auth request ---
+
+type emailAuthRequestInput struct {
+	Body struct {
+		Email string `json:"email" required:"true" format:"email"`
+	}
+}
+
+type emailAuthRequestOutput struct {
+	Body struct {
+		OK bool `json:"ok"`
+	}
+}
+
+func (a *API) emailAuthRequestHandler(ctx context.Context, input *emailAuthRequestInput) (*emailAuthRequestOutput, error) {
+	if a.emailAuthService == nil {
+		return nil, huma.Error503ServiceUnavailable("email authentication unavailable")
+	}
+	if err := a.emailAuthService.RequestAuthentication(ctx, input.Body.Email); err != nil {
+		switch {
+		case errors.Is(err, emailauth.ErrInvalidEmail):
+			return nil, huma.Error422UnprocessableEntity("email must be valid")
+		default:
+			logging.With(a.logger, logging.Op("api.auth.email.request")).ErrorContext(ctx, "email auth request failed", "error", err, "outcome", logging.OutcomeError)
+			return nil, huma.Error503ServiceUnavailable("email authentication unavailable")
+		}
+	}
+	out := &emailAuthRequestOutput{}
+	out.Body.OK = true
+	return out, nil
+}
+
+// --- email auth confirm ---
+
+type emailAuthConfirmInput struct {
+	Body struct {
+		Token string `json:"token" required:"true"`
+	}
+	RawDeviceID string `header:"X-Device-ID"`
+}
+
+type emailAuthConfirmOutput = passkeyAuthOutput
+
+func (a *API) emailAuthConfirmHandler(ctx context.Context, input *emailAuthConfirmInput) (*emailAuthConfirmOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.email.confirm"))
+	if a.emailAuthService == nil {
+		return nil, huma.Error503ServiceUnavailable("email authentication unavailable")
+	}
+	var deviceID uuid.UUID
+	if input.RawDeviceID != "" {
+		deviceID, _ = uuid.Parse(input.RawDeviceID)
+	}
+	authTicket, err := a.emailAuthService.ConfirmAuthentication(ctx, input.Body.Token)
+	if err != nil {
+		switch {
+		case errors.Is(err, emailauth.ErrInvalidToken), errors.Is(err, emailauth.ErrTokenExpired), errors.Is(err, emailauth.ErrTokenConsumed):
+			return nil, huma.Error422UnprocessableEntity("email sign-in link is invalid or expired")
+		default:
+			logger.ErrorContext(ctx, "email auth confirmation failed", "error", err, "outcome", logging.OutcomeError)
+			return nil, huma.Error500InternalServerError("internal server error")
+		}
+	}
+	confirmedEmail, err := a.emailAuthService.ConsumeAuthenticationTicket(ctx, authTicket)
+	if err != nil {
+		logger.ErrorContext(ctx, "email auth ticket consume failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("internal server error")
+	}
+	signResp, err := a.authService.SignInWithEmail(ctx, auth.SignInWithEmailRequest{
+		ConfirmedEmail: confirmedEmail,
+		DeviceID:       deviceID,
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "email sign in failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error401Unauthorized("sign in failed")
+	}
+	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
+		ClientID:  "koditon-web",
+		UserID:    signResp.UserID,
+		Scopes:    []string{auth.ScopeCoreRead},
+		SessionID: signResp.SessionID,
+		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "token issuance failed after email auth", "error", err, "user_id", signResp.UserID, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("failed to issue tokens")
+	}
+	out := &emailAuthConfirmOutput{}
+	out.Body.AccessToken = tokens.AccessToken
+	out.Body.AccessTokenExpiresAt = tokens.AccessExpiry.Unix()
+	out.Body.RefreshToken = tokens.RefreshToken
+	out.Body.RefreshTokenExpiresAt = tokens.RefreshExpiry.Unix()
+	out.Body.UserID = signResp.UserID.String()
 	return out, nil
 }
 

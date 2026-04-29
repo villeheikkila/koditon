@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getToken, passkeySignIn, appleSignIn, isAppleSignInConfigured } from '../lib/auth'
+import {
+  oauthAuthorizeHandoffApprove,
+  oauthAuthorizeHandoffDeny,
+  oauthAuthorizeHandoffResolve,
+  type OAuthHandoffResolveSuccessResponse,
+} from '../api/koditon'
 
 type Phase = 'loading' | 'sign-in' | 'code-entry' | 'review' | 'approving' | 'denied' | 'error'
 
-interface HandoffDetails {
-  handoff_id: string
-  client_display_name: string
-  redirect_host: string
-  scopes: string[]
-  expires_at_unix: number
-}
+type HandoffDetails = OAuthHandoffResolveSuccessResponse
 
 const SCOPE_DESCRIPTIONS: Record<string, string> = {
   'mcp:core:read': 'Read real estate listing and transaction data',
@@ -20,8 +20,7 @@ function scopeLabel(scope: string): string {
 }
 
 export default function OAuthAuthorizePage() {
-  const params = new URLSearchParams(window.location.search)
-  const handoffToken = params.get('handoff_token') ?? ''
+  const handoffToken = useMemo(() => new URLSearchParams(window.location.search).get('handoff_token') ?? '', [])
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [handoff, setHandoff] = useState<HandoffDetails | null>(null)
@@ -30,7 +29,7 @@ export default function OAuthAuthorizePage() {
   const [signInLoading, setSignInLoading] = useState(false)
   const [userCode, setUserCode] = useState('')
 
-  async function resolveHandoff(accessToken: string, hToken: string, code: string) {
+  const resolveHandoff = useCallback(async (accessToken: string, hToken: string, code: string) => {
     setPhase('loading')
     const body: Record<string, string> = {}
     if (hToken) {
@@ -43,28 +42,23 @@ export default function OAuthAuthorizePage() {
     }
 
     try {
-      const res = await fetch('/oauth/authorize/handoff/resolve', {
-        method: 'POST',
+      const res = await oauthAuthorizeHandoffResolve(body, {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(body),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error_description ?? 'Authorization request not found or expired.')
+      if (res.status !== 200) {
+        setErrorMessage('Authorization request not found or expired.')
         setPhase('error')
         return
       }
-      const data = await res.json()
-      setHandoff(data)
+      setHandoff(res.data)
       setPhase('review')
-    } catch {
-      setErrorMessage('Failed to connect to server.')
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : 'Failed to connect to server.')
       setPhase('error')
     }
-  }
+  }, [])
 
   useEffect(() => {
     const token = getToken()
@@ -77,7 +71,7 @@ export default function OAuthAuthorizePage() {
     } else {
       setPhase('code-entry')
     }
-  }, [])
+  }, [handoffToken, resolveHandoff])
 
   async function handlePasskeySignIn() {
     setSignInLoading(true)
@@ -123,29 +117,24 @@ export default function OAuthAuthorizePage() {
     if (!handoff) return
     setPhase('approving')
     try {
-      const res = await fetch('/oauth/authorize/handoff/approve', {
-        method: 'POST',
+      const res = await oauthAuthorizeHandoffApprove({ handoff_id: handoff.handoff_id }, {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ handoff_id: handoff.handoff_id }),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error_description ?? 'Failed to approve the request.')
+      if (res.status !== 200) {
+        setErrorMessage('Failed to approve the request.')
         setPhase('error')
         return
       }
-      const data = await res.json()
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url
+      if (res.data.redirect_url) {
+        window.location.href = res.data.redirect_url
       } else {
         setErrorMessage('Approved but no redirect URL received.')
         setPhase('error')
       }
-    } catch {
-      setErrorMessage('Failed to connect to server.')
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : 'Failed to connect to server.')
       setPhase('error')
     }
   }
@@ -153,15 +142,14 @@ export default function OAuthAuthorizePage() {
   async function handleDeny() {
     if (!handoff) return
     try {
-      await fetch('/oauth/authorize/handoff/deny', {
-        method: 'POST',
+      await oauthAuthorizeHandoffDeny({ handoff_id: handoff.handoff_id }, {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ handoff_id: handoff.handoff_id }),
       })
-    } catch {}
+    } catch {
+      setErrorMessage('')
+    }
     setPhase('denied')
   }
 

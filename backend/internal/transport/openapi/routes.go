@@ -110,6 +110,18 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Exchange an Apple authorization code for access tokens"
 		op.Tags = []string{"Authentication"}
 	})
+	huma.Post(api, "/auth/email/request", a.emailAuthRequestHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-email-request"
+		op.Summary = "Request email sign-in link"
+		op.Description = "Send a sign-in link to the requested email address"
+		op.Tags = []string{"Authentication"}
+	})
+	huma.Post(api, "/auth/email/confirm", a.emailAuthConfirmHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-email-confirm"
+		op.Summary = "Confirm email sign-in"
+		op.Description = "Exchange an email sign-in token for access tokens"
+		op.Tags = []string{"Authentication"}
+	})
 	huma.Post(api, "/auth/passkey/authenticate/options", a.passkeyAuthOptionsHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-passkey-authenticate-options"
 		op.Summary = "Begin passkey authentication"

@@ -26,10 +26,15 @@ const (
 	responseOAuthResourceMeta       = "OAuthProtectedResourceMetadata"
 	responseOAuthServerMeta         = "OAuthAuthorizationServerMetadata"
 	responseOAuthClientRegistration = "OAuthClientRegistrationSuccess"
+	responseOAuthHandoffResolve     = "OAuthHandoffResolveSuccess"
+	responseOAuthHandoffApprove     = "OAuthHandoffApproveSuccess"
+	responseOAuthHandoffDeny        = "OAuthHandoffDenySuccess"
 	requestBodyOAuthToken           = "OAuthTokenRequest"
 	requestBodyOAuthDeviceAuth      = "OAuthDeviceAuthorizationRequest"
 	requestBodyOAuthClientRegister  = "OAuthClientRegistrationRequest"
 	requestBodyOAuthRevoke          = "OAuthRevokeRequest"
+	requestBodyOAuthHandoffResolve  = "OAuthHandoffResolveRequest"
+	requestBodyOAuthHandoffDecision = "OAuthHandoffDecisionRequest"
 )
 
 // RegisterRoutes registers OAuth machine endpoints for unified OpenAPI output.
@@ -100,7 +105,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 				OperationID: "oauth-device-authorization-create",
 				Summary:     "Create OAuth device authorization request",
 				Tags:        []string{tagOAuth, tagAuth},
-				RequestBody: &huma.RequestBody{Ref: "#/components/requestBodies/" + requestBodyOAuthDeviceAuth},
+				RequestBody: oauthFormRequestBody(deviceAuthorizationRequestSchema()),
 				Responses: map[string]*huma.Response{
 					"200": {Ref: "#/components/responses/" + responseOAuthDeviceAuthSuccess},
 					"400": {Ref: "#/components/responses/" + responseOAuthError},
@@ -117,7 +122,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 				OperationID: "oauth-token-create",
 				Summary:     "Exchange OAuth token grants",
 				Tags:        []string{tagOAuth, tagAuth},
-				RequestBody: &huma.RequestBody{Ref: "#/components/requestBodies/" + requestBodyOAuthToken},
+				RequestBody: oauthFormRequestBody(tokenRequestSchema()),
 				Responses: map[string]*huma.Response{
 					"200": {Ref: "#/components/responses/" + responseOAuthTokenSuccess},
 					"400": {Ref: "#/components/responses/" + responseOAuthError},
@@ -135,7 +140,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 				Summary:     "Register OAuth client dynamically",
 				Description: "Registers an external OAuth client for authorization code + PKCE flows.",
 				Tags:        []string{tagOAuth, tagAuth},
-				RequestBody: &huma.RequestBody{Ref: "#/components/requestBodies/" + requestBodyOAuthClientRegister},
+				RequestBody: oauthJSONRequestBody(clientRegistrationRequestSchema()),
 				Responses: map[string]*huma.Response{
 					"201": {Ref: "#/components/responses/" + responseOAuthClientRegistration},
 					"400": {Ref: "#/components/responses/" + responseOAuthError},
@@ -154,10 +159,63 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 				Summary:     "Revoke an OAuth token (RFC 7009)",
 				Description: "Revokes a refresh token. Access tokens (JWTs) cannot be revoked server-side and expire naturally. Returns 200 OK even if the token is already invalid.",
 				Tags:        []string{tagOAuth, tagAuth},
-				RequestBody: &huma.RequestBody{Ref: "#/components/requestBodies/" + requestBodyOAuthRevoke},
+				RequestBody: oauthFormRequestBody(revokeRequestSchema()),
 				Responses: map[string]*huma.Response{
 					"200": {Description: "Token revoked successfully (or was already invalid)."},
 					"400": {Ref: "#/components/responses/" + responseOAuthError},
+					"500": {Ref: "#/components/responses/" + responseOAuthError},
+				},
+			},
+			readRawBody: true,
+		},
+		{
+			op: &huma.Operation{
+				Method:      http.MethodPost,
+				Path:        "/oauth/authorize/handoff/resolve",
+				OperationID: "oauth-authorize-handoff-resolve",
+				Summary:     "Resolve OAuth authorization handoff",
+				Tags:        []string{tagOAuth, tagAuth},
+				RequestBody: oauthJSONRequestBody(handoffResolveRequestSchema()),
+				Responses: map[string]*huma.Response{
+					"200": {Ref: "#/components/responses/" + responseOAuthHandoffResolve},
+					"400": {Ref: "#/components/responses/" + responseOAuthError},
+					"401": {Ref: "#/components/responses/" + responseOAuthError},
+					"404": {Ref: "#/components/responses/" + responseOAuthError},
+					"500": {Ref: "#/components/responses/" + responseOAuthError},
+				},
+			},
+			readRawBody: true,
+		},
+		{
+			op: &huma.Operation{
+				Method:      http.MethodPost,
+				Path:        "/oauth/authorize/handoff/approve",
+				OperationID: "oauth-authorize-handoff-approve",
+				Summary:     "Approve OAuth authorization handoff",
+				Tags:        []string{tagOAuth, tagAuth},
+				RequestBody: oauthJSONRequestBody(handoffDecisionRequestSchema()),
+				Responses: map[string]*huma.Response{
+					"200": {Ref: "#/components/responses/" + responseOAuthHandoffApprove},
+					"400": {Ref: "#/components/responses/" + responseOAuthError},
+					"401": {Ref: "#/components/responses/" + responseOAuthError},
+					"404": {Ref: "#/components/responses/" + responseOAuthError},
+					"500": {Ref: "#/components/responses/" + responseOAuthError},
+				},
+			},
+			readRawBody: true,
+		},
+		{
+			op: &huma.Operation{
+				Method:      http.MethodPost,
+				Path:        "/oauth/authorize/handoff/deny",
+				OperationID: "oauth-authorize-handoff-deny",
+				Summary:     "Deny OAuth authorization handoff",
+				Tags:        []string{tagOAuth, tagAuth},
+				RequestBody: oauthJSONRequestBody(handoffDecisionRequestSchema()),
+				Responses: map[string]*huma.Response{
+					"200": {Ref: "#/components/responses/" + responseOAuthHandoffDeny},
+					"400": {Ref: "#/components/responses/" + responseOAuthError},
+					"401": {Ref: "#/components/responses/" + responseOAuthError},
 					"500": {Ref: "#/components/responses/" + responseOAuthError},
 				},
 			},
@@ -167,8 +225,29 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 
 	for _, item := range operations {
 		openapiutil.ApplyOperationPolicyDocumentation(item.op)
+		if item.op.Path == "/oauth/authorize/handoff/resolve" || item.op.Path == "/oauth/authorize/handoff/approve" || item.op.Path == "/oauth/authorize/handoff/deny" {
+			openapiutil.ApplyBearerSecurity(item.op, nil)
+		}
 		api.OpenAPI().AddOperation(item.op)
 		api.Adapter().Handle(item.op, h.passthroughOperation(item.readRawBody))
+	}
+}
+
+func oauthJSONRequestBody(schema *huma.Schema) *huma.RequestBody {
+	return &huma.RequestBody{
+		Required: true,
+		Content: map[string]*huma.MediaType{
+			"application/json": {Schema: schema},
+		},
+	}
+}
+
+func oauthFormRequestBody(schema *huma.Schema) *huma.RequestBody {
+	return &huma.RequestBody{
+		Required: true,
+		Content: map[string]*huma.MediaType{
+			"application/x-www-form-urlencoded": {Schema: schema},
+		},
 	}
 }
 
@@ -235,28 +314,6 @@ func stringProperty(description string) *huma.Schema {
 	return &huma.Schema{Type: "string", Description: description}
 }
 
-func tokenGrantSchema(grantType string, requiredFields ...string) *huma.Schema {
-	properties := map[string]*huma.Schema{
-		"grant_type": {
-			Type: "string",
-			Enum: []any{grantType},
-		},
-	}
-	for _, field := range requiredFields {
-		properties[field] = &huma.Schema{Type: "string"}
-	}
-	for _, optionalField := range []string{"client_id", "client_secret", "scope", "resource", "redirect_uri", "code_verifier", "nonce"} {
-		if _, exists := properties[optionalField]; !exists {
-			properties[optionalField] = &huma.Schema{Type: "string"}
-		}
-	}
-	return &huma.Schema{
-		Type:       "object",
-		Properties: properties,
-		Required:   append([]string{"grant_type"}, requiredFields...),
-	}
-}
-
 func tokenRequestSchema() *huma.Schema {
 	return &huma.Schema{
 		Type: "object",
@@ -280,14 +337,6 @@ func tokenRequestSchema() *huma.Schema {
 			"scope":         stringProperty("Requested scopes separated by spaces."),
 		},
 		Required: []string{"grant_type"},
-		Discriminator: &huma.Discriminator{
-			PropertyName: "grant_type",
-		},
-		OneOf: []*huma.Schema{
-			tokenGrantSchema(grantAuthorizationCode, "client_id", "code", "redirect_uri", "code_verifier"),
-			tokenGrantSchema(grantRefreshToken, "refresh_token"),
-			tokenGrantSchema(grantDeviceCode, "device_code"),
-		},
 	}
 }
 
@@ -489,6 +538,62 @@ func revokeRequestSchema() *huma.Schema {
 	}
 }
 
+func handoffResolveRequestSchema() *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"handoff_token": stringProperty("Authorization handoff token from the browser or app link."),
+			"user_code":     stringProperty("User-entered handoff code."),
+		},
+	}
+}
+
+func handoffDecisionRequestSchema() *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"handoff_id": {Type: "string", Format: "uuid", Description: "Authorization handoff identifier."},
+		},
+		Required: []string{"handoff_id"},
+	}
+}
+
+func handoffResolveResponseSchema() *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"handoff_id":          {Type: "string", Format: "uuid"},
+			"client_id":           stringProperty("OAuth client ID."),
+			"client_display_name": stringProperty("Display name for the OAuth client."),
+			"redirect_host":       stringProperty("Redirect URI host."),
+			"scopes":              {Type: "array", Items: &huma.Schema{Type: "string"}},
+			"expires_at_unix":     {Type: "integer", Format: "int64"},
+		},
+		Required: []string{"handoff_id", "client_id", "client_display_name", "redirect_host", "scopes", "expires_at_unix"},
+	}
+}
+
+func handoffApproveResponseSchema() *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"ok":           {Type: "boolean"},
+			"redirect_url": stringProperty("OAuth redirect URL with the generated authorization code."),
+		},
+		Required: []string{"ok", "redirect_url"},
+	}
+}
+
+func handoffDenyResponseSchema() *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"ok": {Type: "boolean"},
+		},
+		Required: []string{"ok"},
+	}
+}
+
 func (h *Handler) ensureOpenAPIComponents(oapi *huma.OpenAPI) {
 	if oapi == nil {
 		return
@@ -510,6 +615,9 @@ func (h *Handler) ensureOpenAPIComponents(oapi *huma.OpenAPI) {
 	oapi.Components.Responses[responseOAuthResourceMeta] = openapiutil.JSONResponse("OAuth protected resource metadata.", protectedResourceMetadataSchema())
 	oapi.Components.Responses[responseOAuthServerMeta] = openapiutil.JSONResponse("OAuth authorization server metadata.", authorizationServerMetadataSchema())
 	oapi.Components.Responses[responseOAuthClientRegistration] = openapiutil.JSONResponse("OAuth dynamic client registration response.", clientRegistrationResponseSchema())
+	oapi.Components.Responses[responseOAuthHandoffResolve] = openapiutil.JSONResponse("OAuth authorization handoff response.", handoffResolveResponseSchema())
+	oapi.Components.Responses[responseOAuthHandoffApprove] = openapiutil.JSONResponse("OAuth authorization handoff approval response.", handoffApproveResponseSchema())
+	oapi.Components.Responses[responseOAuthHandoffDeny] = openapiutil.JSONResponse("OAuth authorization handoff denial response.", handoffDenyResponseSchema())
 
 	oapi.Components.Examples["OAuthDeviceAuthorizationRequestDefault"] = &huma.Example{Value: map[string]any{
 		"client_id": koditonCLIClientID,
@@ -587,6 +695,18 @@ func (h *Handler) ensureOpenAPIComponents(oapi *huma.OpenAPI) {
 					"default": {Ref: "#/components/examples/OAuthRevokeRequestDefault"},
 				},
 			},
+		},
+	}
+	oapi.Components.RequestBodies[requestBodyOAuthHandoffResolve] = &huma.RequestBody{
+		Required: true,
+		Content: map[string]*huma.MediaType{
+			"application/json": {Schema: handoffResolveRequestSchema()},
+		},
+	}
+	oapi.Components.RequestBodies[requestBodyOAuthHandoffDecision] = &huma.RequestBody{
+		Required: true,
+		Content: map[string]*huma.MediaType{
+			"application/json": {Schema: handoffDecisionRequestSchema()},
 		},
 	}
 }
