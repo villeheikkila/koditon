@@ -4,7 +4,7 @@
   [38;5;244mEnter select/run • Esc back • q quit • Ctrl+C cancel active job[m
 
   [38;5;238m╭──────────────────────────────────────────────────────────────────────────────────────────╮[m
-  [38;5;238m│[m [1;38;5;86mSearch Transactions[m                                                                      [38;5;238m│[m
+  [38;5;238m│[m [1;38;5;86mSync City by Name[m                                                                        [38;5;238m│[m
   [38;5;238m│[m [38;5;250mTargeted transaction search form[m                                                         [38;5;238m│[m
   [38;5;238m│[m                                                                                          [38;5;238m│[m
   [38;5;238m│[m [1;38;5;75mCity[m                                                                                     [38;5;238m│[m

@@ -216,6 +216,13 @@ func buildSubsystems() []subsystem {
 					},
 				},
 				{
+					Title:       "Queue Sale Listing Match Fanout",
+					Description: "Enqueue weekly transaction matching jobs for closed sale listings",
+					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
+						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_match_sale_listings_fanout", EntityID: "prices:match_sale_listings"}})
+					},
+				},
+				{
 					Title:         "Sync City by Name",
 					Description:   "Queue prices data sync for one city",
 					Prompts:       []string{"city name"},

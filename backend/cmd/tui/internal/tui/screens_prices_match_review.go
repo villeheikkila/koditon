@@ -301,6 +301,9 @@ func linkPricesMatchCandidateCmd(pool *pgxpool.Pool, group pricesMatchCandidateG
 		if _, err := tx.Exec(ctx, `UPDATE public.sale_listing_prices_transaction_match_candidates SET sale_listing_prices_transaction_match_status = CASE WHEN sale_listing_prices_transaction_match_candidate_id = $3::uuid THEN 'auto_linked' ELSE 'rejected' END WHERE sale_listing_prices_transaction_match_run_id = $1::uuid AND sale_listing_id = $2::uuid`, group.RunID, group.Listing.ID, candidate.CandidateID); err != nil {
 			return pricesMatchReviewLinkMsg{err: fmt.Errorf("mark candidates: %w", err)}
 		}
+		if _, err := tx.Exec(ctx, `UPDATE public.sale_listings SET sale_listing_prices_match_status = 'manual_linked', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
+			return pricesMatchReviewLinkMsg{err: fmt.Errorf("mark listing: %w", err)}
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return pricesMatchReviewLinkMsg{err: fmt.Errorf("commit link transaction: %w", err)}
 		}
@@ -316,8 +319,19 @@ func linkPricesMatchCandidateCmd(pool *pgxpool.Pool, group pricesMatchCandidateG
 func rejectPricesMatchListingCmd(pool *pgxpool.Pool, group pricesMatchCandidateGroup) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		if _, err := pool.Exec(ctx, `UPDATE public.sale_listing_prices_transaction_match_candidates SET sale_listing_prices_transaction_match_status = 'rejected' WHERE sale_listing_prices_transaction_match_run_id = $1::uuid AND sale_listing_id = $2::uuid AND sale_listing_prices_transaction_match_status = 'ambiguous'`, group.RunID, group.Listing.ID); err != nil {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return pricesMatchReviewRejectMsg{err: fmt.Errorf("begin reject transaction: %w", err)}
+		}
+		defer tx.Rollback(ctx)
+		if _, err := tx.Exec(ctx, `UPDATE public.sale_listing_prices_transaction_match_candidates SET sale_listing_prices_transaction_match_status = 'rejected' WHERE sale_listing_prices_transaction_match_run_id = $1::uuid AND sale_listing_id = $2::uuid AND sale_listing_prices_transaction_match_status = 'ambiguous'`, group.RunID, group.Listing.ID); err != nil {
 			return pricesMatchReviewRejectMsg{err: fmt.Errorf("reject candidates: %w", err)}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE public.sale_listings SET sale_listing_prices_match_status = 'rejected', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
+			return pricesMatchReviewRejectMsg{err: fmt.Errorf("mark listing rejected: %w", err)}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return pricesMatchReviewRejectMsg{err: fmt.Errorf("commit reject transaction: %w", err)}
 		}
 		nextOffset := group.Offset
 		if group.Total > 0 && nextOffset >= group.Total-1 {

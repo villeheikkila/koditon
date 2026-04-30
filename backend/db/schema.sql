@@ -599,7 +599,14 @@ create table public.sale_listings (
   sale_listing_energy_efficiency_status text,
   sale_listing_energy_efficiency_match_code text,
   sale_listing_first_seen_at timestamp with time zone,
+  sale_listing_prices_match_status text,
+  sale_listing_prices_match_next_attempt_at timestamp with time zone,
+  sale_listing_prices_match_last_attempted_at timestamp with time zone,
+  sale_listing_prices_match_attempt_count integer default 0 not null,
+  sale_listing_prices_match_expires_at timestamp with time zone,
+  sale_listing_prices_match_run_id uuid constraint sale_listings_sale_listing_prices_match_run_id_fkey references sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE SET NULL,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
+  constraint sale_listings_prices_match_status_check CHECK (((sale_listing_prices_match_status IS NULL) OR (sale_listing_prices_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'expired'::text, 'noop'::text])))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
   constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
 );
@@ -619,6 +626,8 @@ CREATE INDEX idx_sale_listings_plot_type_code ON public.sale_listings USING btre
 CREATE INDEX idx_sale_listings_postal ON public.sale_listings USING btree (sale_listing_postal);
 CREATE INDEX idx_sale_listings_price ON public.sale_listings USING btree (sale_listing_asking_price);
 CREATE INDEX idx_sale_listings_price_per_m2 ON public.sale_listings USING btree (sale_listing_price_per_m2);
+CREATE INDEX idx_sale_listings_prices_match_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at) WHERE ((prices_transaction_id IS NULL) AND (sale_listing_source_kind = 'ad'::text));
+CREATE INDEX idx_sale_listings_prices_match_queue ON public.sale_listings USING btree (sale_listing_prices_match_status, sale_listing_prices_match_next_attempt_at) WHERE (prices_transaction_id IS NULL);
 CREATE INDEX idx_sale_listings_property_type_code ON public.sale_listings USING btree (sale_listing_property_type_code);
 CREATE INDEX idx_sale_listings_room_category_code ON public.sale_listings USING btree (sale_listing_room_category_code);
 CREATE INDEX idx_sale_listings_rooms_count ON public.sale_listings USING btree (sale_listing_rooms_count);

@@ -401,6 +401,8 @@ func validateSyncJobTarget(provider, kind string) error {
 			"prices_postal_code_page_sync":         {},
 			"prices_neighborhood_postal_code_sync": {},
 			"prices_sync_all":                      {},
+			"prices_match_sale_listings_fanout":    {},
+			"prices_match_sale_listing":            {},
 		},
 		"postal": {
 			"postal_sync": {},

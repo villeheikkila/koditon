@@ -33,6 +33,7 @@ const (
 	CapacityClassShortcutAPI      = "provider_shortcut_api"
 	CapacityClassPrices           = "provider_prices"
 	CapacityClassPostal           = "provider_postal"
+	CapacityClassInternalDB       = "internal_db"
 	defaultDispatchRetryDelay     = 30 * time.Second
 	defaultStaleClaimAfter        = 35 * time.Minute
 	dispatchAdmissionLockClassID  = int32(174201)
@@ -143,6 +144,7 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			CapacityClassShortcutAPI:     2,
 			CapacityClassPrices:          1,
 			CapacityClassPostal:          1,
+			CapacityClassInternalDB:      8,
 		},
 		KindMaxInProgress: map[string]int{
 			"frontdoor_sitemap_sync":               1,
@@ -158,6 +160,8 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			"prices_postal_code_page_sync":         1,
 			"prices_neighborhood_postal_code_sync": 1,
 			"prices_sync_all":                      1,
+			"prices_match_sale_listings_fanout":    1,
+			"prices_match_sale_listing":            8,
 			"postal_sync":                          1,
 		},
 		BaseDeferDelay: 5 * time.Second,
@@ -190,6 +194,9 @@ func CapacityClassForJob(provider, kind string) string {
 		}
 		return CapacityClassShortcutAPI
 	case "prices":
+		if kind == "prices_match_sale_listings_fanout" || kind == "prices_match_sale_listing" {
+			return CapacityClassInternalDB
+		}
 		return CapacityClassPrices
 	case "postal":
 		return CapacityClassPostal

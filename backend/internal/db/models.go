@@ -483,6 +483,12 @@ type SaleListing struct {
 	SaleListingEnergyEfficiencyStatus       *string         `json:"sale_listing_energy_efficiency_status"`
 	SaleListingEnergyEfficiencyMatchCode    *string         `json:"sale_listing_energy_efficiency_match_code"`
 	SaleListingFirstSeenAt                  *time.Time      `json:"sale_listing_first_seen_at"`
+	SaleListingPricesMatchStatus            *string         `json:"sale_listing_prices_match_status"`
+	SaleListingPricesMatchNextAttemptAt     *time.Time      `json:"sale_listing_prices_match_next_attempt_at"`
+	SaleListingPricesMatchLastAttemptedAt   *time.Time      `json:"sale_listing_prices_match_last_attempted_at"`
+	SaleListingPricesMatchAttemptCount      int32           `json:"sale_listing_prices_match_attempt_count"`
+	SaleListingPricesMatchExpiresAt         *time.Time      `json:"sale_listing_prices_match_expires_at"`
+	SaleListingPricesMatchRunID             *uuid.UUID      `json:"sale_listing_prices_match_run_id"`
 }
 
 type SaleListingPlotTypeAlias struct {
