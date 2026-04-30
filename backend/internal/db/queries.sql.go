@@ -591,6 +591,7 @@ SELECT
     fb.frontdoor_building_postcode,
     fb.frontdoor_building_post_area,
     fb.frontdoor_building_municipality,
+    fb.frontdoor_building_energy_certificate_code,
     jsonb_build_object(
         'announcement_id', fba.frontdoor_building_announcement_id,
         'external_id', fba.frontdoor_building_announcement_external_id,
@@ -650,6 +651,7 @@ type GetFrontdoorAnnouncementUnifiedDetailRow struct {
 	FrontdoorBuildingPostcode                    *string         `json:"frontdoor_building_postcode"`
 	FrontdoorBuildingPostArea                    *string         `json:"frontdoor_building_post_area"`
 	FrontdoorBuildingMunicipality                *string         `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingEnergyCertificateCode       *string         `json:"frontdoor_building_energy_certificate_code"`
 	RawJson                                      json.RawMessage `json:"raw_json"`
 }
 
@@ -683,6 +685,7 @@ func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, ann
 		&i.FrontdoorBuildingPostcode,
 		&i.FrontdoorBuildingPostArea,
 		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingEnergyCertificateCode,
 		&i.RawJson,
 	)
 	return i, err

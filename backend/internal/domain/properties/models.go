@@ -122,6 +122,7 @@ type BuildingDetails struct {
 	ApartmentCount            *int32               `json:"apartment_count,omitempty"`
 	BusinessPremiseCount      *int32               `json:"business_premise_count,omitempty"`
 	EnergyClass               string               `json:"energy_class,omitempty"`
+	EnergyEfficiencyLabel     string               `json:"energy_efficiency_label,omitempty"`
 	Heating                   string               `json:"heating,omitempty"`
 	HeatingDescription        string               `json:"heating_description,omitempty"`
 	HeatingFuel               string               `json:"heating_fuel,omitempty"`

@@ -430,6 +430,7 @@ SELECT
     fb.frontdoor_building_postcode,
     fb.frontdoor_building_post_area,
     fb.frontdoor_building_municipality,
+    fb.frontdoor_building_energy_certificate_code,
     jsonb_build_object(
         'announcement_id', fba.frontdoor_building_announcement_id,
         'external_id', fba.frontdoor_building_announcement_external_id,

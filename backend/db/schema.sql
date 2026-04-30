@@ -548,6 +548,7 @@ create table public.sale_listings (
   sale_listing_elevator boolean,
   sale_listing_plot_type_raw text,
   sale_listing_plot_type_code text,
+  sale_listing_energy_efficiency_label text,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
   constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))

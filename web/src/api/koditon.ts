@@ -167,6 +167,7 @@ export interface BuildingDetails {
   construction_year?: number;
   elevator?: boolean;
   energy_class?: string;
+  energy_efficiency_label?: string;
   floor_count?: number;
   frame_construction_method?: string;
   heating?: string;

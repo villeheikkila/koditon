@@ -29,6 +29,7 @@ SELECT
     sale_listing_build_year,
     sale_listing_condition,
     sale_listing_energy_class,
+    sale_listing_energy_efficiency_label,
     sale_listing_last_seen_at::text,
     sale_listing_published_at::text,
     COALESCE(sale_listing_street_address, '')
@@ -75,7 +76,7 @@ WITH unified AS (
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
 )
-SELECT source, kind, native_id, canonical_id, ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id, url, headline, address, city, postal, price, area, room_layout, NULL::float8, NULL::bigint, NULL::bigint, NULL::int4, NULL::int4, NULL::int4, NULL::int4, NULL::text, NULL::text, last_seen_at::text, published_at::text, address
+SELECT source, kind, native_id, canonical_id, ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id, url, headline, address, city, postal, price, area, room_layout, NULL::float8, NULL::bigint, NULL::bigint, NULL::int4, NULL::int4, NULL::int4, NULL::int4, NULL::text, NULL::text, NULL::text, last_seen_at::text, published_at::text, address
 FROM unified u
 WHERE ($4 = 'all' OR u.source = $4)
   AND ($5::text IS NULL OR trim($5::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim($5::text)) || '%'))
@@ -192,7 +193,7 @@ func (s *Service) searchListings(ctx context.Context, params SearchParams, listi
 	out := []listingSearchRow{}
 	for rows.Next() {
 		var row listingSearchRow
-		if err := rows.Scan(&row.Source, &row.Kind, &row.NativeID, &row.CanonicalID, &row.PublicID, &row.URL, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Price, &row.Area, &row.RoomLayout, &row.PricePerM2, &row.DebtFreePrice, &row.DebtShareAmount, &row.RoomsCount, &row.FloorLevel, &row.TotalFloors, &row.BuildYear, &row.Condition, &row.EnergyClass, &row.LastSeenAt, &row.PublishedAt, &row.BuildingKeyAddress); err != nil {
+		if err := rows.Scan(&row.Source, &row.Kind, &row.NativeID, &row.CanonicalID, &row.PublicID, &row.URL, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Price, &row.Area, &row.RoomLayout, &row.PricePerM2, &row.DebtFreePrice, &row.DebtShareAmount, &row.RoomsCount, &row.FloorLevel, &row.TotalFloors, &row.BuildYear, &row.Condition, &row.EnergyClass, &row.EnergyEfficiencyLabel, &row.LastSeenAt, &row.PublishedAt, &row.BuildingKeyAddress); err != nil {
 			return nil, fmt.Errorf("scan %s listing: %w", listingType, err)
 		}
 		out = append(out, row)

@@ -217,38 +217,39 @@ func mapNotFound(err error) error {
 }
 
 type listingSearchRow struct {
-	Source             string
-	Kind               string
-	NativeID           string
-	CanonicalID        string
-	PublicID           string
-	URL                string
-	Headline           string
-	Address            string
-	City               string
-	Postal             string
-	Price              *int64
-	Area               *float64
-	RoomLayout         string
-	PricePerM2         *float64
-	DebtFreePrice      *int64
-	DebtShareAmount    *int64
-	RoomsCount         *int32
-	FloorLevel         *int32
-	TotalFloors        *int32
-	BuildYear          *int32
-	Condition          *string
-	EnergyClass        *string
-	LastSeenAt         *string
-	PublishedAt        *string
-	BuildingKeyAddress string
+	Source                string
+	Kind                  string
+	NativeID              string
+	CanonicalID           string
+	PublicID              string
+	URL                   string
+	Headline              string
+	Address               string
+	City                  string
+	Postal                string
+	Price                 *int64
+	Area                  *float64
+	RoomLayout            string
+	PricePerM2            *float64
+	DebtFreePrice         *int64
+	DebtShareAmount       *int64
+	RoomsCount            *int32
+	FloorLevel            *int32
+	TotalFloors           *int32
+	BuildYear             *int32
+	Condition             *string
+	EnergyClass           *string
+	EnergyEfficiencyLabel *string
+	LastSeenAt            *string
+	PublishedAt           *string
+	BuildingKeyAddress    string
 }
 
 func (r listingSearchRow) toSaleSummary() SaleListingSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return SaleListingSummary{ID: r.PublicID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, RoomsCount: r.RoomsCount, AreaM2: r.Area, FloorLevel: r.FloorLevel, Condition: valueOrEmpty(r.Condition)}, Building: BuildingDetails{Identity: identity, Location: location, BuildYear: r.BuildYear, FloorCount: r.TotalFloors, EnergyClass: valueOrEmpty(r.EnergyClass)}, Commercial: CommercialDetails{AskingPrice: r.Price, DebtFreePrice: r.DebtFreePrice, DebtShareAmount: r.DebtShareAmount, PricePerSquareMeter: r.PricePerM2, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
+	return SaleListingSummary{ID: r.PublicID, Source: source, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, RoomsCount: r.RoomsCount, AreaM2: r.Area, FloorLevel: r.FloorLevel, Condition: valueOrEmpty(r.Condition)}, Building: BuildingDetails{Identity: identity, Location: location, BuildYear: r.BuildYear, FloorCount: r.TotalFloors, EnergyClass: valueOrEmpty(r.EnergyClass), EnergyEfficiencyLabel: valueOrEmpty(r.EnergyEfficiencyLabel)}, Commercial: CommercialDetails{AskingPrice: r.Price, DebtFreePrice: r.DebtFreePrice, DebtShareAmount: r.DebtShareAmount, PricePerSquareMeter: r.PricePerM2, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func (r listingSearchRow) toRentalSummary() RentalSummary {

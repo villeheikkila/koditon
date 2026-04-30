@@ -706,6 +706,8 @@ components:
           type: boolean
         energy_class:
           type: string
+        energy_efficiency_label:
+          type: string
         floor_count:
           format: int32
           type: integer
