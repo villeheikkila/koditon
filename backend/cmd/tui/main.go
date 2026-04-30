@@ -58,7 +58,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	postalService := postal.NewService(pool)
 	runner := syncflows.NewRunner(logger, adsService, pricesService, shortcutService, frontdoorService, postalService)
 	syncJobStore := syncjobs.NewStore(logger, pool)
-	p := tea.NewProgram(tui.NewApp(runner, tui.WithWebBaseURL(cfg.WebBaseURL), tui.WithSyncJobs(syncJobStore)).Model(), tea.WithOutput(stderr))
+	p := tea.NewProgram(tui.NewApp(runner, tui.WithWebBaseURL(cfg.WebBaseURL), tui.WithSyncJobs(syncJobStore), tui.WithDBPool(pool)).Model(), tea.WithOutput(stderr))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
 	}

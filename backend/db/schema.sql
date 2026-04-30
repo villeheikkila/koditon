@@ -79,6 +79,16 @@ CREATE INDEX idx_device_sessions_user_created ON public.device_sessions USING bt
 CREATE INDEX idx_device_sessions_user_device_id ON public.device_sessions USING btree (device_session_user_device_id);
 CREATE INDEX idx_device_sessions_user_id ON public.device_sessions USING btree (user_id);
 
+create table public.energy_efficiency_aliases (
+  energy_efficiency_alias text not null constraint energy_efficiency_aliases_pkey primary key,
+  energy_efficiency_class_code text,
+  energy_efficiency_standard_year integer,
+  energy_efficiency_status text not null,
+  energy_efficiency_match_code text,
+  energy_efficiency_label text not null,
+  constraint energy_efficiency_aliases_status_check CHECK ((energy_efficiency_status = ANY (ARRAY['known'::text, 'not_required'::text, 'not_available'::text, 'unknown'::text])))
+);
+
 create table public.feature_flags (
   flag_uuid uuid default gen_random_uuid() not null constraint feature_flags_uuid_key unique,
   flag_name text not null constraint feature_flags_flag_name_key unique,
@@ -481,6 +491,41 @@ create table public.sale_listing_plot_type_aliases (
   sale_listing_plot_type_label text not null
 );
 
+create table public.sale_listing_prices_transaction_match_candidates (
+  sale_listing_prices_transaction_match_candidate_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_candidates_pkey primary key,
+  sale_listing_prices_transaction_match_run_id uuid not null constraint sale_listing_prices_transacti_sale_listing_prices_transact_fkey references sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE CASCADE,
+  sale_listing_id uuid not null constraint sale_listing_prices_transaction_match_cand_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE CASCADE,
+  prices_transaction_id uuid not null constraint sale_listing_prices_transaction_matc_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE CASCADE,
+  sale_listing_prices_transaction_match_score integer not null,
+  sale_listing_prices_transaction_match_confidence text not null,
+  sale_listing_prices_transaction_match_status text default 'candidate'::text not null,
+  sale_listing_prices_transaction_match_reasons jsonb default '{}'::jsonb not null,
+  sale_listing_prices_transaction_match_price_delta_percent double precision,
+  sale_listing_prices_transaction_match_created_at timestamp with time zone default now() not null,
+  constraint sale_listing_prices_transaction_match_candidate_unique UNIQUE (sale_listing_prices_transaction_match_run_id, sale_listing_id, prices_transaction_id),
+  constraint sale_listing_prices_transaction_match_confidence_check CHECK ((sale_listing_prices_transaction_match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))),
+  constraint sale_listing_prices_transaction_match_status_check CHECK ((sale_listing_prices_transaction_match_status = ANY (ARRAY['candidate'::text, 'auto_linked'::text, 'ambiguous'::text, 'rejected'::text])))
+);
+
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_listing_sc ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_id, sale_listing_prices_transaction_match_score DESC);
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_run_status ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_prices_transaction_match_run_id, sale_listing_prices_transaction_match_status);
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_transactio ON public.sale_listing_prices_transaction_match_candidates USING btree (prices_transaction_id, sale_listing_prices_transaction_match_score DESC);
+
+create table public.sale_listing_prices_transaction_match_runs (
+  sale_listing_prices_transaction_match_run_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_runs_pkey primary key,
+  sale_listing_prices_transaction_match_run_mode text not null,
+  sale_listing_prices_transaction_match_score_threshold integer default 90 not null,
+  sale_listing_prices_transaction_match_competitor_margin integer default 15 not null,
+  sale_listing_prices_transaction_match_candidates_count integer default 0 not null,
+  sale_listing_prices_transaction_match_auto_linked_count integer default 0 not null,
+  sale_listing_prices_transaction_match_ambiguous_count integer default 0 not null,
+  sale_listing_prices_transaction_match_started_at timestamp with time zone default now() not null,
+  sale_listing_prices_transaction_match_finished_at timestamp with time zone,
+  constraint sale_listing_prices_transaction_match_margin_check CHECK ((sale_listing_prices_transaction_match_competitor_margin >= 0)),
+  constraint sale_listing_prices_transaction_match_run_mode_check CHECK ((sale_listing_prices_transaction_match_run_mode = ANY (ARRAY['dry_run'::text, 'auto_link_safe'::text]))),
+  constraint sale_listing_prices_transaction_match_threshold_check CHECK ((sale_listing_prices_transaction_match_score_threshold >= 0))
+);
+
 create table public.sale_listing_property_type_aliases (
   sale_listing_property_type_alias text not null constraint sale_listing_property_type_aliases_pkey primary key,
   sale_listing_property_type_code text not null,
@@ -549,6 +594,11 @@ create table public.sale_listings (
   sale_listing_plot_type_raw text,
   sale_listing_plot_type_code text,
   sale_listing_energy_efficiency_label text,
+  sale_listing_energy_efficiency_class_code text,
+  sale_listing_energy_efficiency_standard_year integer,
+  sale_listing_energy_efficiency_status text,
+  sale_listing_energy_efficiency_match_code text,
+  sale_listing_first_seen_at timestamp with time zone,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
   constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
@@ -559,6 +609,10 @@ CREATE INDEX idx_sale_listings_build_year ON public.sale_listings USING btree (s
 CREATE INDEX idx_sale_listings_building_match_key ON public.sale_listings USING btree (sale_listing_building_match_key);
 CREATE INDEX idx_sale_listings_city ON public.sale_listings USING btree (sale_listing_city);
 CREATE INDEX idx_sale_listings_elevator ON public.sale_listings USING btree (sale_listing_elevator);
+CREATE INDEX idx_sale_listings_energy_efficiency_class_year ON public.sale_listings USING btree (sale_listing_energy_efficiency_class_code, sale_listing_energy_efficiency_standard_year);
+CREATE INDEX idx_sale_listings_energy_efficiency_match_code ON public.sale_listings USING btree (sale_listing_energy_efficiency_match_code);
+CREATE INDEX idx_sale_listings_energy_efficiency_status ON public.sale_listings USING btree (sale_listing_energy_efficiency_status);
+CREATE INDEX idx_sale_listings_first_seen ON public.sale_listings USING btree (sale_listing_first_seen_at);
 CREATE INDEX idx_sale_listings_floor_level ON public.sale_listings USING btree (sale_listing_floor_level);
 CREATE INDEX idx_sale_listings_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at DESC);
 CREATE INDEX idx_sale_listings_plot_type_code ON public.sale_listings USING btree (sale_listing_plot_type_code);

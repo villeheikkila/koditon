@@ -20,7 +20,37 @@ func TestRootHelpListsCanonicalCommands(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 	out := stdout.String()
-	for _, want := range []string{"search", "detail", "transactions", "sync", "api-query", "--json", "--no-color"} {
+	for _, want := range []string{"search", "detail", "transactions", "prices", "sync", "api-query", "--json", "--no-color"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
+	}
+}
+
+func TestPricesHelpListsMatchSubcommand(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"prices", "match", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "sale-listings") {
+		t.Fatalf("expected sale-listings in help:\n%s", out)
+	}
+}
+
+func TestPricesMatchSaleListingsHelpListsSafetyFlags(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCommand(context.Background(), &stdout, &stderr, envGetter(nil))
+	cmd.SetArgs([]string{"prices", "match", "sale-listings", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	out := stdout.String()
+	for _, want := range []string{"--auto-link-safe", "--threshold", "--margin"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in help:\n%s", want, out)
 		}

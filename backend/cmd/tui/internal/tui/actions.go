@@ -294,6 +294,16 @@ func buildSubsystems() []subsystem {
 						}, nil
 					},
 				},
+				{
+					Title:       "Review Sale Listing Matches",
+					Description: "Auto-link obvious transaction matches, then resolve ambiguous sale listings",
+					BuildInput: func(ctx *appContext, _ action, _ []string, breadcrumb string) Screen {
+						return newPricesMatchReviewScreen(ctx, breadcrumb+" > Match Review")
+					},
+					Run: func(_ context.Context, _ *appContext, _ []string, _ reportFn) (actionResult, error) {
+						return actionResult{Output: "prices match review opened"}, nil
+					},
+				},
 			},
 		},
 		{

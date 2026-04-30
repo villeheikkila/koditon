@@ -54,6 +54,7 @@ func newRootCommand(ctx context.Context, stdout, stderr io.Writer, getenv func(s
 	cmd.AddCommand(newSearchCommand(opts))
 	cmd.AddCommand(newDetailCommand(opts))
 	cmd.AddCommand(newTransactionsCommand(opts))
+	cmd.AddCommand(newPricesCommand(opts))
 	cmd.AddCommand(newSyncCommand(opts))
 	cmd.AddCommand(newAPIQueryCommand(opts))
 	return cmd
@@ -131,6 +132,46 @@ func newTransactionsCommand(opts *commandOptions) *cobra.Command {
 	cmd.Flags().StringVar(&f.City, "city", "", "City name (required)")
 	cmd.Flags().StringVar(&f.Search, "search", "", "Address/description search term")
 	cmd.Flags().IntVar(&f.Limit, "limit", 50, "Maximum results")
+	return cmd
+}
+
+func newPricesCommand(opts *commandOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "prices",
+		Short: "Operate prices data and listing matches",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
+	}
+	match := &cobra.Command{
+		Use:   "match",
+		Short: "Generate and apply prices matching candidates",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
+	}
+	var f cli.PricesMatchSaleListingsFlags
+	saleListings := &cobra.Command{
+		Use:   "sale-listings",
+		Short: "Match prices transactions to sale listings",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			pool, _, err := setup(opts.ctx)
+			if err != nil {
+				return err
+			}
+			defer pool.Close()
+			f.JSON = opts.json
+			f.Out = opts.stdout
+			return cli.RunPricesMatchSaleListings(opts.ctx, pool, f)
+		},
+	}
+	saleListings.Flags().BoolVar(&f.AutoLinkSafe, "auto-link-safe", false, "Apply only unique high-confidence matches")
+	saleListings.Flags().IntVar(&f.ScoreThreshold, "threshold", 90, "Minimum score for high-confidence matches")
+	saleListings.Flags().IntVar(&f.CompetitorMargin, "margin", 15, "Minimum score gap to competing candidates")
+	match.AddCommand(saleListings)
+	cmd.AddCommand(match)
 	return cmd
 }
 
