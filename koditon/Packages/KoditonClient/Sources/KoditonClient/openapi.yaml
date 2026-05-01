@@ -993,6 +993,190 @@ components:
       required:
         - id
       type: object
+    TransactionMatchCandidate:
+      additionalProperties: false
+      properties:
+        confidence:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        listing:
+          $ref: "#/components/schemas/TransactionMatchListingCandidate"
+        price_delta_percent:
+          format: double
+          type: number
+        reasons:
+          additionalProperties: true
+          type: object
+        score:
+          format: int32
+          type: integer
+        status:
+          type: string
+        transaction:
+          $ref: "#/components/schemas/TransactionMatchTransaction"
+      required:
+        - id
+        - status
+        - score
+        - confidence
+        - listing
+        - transaction
+      type: object
+    TransactionMatchCandidatesOutputBody:
+      additionalProperties: false
+      properties:
+        candidates:
+          items:
+            $ref: "#/components/schemas/TransactionMatchCandidate"
+          type:
+            - array
+            - "null"
+      required:
+        - candidates
+      type: object
+    TransactionMatchListingCandidate:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        asking_price:
+          format: int64
+          type: integer
+        build_year:
+          format: int32
+          type: integer
+        canonical_id:
+          type: string
+        city:
+          type: string
+        floor_level:
+          format: int32
+          type: integer
+        headline:
+          type: string
+        id:
+          type: string
+        last_seen_at:
+          type: string
+        postal:
+          type: string
+        price_per_m2:
+          format: double
+          type: number
+        room_layout:
+          type: string
+        source_provider:
+          type: string
+        street_address:
+          type: string
+        total_floors:
+          format: int32
+          type: integer
+        url:
+          type: string
+      required:
+        - id
+        - canonical_id
+        - source_provider
+      type: object
+    TransactionMatchPostalSummary:
+      additionalProperties: false
+      properties:
+        ambiguous_count:
+          format: int64
+          type: integer
+        candidate_count:
+          format: int64
+          type: integer
+        high_count:
+          format: int64
+          type: integer
+        latest_at:
+          type: string
+        listing_count:
+          format: int64
+          type: integer
+        low_count:
+          format: int64
+          type: integer
+        medium_count:
+          format: int64
+          type: integer
+        postal:
+          type: string
+        transaction_count:
+          format: int64
+          type: integer
+      required:
+        - postal
+        - candidate_count
+        - listing_count
+        - transaction_count
+        - high_count
+        - medium_count
+        - low_count
+        - ambiguous_count
+      type: object
+    TransactionMatchPostalsOutputBody:
+      additionalProperties: false
+      properties:
+        postals:
+          items:
+            $ref: "#/components/schemas/TransactionMatchPostalSummary"
+          type:
+            - array
+            - "null"
+      required:
+        - postals
+      type: object
+    TransactionMatchTransaction:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        build_year:
+          format: int32
+          type: integer
+        category:
+          type: string
+        condition:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor:
+          type: string
+        id:
+          type: string
+        period_identifier:
+          type: string
+        plot:
+          type: string
+        price:
+          format: int64
+          type: integer
+        price_per_m2:
+          format: int64
+          type: integer
+        type:
+          type: string
+      required:
+        - id
+        - area_m2
+        - price
+        - price_per_m2
+        - elevator
+      type: object
     Contact:
       additionalProperties: false
       properties:
@@ -2997,6 +3181,88 @@ paths:
       summary: Search sale listings
       tags:
         - Sale Listings
+  /api/v1/sale-listings/transaction-match-candidates:
+    get:
+      description: Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code
+      operationId: sale-listings-transaction-match-candidates
+      parameters:
+        - description: Postal code filter
+          explode: false
+          in: query
+          name: postal
+          schema:
+            description: Postal code filter
+            type: string
+        - description: "Candidate status filter: candidate or ambiguous"
+          explode: false
+          in: query
+          name: status
+          schema:
+            description: "Candidate status filter: candidate or ambiguous"
+            type: string
+        - description: Maximum candidates to return
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Maximum candidates to return
+            format: int32
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionMatchCandidatesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer:
+            - core:read
+      summary: List potential transaction matches
+      tags:
+        - Sale Listings
+      x-koditon-scopes:
+        - core:read
+  /api/v1/sale-listings/transaction-match-postals:
+    get:
+      description: Returns postal codes where unresolved sale listing to price transaction candidates exist
+      operationId: sale-listings-transaction-match-postals
+      parameters:
+        - description: Maximum postal codes to return
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Maximum postal codes to return
+            format: int32
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionMatchPostalsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer:
+            - core:read
+      summary: List postal codes with potential transaction matches
+      tags:
+        - Sale Listings
+      x-koditon-scopes:
+        - core:read
   /api/v1/sale-listings/{id}:
     get:
       description: Fetch a sale listing by public ID, canonical ID, or source URL

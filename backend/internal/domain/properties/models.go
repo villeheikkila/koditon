@@ -227,6 +227,67 @@ type PriceTransactionMatch struct {
 	MatchConfidence     string   `json:"match_confidence,omitempty"`
 }
 
+type TransactionMatchPostalSummary struct {
+	Postal           string `json:"postal"`
+	CandidateCount   int64  `json:"candidate_count"`
+	ListingCount     int64  `json:"listing_count"`
+	TransactionCount int64  `json:"transaction_count"`
+	HighCount        int64  `json:"high_count"`
+	MediumCount      int64  `json:"medium_count"`
+	LowCount         int64  `json:"low_count"`
+	AmbiguousCount   int64  `json:"ambiguous_count"`
+	LatestAt         string `json:"latest_at,omitempty"`
+}
+
+type TransactionMatchCandidate struct {
+	ID                string                           `json:"id"`
+	Status            string                           `json:"status"`
+	Score             int32                            `json:"score"`
+	Confidence        string                           `json:"confidence"`
+	PriceDeltaPercent *float64                         `json:"price_delta_percent,omitempty"`
+	Reasons           json.RawMessage                  `json:"reasons,omitempty"`
+	CreatedAt         string                           `json:"created_at,omitempty"`
+	Listing           TransactionMatchListingCandidate `json:"listing"`
+	Transaction       TransactionMatchTransaction      `json:"transaction"`
+}
+
+type TransactionMatchListingCandidate struct {
+	ID             string   `json:"id"`
+	CanonicalID    string   `json:"canonical_id"`
+	SourceProvider string   `json:"source_provider"`
+	URL            string   `json:"url,omitempty"`
+	Headline       string   `json:"headline,omitempty"`
+	StreetAddress  string   `json:"street_address,omitempty"`
+	City           string   `json:"city,omitempty"`
+	Postal         string   `json:"postal,omitempty"`
+	RoomLayout     string   `json:"room_layout,omitempty"`
+	AreaM2         *float64 `json:"area_m2,omitempty"`
+	AskingPrice    *int64   `json:"asking_price,omitempty"`
+	PricePerM2     *float64 `json:"price_per_m2,omitempty"`
+	BuildYear      *int32   `json:"build_year,omitempty"`
+	FloorLevel     *int32   `json:"floor_level,omitempty"`
+	TotalFloors    *int32   `json:"total_floors,omitempty"`
+	LastSeenAt     string   `json:"last_seen_at,omitempty"`
+}
+
+type TransactionMatchTransaction struct {
+	ID                  string  `json:"id"`
+	Description         string  `json:"description,omitempty"`
+	Type                string  `json:"type,omitempty"`
+	Category            string  `json:"category,omitempty"`
+	AreaM2              float64 `json:"area_m2"`
+	Price               int64   `json:"price"`
+	PricePerSquareMeter int64   `json:"price_per_m2"`
+	BuildYear           int32   `json:"build_year,omitempty"`
+	Floor               string  `json:"floor,omitempty"`
+	Elevator            bool    `json:"elevator"`
+	Condition           string  `json:"condition,omitempty"`
+	Plot                string  `json:"plot,omitempty"`
+	EnergyClass         string  `json:"energy_class,omitempty"`
+	PeriodIdentifier    string  `json:"period_identifier,omitempty"`
+	CreatedAt           string  `json:"created_at,omitempty"`
+}
+
 type Charges struct {
 	MaintenanceMonthly *float64 `json:"maintenance_monthly,omitempty"`
 	TotalMonthly       *float64 `json:"total_monthly,omitempty"`

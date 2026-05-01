@@ -38,6 +38,16 @@ type propertyDetailInput struct {
 	ID string `path:"id" required:"true" doc:"Public ID, canonical ID, or source URL"`
 }
 
+type transactionMatchPostalsInput struct {
+	Limit int32 `query:"limit" doc:"Maximum postal codes to return"`
+}
+
+type transactionMatchCandidatesInput struct {
+	Postal string `query:"postal" doc:"Postal code filter"`
+	Status string `query:"status" doc:"Candidate status filter: candidate or ambiguous"`
+	Limit  int32  `query:"limit"  doc:"Maximum candidates to return"`
+}
+
 type resolveCanonicalIDInput struct {
 	URL string `query:"url" required:"true" doc:"Source URL"`
 }
@@ -71,6 +81,18 @@ type buildingDetailOutput struct {
 	Body properties.Building
 }
 
+type transactionMatchPostalsOutput struct {
+	Body struct {
+		Postals []properties.TransactionMatchPostalSummary `json:"postals"`
+	}
+}
+
+type transactionMatchCandidatesOutput struct {
+	Body struct {
+		Candidates []properties.TransactionMatchCandidate `json:"candidates"`
+	}
+}
+
 func (a *API) saleListingsSearchHandler(ctx context.Context, input *propertySearchInput) (*saleListingsSearchOutput, error) {
 	logger := logging.With(a.logger, logging.Op("api.sale_listings_search"))
 	page, err := a.propertiesService.SearchSaleListings(ctx, propertySearchParams(input))
@@ -101,6 +123,28 @@ func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetai
 		return nil, huma.Error400BadRequest("invalid sale listing canonical ID")
 	}
 	return &saleListingDetailOutput{Body: listing}, nil
+}
+
+func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {
+	postals, err := a.propertiesService.TransactionMatchPostals(ctx, input.Limit)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "transaction match postal list failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("transaction match postal list failed")
+	}
+	out := &transactionMatchPostalsOutput{}
+	out.Body.Postals = postals
+	return out, nil
+}
+
+func (a *API) transactionMatchCandidatesHandler(ctx context.Context, input *transactionMatchCandidatesInput) (*transactionMatchCandidatesOutput, error) {
+	candidates, err := a.propertiesService.TransactionMatchCandidates(ctx, input.Postal, input.Status, input.Limit)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "transaction match candidate list failed", "postal", input.Postal, "status", input.Status, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("transaction match candidate list failed")
+	}
+	out := &transactionMatchCandidatesOutput{}
+	out.Body.Candidates = candidates
+	return out, nil
 }
 
 func (a *API) rentalDetailHandler(ctx context.Context, input *propertyDetailInput) (*rentalDetailOutput, error) {

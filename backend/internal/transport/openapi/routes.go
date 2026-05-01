@@ -74,6 +74,20 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search sale listings using the shared provider-neutral sale listing model"
 		op.Tags = []string{"Sale Listings"}
 	})
+	huma.Get(api, "/api/v1/sale-listings/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-transaction-match-postals"
+		op.Summary = "List postal codes with potential transaction matches"
+		op.Description = "Returns postal codes where unresolved sale listing to price transaction candidates exist"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-transaction-match-postals"))
+	})
+	huma.Get(api, "/api/v1/sale-listings/transaction-match-candidates", a.transactionMatchCandidatesHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-transaction-match-candidates"
+		op.Summary = "List potential transaction matches"
+		op.Description = "Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-transaction-match-candidates"))
+	})
 	huma.Get(api, "/api/v1/sale-listings/{id}", a.saleListingDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-detail"
 		op.Summary = "Get sale listing detail"

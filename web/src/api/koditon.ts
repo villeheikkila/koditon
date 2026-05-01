@@ -383,6 +383,79 @@ export interface CommercialDetails {
   unpublished_at?: string;
 }
 
+export type TransactionMatchCandidateReasons = { [key: string]: unknown };
+
+export interface TransactionMatchListingCandidate {
+  area_m2?: number;
+  asking_price?: number;
+  build_year?: number;
+  canonical_id: string;
+  city?: string;
+  floor_level?: number;
+  headline?: string;
+  id: string;
+  last_seen_at?: string;
+  postal?: string;
+  price_per_m2?: number;
+  room_layout?: string;
+  source_provider: string;
+  street_address?: string;
+  total_floors?: number;
+  url?: string;
+}
+
+export interface TransactionMatchTransaction {
+  area_m2: number;
+  build_year?: number;
+  category?: string;
+  condition?: string;
+  created_at?: string;
+  description?: string;
+  elevator: boolean;
+  energy_class?: string;
+  floor?: string;
+  id: string;
+  period_identifier?: string;
+  plot?: string;
+  price: number;
+  price_per_m2: number;
+  type?: string;
+}
+
+export interface TransactionMatchCandidate {
+  confidence: string;
+  created_at?: string;
+  id: string;
+  listing: TransactionMatchListingCandidate;
+  price_delta_percent?: number;
+  reasons?: TransactionMatchCandidateReasons;
+  score: number;
+  status: string;
+  transaction: TransactionMatchTransaction;
+}
+
+export interface TransactionMatchCandidatesOutputBody {
+  /** @nullable */
+  candidates: TransactionMatchCandidate[] | null;
+}
+
+export interface TransactionMatchPostalSummary {
+  ambiguous_count: number;
+  candidate_count: number;
+  high_count: number;
+  latest_at?: string;
+  listing_count: number;
+  low_count: number;
+  medium_count: number;
+  postal: string;
+  transaction_count: number;
+}
+
+export interface TransactionMatchPostalsOutputBody {
+  /** @nullable */
+  postals: TransactionMatchPostalSummary[] | null;
+}
+
 export interface Contact {
   email?: string;
   name?: string;
@@ -1170,6 +1243,28 @@ page?: number;
  * Results per page: 25, 50, or 100
  */
 page_size?: number;
+};
+
+export type SaleListingsTransactionMatchCandidatesParams = {
+/**
+ * Postal code filter
+ */
+postal?: string;
+/**
+ * Candidate status filter: candidate or ambiguous
+ */
+status?: string;
+/**
+ * Maximum candidates to return
+ */
+limit?: number;
+};
+
+export type SaleListingsTransactionMatchPostalsParams = {
+/**
+ * Maximum postal codes to return
+ */
+limit?: number;
 };
 
 export type SearchParams = {
@@ -3317,6 +3412,258 @@ export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleList
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getSaleListingsSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code
+ * @summary List potential transaction matches
+ */
+export type saleListingsTransactionMatchCandidatesResponse200 = {
+  data: TransactionMatchCandidatesOutputBody
+  status: 200
+}
+
+export type saleListingsTransactionMatchCandidatesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type saleListingsTransactionMatchCandidatesResponseSuccess = (saleListingsTransactionMatchCandidatesResponse200) & {
+  headers: Headers;
+};
+export type saleListingsTransactionMatchCandidatesResponseError = (saleListingsTransactionMatchCandidatesResponseDefault) & {
+  headers: Headers;
+};
+
+export type saleListingsTransactionMatchCandidatesResponse = (saleListingsTransactionMatchCandidatesResponseSuccess | saleListingsTransactionMatchCandidatesResponseError)
+
+export const getSaleListingsTransactionMatchCandidatesUrl = (params?: SaleListingsTransactionMatchCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/sale-listings/transaction-match-candidates?${stringifiedParams}` : `/api/v1/sale-listings/transaction-match-candidates`
+}
+
+export const saleListingsTransactionMatchCandidates = async (params?: SaleListingsTransactionMatchCandidatesParams, options?: RequestInit): Promise<saleListingsTransactionMatchCandidatesResponse> => {
+
+  return customInstance<saleListingsTransactionMatchCandidatesResponse>(getSaleListingsTransactionMatchCandidatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSaleListingsTransactionMatchCandidatesQueryKey = (params?: SaleListingsTransactionMatchCandidatesParams,) => {
+    return [
+    `/api/v1/sale-listings/transaction-match-candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSaleListingsTransactionMatchCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSaleListingsTransactionMatchCandidatesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>> = ({ signal }) => saleListingsTransactionMatchCandidates(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SaleListingsTransactionMatchCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>>
+export type SaleListingsTransactionMatchCandidatesQueryError = ErrorType<ErrorModel>
+
+
+export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  SaleListingsTransactionMatchCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List potential transaction matches
+ */
+
+export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSaleListingsTransactionMatchCandidatesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns postal codes where unresolved sale listing to price transaction candidates exist
+ * @summary List postal codes with potential transaction matches
+ */
+export type saleListingsTransactionMatchPostalsResponse200 = {
+  data: TransactionMatchPostalsOutputBody
+  status: 200
+}
+
+export type saleListingsTransactionMatchPostalsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type saleListingsTransactionMatchPostalsResponseSuccess = (saleListingsTransactionMatchPostalsResponse200) & {
+  headers: Headers;
+};
+export type saleListingsTransactionMatchPostalsResponseError = (saleListingsTransactionMatchPostalsResponseDefault) & {
+  headers: Headers;
+};
+
+export type saleListingsTransactionMatchPostalsResponse = (saleListingsTransactionMatchPostalsResponseSuccess | saleListingsTransactionMatchPostalsResponseError)
+
+export const getSaleListingsTransactionMatchPostalsUrl = (params?: SaleListingsTransactionMatchPostalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/sale-listings/transaction-match-postals?${stringifiedParams}` : `/api/v1/sale-listings/transaction-match-postals`
+}
+
+export const saleListingsTransactionMatchPostals = async (params?: SaleListingsTransactionMatchPostalsParams, options?: RequestInit): Promise<saleListingsTransactionMatchPostalsResponse> => {
+
+  return customInstance<saleListingsTransactionMatchPostalsResponse>(getSaleListingsTransactionMatchPostalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSaleListingsTransactionMatchPostalsQueryKey = (params?: SaleListingsTransactionMatchPostalsParams,) => {
+    return [
+    `/api/v1/sale-listings/transaction-match-postals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSaleListingsTransactionMatchPostalsQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSaleListingsTransactionMatchPostalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>> = ({ signal }) => saleListingsTransactionMatchPostals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SaleListingsTransactionMatchPostalsQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>>
+export type SaleListingsTransactionMatchPostalsQueryError = ErrorType<ErrorModel>
+
+
+export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  SaleListingsTransactionMatchPostalsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>,
+          TError,
+          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List postal codes with potential transaction matches
+ */
+
+export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
+ params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSaleListingsTransactionMatchPostalsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

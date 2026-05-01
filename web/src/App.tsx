@@ -5,6 +5,7 @@ import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
 import SearchPage from './pages/SearchPage'
+import MatchesPage from './pages/MatchesPage'
 import OAuthAuthorizePage from './pages/OAuthAuthorizePage'
 import EmailConfirmPage from './pages/EmailConfirmPage'
 
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/rental/:id" element={<DetailPage kind="rental" />} />
         <Route path="/building/:id" element={<DetailPage kind="building" />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/matches" element={authenticated ? <MatchesPage /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
         <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />
 

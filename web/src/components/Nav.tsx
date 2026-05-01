@@ -25,6 +25,12 @@ export default function Nav({ actions }: NavProps) {
         >
           Prices
         </NavLink>
+        <NavLink
+          to="/matches"
+          className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+        >
+          Matches
+        </NavLink>
       </nav>
       {actions && <div className="nav-actions">{actions}</div>}
     </header>
