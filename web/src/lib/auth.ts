@@ -7,21 +7,21 @@ import {
   authPasskeyRegisterFinish,
   authPasskeyRegisterOptions,
 } from '../api/koditon'
+import {
+  clearToken,
+  getToken,
+  setSession,
+  signOutSession,
+  type WebSession,
+} from './auth-store'
 
-const TOKEN_KEY = 'koditon_access_token'
 const DEVICE_ID_KEY = 'koditon_device_id'
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
-}
-
 export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
+  setSession({ access_token: token, access_token_expires_at: 0, user_id: '' })
 }
 
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
+export { clearToken, getToken, signOutSession }
 
 export function getOrCreateDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY)
@@ -49,7 +49,7 @@ export async function passkeySignIn(): Promise<void> {
     },
   })
   if (tokenRes.status !== 200) throw new Error('Passkey authentication failed')
-  setToken(tokenRes.data.access_token)
+  setSession(tokenRes.data as WebSession)
 }
 
 export async function passkeyRegisterBegin(): Promise<{ challenge_id: string; options: PublicKeyCredentialCreationOptions }> {
@@ -115,7 +115,7 @@ export async function appleSignIn(): Promise<void> {
     },
   })
   if (tokenRes.status !== 200) throw new Error('Apple Sign In failed')
-  setToken(tokenRes.data.access_token)
+  setSession(tokenRes.data as WebSession)
 }
 
 export async function requestEmailSignIn(email: string): Promise<void> {
@@ -129,7 +129,7 @@ export async function confirmEmailSignIn(token: string): Promise<void> {
     },
   })
   if (tokenRes.status !== 200) throw new Error('Email sign in failed')
-  setToken(tokenRes.data.access_token)
+  setSession(tokenRes.data as WebSession)
 }
 
 export function isAppleSignInConfigured(): boolean {

@@ -343,6 +343,7 @@ create table public.oauth_refresh_tokens (
   oauth_refresh_token_token_hash text not null constraint oauth_refresh_tokens_oauth_refresh_token_token_hash_key unique,
   oauth_client_id text not null,
   user_uuid uuid not null constraint oauth_refresh_tokens_user_uuid_fkey references users(user_uuid) ON DELETE CASCADE,
+  device_session_uuid uuid constraint oauth_refresh_tokens_device_session_uuid_fkey references device_sessions(device_session_uuid) ON DELETE SET NULL,
   oauth_refresh_token_scopes text[] default '{}'::text[] not null,
   oauth_refresh_token_audience text default ''::text not null,
   oauth_refresh_token_expires_at timestamp with time zone not null,
@@ -354,6 +355,7 @@ create table public.oauth_refresh_tokens (
 
 CREATE INDEX idx_oauth_refresh_tokens_audience ON public.oauth_refresh_tokens USING btree (oauth_refresh_token_audience);
 CREATE INDEX idx_oauth_refresh_tokens_client_id ON public.oauth_refresh_tokens USING btree (oauth_client_id);
+CREATE INDEX idx_oauth_refresh_tokens_device_session_uuid ON public.oauth_refresh_tokens USING btree (device_session_uuid);
 CREATE INDEX idx_oauth_refresh_tokens_expires_at ON public.oauth_refresh_tokens USING btree (oauth_refresh_token_expires_at);
 CREATE INDEX idx_oauth_refresh_tokens_user_uuid ON public.oauth_refresh_tokens USING btree (user_uuid);
 

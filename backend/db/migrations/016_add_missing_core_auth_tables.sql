@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS public.oauth_refresh_tokens (
     oauth_refresh_token_token_hash text NOT NULL UNIQUE,
     oauth_client_id text NOT NULL,
     user_uuid uuid NOT NULL REFERENCES public.users(user_uuid) ON DELETE CASCADE,
+    device_session_uuid uuid REFERENCES public.device_sessions(device_session_uuid) ON DELETE SET NULL,
     oauth_refresh_token_scopes text[] NOT NULL DEFAULT '{}',
     oauth_refresh_token_audience text NOT NULL DEFAULT '',
     oauth_refresh_token_expires_at timestamptz NOT NULL,
@@ -175,5 +176,6 @@ CREATE TABLE IF NOT EXISTS public.oauth_refresh_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_client_id ON public.oauth_refresh_tokens (oauth_client_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_user_uuid ON public.oauth_refresh_tokens (user_uuid);
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_device_session_uuid ON public.oauth_refresh_tokens (device_session_uuid);
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_expires_at ON public.oauth_refresh_tokens (oauth_refresh_token_expires_at);
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_audience ON public.oauth_refresh_tokens (oauth_refresh_token_audience);

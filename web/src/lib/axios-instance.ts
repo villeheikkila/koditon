@@ -1,17 +1,39 @@
+import { clearAndRedirectToSignIn, getFreshTokenOrNull, refreshSession } from './auth-store'
+
 export const customInstance = async <T>(
   url: string,
   options?: RequestInit,
 ): Promise<T> => {
-  const token = localStorage.getItem('koditon_access_token')
+  const token = getFreshTokenOrNull()
   const response = await fetch(url, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   })
+  if (response.status === 401 && !isSessionRefresh(url)) {
+    const refreshedToken = await refreshSession().catch(() => null)
+    if (refreshedToken) {
+      const retryResponse = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+          Authorization: `Bearer ${refreshedToken}`,
+        },
+      })
+      return parseResponse<T>(retryResponse)
+    }
+    clearAndRedirectToSignIn()
+  }
+  return parseResponse<T>(response)
+}
 
+async function parseResponse<T>(response: Response): Promise<T> {
   let data: unknown
   const contentType = response.headers.get('content-type') ?? ''
   if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
@@ -24,6 +46,10 @@ export const customInstance = async <T>(
     throw new Error(detail)
   }
   return { data, status: response.status, headers: response.headers } as T
+}
+
+function isSessionRefresh(url: string): boolean {
+  return url.includes('/auth/session/refresh')
 }
 
 function errorDetail(data: unknown): string | null {

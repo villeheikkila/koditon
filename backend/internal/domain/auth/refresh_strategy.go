@@ -39,6 +39,7 @@ type refreshStrategy interface {
 func refreshTokenStateFromLockedRow(row db.OauthRefreshToken, audience string) refreshFlowState {
 	return refreshFlowState{
 		UserID:         row.UserUuid,
+		SessionID:      uuidValue(row.DeviceSessionUuid),
 		ClientID:       row.OauthClientID,
 		Scopes:         row.OauthRefreshTokenScopes,
 		Audience:       audience,
@@ -162,13 +163,20 @@ func (s oauthOpaqueRefreshStrategy) handleReuse(ctx context.Context, _ pgx.Tx, q
 }
 
 func (s oauthOpaqueRefreshStrategy) rotate(ctx context.Context, _ pgx.Tx, queries *db.Queries, state refreshFlowState) (refreshFlowState, error) {
-	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, queries, state.ClientID, state.UserID, state.Scopes, state.Audience, state.RotatedTokenID, s.service.policy.OAuthRefreshTokenTTL)
+	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, queries, state.ClientID, state.UserID, state.SessionID, state.Scopes, state.Audience, state.RotatedTokenID, s.service.policy.OAuthRefreshTokenTTL)
 	if err != nil {
 		return refreshFlowState{}, fmt.Errorf("rotate oauth refresh token: %w", err)
 	}
 	state.NextRefreshToken = refreshToken
 	state.SessionNotAfter = refreshExpiry
 	return state, nil
+}
+
+func uuidValue(value *uuid.UUID) uuid.UUID {
+	if value == nil {
+		return uuid.Nil
+	}
+	return *value
 }
 
 func strategyAuthType(state refreshFlowState) string {

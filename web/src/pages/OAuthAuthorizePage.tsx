@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { getToken, passkeySignIn, appleSignIn, isAppleSignInConfigured } from '../lib/auth'
+import { passkeySignIn, appleSignIn, isAppleSignInConfigured } from '../lib/auth'
+import { getValidAccessToken } from '../lib/auth-store'
 import {
   oauthAuthorizeHandoffApprove,
   oauthAuthorizeHandoffDeny,
@@ -61,16 +62,17 @@ export default function OAuthAuthorizePage() {
   }, [])
 
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
-      setPhase(handoffToken ? 'sign-in' : 'sign-in')
-      return
-    }
-    if (handoffToken) {
-      resolveHandoff(token, handoffToken, '')
-    } else {
-      setPhase('code-entry')
-    }
+    getValidAccessToken().then(token => {
+      if (!token) {
+        setPhase('sign-in')
+        return
+      }
+      if (handoffToken) {
+        resolveHandoff(token, handoffToken, '')
+      } else {
+        setPhase('code-entry')
+      }
+    }).catch(() => setPhase('sign-in'))
   }, [handoffToken, resolveHandoff])
 
   async function handlePasskeySignIn() {
@@ -78,7 +80,8 @@ export default function OAuthAuthorizePage() {
     setSignInError('')
     try {
       await passkeySignIn()
-      const token = getToken()!
+      const token = await getValidAccessToken()
+      if (!token) throw new Error('Sign in failed')
       await resolveHandoff(token, handoffToken, userCode)
     } catch (e) {
       setSignInError(e instanceof Error ? e.message : 'Sign in failed')
@@ -93,7 +96,8 @@ export default function OAuthAuthorizePage() {
     setSignInError('')
     try {
       await appleSignIn()
-      const token = getToken()!
+      const token = await getValidAccessToken()
+      if (!token) throw new Error('Apple sign in failed')
       await resolveHandoff(token, handoffToken, userCode)
     } catch (e) {
       setSignInError(e instanceof Error ? e.message : 'Apple sign in failed')
@@ -105,7 +109,7 @@ export default function OAuthAuthorizePage() {
 
   async function handleCodeSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const token = getToken()
+    const token = await getValidAccessToken()
     if (!token) {
       setPhase('sign-in')
       return
@@ -117,9 +121,11 @@ export default function OAuthAuthorizePage() {
     if (!handoff) return
     setPhase('approving')
     try {
+      const token = await getValidAccessToken()
+      if (!token) throw new Error('Sign in required')
       const res = await oauthAuthorizeHandoffApprove({ handoff_id: handoff.handoff_id }, {
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
       })
       if (res.status !== 200) {
@@ -142,9 +148,10 @@ export default function OAuthAuthorizePage() {
   async function handleDeny() {
     if (!handoff) return
     try {
+      const token = await getValidAccessToken()
       await oauthAuthorizeHandoffDeny({ handoff_id: handoff.handoff_id }, {
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       })
     } catch {

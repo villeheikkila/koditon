@@ -200,6 +200,7 @@ insert into oauth_refresh_tokens (
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
+  device_session_uuid,
   oauth_refresh_token_scopes,
   oauth_refresh_token_audience,
   oauth_refresh_token_expires_at,
@@ -211,13 +212,15 @@ insert into oauth_refresh_tokens (
   $4,
   $5,
   $6,
-  $7
+  $7,
+  $8
 )
 returning
   oauth_refresh_token_id,
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
+  device_session_uuid,
   oauth_refresh_token_scopes,
   oauth_refresh_token_audience,
   oauth_refresh_token_expires_at,
@@ -231,6 +234,7 @@ type CreateOAuthRefreshTokenParams struct {
 	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
 	OauthClientID                string     `json:"oauth_client_id"`
 	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
 	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
 	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
 	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
@@ -242,6 +246,7 @@ func (q *Queries) CreateOAuthRefreshToken(ctx context.Context, arg CreateOAuthRe
 		arg.OauthRefreshTokenTokenHash,
 		arg.OauthClientID,
 		arg.UserUuid,
+		arg.DeviceSessionUuid,
 		arg.OauthRefreshTokenScopes,
 		arg.OauthRefreshTokenAudience,
 		arg.OauthRefreshTokenExpiresAt,
@@ -253,6 +258,7 @@ func (q *Queries) CreateOAuthRefreshToken(ctx context.Context, arg CreateOAuthRe
 		&i.OauthRefreshTokenTokenHash,
 		&i.OauthClientID,
 		&i.UserUuid,
+		&i.DeviceSessionUuid,
 		&i.OauthRefreshTokenScopes,
 		&i.OauthRefreshTokenAudience,
 		&i.OauthRefreshTokenExpiresAt,
@@ -270,6 +276,7 @@ select
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
+  device_session_uuid,
   oauth_refresh_token_scopes,
   oauth_refresh_token_audience,
   oauth_refresh_token_expires_at,
@@ -292,6 +299,7 @@ func (q *Queries) GetOAuthRefreshTokenByHashForUpdate(ctx context.Context, oauth
 		&i.OauthRefreshTokenTokenHash,
 		&i.OauthClientID,
 		&i.UserUuid,
+		&i.DeviceSessionUuid,
 		&i.OauthRefreshTokenScopes,
 		&i.OauthRefreshTokenAudience,
 		&i.OauthRefreshTokenExpiresAt,
@@ -426,6 +434,7 @@ returning
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
+  device_session_uuid,
   oauth_refresh_token_scopes,
   oauth_refresh_token_audience,
   oauth_refresh_token_expires_at,
@@ -443,6 +452,7 @@ func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefres
 		&i.OauthRefreshTokenTokenHash,
 		&i.OauthClientID,
 		&i.UserUuid,
+		&i.DeviceSessionUuid,
 		&i.OauthRefreshTokenScopes,
 		&i.OauthRefreshTokenAudience,
 		&i.OauthRefreshTokenExpiresAt,
@@ -469,6 +479,7 @@ returning
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
+  device_session_uuid,
   oauth_refresh_token_scopes,
   oauth_refresh_token_audience,
   oauth_refresh_token_expires_at,
@@ -491,6 +502,7 @@ func (q *Queries) RevokeOAuthRefreshTokenByHashAndClientID(ctx context.Context, 
 		&i.OauthRefreshTokenTokenHash,
 		&i.OauthClientID,
 		&i.UserUuid,
+		&i.DeviceSessionUuid,
 		&i.OauthRefreshTokenScopes,
 		&i.OauthRefreshTokenAudience,
 		&i.OauthRefreshTokenExpiresAt,

@@ -298,6 +298,7 @@ type OauthRefreshToken struct {
 	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
 	OauthClientID                string     `json:"oauth_client_id"`
 	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
 	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
 	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
 	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`

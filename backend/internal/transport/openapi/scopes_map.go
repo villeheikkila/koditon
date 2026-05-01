@@ -21,6 +21,8 @@ var operationIDScopes = map[string][]string{
 	"auth-apple-web":                    {},
 	"auth-passkey-authenticate-options": {},
 	"auth-passkey-authenticate":         {},
+	"auth-session-refresh":              {},
+	"auth-session-sign-out":             {},
 	"auth-passkey-register-options":     {auth.ScopeProfileWrite},
 	"auth-passkey-register-finish":      {auth.ScopeProfileWrite},
 }
@@ -31,4 +33,6 @@ var publicOperationIDs = map[string]struct{}{
 	"auth-apple-web":                    {},
 	"auth-passkey-authenticate-options": {},
 	"auth-passkey-authenticate":         {},
+	"auth-session-refresh":              {},
+	"auth-session-sign-out":             {},
 }

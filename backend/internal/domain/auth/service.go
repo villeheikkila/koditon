@@ -505,6 +505,11 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 		}
 		return fmt.Errorf("revoke oauth refresh token for client: %w", err)
 	}
+	if row.DeviceSessionUuid != nil {
+		if err := s.queries.RevokeSession(ctx, *row.DeviceSessionUuid); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("revoke session for oauth refresh token: %w", err)
+		}
+	}
 	s.emitTokenEvent(ctx, tokenEvent{
 		Name:      tokenEventRevoked,
 		AuthType:  string(AccessTokenKindOAuth),

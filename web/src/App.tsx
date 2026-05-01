@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { getToken, clearToken } from './lib/auth'
+import { consumeReturnPath, hasAccessToken, restoreSession, signOutSession } from './lib/auth-store'
 import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
@@ -9,16 +9,37 @@ import OAuthAuthorizePage from './pages/OAuthAuthorizePage'
 import EmailConfirmPage from './pages/EmailConfirmPage'
 
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(() => !!getToken())
+  const [authReady, setAuthReady] = useState(false)
+  const [authenticated, setAuthenticated] = useState(() => hasAccessToken())
+
+  useEffect(() => {
+    let cancelled = false
+    restoreSession().then(ok => {
+      if (cancelled) return
+      setAuthenticated(ok)
+      setAuthReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSignIn = useCallback(function handleSignIn() {
     setAuthenticated(true)
+    const returnTo = consumeReturnPath()
+    if (returnTo && returnTo !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.location.assign(returnTo)
+    }
   }, [])
 
-  const handleSignOut = useCallback(function handleSignOut() {
-    clearToken()
+  const handleSignOut = useCallback(async function handleSignOut() {
+    await signOutSession()
     setAuthenticated(false)
   }, [])
+
+  if (!authReady) {
+    return null
+  }
 
   return (
     <BrowserRouter>

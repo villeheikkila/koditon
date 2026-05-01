@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -12,6 +16,27 @@ import (
 	"koditon/internal/domain/emailauth"
 	"koditon/internal/platform/logging"
 )
+
+const webRefreshCookieName = "__Host-koditon_refresh"
+const webOAuthClientID = "koditon-web"
+
+type webAuthHeaders struct {
+	Origin  string `header:"Origin"`
+	Referer string `header:"Referer"`
+}
+
+type authTokenBody struct {
+	AccessToken           string `json:"access_token"`
+	AccessTokenExpiresAt  int64  `json:"access_token_expires_at"`
+	RefreshToken          string `json:"refresh_token,omitempty"`
+	RefreshTokenExpiresAt int64  `json:"refresh_token_expires_at,omitempty"`
+	UserID                string `json:"user_id"`
+}
+
+type authTokenOutput struct {
+	SetCookie []http.Cookie `header:"Set-Cookie"`
+	Body      authTokenBody
+}
 
 // --- passkey authenticate options ---
 
@@ -77,14 +102,18 @@ type emailAuthConfirmInput struct {
 		Token string `json:"token" required:"true"`
 	}
 	RawDeviceID string `header:"X-Device-ID"`
+	webAuthHeaders
 }
 
-type emailAuthConfirmOutput = passkeyAuthOutput
+type emailAuthConfirmOutput = authTokenOutput
 
 func (a *API) emailAuthConfirmHandler(ctx context.Context, input *emailAuthConfirmInput) (*emailAuthConfirmOutput, error) {
 	logger := logging.With(a.logger, logging.Op("api.auth.email.confirm"))
 	if a.emailAuthService == nil {
 		return nil, huma.Error503ServiceUnavailable("email authentication unavailable")
+	}
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
 	}
 	var deviceID uuid.UUID
 	if input.RawDeviceID != "" {
@@ -114,7 +143,7 @@ func (a *API) emailAuthConfirmHandler(ctx context.Context, input *emailAuthConfi
 		return nil, huma.Error401Unauthorized("sign in failed")
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
-		ClientID:  "koditon-web",
+		ClientID:  webOAuthClientID,
 		UserID:    signResp.UserID,
 		Scopes:    []string{auth.ScopeCoreRead},
 		SessionID: signResp.SessionID,
@@ -124,13 +153,7 @@ func (a *API) emailAuthConfirmHandler(ctx context.Context, input *emailAuthConfi
 		logger.ErrorContext(ctx, "token issuance failed after email auth", "error", err, "user_id", signResp.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
-	out := &emailAuthConfirmOutput{}
-	out.Body.AccessToken = tokens.AccessToken
-	out.Body.AccessTokenExpiresAt = tokens.AccessExpiry.Unix()
-	out.Body.RefreshToken = tokens.RefreshToken
-	out.Body.RefreshTokenExpiresAt = tokens.RefreshExpiry.Unix()
-	out.Body.UserID = signResp.UserID.String()
-	return out, nil
+	return a.webAuthTokenOutput(tokens), nil
 }
 
 // --- passkey authenticate ---
@@ -141,20 +164,16 @@ type passkeyAuthInput struct {
 		CredentialJSON string `json:"credential_json" required:"true"`
 	}
 	RawDeviceID string `header:"X-Device-ID"`
+	webAuthHeaders
 }
 
-type passkeyAuthOutput struct {
-	Body struct {
-		AccessToken           string `json:"access_token"`
-		AccessTokenExpiresAt  int64  `json:"access_token_expires_at"`
-		RefreshToken          string `json:"refresh_token"`
-		RefreshTokenExpiresAt int64  `json:"refresh_token_expires_at"`
-		UserID                string `json:"user_id"`
-	}
-}
+type passkeyAuthOutput = authTokenOutput
 
 func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (*passkeyAuthOutput, error) {
 	logger := logging.With(a.logger, logging.Op("api.auth.passkey.authenticate"))
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
+	}
 	challengeID, err := uuid.Parse(input.Body.ChallengeID)
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity("challenge_id must be a valid UUID")
@@ -180,7 +199,7 @@ func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (
 		}
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
-		ClientID:  "koditon-web",
+		ClientID:  webOAuthClientID,
 		UserID:    finishResp.UserID,
 		Scopes:    []string{auth.ScopeCoreRead},
 		SessionID: finishResp.SessionID,
@@ -190,13 +209,7 @@ func (a *API) passkeyAuthHandler(ctx context.Context, input *passkeyAuthInput) (
 		logger.ErrorContext(ctx, "token issuance failed after passkey auth", "error", err, "user_id", finishResp.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
-	out := &passkeyAuthOutput{}
-	out.Body.AccessToken = tokens.AccessToken
-	out.Body.AccessTokenExpiresAt = tokens.AccessExpiry.Unix()
-	out.Body.RefreshToken = tokens.RefreshToken
-	out.Body.RefreshTokenExpiresAt = tokens.RefreshExpiry.Unix()
-	out.Body.UserID = finishResp.UserID.String()
-	return out, nil
+	return a.webAuthTokenOutput(tokens), nil
 }
 
 // --- passkey register options ---
@@ -283,20 +296,16 @@ type appleWebAuthInput struct {
 		Code string `json:"code" required:"true"`
 	}
 	RawDeviceID string `header:"X-Device-ID"`
+	webAuthHeaders
 }
 
-type appleWebAuthOutput struct {
-	Body struct {
-		AccessToken           string `json:"access_token"`
-		AccessTokenExpiresAt  int64  `json:"access_token_expires_at"`
-		RefreshToken          string `json:"refresh_token"`
-		RefreshTokenExpiresAt int64  `json:"refresh_token_expires_at"`
-		UserID                string `json:"user_id"`
-	}
-}
+type appleWebAuthOutput = authTokenOutput
 
 func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput) (*appleWebAuthOutput, error) {
 	logger := logging.With(a.logger, logging.Op("api.auth.apple_web"))
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
+	}
 	var deviceID uuid.UUID
 	if input.RawDeviceID != "" {
 		deviceID, _ = uuid.Parse(input.RawDeviceID)
@@ -310,7 +319,7 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 		return nil, huma.Error401Unauthorized("sign in failed")
 	}
 	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
-		ClientID:  "koditon-web",
+		ClientID:  webOAuthClientID,
 		UserID:    siwaResp.UserID,
 		Scopes:    []string{auth.ScopeCoreRead},
 		SessionID: siwaResp.SessionID,
@@ -320,11 +329,194 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 		logger.ErrorContext(ctx, "token issuance failed after apple web auth", "error", err, "user_id", siwaResp.UserID, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("failed to issue tokens")
 	}
-	out := &appleWebAuthOutput{}
+	return a.webAuthTokenOutput(tokens), nil
+}
+
+type webSessionRefreshInput struct {
+	RefreshToken string `cookie:"__Host-koditon_refresh"`
+	webAuthHeaders
+}
+
+type webSessionRefreshOutput struct {
+	SetCookie []http.Cookie `header:"Set-Cookie"`
+	Body      struct {
+		AccessToken          string `json:"access_token"`
+		AccessTokenExpiresAt int64  `json:"access_token_expires_at"`
+		UserID               string `json:"user_id"`
+	}
+}
+
+func (a *API) webSessionRefreshHandler(ctx context.Context, input *webSessionRefreshInput) (*webSessionRefreshOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.session.refresh"))
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
+	}
+	refreshToken := strings.TrimSpace(input.RefreshToken)
+	if refreshToken == "" {
+		return nil, huma.Error401Unauthorized("session refresh token is missing")
+	}
+	tokens, err := a.authService.RefreshOAuthTokens(ctx, auth.OAuthRefreshTokensRequest{
+		ClientID:     webOAuthClientID,
+		RefreshToken: refreshToken,
+		Audience:     auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrTokenReuse):
+			return nil, huma.Error401Unauthorized("session refresh token was reused")
+		case errors.Is(err, auth.ErrOAuthInvalidGrant), errors.Is(err, auth.ErrOAuthInvalidRequest):
+			return nil, huma.Error401Unauthorized("session refresh token is invalid or expired")
+		default:
+			logger.ErrorContext(ctx, "web session refresh failed", "error", err, "outcome", logging.OutcomeError)
+			return nil, huma.Error500InternalServerError("failed to refresh session")
+		}
+	}
+	out := &webSessionRefreshOutput{}
+	out.SetCookie = []http.Cookie{a.webRefreshCookie(tokens.RefreshToken, tokens.RefreshExpiry)}
 	out.Body.AccessToken = tokens.AccessToken
 	out.Body.AccessTokenExpiresAt = tokens.AccessExpiry.Unix()
-	out.Body.RefreshToken = tokens.RefreshToken
-	out.Body.RefreshTokenExpiresAt = tokens.RefreshExpiry.Unix()
-	out.Body.UserID = siwaResp.UserID.String()
+	out.Body.UserID = tokens.UserID.String()
 	return out, nil
+}
+
+type webSessionSignOutInput struct {
+	RefreshToken  string `cookie:"__Host-koditon_refresh"`
+	Authorization string `header:"Authorization"`
+	webAuthHeaders
+}
+
+type webSessionSignOutOutput struct {
+	SetCookie []http.Cookie `header:"Set-Cookie"`
+	Body      struct {
+		OK bool `json:"ok"`
+	}
+}
+
+func (a *API) webSessionSignOutHandler(ctx context.Context, input *webSessionSignOutInput) (*webSessionSignOutOutput, error) {
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
+	}
+	if token := extractBearer(input.Authorization); token != "" {
+		if claims, err := a.authService.VerifyAccessToken(ctx, token); err == nil && claims.SessionID != uuid.Nil {
+			_ = a.authService.SignOutWithOwnershipCheck(ctx, claims.UserID, claims.SessionID)
+		}
+	}
+	if refreshToken := strings.TrimSpace(input.RefreshToken); refreshToken != "" {
+		if err := a.authService.RevokeOAuthRefreshTokenForClient(ctx, webOAuthClientID, refreshToken); err != nil {
+			logging.With(a.logger, logging.Op("api.auth.session.sign_out")).ErrorContext(ctx, "web session sign out failed", "error", err, "outcome", logging.OutcomeError)
+			return nil, huma.Error500InternalServerError("failed to sign out")
+		}
+	}
+	out := &webSessionSignOutOutput{}
+	out.SetCookie = []http.Cookie{a.clearWebRefreshCookie()}
+	out.Body.OK = true
+	return out, nil
+}
+
+func (a *API) webAuthTokenOutput(tokens *auth.OAuthTokenResponse) *authTokenOutput {
+	return &authTokenOutput{
+		SetCookie: []http.Cookie{a.webRefreshCookie(tokens.RefreshToken, tokens.RefreshExpiry)},
+		Body: authTokenBody{
+			AccessToken:           tokens.AccessToken,
+			AccessTokenExpiresAt:  tokens.AccessExpiry.Unix(),
+			RefreshToken:          tokens.RefreshToken,
+			RefreshTokenExpiresAt: tokens.RefreshExpiry.Unix(),
+			UserID:                tokens.UserID.String(),
+		},
+	}
+}
+
+func (a *API) webRefreshCookie(token string, expiresAt time.Time) http.Cookie {
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 0 {
+		maxAge = 0
+	}
+	return http.Cookie{
+		Name:     webRefreshCookieName,
+		Value:    token,
+		Path:     "/",
+		Expires:  expiresAt,
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+func (a *API) clearWebRefreshCookie() http.Cookie {
+	return http.Cookie{
+		Name:     webRefreshCookieName,
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+func (a *API) validateWebAuthOrigin(headers webAuthHeaders) error {
+	origin := strings.TrimSpace(headers.Origin)
+	if origin == "" {
+		origin = originFromReferer(headers.Referer)
+	}
+	if origin == "" {
+		return nil
+	}
+	if a.isAllowedWebAuthOrigin(origin) {
+		return nil
+	}
+	return huma.Error403Forbidden("origin is not allowed")
+}
+
+func (a *API) isAllowedWebAuthOrigin(origin string) bool {
+	for _, candidate := range []string{a.cfg.WebBaseURL, a.cfg.APIPublicBaseURL} {
+		if sameOrigin(origin, candidate) {
+			return true
+		}
+	}
+	for _, candidate := range strings.Split(a.cfg.CORSAllowedOrigins, ",") {
+		if sameOrigin(origin, candidate) {
+			return true
+		}
+	}
+	if a.cfg.Environment.IsDevelopment() {
+		u, err := url.Parse(origin)
+		if err == nil {
+			host := u.Hostname()
+			return host == "localhost" || host == "127.0.0.1" || host == "::1"
+		}
+	}
+	return false
+}
+
+func sameOrigin(origin, candidate string) bool {
+	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+	candidate = strings.TrimRight(strings.TrimSpace(candidate), "/")
+	if origin == "" || candidate == "" {
+		return false
+	}
+	originURL, originErr := url.Parse(origin)
+	candidateURL, candidateErr := url.Parse(candidate)
+	if originErr == nil && candidateErr == nil && originURL.Scheme != "" && candidateURL.Scheme != "" {
+		return strings.EqualFold(originURL.Scheme, candidateURL.Scheme) && strings.EqualFold(originURL.Host, candidateURL.Host)
+	}
+	return origin == candidate
+}
+
+func originFromReferer(referer string) string {
+	u, err := url.Parse(strings.TrimSpace(referer))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+func extractBearer(header string) string {
+	header = strings.TrimSpace(header)
+	if len(header) < len("Bearer ") || !strings.EqualFold(header[:len("Bearer ")], "Bearer ") {
+		return ""
+	}
+	return strings.TrimSpace(header[len("Bearer "):])
 }

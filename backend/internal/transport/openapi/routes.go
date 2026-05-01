@@ -148,4 +148,16 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Authentication"}
 		applyAuth(op, makeMiddleware, resolveScopes("auth-passkey-register-finish"))
 	})
+	huma.Post(api, "/auth/session/refresh", a.webSessionRefreshHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-session-refresh"
+		op.Summary = "Refresh web session"
+		op.Description = "Rotate the web refresh cookie and return a new access token"
+		op.Tags = []string{"Authentication"}
+	})
+	huma.Post(api, "/auth/session/sign-out", a.webSessionSignOutHandler, func(op *huma.Operation) {
+		op.OperationID = "auth-session-sign-out"
+		op.Summary = "Sign out web session"
+		op.Description = "Revoke the web refresh token and clear the session cookie"
+		op.Tags = []string{"Authentication"}
+	})
 }

@@ -48,6 +48,43 @@ func TestIssueOAuthTokensForUser_BindsAccessTokenToSession(t *testing.T) {
 	}
 }
 
+func TestRefreshOAuthTokens_PreservesSessionBinding(t *testing.T) {
+	t.Parallel()
+
+	ctx, pool := openAuthTestPool(t)
+	queries := db.New(pool)
+	service := newOAuthTestService(t, pool, queries)
+	userID := createAuthTestUser(t, ctx, pool, queries)
+	sessionID := createOAuthTestSession(t, ctx, service, userID)
+
+	tokenResp, err := service.IssueOAuthTokensForUser(ctx, OAuthIssueTokensForUserRequest{
+		ClientID:  "koditon-web",
+		UserID:    userID,
+		Scopes:    []string{ScopeProfileRead},
+		SessionID: sessionID,
+		Audience:  "https://api.example.test",
+	})
+	if err != nil {
+		t.Fatalf("issue oauth tokens: %v", err)
+	}
+
+	rotated, err := service.RefreshOAuthTokens(ctx, OAuthRefreshTokensRequest{
+		ClientID:     "koditon-web",
+		RefreshToken: tokenResp.RefreshToken,
+		Audience:     "https://api.example.test",
+	})
+	if err != nil {
+		t.Fatalf("refresh oauth tokens: %v", err)
+	}
+	claims, err := service.VerifyAccessToken(ctx, rotated.AccessToken)
+	if err != nil {
+		t.Fatalf("verify refreshed access token: %v", err)
+	}
+	if claims.SessionID != sessionID {
+		t.Fatalf("expected refreshed token session %s, got %s", sessionID, claims.SessionID)
+	}
+}
+
 func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 	t.Parallel()
 

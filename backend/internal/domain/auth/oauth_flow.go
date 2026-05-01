@@ -139,7 +139,7 @@ func (s *Service) ExchangeOAuthAuthorizationCode(ctx context.Context, req OAuthE
 	if err != nil {
 		return nil, fmt.Errorf("create oauth access token: %w", err)
 	}
-	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, s.queries, row.OauthClientID, row.UserUuid, row.OauthAuthorizationCodeScopes, strings.TrimSpace(req.Audience), uuid.Nil, s.policy.OAuthRefreshTokenTTL)
+	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, s.queries, row.OauthClientID, row.UserUuid, uuid.Nil, row.OauthAuthorizationCodeScopes, strings.TrimSpace(req.Audience), uuid.Nil, s.policy.OAuthRefreshTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("create oauth refresh token: %w", err)
 	}
@@ -218,7 +218,7 @@ func (s *Service) IssueOAuthTokensForUser(ctx context.Context, req OAuthIssueTok
 	if err != nil {
 		return nil, fmt.Errorf("create oauth access token: %w", err)
 	}
-	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, s.queries, strings.TrimSpace(req.ClientID), req.UserID, req.Scopes, strings.TrimSpace(req.Audience), uuid.Nil, s.policy.OAuthRefreshTokenTTL)
+	refreshToken, refreshExpiry, err := createOAuthRefreshToken(ctx, s.queries, strings.TrimSpace(req.ClientID), req.UserID, req.SessionID, req.Scopes, strings.TrimSpace(req.Audience), uuid.Nil, s.policy.OAuthRefreshTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("create oauth refresh token: %w", err)
 	}
@@ -241,7 +241,7 @@ func (s *Service) IssueOAuthTokensForUser(ctx context.Context, req OAuthIssueTok
 	}, nil
 }
 
-func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID string, userID uuid.UUID, scopes []string, audience string, rotatedFrom uuid.UUID, ttl time.Duration) (string, time.Time, error) {
+func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID string, userID, sessionID uuid.UUID, scopes []string, audience string, rotatedFrom uuid.UUID, ttl time.Duration) (string, time.Time, error) {
 	refreshToken, err := randomURLSafeToken(40)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate oauth refresh token: %w", err)
@@ -254,10 +254,15 @@ func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID 
 	if rotatedFrom != uuid.Nil {
 		rotatedFromValue = &rotatedFrom
 	}
+	var sessionIDValue *uuid.UUID
+	if sessionID != uuid.Nil {
+		sessionIDValue = &sessionID
+	}
 	if _, err := queries.CreateOAuthRefreshToken(ctx, db.CreateOAuthRefreshTokenParams{
 		OauthRefreshTokenTokenHash:   hashSHA256Hex(refreshToken),
 		OauthClientID:                clientID,
 		UserUuid:                     userID,
+		DeviceSessionUuid:            sessionIDValue,
 		OauthRefreshTokenScopes:      scopes,
 		OauthRefreshTokenAudience:    strings.TrimSpace(audience),
 		OauthRefreshTokenExpiresAt:   expiresAt,
