@@ -317,6 +317,25 @@ export interface Charges {
 
 export type CommercialDetailsLeadOptions = {[key: string]: boolean};
 
+export interface PriceTransactionMatch {
+  area_m2?: number;
+  build_year?: number;
+  condition?: string;
+  description?: string;
+  elevator?: boolean;
+  energy_class?: string;
+  floor?: string;
+  id: string;
+  match_confidence?: string;
+  match_score?: number;
+  match_status?: string;
+  period_identifier?: string;
+  plot?: string;
+  price?: number;
+  price_per_m2?: number;
+  type?: string;
+}
+
 export interface CommercialDetails {
   asking_price?: number;
   available_from?: string;
@@ -340,6 +359,7 @@ export interface CommercialDetails {
   lead_options?: CommercialDetailsLeadOptions;
   main_image_hidden?: boolean;
   map_visible?: boolean;
+  matched_transaction?: PriceTransactionMatch;
   minimum_term_months?: number;
   new_development?: boolean;
   notify_price_changed?: boolean;

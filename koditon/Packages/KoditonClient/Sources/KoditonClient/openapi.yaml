@@ -895,6 +895,8 @@ components:
           type: boolean
         map_visible:
           type: boolean
+        matched_transaction:
+          $ref: "#/components/schemas/PriceTransactionMatch"
         minimum_term_months:
           format: int32
           type: integer
@@ -947,6 +949,49 @@ components:
         unpublished_at:
           format: date-time
           type: string
+      type: object
+    PriceTransactionMatch:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        build_year:
+          format: int32
+          type: integer
+        condition:
+          type: string
+        description:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor:
+          type: string
+        id:
+          type: string
+        match_confidence:
+          type: string
+        match_score:
+          format: int32
+          type: integer
+        match_status:
+          type: string
+        period_identifier:
+          type: string
+        plot:
+          type: string
+        price:
+          format: int64
+          type: integer
+        price_per_m2:
+          format: int64
+          type: integer
+        type:
+          type: string
+      required:
+        - id
       type: object
     Contact:
       additionalProperties: false

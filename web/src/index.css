@@ -1102,6 +1102,21 @@ td.dim { color: var(--text-3); font-size: 12px; }
   letter-spacing: -0.02em;
 }
 
+.listing-price-transaction {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--success, #168a4a) 36%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--success, #168a4a) 10%, var(--surface-1));
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
 /* Key facts strip */
 .listing-facts {
   display: flex;

@@ -82,13 +82,21 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 		if row.ShortcutAdType != "listing" {
 			return SaleListing{}, fmt.Errorf("%w: not a sale listing", ErrNotFound)
 		}
-		return saleFromShortcutAd(canonicalID, nativeID, row), nil
+		listing := saleFromShortcutAd(canonicalID, nativeID, row)
+		if err := s.enrichSaleListingFromSharedRow(ctx, &listing, canonicalID); err != nil {
+			return SaleListing{}, err
+		}
+		return listing, nil
 	case "frontdoor:ad":
 		row, err := s.queries.GetFrontdoorAdUnifiedDetail(ctx, nativeID)
 		if err != nil {
 			return SaleListing{}, mapNotFound(err)
 		}
-		return saleFromFrontdoorAd(canonicalID, nativeID, row), nil
+		listing := saleFromFrontdoorAd(canonicalID, nativeID, row)
+		if err := s.enrichSaleListingFromSharedRow(ctx, &listing, canonicalID); err != nil {
+			return SaleListing{}, err
+		}
+		return listing, nil
 	case "frontdoor:announcement":
 		announcementID, err := uuid.Parse(nativeID)
 		if err != nil {
@@ -101,7 +109,11 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 		if row.FrontdoorBuildingAnnouncementRentPeriod != nil || row.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
 			return SaleListing{}, fmt.Errorf("%w: not a sale listing", ErrNotFound)
 		}
-		return saleFromFrontdoorAnnouncement(canonicalID, nativeID, row), nil
+		listing := saleFromFrontdoorAnnouncement(canonicalID, nativeID, row)
+		if err := s.enrichSaleListingFromSharedRow(ctx, &listing, canonicalID); err != nil {
+			return SaleListing{}, err
+		}
+		return listing, nil
 	default:
 		return SaleListing{}, fmt.Errorf("%w: unsupported sale listing id", ErrNotFound)
 	}
@@ -207,6 +219,68 @@ func (s *Service) resolveBuildingInput(ctx context.Context, input string, shortc
 		return "", mapNotFound(err)
 	}
 	return canonicalID, nil
+}
+
+func (s *Service) enrichSaleListingFromSharedRow(ctx context.Context, listing *SaleListing, canonicalID string) error {
+	var publicID string
+	var transactionID *uuid.UUID
+	var description, transactionType, period string
+	var area float64
+	var price, pricePerM2, buildYear int32
+	var floor, condition, plot, energyClass *string
+	var elevator bool
+	var matchStatus *string
+	var matchScore *int32
+	var matchConfidence *string
+	err := s.db.QueryRow(ctx, `
+SELECT
+    sl.sale_listing_public_id,
+    pt.prices_transaction_id,
+    COALESCE(pt.prices_transaction_description, ''),
+    COALESCE(pt.prices_transaction_type, ''),
+    COALESCE(pt.prices_transaction_area, 0),
+    COALESCE(pt.prices_transaction_price, 0),
+    COALESCE(pt.prices_transaction_price_per_square_meter, 0),
+    COALESCE(pt.prices_transaction_build_year, 0),
+    pt.prices_transaction_floor,
+    COALESCE(pt.prices_transaction_elevator, false),
+    pt.prices_transaction_condition,
+    pt.prices_transaction_plot,
+    pt.prices_transaction_energy_class,
+    COALESCE(pt.prices_transaction_period_identifier, ''),
+    sl.sale_listing_prices_match_status,
+    c.sale_listing_prices_transaction_match_score,
+    c.sale_listing_prices_transaction_match_confidence
+FROM public.sale_listings sl
+LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = sl.prices_transaction_id
+LEFT JOIN LATERAL (
+    SELECT
+        c.sale_listing_prices_transaction_match_score,
+        c.sale_listing_prices_transaction_match_confidence
+    FROM public.sale_listing_prices_transaction_match_candidates c
+    WHERE c.sale_listing_id = sl.sale_listing_id
+        AND c.prices_transaction_id = sl.prices_transaction_id
+    ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
+    LIMIT 1
+) c ON true
+WHERE sl.sale_listing_canonical_id = $1
+LIMIT 1`, canonicalID).Scan(&publicID, &transactionID, &description, &transactionType, &area, &price, &pricePerM2, &buildYear, &floor, &elevator, &condition, &plot, &energyClass, &period, &matchStatus, &matchScore, &matchConfidence)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	listing.ID = publicID
+	if transactionID == nil {
+		return nil
+	}
+	areaPtr := area
+	priceValue := int64(price)
+	pricePerM2Value := int64(pricePerM2)
+	buildYearValue := buildYear
+	listing.Commercial.MatchedTransaction = &PriceTransactionMatch{ID: transactionID.String(), Description: description, Type: transactionType, AreaM2: &areaPtr, Price: &priceValue, PricePerSquareMeter: &pricePerM2Value, BuildYear: &buildYearValue, Floor: valueOrEmpty(floor), Elevator: &elevator, Condition: valueOrEmpty(condition), Plot: valueOrEmpty(plot), EnergyClass: valueOrEmpty(energyClass), PeriodIdentifier: period, MatchStatus: valueOrEmpty(matchStatus), MatchScore: matchScore, MatchConfidence: valueOrEmpty(matchConfidence)}
+	return nil
 }
 
 func mapNotFound(err error) error {

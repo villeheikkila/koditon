@@ -25,6 +25,7 @@ const (
 	TaskTypePricesPostalCodePageSync         = "prices_postal_code_page_sync"
 	TaskTypePricesNeighborhoodPostalCodeSync = "prices_neighborhood_postal_code_sync"
 	TaskTypePricesSyncAll                    = "prices_sync_all"
+	TaskTypePricesMatchSaleListingsBackfill  = "prices_match_sale_listings_backfill"
 	TaskTypePricesMatchSaleListingsFanout    = "prices_match_sale_listings_fanout"
 	TaskTypePricesMatchSaleListing           = "prices_match_sale_listing"
 
@@ -41,6 +42,11 @@ type pricesPostalCodePayload struct {
 
 type pricesMatchFanoutPayload struct {
 	Limit int32 `json:"limit,omitempty"`
+}
+
+type pricesMatchBackfillPayload struct {
+	ScoreThreshold   int32 `json:"score_threshold,omitempty"`
+	CompetitorMargin int32 `json:"competitor_margin,omitempty"`
 }
 
 type pricesMatchSaleListingPayload struct {
@@ -164,6 +170,8 @@ func (c *Consumer) runPricesSyncJob(ctx context.Context, logger *slog.Logger, jo
 		return c.handlePricesNeighborhoodPostalCodeSync(ctx, logger)
 	case TaskTypePricesSyncAll:
 		return c.handlePricesSyncAll(ctx, logger)
+	case TaskTypePricesMatchSaleListingsBackfill:
+		return c.handlePricesMatchSaleListingsBackfill(ctx, logger, job)
 	case TaskTypePricesMatchSaleListingsFanout:
 		return c.handlePricesMatchSaleListingsFanout(ctx, logger, job)
 	case TaskTypePricesMatchSaleListing:
@@ -276,6 +284,44 @@ func (c *Consumer) enqueuePricesPostalCodePage(ctx context.Context, payload pric
 		Payload:     raw,
 	})
 	return err
+}
+
+func (c *Consumer) handlePricesMatchSaleListingsBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.prices.match_sale_listings_backfill"))
+	payload := pricesMatchBackfillPayload{ScoreThreshold: 90, CompetitorMargin: 15}
+	if len(job.SyncJobPayload) > 0 {
+		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
+			return taskqueue.NewPermanentError(fmt.Errorf("decode prices match backfill payload: %w", err), "invalid payload")
+		}
+	}
+	if payload.ScoreThreshold <= 0 {
+		payload.ScoreThreshold = 90
+	}
+	if payload.CompetitorMargin < 0 {
+		payload.CompetitorMargin = 15
+	}
+	run, err := c.runPricesMatchBackfill(ctx, int(payload.ScoreThreshold), int(payload.CompetitorMargin))
+	if err != nil {
+		return err
+	}
+	result, err := json.Marshal(map[string]any{
+		"run_id":      run.RunID,
+		"candidates":  run.Candidates,
+		"auto_linked": run.AutoLinked,
+		"ambiguous":   run.Ambiguous,
+	})
+	if err == nil {
+		c.updatePricesCheckpoint(ctx, job, map[string]any{
+			"run_id":      run.RunID,
+			"candidates":  run.Candidates,
+			"auto_linked": run.AutoLinked,
+			"ambiguous":   run.Ambiguous,
+			"updated_at":  time.Now().UTC(),
+			"result":      json.RawMessage(result),
+		})
+	}
+	logger.InfoContext(ctx, "prices sale listing backfill matched", "run_id", run.RunID, "candidates", run.Candidates, "auto_linked", run.AutoLinked, "ambiguous", run.Ambiguous, "outcome", logging.OutcomeSuccess)
+	return nil
 }
 
 func (c *Consumer) handlePricesMatchSaleListingsFanout(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
@@ -435,6 +481,26 @@ FROM public.sale_listing_prices_transaction_match_runs
 WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
 	if err != nil {
 		return pricesMatchRunSummary{}, fmt.Errorf("load prices sale listing match run: %w", err)
+	}
+	return summary, nil
+}
+
+func (c *Consumer) runPricesMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (pricesMatchRunSummary, error) {
+	var runID string
+	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, $1, $2, NULL)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
+		return pricesMatchRunSummary{}, fmt.Errorf("run prices sale listing match backfill: %w", err)
+	}
+	var summary pricesMatchRunSummary
+	err := c.pool.QueryRow(ctx, `
+SELECT
+    sale_listing_prices_transaction_match_run_id::text,
+    sale_listing_prices_transaction_match_candidates_count,
+    sale_listing_prices_transaction_match_auto_linked_count,
+    sale_listing_prices_transaction_match_ambiguous_count
+FROM public.sale_listing_prices_transaction_match_runs
+WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
+	if err != nil {
+		return pricesMatchRunSummary{}, fmt.Errorf("load prices sale listing match backfill run: %w", err)
 	}
 	return summary, nil
 }

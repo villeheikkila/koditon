@@ -97,6 +97,7 @@ func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetai
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("sale listing not found")
 		}
+		a.logger.ErrorContext(ctx, "sale listing detail failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error400BadRequest("invalid sale listing canonical ID")
 	}
 	return &saleListingDetailOutput{Body: listing}, nil

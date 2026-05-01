@@ -160,6 +160,7 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			"prices_postal_code_page_sync":         1,
 			"prices_neighborhood_postal_code_sync": 1,
 			"prices_sync_all":                      1,
+			"prices_match_sale_listings_backfill":  1,
 			"prices_match_sale_listings_fanout":    1,
 			"prices_match_sale_listing":            8,
 			"postal_sync":                          1,
@@ -194,7 +195,7 @@ func CapacityClassForJob(provider, kind string) string {
 		}
 		return CapacityClassShortcutAPI
 	case "prices":
-		if kind == "prices_match_sale_listings_fanout" || kind == "prices_match_sale_listing" {
+		if kind == "prices_match_sale_listings_backfill" || kind == "prices_match_sale_listings_fanout" || kind == "prices_match_sale_listing" {
 			return CapacityClassInternalDB
 		}
 		return CapacityClassPrices
@@ -244,7 +245,7 @@ func (s *Store) Enqueue(ctx context.Context, req EnqueueRequest) (EnqueueResult,
 		}
 		return EnqueueResult{}, fmt.Errorf("upsert sync job: %w", err)
 	}
-	msgID, err := sendJobMessage(ctx, qtx, queueName, job, 0)
+	msgID, err := sendJobMessage(ctx, qtx, queueName, job, delaySecondsUntil(job.SyncJobRunAfter))
 	if err != nil {
 		return EnqueueResult{}, err
 	}
@@ -516,6 +517,14 @@ func sendJobMessage(ctx context.Context, qtx *db.Queries, queueName string, job 
 		return 0, fmt.Errorf("update sync job enqueue metadata: %w", err)
 	}
 	return msgID, nil
+}
+
+func delaySecondsUntil(runAfter time.Time) int {
+	delay := time.Until(runAfter)
+	if delay <= 0 {
+		return 0
+	}
+	return int((delay + time.Second - time.Nanosecond) / time.Second)
 }
 
 func resolveRunAfter(value time.Time) time.Time {

@@ -59,6 +59,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
+  const matchedTransaction = kind === 'listing' ? commercial.matched_transaction : undefined
   const texts = d.texts
   const location = unit.location
   const charges = commercial.charges
@@ -106,6 +107,12 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
             {commercial.price_per_m2 != null && (
               <div className="listing-price-sqm">{fmtEur(commercial.price_per_m2)} / m²</div>
             )}
+            {matchedTransaction?.price != null && (
+              <div className="listing-price-transaction">
+                Sold {fmtPrice(matchedTransaction.price)}
+                {matchedTransaction.period_identifier ? ` · ${matchedTransaction.period_identifier}` : ''}
+              </div>
+            )}
           </div>
         </div>
         <div className="listing-facts">
@@ -133,6 +140,11 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
                 {commercial.rent != null && <Row label="Rent" value={`${fmtPrice(commercial.rent)}${commercial.rent_period ? ` / ${commercial.rent_period}` : ''}`} highlight />}
                 {commercial.asking_price != null && <Row label="Asking price" value={fmtPrice(commercial.asking_price)} highlight={!isRental} />}
                 {commercial.debt_free_price != null && <Row label="Debt-free price" value={fmtPrice(commercial.debt_free_price)} />}
+                {matchedTransaction?.price != null && <Row label="Matched sale price" value={fmtPrice(matchedTransaction.price)} highlight />}
+                {matchedTransaction?.price_per_m2 != null && <Row label="Matched sale / m²" value={fmtEur(matchedTransaction.price_per_m2)} />}
+                {matchedTransaction?.period_identifier && <Row label="Transaction period" value={matchedTransaction.period_identifier} />}
+                {matchedTransaction?.description && <Row label="Transaction layout" value={matchedTransaction.description} />}
+                {matchedTransaction?.match_score != null && <Row label="Match confidence" value={[matchedTransaction.match_confidence, String(matchedTransaction.match_score)].filter(Boolean).join(' · ')} />}
                 {commercial.debt_share_amount != null && <Row label="Debt share" value={fmtPrice(commercial.debt_share_amount)} />}
                 {charges?.maintenance_monthly != null && <Row label="Maintenance charge" value={`${fmtEur(charges.maintenance_monthly)} / mo`} />}
                 {charges?.total_monthly != null && charges.total_monthly !== charges.maintenance_monthly && <Row label="Total monthly charge" value={`${fmtEur(charges.total_monthly)} / mo`} />}
