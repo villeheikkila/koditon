@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Nav from '../components/Nav'
 import {
@@ -27,14 +27,58 @@ function fmtDelta(n?: number) {
   return `${(n * 100).toFixed(1)}%`
 }
 
+function fmtBool(value?: boolean) {
+  if (value == null) return undefined
+  return value ? 'yes' : 'no'
+}
+
+function fmtPlotOwned(value?: boolean, raw?: string) {
+  if (value != null) return value ? 'owned' : 'rented'
+  return raw
+}
+
+function fmtNormalized(raw?: string, code?: string) {
+  if (!code) return raw
+  return <span className="match-text-hit">{code}</span>
+}
+
+function commonPrefixLength(a?: string, b?: string) {
+  if (!a || !b) return 0
+  const max = Math.min(a.length, b.length)
+  let index = 0
+  while (index < max && a[index]?.toLocaleLowerCase() === b[index]?.toLocaleLowerCase()) index += 1
+  return index
+}
+
+function highlightedPrefix(value?: string, matchWith?: string) {
+  if (!value) return undefined
+  const length = commonPrefixLength(value, matchWith)
+  if (length < 2) return value
+  return (
+    <>
+      <span className="match-text-hit">{value.slice(0, length)}</span>{value.slice(length)}
+    </>
+  )
+}
+
 export default function MatchesPage() {
   const [selectedPostal, setSelectedPostal] = useState('')
   const [status, setStatus] = useState('')
+  const [postalSearch, setPostalSearch] = useState('')
   const postalsQuery = useSaleListingsTransactionMatchPostals({ limit: 250 }, { query: { staleTime: 30_000 } })
   const postals = useMemo(
     () => postalsQuery.data?.status === 200 ? (postalsQuery.data.data.postals ?? []) : [],
     [postalsQuery.data],
   )
+  const filteredPostals = useMemo(() => {
+    const query = postalSearch.trim().toLowerCase()
+    if (!query) return postals
+    return postals.filter(postal => [
+      postal.postal,
+      postal.name_fi,
+      postal.municipality_name,
+    ].some(value => value?.toLowerCase().includes(query)))
+  }, [postalSearch, postals])
   const activePostal = selectedPostal || postals[0]?.postal || ''
   const candidatesQuery = useSaleListingsTransactionMatchCandidates({
     postal: activePostal || undefined,
@@ -50,6 +94,7 @@ export default function MatchesPage() {
   const activeSummary = postals.find(p => p.postal === activePostal)
   const highCount = candidates.filter(c => c.confidence === 'high').length
   const ambiguousCount = candidates.filter(c => c.status === 'ambiguous').length
+  const activeTitle = [activePostal, activeSummary?.name_fi || activeSummary?.municipality_name].filter(Boolean).join(' ')
   return (
     <div className="matches-layout">
       <Nav actions={<span className="search-total">{postals.length.toLocaleString('fi-FI')} postal codes</span>} />
@@ -62,14 +107,22 @@ export default function MatchesPage() {
               <option value="ambiguous">Ambiguous</option>
               <option value="candidate">Candidate</option>
             </select>
+            <input
+              className="filter-input matches-postal-search"
+              placeholder="Search postal or area"
+              value={postalSearch}
+              onChange={e => setPostalSearch(e.target.value)}
+            />
           </div>
           <div className="matches-postal-list">
             {postalsQuery.isPending ? (
               <div className="loading-state"><div className="spinner" /></div>
             ) : postals.length === 0 ? (
               <div className="empty-state compact">No potential matches</div>
+            ) : filteredPostals.length === 0 ? (
+              <div className="empty-state compact">No postal codes match the search</div>
             ) : (
-              postals.map(postal => (
+              filteredPostals.map(postal => (
                 <PostalButton
                   key={postal.postal}
                   postal={postal}
@@ -84,7 +137,7 @@ export default function MatchesPage() {
           <div className="matches-header">
             <div>
               <div className="matches-kicker">Review Queue</div>
-              <h1 className="matches-title">{activePostal || 'No postal code selected'}</h1>
+              <h1 className="matches-title">{activeTitle || 'No postal code selected'}</h1>
             </div>
             {activeSummary && (
               <div className="matches-header-meta">
@@ -114,7 +167,7 @@ export default function MatchesPage() {
             ) : candidates.length === 0 ? (
               <div className="empty-state">No candidates for this filter</div>
             ) : (
-              <CandidateTable candidates={candidates} />
+              <CandidateCards candidates={candidates} />
             )}
           </div>
         </main>
@@ -124,11 +177,13 @@ export default function MatchesPage() {
 }
 
 function PostalButton({ postal, active, onClick }: { postal: TransactionMatchPostalSummary; active: boolean; onClick: () => void }) {
+  const area = [postal.name_fi, postal.municipality_name].filter(Boolean).join(', ')
   return (
     <button className={`matches-postal-btn${active ? ' matches-postal-btn--active' : ''}`} onClick={onClick}>
       <span className="matches-postal-code">{postal.postal}</span>
       <span className="matches-postal-count">{fmt(postal.candidate_count)}</span>
-      <span className="matches-postal-sub">{fmt(postal.listing_count)} listings · {fmt(postal.ambiguous_count)} ambiguous</span>
+      {area && <span className="matches-postal-area">{area}</span>}
+      <span className="matches-postal-sub">{fmt(postal.listing_count)} listings · {fmt(postal.transaction_count)} transactions · {fmt(postal.ambiguous_count)} ambiguous</span>
     </button>
   )
 }
@@ -143,63 +198,75 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
   )
 }
 
-function CandidateTable({ candidates }: { candidates: TransactionMatchCandidate[] }) {
+function CandidateCards({ candidates }: { candidates: TransactionMatchCandidate[] }) {
   return (
-    <div className="table-wrap matches-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Score</th>
-            <th>Listing</th>
-            <th>Transaction</th>
-            <th className="right">Ask</th>
-            <th className="right">Sold</th>
-            <th className="right">Delta</th>
-            <th>Facts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {candidates.map(candidate => (
-            <CandidateRow key={candidate.id} candidate={candidate} />
-          ))}
-        </tbody>
-      </table>
+    <div className="matches-card-list">
+      {candidates.map(candidate => (
+        <CandidateCard key={candidate.id} candidate={candidate} />
+      ))}
     </div>
   )
 }
 
-function CandidateRow({ candidate }: { candidate: TransactionMatchCandidate }) {
+function CandidateCard({ candidate }: { candidate: TransactionMatchCandidate }) {
   const listing = candidate.listing
   const transaction = candidate.transaction
-  const facts = [
-    listing.room_layout || transaction.description,
-    fmtArea(listing.area_m2),
-    listing.build_year || transaction.build_year,
-    listing.floor_level && listing.total_floors ? `${listing.floor_level}/${listing.total_floors}` : transaction.floor,
-    transaction.energy_class,
-  ].filter(Boolean).join(' · ')
+  const listingTitle = listing.street_address || listing.headline || listing.id
+  const transactionTitle = transaction.description || transaction.id
+  const transactionLayout = transaction.description
+  const rows: [string, ReactNode | undefined, ReactNode | undefined][] = [
+    ['Layout', highlightedPrefix(listing.room_layout, transactionLayout), highlightedPrefix(transactionLayout, listing.room_layout)],
+    ['Condition', fmtNormalized(listing.condition, listing.condition_match_code), fmtNormalized(transaction.condition, transaction.condition_match_code)],
+    ['Area', fmtArea(listing.area_m2), fmtArea(transaction.area_m2)],
+    ['Build', listing.build_year, transaction.build_year || undefined],
+    ['Floor', listing.floor_level && listing.total_floors ? `${listing.floor_level}/${listing.total_floors}` : listing.floor_level, transaction.floor],
+    ['€/m²', listing.price_per_m2 == null ? undefined : fmt(Math.round(listing.price_per_m2)), fmt(transaction.price_per_m2)],
+    ['Elevator', fmtBool(listing.elevator), fmtBool(transaction.elevator)],
+    ['Energy', listing.energy_match_code || listing.energy_label, transaction.energy_match_code || transaction.energy_class],
+    ['Plot', fmtPlotOwned(listing.plot_owned, listing.plot_ownership_raw), fmtPlotOwned(transaction.plot_owned, transaction.plot)],
+    ['Appeared', listing.first_seen_at, transaction.created_at],
+    ['Unlisted', listing.last_seen_at, undefined],
+  ]
   return (
-    <tr>
-      <td>
-        <div className="match-score">
+    <article className="match-card">
+      <div className="match-card-head">
+        <div className="match-card-score">
           <span>{candidate.score}</span>
-          <small>{candidate.confidence}</small>
+          <small>{candidate.confidence} · {candidate.status}</small>
         </div>
-      </td>
-      <td className="matches-entity-cell">
-        <Link className="matches-listing-link" to={`/listing/${encodeURIComponent(listing.id)}`}>
-          {listing.street_address || listing.headline || listing.id}
-        </Link>
-        <div className="matches-entity-sub">{listing.source_provider} · {listing.postal} · last seen {listing.last_seen_at || '—'}</div>
-      </td>
-      <td className="matches-entity-cell">
-        <div className="matches-transaction-main">{transaction.description || transaction.id}</div>
-        <div className="matches-entity-sub">{transaction.type} · {transaction.period_identifier || transaction.created_at}</div>
-      </td>
-      <td className="right mono">{fmtPrice(listing.asking_price)}</td>
-      <td className="right mono">{fmtPrice(transaction.price)}</td>
-      <td className="right mono">{fmtDelta(candidate.price_delta_percent)}</td>
-      <td className="muted matches-facts">{facts || '—'}</td>
-    </tr>
+        <div className="match-card-prices">
+          <span>Ask {fmtPrice(listing.asking_price)}</span>
+          <span>Sold {fmtPrice(transaction.price)}</span>
+          <strong>{fmtDelta(candidate.price_delta_percent)}</strong>
+        </div>
+      </div>
+      <div className="match-card-grid">
+        <section className="match-card-side">
+          <div className="match-card-label">Listing</div>
+          <Link className="matches-listing-link match-card-title" to={`/listing/${encodeURIComponent(listing.id)}`}>{listingTitle}</Link>
+          <div className="matches-entity-sub">{listing.source_provider} · {listing.postal || '—'} · {listing.city || '—'}</div>
+          <FactGrid items={rows.map(([label, value]) => [label, value])} />
+        </section>
+        <section className="match-card-side">
+          <div className="match-card-label">Transaction</div>
+          <div className="matches-transaction-main match-card-title">{transactionTitle}</div>
+          <div className="matches-entity-sub">{transaction.type || '—'} · {transaction.category || '—'} · {transaction.period_identifier || transaction.created_at || '—'}</div>
+          <FactGrid items={rows.map(([label, , value]) => [label, value])} />
+        </section>
+      </div>
+    </article>
+  )
+}
+
+function FactGrid({ items }: { items: [string, ReactNode | undefined][] }) {
+  return (
+    <dl className="match-fact-grid">
+      {items.map(([label, value]) => (
+        <div className="match-fact" key={label}>
+          <dt>{label}</dt>
+          <dd>{value == null || value === '' ? '—' : value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }

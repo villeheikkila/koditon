@@ -1250,6 +1250,85 @@ td.dim { color: var(--text-3); font-size: 12px; }
   padding-top: 4px;
 }
 
+.renovation-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.renovation-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.renovation-row:last-child {
+  border-bottom: none;
+}
+
+.renovation-year {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-weight: 650;
+}
+
+.renovation-main {
+  min-width: 0;
+}
+
+.renovation-kind {
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.renovation-status {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.renovation-status--planned {
+  color: var(--accent);
+}
+
+.listing-row-value a {
+  color: var(--accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.listing-row-value a:hover {
+  text-decoration: underline;
+}
+
+.listing-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.listing-image-grid a {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.listing-image-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Footer */
 .listing-meta-footer {
   display: flex;
@@ -1630,9 +1709,17 @@ td.dim { color: var(--text-3); font-size: 12px; }
 .matches-sidebar-head {
   padding: 14px 10px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.matches-postal-search {
+  height: 31px;
 }
 
 .matches-postal-list {
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
 }
@@ -1676,15 +1763,29 @@ td.dim { color: var(--text-3); font-size: 12px; }
   color: var(--accent);
 }
 
+.matches-postal-area {
+  grid-column: 1 / -1;
+  color: var(--text-1);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .matches-postal-sub {
   grid-column: 1 / -1;
   color: var(--text-3);
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matches-main {
   flex: 1;
-  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding: 20px 22px;
   display: flex;
   flex-direction: column;
@@ -1727,14 +1828,12 @@ td.dim { color: var(--text-3); font-size: 12px; }
 }
 
 .matches-table-shell {
+  flex: 1;
+  min-height: 0;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.matches-table-wrap table {
-  min-width: 1040px;
+  overflow: auto;
 }
 
 .match-score {
@@ -1787,6 +1886,129 @@ td.dim { color: var(--text-3); font-size: 12px; }
   text-overflow: ellipsis;
 }
 
+.matches-card-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.match-card {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.match-card:last-child {
+  border-bottom: none;
+}
+
+.match-card:hover {
+  background: var(--surface-2);
+}
+
+.match-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.match-card-score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+}
+
+.match-card-score span {
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.match-card-score small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.match-card-prices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 12px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.match-card-prices strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.match-card-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.match-card-side {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+}
+
+.match-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 5px;
+}
+
+.match-card-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-fact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.match-fact {
+  min-width: 0;
+}
+
+.match-fact dt {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.match-fact dd {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-text-hit {
+  color: var(--success);
+  font-weight: 700;
+}
+
 .empty-state.compact {
   padding: 24px 10px;
 }
@@ -1808,6 +2030,10 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .search-grid { grid-template-columns: 1fr; }
   .matches-sidebar { display: none; }
   .matches-header { align-items: flex-start; flex-direction: column; }
+  .match-card-grid { grid-template-columns: 1fr; }
+  .match-card-head { flex-direction: column; }
+  .match-card-prices { justify-content: flex-start; }
+  .match-fact-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 900px) {

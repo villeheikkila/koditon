@@ -391,10 +391,18 @@ export interface TransactionMatchListingCandidate {
   build_year?: number;
   canonical_id: string;
   city?: string;
+  condition?: string;
+  condition_match_code?: string;
+  elevator?: boolean;
+  energy_label?: string;
+  energy_match_code?: string;
   floor_level?: number;
+  first_seen_at?: string;
   headline?: string;
   id: string;
   last_seen_at?: string;
+  plot_owned?: boolean;
+  plot_ownership_raw?: string;
   postal?: string;
   price_per_m2?: number;
   room_layout?: string;
@@ -409,14 +417,17 @@ export interface TransactionMatchTransaction {
   build_year?: number;
   category?: string;
   condition?: string;
+  condition_match_code?: string;
   created_at?: string;
   description?: string;
   elevator: boolean;
   energy_class?: string;
+  energy_match_code?: string;
   floor?: string;
   id: string;
   period_identifier?: string;
   plot?: string;
+  plot_owned?: boolean;
   price: number;
   price_per_m2: number;
   type?: string;
@@ -447,6 +458,8 @@ export interface TransactionMatchPostalSummary {
   listing_count: number;
   low_count: number;
   medium_count: number;
+  municipality_name?: string;
+  name_fi?: string;
   postal: string;
   transaction_count: number;
 }

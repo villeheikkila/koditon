@@ -226,6 +226,7 @@ func (s *Service) IssueOAuthTokensForUser(ctx context.Context, req OAuthIssueTok
 		Name:      tokenEventIssued,
 		AuthType:  string(AccessTokenKindOAuth),
 		ClientID:  strings.TrimSpace(req.ClientID),
+		SessionID: req.SessionID,
 		UserID:    req.UserID,
 		Scopes:    req.Scopes,
 		TokenType: "refresh",

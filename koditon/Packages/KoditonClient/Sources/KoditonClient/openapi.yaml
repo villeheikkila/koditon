@@ -1053,14 +1053,30 @@ components:
           type: string
         city:
           type: string
+        condition:
+          type: string
+        condition_match_code:
+          type: string
+        elevator:
+          type: boolean
+        energy_label:
+          type: string
+        energy_match_code:
+          type: string
         floor_level:
           format: int32
           type: integer
+        first_seen_at:
+          type: string
         headline:
           type: string
         id:
           type: string
         last_seen_at:
+          type: string
+        plot_owned:
+          type: boolean
+        plot_ownership_raw:
           type: string
         postal:
           type: string
@@ -1106,6 +1122,10 @@ components:
         medium_count:
           format: int64
           type: integer
+        municipality_name:
+          type: string
+        name_fi:
+          type: string
         postal:
           type: string
         transaction_count:
@@ -1146,6 +1166,8 @@ components:
           type: string
         condition:
           type: string
+        condition_match_code:
+          type: string
         created_at:
           type: string
         description:
@@ -1153,6 +1175,8 @@ components:
         elevator:
           type: boolean
         energy_class:
+          type: string
+        energy_match_code:
           type: string
         floor:
           type: string
@@ -1162,6 +1186,8 @@ components:
           type: string
         plot:
           type: string
+        plot_owned:
+          type: boolean
         price:
           format: int64
           type: integer

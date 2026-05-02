@@ -28,8 +28,11 @@ export default function App() {
   const handleSignIn = useCallback(function handleSignIn() {
     setAuthenticated(true)
     const returnTo = consumeReturnPath()
-    if (returnTo && returnTo !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (returnTo && returnTo !== currentPath) {
       window.location.assign(returnTo)
+    } else if (window.location.pathname.startsWith('/email/confirm/')) {
+      window.location.replace('/')
     }
   }, [])
 

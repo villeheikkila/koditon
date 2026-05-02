@@ -17,7 +17,8 @@ import (
 	"koditon/internal/platform/logging"
 )
 
-const webRefreshCookieName = "__Host-koditon_refresh"
+const secureWebRefreshCookieName = "__Host-koditon_refresh"
+const devWebRefreshCookieName = "koditon_refresh"
 const webOAuthClientID = "koditon-web"
 
 type webAuthHeaders struct {
@@ -333,7 +334,8 @@ func (a *API) appleWebAuthHandler(ctx context.Context, input *appleWebAuthInput)
 }
 
 type webSessionRefreshInput struct {
-	RefreshToken string `cookie:"__Host-koditon_refresh"`
+	SecureRefreshToken string `cookie:"__Host-koditon_refresh"`
+	DevRefreshToken    string `cookie:"koditon_refresh"`
 	webAuthHeaders
 }
 
@@ -351,7 +353,7 @@ func (a *API) webSessionRefreshHandler(ctx context.Context, input *webSessionRef
 	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
 		return nil, err
 	}
-	refreshToken := strings.TrimSpace(input.RefreshToken)
+	refreshToken := input.refreshToken()
 	if refreshToken == "" {
 		return nil, huma.Error401Unauthorized("session refresh token is missing")
 	}
@@ -380,8 +382,9 @@ func (a *API) webSessionRefreshHandler(ctx context.Context, input *webSessionRef
 }
 
 type webSessionSignOutInput struct {
-	RefreshToken  string `cookie:"__Host-koditon_refresh"`
-	Authorization string `header:"Authorization"`
+	SecureRefreshToken string `cookie:"__Host-koditon_refresh"`
+	DevRefreshToken    string `cookie:"koditon_refresh"`
+	Authorization      string `header:"Authorization"`
 	webAuthHeaders
 }
 
@@ -401,14 +404,14 @@ func (a *API) webSessionSignOutHandler(ctx context.Context, input *webSessionSig
 			_ = a.authService.SignOutWithOwnershipCheck(ctx, claims.UserID, claims.SessionID)
 		}
 	}
-	if refreshToken := strings.TrimSpace(input.RefreshToken); refreshToken != "" {
+	if refreshToken := input.refreshToken(); refreshToken != "" {
 		if err := a.authService.RevokeOAuthRefreshTokenForClient(ctx, webOAuthClientID, refreshToken); err != nil {
 			logging.With(a.logger, logging.Op("api.auth.session.sign_out")).ErrorContext(ctx, "web session sign out failed", "error", err, "outcome", logging.OutcomeError)
 			return nil, huma.Error500InternalServerError("failed to sign out")
 		}
 	}
 	out := &webSessionSignOutOutput{}
-	out.SetCookie = []http.Cookie{a.clearWebRefreshCookie()}
+	out.SetCookie = a.clearWebRefreshCookies()
 	out.Body.OK = true
 	return out, nil
 }
@@ -432,28 +435,46 @@ func (a *API) webRefreshCookie(token string, expiresAt time.Time) http.Cookie {
 		maxAge = 0
 	}
 	return http.Cookie{
-		Name:     webRefreshCookieName,
+		Name:     a.webRefreshCookieName(),
 		Value:    token,
 		Path:     "/",
 		Expires:  expiresAt,
 		MaxAge:   maxAge,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   a.webRefreshCookieSecure(),
 		SameSite: http.SameSiteLaxMode,
 	}
 }
 
-func (a *API) clearWebRefreshCookie() http.Cookie {
+func (a *API) clearWebRefreshCookies() []http.Cookie {
+	return []http.Cookie{
+		a.clearWebRefreshCookie(secureWebRefreshCookieName, true),
+		a.clearWebRefreshCookie(devWebRefreshCookieName, false),
+	}
+}
+
+func (a *API) clearWebRefreshCookie(name string, secure bool) http.Cookie {
 	return http.Cookie{
-		Name:     webRefreshCookieName,
+		Name:     name,
 		Value:    "",
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
+}
+
+func (a *API) webRefreshCookieName() string {
+	if a.webRefreshCookieSecure() {
+		return secureWebRefreshCookieName
+	}
+	return devWebRefreshCookieName
+}
+
+func (a *API) webRefreshCookieSecure() bool {
+	return !a.cfg.Environment.IsDevelopment()
 }
 
 func (a *API) validateWebAuthOrigin(headers webAuthHeaders) error {
@@ -519,4 +540,18 @@ func extractBearer(header string) string {
 		return ""
 	}
 	return strings.TrimSpace(header[len("Bearer "):])
+}
+
+func (input webSessionRefreshInput) refreshToken() string {
+	if token := strings.TrimSpace(input.SecureRefreshToken); token != "" {
+		return token
+	}
+	return strings.TrimSpace(input.DevRefreshToken)
+}
+
+func (input webSessionSignOutInput) refreshToken() string {
+	if token := strings.TrimSpace(input.SecureRefreshToken); token != "" {
+		return token
+	}
+	return strings.TrimSpace(input.DevRefreshToken)
 }

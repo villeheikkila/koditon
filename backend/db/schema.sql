@@ -343,14 +343,14 @@ create table public.oauth_refresh_tokens (
   oauth_refresh_token_token_hash text not null constraint oauth_refresh_tokens_oauth_refresh_token_token_hash_key unique,
   oauth_client_id text not null,
   user_uuid uuid not null constraint oauth_refresh_tokens_user_uuid_fkey references users(user_uuid) ON DELETE CASCADE,
-  device_session_uuid uuid constraint oauth_refresh_tokens_device_session_uuid_fkey references device_sessions(device_session_uuid) ON DELETE SET NULL,
   oauth_refresh_token_scopes text[] default '{}'::text[] not null,
   oauth_refresh_token_audience text default ''::text not null,
   oauth_refresh_token_expires_at timestamp with time zone not null,
   oauth_refresh_token_revoked_at timestamp with time zone,
   oauth_refresh_token_rotated_from uuid constraint oauth_refresh_tokens_oauth_refresh_token_rotated_from_fkey references oauth_refresh_tokens(oauth_refresh_token_id) ON DELETE SET NULL,
   oauth_refresh_token_created_at timestamp with time zone default now() not null,
-  oauth_refresh_token_updated_at timestamp with time zone default now() not null
+  oauth_refresh_token_updated_at timestamp with time zone default now() not null,
+  device_session_uuid uuid constraint oauth_refresh_tokens_device_session_uuid_fkey references device_sessions(device_session_uuid) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_oauth_refresh_tokens_audience ON public.oauth_refresh_tokens USING btree (oauth_refresh_token_audience);
@@ -464,10 +464,12 @@ create table public.prices_transactions (
   prices_transaction_updated_at timestamp with time zone default now() not null,
   prices_transaction_category text not null,
   prices_neighborhood_id uuid constraint prices_transactions_prices_neighborhoods_id_fkey references prices_neighborhoods(prices_neighborhood_id),
+  prices_transaction_plot_owned boolean,
   constraint prices_transaction_unique_key UNIQUE NULLS NOT DISTINCT (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category)
 );
 
 CREATE INDEX idx_prices_transaction_period_identifier ON public.prices_transactions USING btree (prices_transaction_period_identifier);
+CREATE INDEX idx_prices_transactions_plot_owned ON public.prices_transactions USING btree (prices_transaction_plot_owned);
 CREATE UNIQUE INDEX prices_transactions_unique_key ON public.prices_transactions USING btree (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category) NULLS NOT DISTINCT;
 
 create table public.role_feature_flags (
@@ -607,6 +609,7 @@ create table public.sale_listings (
   sale_listing_prices_match_attempt_count integer default 0 not null,
   sale_listing_prices_match_expires_at timestamp with time zone,
   sale_listing_prices_match_run_id uuid constraint sale_listings_sale_listing_prices_match_run_id_fkey references sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE SET NULL,
+  sale_listing_plot_owned boolean,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
   constraint sale_listings_prices_match_status_check CHECK (((sale_listing_prices_match_status IS NULL) OR (sale_listing_prices_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'expired'::text, 'noop'::text])))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
@@ -624,6 +627,7 @@ CREATE INDEX idx_sale_listings_energy_efficiency_status ON public.sale_listings 
 CREATE INDEX idx_sale_listings_first_seen ON public.sale_listings USING btree (sale_listing_first_seen_at);
 CREATE INDEX idx_sale_listings_floor_level ON public.sale_listings USING btree (sale_listing_floor_level);
 CREATE INDEX idx_sale_listings_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at DESC);
+CREATE INDEX idx_sale_listings_plot_owned ON public.sale_listings USING btree (sale_listing_plot_owned);
 CREATE INDEX idx_sale_listings_plot_type_code ON public.sale_listings USING btree (sale_listing_plot_type_code);
 CREATE INDEX idx_sale_listings_postal ON public.sale_listings USING btree (sale_listing_postal);
 CREATE INDEX idx_sale_listings_price ON public.sale_listings USING btree (sale_listing_asking_price);

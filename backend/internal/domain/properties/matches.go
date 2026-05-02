@@ -30,6 +30,8 @@ potential AS (
 )
 SELECT
     postal,
+    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_name_fi,
+    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name,
     count(*)::bigint AS candidate_count,
     count(DISTINCT sale_listing_id)::bigint AS listing_count,
     count(DISTINCT prices_transaction_id)::bigint AS transaction_count,
@@ -39,7 +41,9 @@ SELECT
     count(*) FILTER (WHERE sale_listing_prices_transaction_match_status = 'ambiguous')::bigint AS ambiguous_count,
     COALESCE(max(sale_listing_prices_transaction_match_created_at)::text, '') AS latest_at
 FROM potential
-GROUP BY postal
+LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_code = potential.postal
+LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+GROUP BY postal, ppc.postal_postal_code_name_fi, pm.postal_municipality_name_fi
 ORDER BY candidate_count DESC, postal
 LIMIT $1`
 
@@ -67,12 +71,20 @@ SELECT
     COALESCE(sl.sale_listing_city, ''),
     COALESCE(sl.sale_listing_postal_norm, ''),
     COALESCE(sl.sale_listing_room_layout, ''),
+    COALESCE(sl.sale_listing_condition, ''),
+    COALESCE(public.fnc__condition_match_code(sl.sale_listing_condition), ''),
     sl.sale_listing_area_value,
     sl.sale_listing_asking_price,
     sl.sale_listing_price_per_m2,
     sl.sale_listing_build_year,
     sl.sale_listing_floor_level,
     sl.sale_listing_total_floors,
+    sl.sale_listing_elevator,
+    COALESCE(sl.sale_listing_energy_efficiency_match_code, ''),
+    COALESCE(sl.sale_listing_energy_efficiency_label, ''),
+    COALESCE(sl.sale_listing_plot_type_raw, ''),
+    sl.sale_listing_plot_owned,
+    COALESCE(sl.sale_listing_first_seen_at::text, ''),
     COALESCE(sl.sale_listing_last_seen_at::text, ''),
     pt.prices_transaction_id::text,
     COALESCE(pt.prices_transaction_description, ''),
@@ -85,8 +97,11 @@ SELECT
     COALESCE(pt.prices_transaction_floor, ''),
     pt.prices_transaction_elevator,
     COALESCE(pt.prices_transaction_condition, ''),
+    COALESCE(public.fnc__condition_match_code(pt.prices_transaction_condition), ''),
     COALESCE(pt.prices_transaction_plot, ''),
+    COALESCE(pt.prices_transaction_plot_owned, public.fnc__plot_owned(pt.prices_transaction_plot)),
     COALESCE(pt.prices_transaction_energy_class, ''),
+    COALESCE(public.fnc__prices_transaction_energy_match_code(pt.prices_transaction_energy_class), ''),
     COALESCE(pt.prices_transaction_period_identifier, ''),
     COALESCE(pt.prices_transaction_created_at::text, '')
 FROM latest
@@ -120,7 +135,7 @@ func (s *Service) TransactionMatchPostals(ctx context.Context, limit int32) ([]T
 	out := []TransactionMatchPostalSummary{}
 	for rows.Next() {
 		var item TransactionMatchPostalSummary
-		if err := rows.Scan(&item.Postal, &item.CandidateCount, &item.ListingCount, &item.TransactionCount, &item.HighCount, &item.MediumCount, &item.LowCount, &item.AmbiguousCount, &item.LatestAt); err != nil {
+		if err := rows.Scan(&item.Postal, &item.NameFi, &item.MunicipalityName, &item.CandidateCount, &item.ListingCount, &item.TransactionCount, &item.HighCount, &item.MediumCount, &item.LowCount, &item.AmbiguousCount, &item.LatestAt); err != nil {
 			return nil, fmt.Errorf("scan transaction match postal: %w", err)
 		}
 		out = append(out, item)
@@ -150,6 +165,8 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 		var listingArea, listingPricePerM2, priceDelta *float64
 		var listingAskingPrice *int64
 		var listingBuildYear, floorLevel, totalFloors *int32
+		var listingElevator *bool
+		var listingPlotOwned, transactionPlotOwned *bool
 		var transactionPrice, transactionPricePerM2 int32
 		if err := rows.Scan(
 			&item.ID,
@@ -168,12 +185,20 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 			&item.Listing.City,
 			&item.Listing.Postal,
 			&item.Listing.RoomLayout,
+			&item.Listing.Condition,
+			&item.Listing.ConditionMatchCode,
 			&listingArea,
 			&listingAskingPrice,
 			&listingPricePerM2,
 			&listingBuildYear,
 			&floorLevel,
 			&totalFloors,
+			&listingElevator,
+			&item.Listing.EnergyMatchCode,
+			&item.Listing.EnergyLabel,
+			&item.Listing.PlotOwnershipRaw,
+			&listingPlotOwned,
+			&item.Listing.FirstSeenAt,
 			&item.Listing.LastSeenAt,
 			&item.Transaction.ID,
 			&item.Transaction.Description,
@@ -186,8 +211,11 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 			&item.Transaction.Floor,
 			&item.Transaction.Elevator,
 			&item.Transaction.Condition,
+			&item.Transaction.ConditionMatchCode,
 			&item.Transaction.Plot,
+			&transactionPlotOwned,
 			&item.Transaction.EnergyClass,
+			&item.Transaction.EnergyMatchCode,
 			&item.Transaction.PeriodIdentifier,
 			&item.Transaction.CreatedAt,
 		); err != nil {
@@ -201,8 +229,11 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 		item.Listing.BuildYear = listingBuildYear
 		item.Listing.FloorLevel = floorLevel
 		item.Listing.TotalFloors = totalFloors
+		item.Listing.Elevator = listingElevator
+		item.Listing.PlotOwned = listingPlotOwned
 		item.Transaction.Price = int64(transactionPrice)
 		item.Transaction.PricePerSquareMeter = int64(transactionPricePerM2)
+		item.Transaction.PlotOwned = transactionPlotOwned
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {

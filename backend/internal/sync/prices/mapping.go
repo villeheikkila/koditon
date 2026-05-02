@@ -2,6 +2,7 @@ package prices
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -81,7 +82,13 @@ func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, n
 		buildYear := int32(tx.BuildYear)
 		floor := emptyToNull(tx.Floor)
 		condition := emptyToNull(tx.Condition)
+		if _, err := parseConditionMatchCode(condition); err != nil {
+			return nil, err
+		}
 		plot := emptyToNull(tx.Plot)
+		if _, err := parsePlotOwned(plot); err != nil {
+			return nil, err
+		}
 		energyClass := emptyToNull(tx.EnergyClass)
 		category := util.TrimUnicodeSpace(tx.Category)
 		dedupKey := transactionKey{
@@ -128,4 +135,57 @@ type neighborhoodNotFoundError struct {
 
 func (e *neighborhoodNotFoundError) Error() string {
 	return "neighborhood not found: " + e.neighborhood
+}
+
+func parseConditionMatchCode(value string) (string, error) {
+	key := plotAliasKey(value)
+	switch key {
+	case "":
+		return "", nil
+	case "good", "hyvä", "hyva":
+		return "good", nil
+	case "satisfactory", "tyyd", "tyydyttävä", "tyydyttava":
+		return "satisfactory", nil
+	case "tolerable", "poor", "bad", "huono", "välttävä", "valttava":
+		return "poor", nil
+	case "unclassified", "not_known", "not_shown":
+		return "unknown", nil
+	default:
+		return "", fmt.Errorf("invalid condition value: %q", value)
+	}
+}
+
+func parsePlotOwned(value string) (*bool, error) {
+	key := plotAliasKey(value)
+	switch key {
+	case "":
+		return nil, nil
+	case "oma", "own", "owned", "omistus", "omistettu":
+		return boolPtr(true), nil
+	case "vuokra", "rent", "rented", "rental", "lease", "leased", "vuokralla", "vuokratontti", "optional_rental", "valinnainen_vuokratontti":
+		return boolPtr(false), nil
+	default:
+		return nil, fmt.Errorf("invalid plot ownership value: %q", value)
+	}
+}
+
+func plotAliasKey(value string) string {
+	value = strings.ToLower(util.TrimUnicodeSpace(value))
+	value = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == 'å' || r == 'ä' || r == 'ö':
+			return r
+		default:
+			return '_'
+		}
+	}, value)
+	return strings.Trim(value, "_")
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

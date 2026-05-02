@@ -9,6 +9,12 @@ import {
 } from '../api/koditon'
 
 type ListingDetail = SaleListing | Rental
+type RenovationStatus = 'done' | 'planned'
+type RenovationItem = {
+  kind: string
+  status: RenovationStatus
+  year?: number
+}
 
 interface DetailPageProps {
   kind: 'listing' | 'rental' | 'building'
@@ -65,9 +71,30 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const charges = commercial.charges
   const price = commercial.asking_price ?? commercial.rent
   const isRental = kind === 'rental'
+  const site = d.site
+  const siteRows = site ? [
+    site.plot_type,
+    site.plot_ownership_type,
+    site.plot_area_m2,
+    site.lot_redemption_info,
+    site.lot_rental_agreement,
+    site.yard,
+    site.shore,
+    site.zoning,
+    site.road_access,
+    site.water_supply,
+    site.water_supply_types?.length,
+    site.sewer,
+    site.services,
+    site.transport,
+    site.driving_directions,
+  ] : []
+  const hasSiteDetails = siteRows.some(value => value != null && value !== '')
   const title = [unit.room_layout, unit.area_m2 != null && `${unit.area_m2.toFixed(1)} m²`]
     .filter(Boolean).join(', ')
   const mainImage = d.media?.main_image?.variants?.gallery || d.media?.main_image?.variants?.large || d.media?.main_image?.url
+  const images = d.media?.images?.filter(image => image.url !== mainImage) ?? []
+  const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
 
   return (
     <div className="listing-layout">
@@ -121,12 +148,32 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           {unit.floor_level != null && <Fact label="Floor" value={building.floor_count != null ? `${unit.floor_level} / ${building.floor_count}` : String(unit.floor_level)} />}
           {building.build_year != null && <Fact label="Built" value={String(building.build_year)} />}
           {unit.condition && <Fact label="Condition" value={unit.condition} />}
-          {building.energy_class && <Fact label="Energy" value={building.energy_class} />}
+          {(building.energy_efficiency_label || building.energy_class) && <Fact label="Energy" value={building.energy_efficiency_label || building.energy_class || ''} />}
           {building.elevator != null && <Fact label="Elevator" value={building.elevator ? 'Yes' : 'No'} />}
+          {unit.balcony != null && <Fact label="Balcony" value={unit.balcony ? 'Yes' : 'No'} />}
           {unit.sauna != null && <Fact label="Sauna" value={unit.sauna ? 'Yes' : 'No'} />}
-          {d.site?.plot_type && <Fact label="Plot" value={d.site.plot_type} />}
+          {(site?.plot_ownership_type || site?.plot_type) && <Fact label="Plot" value={plotSummary(site)} />}
         </div>
         <div className="listing-body">
+          <Section title="Source & Timing">
+            <div className="listing-table">
+              <Row label="Provider" value={providerLabel(d.source.provider)} />
+              <Row label="Source kind" value={d.source.kind} />
+              <Row label="Native ID" value={d.source.native_id} />
+              {d.source.external_id && <Row label="External ID" value={d.source.external_id} />}
+              {d.source.friendly_id && <Row label="Friendly ID" value={d.source.friendly_id} />}
+              {commercial.status && <Row label="Status" value={commercial.status} />}
+              {commercial.booking_status && <Row label="Booking status" value={commercial.booking_status} />}
+              {commercial.published_at && <Row label="Published" value={fmtDateTime(commercial.published_at)} />}
+              {commercial.first_seen_at && <Row label="First seen" value={fmtDateTime(commercial.first_seen_at)} />}
+              {commercial.last_seen_at && <Row label="Last seen" value={fmtDateTime(commercial.last_seen_at)} />}
+              {commercial.unpublished_at && <Row label="Unpublished" value={fmtDateTime(commercial.unpublished_at)} />}
+              {commercial.days_on_market != null && <Row label="Days on market" value={String(commercial.days_on_market)} />}
+              {commercial.can_receive_leads != null && <Row label="Can receive leads" value={fmtBool(commercial.can_receive_leads)} />}
+              {commercial.map_visible != null && <Row label="Map visible" value={fmtBool(commercial.map_visible)} />}
+              {d.source.original_url && <Row label="Original URL" value={<a href={d.source.original_url} target="_blank" rel="noopener noreferrer">{d.source.original_url}</a>} />}
+            </div>
+          </Section>
           {texts?.description && (
             <Section title="Description">
               <TextBlock text={texts.description} />
@@ -140,18 +187,44 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
                 {commercial.rent != null && <Row label="Rent" value={`${fmtPrice(commercial.rent)}${commercial.rent_period ? ` / ${commercial.rent_period}` : ''}`} highlight />}
                 {commercial.asking_price != null && <Row label="Asking price" value={fmtPrice(commercial.asking_price)} highlight={!isRental} />}
                 {commercial.debt_free_price != null && <Row label="Debt-free price" value={fmtPrice(commercial.debt_free_price)} />}
+                {commercial.previous_asking_price != null && <Row label="Previous asking price" value={fmtPrice(commercial.previous_asking_price)} />}
+                {commercial.previous_debt_free_price != null && <Row label="Previous debt-free price" value={fmtPrice(commercial.previous_debt_free_price)} />}
                 {matchedTransaction?.price != null && <Row label="Matched sale price" value={fmtPrice(matchedTransaction.price)} highlight />}
                 {matchedTransaction?.price_per_m2 != null && <Row label="Matched sale / m²" value={fmtEur(matchedTransaction.price_per_m2)} />}
+                {matchedTransaction?.condition && <Row label="Transaction condition" value={matchedTransaction.condition} />}
+                {matchedTransaction?.floor && <Row label="Transaction floor" value={matchedTransaction.floor} />}
+                {matchedTransaction?.plot && <Row label="Transaction plot" value={matchedTransaction.plot} />}
+                {matchedTransaction?.energy_class && <Row label="Transaction energy" value={matchedTransaction.energy_class} />}
                 {matchedTransaction?.period_identifier && <Row label="Transaction period" value={matchedTransaction.period_identifier} />}
                 {matchedTransaction?.description && <Row label="Transaction layout" value={matchedTransaction.description} />}
                 {matchedTransaction?.match_score != null && <Row label="Match confidence" value={[matchedTransaction.match_confidence, String(matchedTransaction.match_score)].filter(Boolean).join(' · ')} />}
                 {commercial.debt_share_amount != null && <Row label="Debt share" value={fmtPrice(commercial.debt_share_amount)} />}
+                {commercial.debt_share_additional_info && <Row label="Debt share info" value={commercial.debt_share_additional_info} />}
                 {charges?.maintenance_monthly != null && <Row label="Maintenance charge" value={`${fmtEur(charges.maintenance_monthly)} / mo`} />}
                 {charges?.total_monthly != null && charges.total_monthly !== charges.maintenance_monthly && <Row label="Total monthly charge" value={`${fmtEur(charges.total_monthly)} / mo`} />}
                 {charges?.water != null && <Row label="Water charge" value={`${fmtEur(charges.water)} / mo`} />}
+                {charges?.parking != null && <Row label="Parking charge" value={`${fmtEur(charges.parking)} / mo`} />}
+                {charges?.sauna != null && <Row label="Sauna charge" value={`${fmtEur(charges.sauna)} / mo`} />}
+                {charges?.electricity && <Row label="Electricity" value={charges.electricity} />}
+                {charges?.heating && <Row label="Heating charge" value={charges.heating} />}
+                {charges?.notes && <Row label="Charge notes" value={charges.notes} />}
+                {commercial.fees_info && <Row label="Fees info" value={commercial.fees_info} />}
+                {commercial.financing_fee_interest_only_period && <Row label="Interest-only period" value={commercial.financing_fee_interest_only_period} />}
+                {commercial.financing_fee_interest_only_start_date && <Row label="Interest-only starts" value={commercial.financing_fee_interest_only_start_date} />}
+                {commercial.financing_fee_interest_only_end_date && <Row label="Interest-only ends" value={commercial.financing_fee_interest_only_end_date} />}
+                {commercial.open_bidding_in_use != null && <Row label="Open bidding" value={fmtBool(commercial.open_bidding_in_use)} />}
+                {commercial.open_bidding_starting_selling_price != null && <Row label="Bidding start price" value={fmtPrice(commercial.open_bidding_starting_selling_price)} />}
+                {commercial.open_bidding_starting_debt_free_price != null && <Row label="Bidding start debt-free" value={fmtPrice(commercial.open_bidding_starting_debt_free_price)} />}
+                {commercial.open_bidding_latest_offer != null && <Row label="Latest bid" value={fmtPrice(commercial.open_bidding_latest_offer)} />}
                 {commercial.security_deposit && <Row label="Security deposit" value={commercial.security_deposit} />}
                 {commercial.minimum_term_months != null && <Row label="Minimum term" value={`${commercial.minimum_term_months} months`} />}
                 {commercial.pets_allowed != null && <Row label="Pets allowed" value={commercial.pets_allowed ? 'Yes' : 'No'} />}
+                {commercial.furnished != null && <Row label="Furnished" value={fmtBool(commercial.furnished)} />}
+                {commercial.fixed_term != null && <Row label="Fixed term" value={fmtBool(commercial.fixed_term)} />}
+                {commercial.ownership_type && <Row label="Ownership type" value={commercial.ownership_type} />}
+                {commercial.development_phase && <Row label="Development phase" value={commercial.development_phase} />}
+                {commercial.new_development != null && <Row label="New development" value={fmtBool(commercial.new_development)} />}
+                {commercial.other_terms && <Row label="Other terms" value={commercial.other_terms} />}
               </div>
               {texts?.charges && <TextBlock text={texts.charges} muted />}
             </Section>
@@ -160,36 +233,103 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
             <div className="listing-table">
               {unit.room_layout && <Row label="Room layout" value={unit.room_layout} />}
               {unit.rooms_count != null && <Row label="Rooms" value={String(unit.rooms_count)} />}
+              {unit.bedrooms_count != null && <Row label="Bedrooms" value={String(unit.bedrooms_count)} />}
               {unit.area_m2 != null && <Row label="Area" value={`${unit.area_m2.toFixed(1)} m²`} />}
+              {unit.living_area_m2 != null && <Row label="Living area" value={`${unit.living_area_m2.toFixed(1)} m²`} />}
+              {unit.total_area_m2 != null && <Row label="Total area" value={`${unit.total_area_m2.toFixed(1)} m²`} />}
+              {unit.other_area_m2 != null && <Row label="Other area" value={`${unit.other_area_m2.toFixed(1)} m²`} />}
               {commercial.price_per_m2 != null && <Row label="Price / m²" value={fmtEur(commercial.price_per_m2)} />}
               {unit.floor_level != null && <Row label="Floor" value={building.floor_count != null ? `${unit.floor_level} / ${building.floor_count}` : String(unit.floor_level)} />}
+              {unit.property_type && <Row label="Property type" value={unit.property_type} />}
+              {unit.property_subtype && <Row label="Property subtype" value={unit.property_subtype} />}
               {unit.condition && <Row label="Condition" value={unit.condition} />}
+              {unit.balcony != null && <Row label="Balcony" value={fmtBool(unit.balcony)} />}
+              {unit.balcony_description && <Row label="Balcony details" value={unit.balcony_description} />}
+              {unit.sauna != null && <Row label="Sauna" value={fmtBool(unit.sauna)} />}
+              {unit.sauna_description && <Row label="Sauna details" value={unit.sauna_description} />}
               {unit.parking && <Row label="Parking" value={unit.parking} />}
+              {unit.availability && <Row label="Availability" value={unit.availability} />}
               {unit.kitchen_description && <Row label="Kitchen" value={unit.kitchen_description} />}
               {unit.bathroom_description && <Row label="Bathroom" value={unit.bathroom_description} />}
               {unit.storage_description && <Row label="Storage" value={unit.storage_description} />}
+              {unit.views_description && <Row label="Views" value={unit.views_description} />}
+              {unit.floor_materials_description && <Row label="Floor materials" value={unit.floor_materials_description} />}
+              {unit.wall_materials_description && <Row label="Wall materials" value={unit.wall_materials_description} />}
+              {unit.appliances?.length ? <Row label="Appliances" value={unit.appliances.join(', ')} /> : null}
+              {unit.features?.length ? <Row label="Features" value={unit.features.join(', ')} /> : null}
             </div>
           </Section>
-          <Section title="Building">
+          <Section title="Building Details">
             <div className="listing-table">
               {building.housing_company && <Row label="Housing company" value={building.housing_company} />}
+              {building.identity?.key && <Row label="Building identity" value={`${building.identity.key} · ${Math.round(building.identity.confidence * 100)}%`} />}
+              {building.business_id && <Row label="Business ID" value={building.business_id} />}
               {building.build_year != null && <Row label="Year built" value={String(building.build_year)} />}
-              {building.energy_class && <Row label="Energy class" value={building.energy_class} />}
+              {building.construction_year != null && <Row label="Construction year" value={String(building.construction_year)} />}
+              {building.building_type && <Row label="Building type" value={building.building_type} />}
+              {building.building_subtype && <Row label="Building subtype" value={building.building_subtype} />}
+              {(building.energy_efficiency_label || building.energy_class) && <Row label="Energy class" value={building.energy_efficiency_label || building.energy_class || ''} />}
               {building.heating && <Row label="Heating" value={building.heating} />}
+              {building.heating_description && <Row label="Heating details" value={building.heating_description} />}
+              {building.heating_fuel && <Row label="Heating fuel" value={building.heating_fuel} />}
               {building.apartment_count != null && <Row label="Apartments" value={String(building.apartment_count)} />}
+              {building.business_premise_count != null && <Row label="Business premises" value={String(building.business_premise_count)} />}
+              {building.floor_count != null && <Row label="Floors" value={String(building.floor_count)} />}
               {building.elevator != null && <Row label="Elevator" value={building.elevator ? 'Yes' : 'No'} />}
+              {building.sauna != null && <Row label="Building sauna" value={fmtBool(building.sauna)} />}
+              {building.car_storage && <Row label="Car storage" value={building.car_storage} />}
+              {building.building_material && <Row label="Building material" value={building.building_material} />}
+              {building.frame_construction_method && <Row label="Frame construction" value={building.frame_construction_method} />}
+              {building.wall_structure && <Row label="Wall structure" value={building.wall_structure} />}
+              {building.roof_type && <Row label="Roof type" value={building.roof_type} />}
+              {building.roof_material && <Row label="Roof material" value={building.roof_material} />}
+              {building.management_method && <Row label="Management" value={building.management_method} />}
+              {building.property_manager && <Row label="Property manager" value={building.property_manager} />}
+              {building.maintenance_responsibility && <Row label="Maintenance responsibility" value={building.maintenance_responsibility} />}
+              {building.connectivity && <Row label="Connectivity" value={building.connectivity} />}
               {building.common_areas && <Row label="Common areas" value={building.common_areas} />}
+              {building.other_info && <Row label="Other building info" value={building.other_info} />}
             </div>
           </Section>
+          {renovationRows.length > 0 && (
+            <Section title="Building Renovations">
+              <div className="renovation-list">
+                {renovationRows.map((item, index) => (
+                  <div className="renovation-row" key={`${item.kind}-${item.year || 'no-year'}-${item.status}-${index}`}>
+                    <div className="renovation-year">{item.year || '—'}</div>
+                    <div className="renovation-main">
+                      <div className="renovation-kind">{item.kind}</div>
+                      <div className={`renovation-status renovation-status--${item.status}`}>{item.status}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+          {site && hasSiteDetails && (
+            <Section title="Site & Area">
+              <div className="listing-table">
+                {site.plot_type && <Row label="Plot type" value={fmtPlotOwnership(site.plot_type)} />}
+                {site.plot_ownership_type && <Row label="Plot ownership" value={fmtPlotOwnership(site.plot_ownership_type)} />}
+                {site.plot_area_m2 != null && <Row label="Plot area" value={`${site.plot_area_m2.toFixed(0)} m²`} />}
+                {site.lot_redemption_info && <Row label="Lot redemption" value={site.lot_redemption_info} />}
+                {site.lot_rental_agreement && <Row label="Lot rental agreement" value={site.lot_rental_agreement} />}
+                {site.yard && <Row label="Yard" value={site.yard} />}
+                {site.shore && <Row label="Shore" value={site.shore} />}
+                {site.zoning && <Row label="Zoning" value={site.zoning} />}
+                {site.road_access && <Row label="Road access" value={site.road_access} />}
+                {site.water_supply && <Row label="Water supply" value={site.water_supply} />}
+                {site.water_supply_types?.length ? <Row label="Water supply types" value={site.water_supply_types.join(', ')} /> : null}
+                {site.sewer && <Row label="Sewer" value={site.sewer} />}
+                {site.services && <Row label="Services" value={site.services} />}
+                {site.transport && <Row label="Transport" value={site.transport} />}
+                {site.driving_directions && <Row label="Driving directions" value={site.driving_directions} />}
+              </div>
+            </Section>
+          )}
           {texts?.availability && (
             <Section title="Availability">
               <TextBlock text={texts.availability} />
-            </Section>
-          )}
-          {(texts?.renovations_done || texts?.renovations_planned) && (
-            <Section title="Renovations">
-              {texts.renovations_done && <TextBlock text={texts.renovations_done} />}
-              {texts.renovations_planned && <TextBlock text={texts.renovations_planned} />}
             </Section>
           )}
           {texts?.additional_info && (
@@ -197,11 +337,70 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               <TextBlock text={texts.additional_info} />
             </Section>
           )}
+          {(texts?.kitchen || texts?.bathroom || texts?.storage || texts?.materials || texts?.amenities || texts?.area || texts?.transport || texts?.building) && (
+            <Section title="Source Texts">
+              {texts.kitchen && <TextBlock text={texts.kitchen} />}
+              {texts.bathroom && <TextBlock text={texts.bathroom} />}
+              {texts.storage && <TextBlock text={texts.storage} />}
+              {texts.materials && <TextBlock text={texts.materials} />}
+              {texts.amenities && <TextBlock text={texts.amenities} />}
+              {texts.area && <TextBlock text={texts.area} />}
+              {texts.transport && <TextBlock text={texts.transport} />}
+              {texts.building && <TextBlock text={texts.building} />}
+            </Section>
+          )}
+          {d.showings?.length ? (
+            <Section title="Showings">
+              <div className="listing-table">
+                {d.showings.map((showing, index) => (
+                  <Row key={`${showing.start_at || index}`} label={showing.start_at ? fmtDateTime(showing.start_at) : `Showing ${index + 1}`} value={[showing.end_at && `ends ${fmtDateTime(showing.end_at)}`, showing.info].filter(Boolean).join(' · ') || 'Open'} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+          {d.contacts?.length ? (
+            <Section title="Contacts">
+              <div className="listing-table">
+                {d.contacts.map((contact, index) => (
+                  <Row key={`${contact.name || contact.email || index}`} label={contact.name || `Contact ${index + 1}`} value={[contact.title, contact.office_name, contact.phone, contact.email].filter(Boolean).join(' · ')} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+          {d.links?.length ? (
+            <Section title="Links">
+              <div className="listing-table">
+                {d.links.map(link => (
+                  <Row key={link.url} label={link.type || 'Link'} value={<a href={link.url} target="_blank" rel="noopener noreferrer">{link.title || link.url}</a>} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+          {d.insights?.items?.length ? (
+            <Section title="Insights">
+              <div className="listing-table">
+                {d.insights.items.map(insight => (
+                  <Row key={`${insight.key}-${insight.value}`} label={insight.key} value={[insight.value, insight.source, insight.confidence != null && `${Math.round(insight.confidence * 100)}%`].filter(Boolean).join(' · ')} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+          {images.length > 0 && (
+            <Section title="Images">
+              <div className="listing-image-grid">
+                {images.slice(0, 24).map(image => (
+                  <a key={image.id || image.url} href={image.url} target="_blank" rel="noopener noreferrer">
+                    <img src={image.variants?.thumbnail || image.variants?.gallery || image.url} alt={image.description || ''} />
+                  </a>
+                ))}
+              </div>
+            </Section>
+          )}
           <div className="listing-meta-footer">
             <span className="badge badge-default">{d.id}</span>
             {commercial.last_seen_at && (
               <span className="listing-meta-date">
-                Last seen {new Date(commercial.last_seen_at).toLocaleDateString('fi-FI')}
+                Last seen {fmtDateTime(commercial.last_seen_at)}
               </span>
             )}
           </div>
@@ -266,7 +465,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Row({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
   return (
     <div className="listing-row">
       <span className="listing-row-label">{label}</span>
@@ -295,4 +494,46 @@ function fmtPrice(n: number): string {
 
 function fmtEur(n: number): string {
   return new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 0 }).format(n) + ' €'
+}
+
+function fmtBool(value: boolean): string {
+  return value ? 'Yes' : 'No'
+}
+
+function fmtDateTime(value: string): string {
+  return new Date(value).toLocaleString('fi-FI', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function renovationItems(records: ListingDetail['building']['renovations'], doneText?: string, plannedText?: string): RenovationItem[] {
+  const items = [
+    ...(records ?? []).map(item => ({ kind: item.kind, status: item.done === false ? 'planned' as const : 'done' as const, year: item.year })),
+    ...renovationTextItems(doneText, 'done'),
+    ...renovationTextItems(plannedText, 'planned'),
+  ]
+  const seen = new Set<string>()
+  return items.filter(item => {
+    const key = `${item.status}:${item.year ?? ''}:${item.kind}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return item.kind.trim() !== ''
+  }).sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.status.localeCompare(b.status) || a.kind.localeCompare(b.kind))
+}
+
+function renovationTextItems(text: string | undefined, status: RenovationStatus): RenovationItem[] {
+  return (text ?? '').split(/\r?\n/).map(line => {
+    const value = line.trim()
+    const year = value.match(/\b(19|20)\d{2}\b/)?.[0]
+    return { kind: year ? value.replace(year, '').trim() || value : value, status, year: year ? Number(year) : undefined }
+  }).filter(item => item.kind !== '')
+}
+
+function fmtPlotOwnership(value: string): string {
+  const key = value.trim().toLowerCase().replace(/[^a-z0-9åäö]+/g, '_').replace(/^_+|_+$/g, '')
+  if (['1', 'oma', 'own', 'owned', 'omistus', 'omistettu'].includes(key)) return 'owned'
+  if (['2', '3', 'vuokra', 'rent', 'rented', 'rental', 'lease', 'leased', 'vuokralla', 'vuokratontti'].includes(key)) return 'rented'
+  return value
+}
+
+function plotSummary(site: NonNullable<ListingDetail['site']>): string {
+  return Array.from(new Set([site.plot_ownership_type, site.plot_type].filter(Boolean).map(value => fmtPlotOwnership(value as string)))).join(' · ')
 }
