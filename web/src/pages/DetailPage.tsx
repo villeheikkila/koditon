@@ -8,6 +8,7 @@ import {
   type Rental,
   type SaleListing,
 } from '../api/koditon'
+import ListingLocationMap from '../components/ListingLocationMap'
 
 type ListingDetail = SaleListing | Rental
 type RenovationStatus = 'done' | 'planned'
@@ -99,6 +100,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const images = d.media?.images?.filter(image => image.url !== mainImage) ?? []
   const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
   const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
+  const mapLatitude = location.latitude ?? building.location.latitude
+  const mapLongitude = location.longitude ?? building.location.longitude
+  const mapLabel = [location.street_address || building.location.street_address || d.headline, location.postal || building.location.postal, location.city || building.location.city].filter(Boolean).join(', ')
 
   return (
     <div className="listing-layout">
@@ -158,6 +162,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           {unit.sauna != null && <Fact label="Sauna" value={unit.sauna ? 'Yes' : 'No'} />}
           {(site?.plot_ownership_type || site?.plot_type) && <Fact label="Plot" value={plotSummary(site)} />}
         </div>
+        {mapLatitude != null && mapLongitude != null && (
+          <ListingLocationMap latitude={mapLatitude} longitude={mapLongitude} label={mapLabel || 'Listing location'} />
+        )}
         <div className="listing-body">
           <Section title="Source & Timing">
             <div className="listing-table">

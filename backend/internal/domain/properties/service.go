@@ -365,6 +365,7 @@ func (s *Service) enrichSaleListingFromCanonicalBuilding(ctx context.Context, li
 	var housingCompany, businessID, address, postal, city, energyLabel, heating, heatingFuel, roofMaterial, roofType, carStorage, otherInfo *string
 	var buildYear, floorCount, apartmentCount *int32
 	var elevator, sauna *bool
+	var latitude, longitude *float64
 	var elevatorRenovated, facadeRenovated, windowRenovated, roofRenovated, pipeRenovated, balconyRenovated, electricityRenovated *bool
 	var elevatorRenovatedYear, facadeRenovatedYear, windowRenovatedYear, roofRenovatedYear, pipeRenovatedYear, balconyRenovatedYear, electricityRenovatedYear *int32
 	err := s.db.QueryRow(ctx, `
@@ -399,7 +400,9 @@ SELECT
     fb.frontdoor_building_balcony_renovated,
     fb.frontdoor_building_balcony_renovated_year,
     fb.frontdoor_building_electricity_renovated,
-    fb.frontdoor_building_electricity_renovated_year
+    fb.frontdoor_building_electricity_renovated_year,
+    postgis.ST_Y(pb.property_building_geom)::double precision,
+    postgis.ST_X(pb.property_building_geom)::double precision
 FROM public.property_offerings po
 JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 JOIN public.property_buildings pb ON pb.property_building_id = pu.property_building_id
@@ -407,7 +410,7 @@ LEFT JOIN public.sale_listings sl ON sl.sale_listing_id = $2
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 WHERE po.property_offering_id = $1
-LIMIT 1`, offeringID, saleListingID).Scan(&housingCompany, &businessID, &address, &postal, &city, &buildYear, &floorCount, &apartmentCount, &elevator, &sauna, &energyLabel, &heating, &heatingFuel, &roofMaterial, &roofType, &carStorage, &otherInfo, &elevatorRenovated, &elevatorRenovatedYear, &facadeRenovated, &facadeRenovatedYear, &windowRenovated, &windowRenovatedYear, &roofRenovated, &roofRenovatedYear, &pipeRenovated, &pipeRenovatedYear, &balconyRenovated, &balconyRenovatedYear, &electricityRenovated, &electricityRenovatedYear)
+LIMIT 1`, offeringID, saleListingID).Scan(&housingCompany, &businessID, &address, &postal, &city, &buildYear, &floorCount, &apartmentCount, &elevator, &sauna, &energyLabel, &heating, &heatingFuel, &roofMaterial, &roofType, &carStorage, &otherInfo, &elevatorRenovated, &elevatorRenovatedYear, &facadeRenovated, &facadeRenovatedYear, &windowRenovated, &windowRenovatedYear, &roofRenovated, &roofRenovatedYear, &pipeRenovated, &pipeRenovatedYear, &balconyRenovated, &balconyRenovatedYear, &electricityRenovated, &electricityRenovatedYear, &latitude, &longitude)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -419,6 +422,10 @@ LIMIT 1`, offeringID, saleListingID).Scan(&housingCompany, &businessID, &address
 	listing.Building.Location.StreetAddress = firstNonEmpty(listing.Building.Location.StreetAddress, valueOrEmpty(address))
 	listing.Building.Location.Postal = firstNonEmpty(listing.Building.Location.Postal, valueOrEmpty(postal))
 	listing.Building.Location.City = firstNonEmpty(listing.Building.Location.City, valueOrEmpty(city))
+	listing.Building.Location.Latitude = firstFloat64(listing.Building.Location.Latitude, latitude)
+	listing.Building.Location.Longitude = firstFloat64(listing.Building.Location.Longitude, longitude)
+	listing.Unit.Location.Latitude = firstFloat64(listing.Unit.Location.Latitude, latitude)
+	listing.Unit.Location.Longitude = firstFloat64(listing.Unit.Location.Longitude, longitude)
 	listing.Building.BuildYear = firstInt32(listing.Building.BuildYear, buildYear)
 	listing.Building.FloorCount = firstInt32(listing.Building.FloorCount, floorCount)
 	listing.Building.ApartmentCount = firstInt32(listing.Building.ApartmentCount, apartmentCount)
