@@ -19,6 +19,12 @@ export default function Nav({ actions }: NavProps) {
           Search
         </NavLink>
         <NavLink
+          to="/map"
+          className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+        >
+          Map
+        </NavLink>
+        <NavLink
           to="/"
           end
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}

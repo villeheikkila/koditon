@@ -62,7 +62,7 @@ SELECT
     latest.sale_listing_prices_transaction_match_price_delta_percent,
     latest.sale_listing_prices_transaction_match_reasons,
     COALESCE(latest.sale_listing_prices_transaction_match_created_at::text, ''),
-    sl.sale_listing_public_id,
+    pos.property_offering_id::text,
     sl.sale_listing_canonical_id,
     sl.sale_listing_source_provider,
     COALESCE(sl.sale_listing_url, ''),
@@ -106,6 +106,8 @@ SELECT
     COALESCE(pt.prices_transaction_created_at::text, '')
 FROM latest
 JOIN public.sale_listings sl ON sl.sale_listing_id = latest.sale_listing_id
+JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+    AND pos.property_offering_source_link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
 WHERE latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate'::text, 'ambiguous'::text])
     AND sl.prices_transaction_id IS NULL

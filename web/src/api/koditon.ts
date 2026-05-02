@@ -58,13 +58,13 @@ export interface AppleWebAuthInputBody {
   code: string;
 }
 
-export interface AppleWebAuthOutputBody {
+export interface AuthTokenBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   access_token: string;
   access_token_expires_at: number;
-  refresh_token: string;
-  refresh_token_expires_at: number;
+  refresh_token?: string;
+  refresh_token_expires_at?: number;
   user_id: string;
 }
 
@@ -304,6 +304,14 @@ export interface Building {
   texts?: TextSections;
 }
 
+export interface CanonicalOffering {
+  building_id?: string;
+  offering_id: string;
+  primary_source_listing_id?: string;
+  source_count?: number;
+  unit_id?: string;
+}
+
 export interface Charges {
   electricity?: string;
   heating?: string;
@@ -320,20 +328,27 @@ export type CommercialDetailsLeadOptions = {[key: string]: boolean};
 export interface PriceTransactionMatch {
   area_m2?: number;
   build_year?: number;
+  category?: string;
+  city?: string;
   condition?: string;
   description?: string;
   elevator?: boolean;
   energy_class?: string;
+  first_seen_at?: string;
   floor?: string;
   id: string;
   match_confidence?: string;
   match_score?: number;
   match_status?: string;
+  neighborhood?: string;
   period_identifier?: string;
   plot?: string;
+  plot_owned?: boolean;
+  postal_code?: string;
   price?: number;
   price_per_m2?: number;
   type?: string;
+  updated_at?: string;
 }
 
 export interface CommercialDetails {
@@ -381,92 +396,6 @@ export interface CommercialDetails {
   show_bidding_indicators?: boolean;
   status?: string;
   unpublished_at?: string;
-}
-
-export type TransactionMatchCandidateReasons = { [key: string]: unknown };
-
-export interface TransactionMatchListingCandidate {
-  area_m2?: number;
-  asking_price?: number;
-  build_year?: number;
-  canonical_id: string;
-  city?: string;
-  condition?: string;
-  condition_match_code?: string;
-  elevator?: boolean;
-  energy_label?: string;
-  energy_match_code?: string;
-  floor_level?: number;
-  first_seen_at?: string;
-  headline?: string;
-  id: string;
-  last_seen_at?: string;
-  plot_owned?: boolean;
-  plot_ownership_raw?: string;
-  postal?: string;
-  price_per_m2?: number;
-  room_layout?: string;
-  source_provider: string;
-  street_address?: string;
-  total_floors?: number;
-  url?: string;
-}
-
-export interface TransactionMatchTransaction {
-  area_m2: number;
-  build_year?: number;
-  category?: string;
-  condition?: string;
-  condition_match_code?: string;
-  created_at?: string;
-  description?: string;
-  elevator: boolean;
-  energy_class?: string;
-  energy_match_code?: string;
-  floor?: string;
-  id: string;
-  period_identifier?: string;
-  plot?: string;
-  plot_owned?: boolean;
-  price: number;
-  price_per_m2: number;
-  type?: string;
-}
-
-export interface TransactionMatchCandidate {
-  confidence: string;
-  created_at?: string;
-  id: string;
-  listing: TransactionMatchListingCandidate;
-  price_delta_percent?: number;
-  reasons?: TransactionMatchCandidateReasons;
-  score: number;
-  status: string;
-  transaction: TransactionMatchTransaction;
-}
-
-export interface TransactionMatchCandidatesOutputBody {
-  /** @nullable */
-  candidates: TransactionMatchCandidate[] | null;
-}
-
-export interface TransactionMatchPostalSummary {
-  ambiguous_count: number;
-  candidate_count: number;
-  high_count: number;
-  latest_at?: string;
-  listing_count: number;
-  low_count: number;
-  medium_count: number;
-  municipality_name?: string;
-  name_fi?: string;
-  postal: string;
-  transaction_count: number;
-}
-
-export interface TransactionMatchPostalsOutputBody {
-  /** @nullable */
-  postals: TransactionMatchPostalSummary[] | null;
 }
 
 export interface Contact {
@@ -591,6 +520,22 @@ export interface Media {
   main_image?: Image;
 }
 
+export interface OfferingSourceRecord {
+  canonical_id: string;
+  first_seen_at?: string;
+  headline?: string;
+  id: string;
+  kind: string;
+  last_seen_at?: string;
+  link_method: string;
+  link_score: number;
+  link_status: string;
+  native_id: string;
+  provider: string;
+  public_id?: string;
+  url?: string;
+}
+
 export interface UnitDetails {
   /** @nullable */
   appliances?: string[] | null;
@@ -651,6 +596,7 @@ export interface SaleListingSummary {
   media?: Media;
   site?: SiteDetails;
   source: ListingSource;
+  source_providers?: string[];
   unit: UnitDetails;
 }
 
@@ -676,16 +622,6 @@ export interface PasskeyAuthOptionsOutputBody {
   readonly $schema?: string;
   challenge_id: string;
   options: unknown;
-}
-
-export interface PasskeyAuthOutputBody {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  access_token: string;
-  access_token_expires_at: number;
-  refresh_token: string;
-  refresh_token_expires_at: number;
-  user_id: string;
 }
 
 export interface PasskeyRegisterFinishInputBody {
@@ -817,6 +753,7 @@ export interface SaleListing {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   building: BuildingDetails;
+  canonical: CanonicalOffering;
   commercial: CommercialDetails;
   /** @nullable */
   contacts?: Contact[] | null;
@@ -830,6 +767,8 @@ export interface SaleListing {
   showings?: Showing[] | null;
   site?: SiteDetails;
   source: ListingSource;
+  /** @nullable */
+  source_records?: OfferingSourceRecord[] | null;
   texts?: TextSections;
   unit: UnitDetails;
 }
@@ -859,194 +798,107 @@ export interface SearchOutputBody {
   total: number;
 }
 
-export type OAuthAuthorizationServerMetadataResponse = {
-  /** Authorization endpoint URL. */
-  authorization_endpoint: string;
-  code_challenge_methods_supported: string[];
-  /** Device authorization endpoint URL. */
-  device_authorization_endpoint: string;
-  grant_types_supported: string[];
-  /** Authorization server issuer. */
-  issuer: string;
-  /** JWKS endpoint URL. */
-  jwks_uri: string;
-  /** Dynamic client registration endpoint URL. */
-  registration_endpoint?: string;
-  response_types_supported: string[];
-  /** Token revocation endpoint URL (RFC 7009). */
-  revocation_endpoint?: string;
-  scopes_supported: string[];
-  /** Token endpoint URL. */
-  token_endpoint: string;
-  token_endpoint_auth_methods_supported: string[];
-};
+export interface TransactionMatchListingCandidate {
+  area_m2?: number;
+  asking_price?: number;
+  build_year?: number;
+  canonical_id: string;
+  city?: string;
+  condition?: string;
+  condition_match_code?: string;
+  elevator?: boolean;
+  energy_label?: string;
+  energy_match_code?: string;
+  first_seen_at?: string;
+  floor_level?: number;
+  headline?: string;
+  id: string;
+  last_seen_at?: string;
+  plot_owned?: boolean;
+  plot_ownership_raw?: string;
+  postal?: string;
+  price_per_m2?: number;
+  room_layout?: string;
+  source_provider: string;
+  street_address?: string;
+  total_floors?: number;
+  url?: string;
+}
 
-export type OAuthClientRegistrationSuccessResponse = {
-  client_id: string;
-  client_id_issued_at: number;
-  client_name?: string;
-  grant_types: string[];
-  logo_uri?: string;
-  redirect_uris: string[];
-  response_types: string[];
-  scope: string;
-  token_endpoint_auth_method: string;
-};
+export interface TransactionMatchTransaction {
+  area_m2: number;
+  build_year?: number;
+  category?: string;
+  condition?: string;
+  condition_match_code?: string;
+  created_at?: string;
+  description?: string;
+  elevator: boolean;
+  energy_class?: string;
+  energy_match_code?: string;
+  floor?: string;
+  id: string;
+  period_identifier?: string;
+  plot?: string;
+  plot_owned?: boolean;
+  price: number;
+  price_per_m2: number;
+  type?: string;
+}
 
-export type OAuthDeviceAuthorizationSuccessResponse = {
-  /** Device code for token polling. */
-  device_code: string;
-  /** Expiration in seconds. */
-  expires_in: number;
-  /** Recommended polling interval in seconds. */
-  interval: number;
-  /** User-entered verification code. */
-  user_code: string;
-  /** Verification URL for user interaction. */
-  verification_uri: string;
-  /** Verification URL with user code prefilled. */
-  verification_uri_complete: string;
-};
+export interface TransactionMatchCandidate {
+  confidence: string;
+  created_at?: string;
+  id: string;
+  listing: TransactionMatchListingCandidate;
+  price_delta_percent?: number;
+  reasons?: unknown;
+  score: number;
+  status: string;
+  transaction: TransactionMatchTransaction;
+}
 
-export type OAuthErrorResponse = {
-  /** OAuth error code. */
-  error: string;
-  /** Optional app-specific error code. */
-  error_code?: string;
-  /** Human-readable OAuth error description. */
-  error_description: string;
-};
+export interface TransactionMatchCandidatesOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  /** @nullable */
+  candidates: TransactionMatchCandidate[] | null;
+}
 
-export type OAuthHandoffApproveSuccessResponse = {
-  ok: boolean;
-  /** OAuth redirect URL with the generated authorization code. */
-  redirect_url: string;
-};
+export interface TransactionMatchPostalSummary {
+  ambiguous_count: number;
+  candidate_count: number;
+  high_count: number;
+  latest_at?: string;
+  listing_count: number;
+  low_count: number;
+  medium_count: number;
+  municipality_name?: string;
+  name_fi?: string;
+  postal: string;
+  transaction_count: number;
+}
 
-export type OAuthHandoffDenySuccessResponse = {
-  ok: boolean;
-};
+export interface TransactionMatchPostalsOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  /** @nullable */
+  postals: TransactionMatchPostalSummary[] | null;
+}
 
-export type OAuthHandoffResolveSuccessResponse = {
-  /** Display name for the OAuth client. */
-  client_display_name: string;
-  /** OAuth client ID. */
-  client_id: string;
-  expires_at_unix: number;
-  handoff_id: string;
-  /** Redirect URI host. */
-  redirect_host: string;
-  scopes: string[];
-};
-
-export type OAuthJWKSResponseKeysItem = { [key: string]: unknown };
-
-export type OAuthJWKSResponse = {
-  keys: OAuthJWKSResponseKeysItem[];
-};
-
-export type OAuthProtectedResourceMetadataResponse = {
-  authorization_servers: string[];
-  bearer_methods_supported: string[];
-  /** Protected resource identifier. */
-  resource: string;
-  /** Display name for the protected resource. */
-  resource_name: string;
-  scopes_supported: string[];
-};
-
-export type OAuthTokenSuccessResponse = {
-  /** Bearer access token. */
+export interface WebSessionRefreshOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
   access_token: string;
-  /** Access token expiration in seconds. */
-  expires_in: number;
-  /** Refresh token. */
-  refresh_token: string;
-  /** Refresh token expiration in seconds. */
-  refresh_token_expires_in: number;
-  /** Granted scopes separated by spaces. */
-  scope: string;
-  /** Associated device session identifier when available. */
-  session_id?: string;
-  /** Token type. */
-  token_type: string;
-};
+  access_token_expires_at: number;
+  user_id: string;
+}
 
-export type OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod = typeof OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod[keyof typeof OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod];
-
-
-export const OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod = {
-  none: 'none',
-} as const;
-
-export type OAuthClientRegistrationRequestBody = {
-  client_name?: string;
-  logo_uri?: string;
-  redirect_uris: string[];
-  scope?: string;
-  token_endpoint_auth_method?: OAuthClientRegistrationRequestBodyTokenEndpointAuthMethod;
-};
-
-export type OAuthDeviceAuthorizationRequestBody = {
-  /** OAuth client ID. */
-  client_id: string;
-  /** OAuth client secret for confidential clients. */
-  client_secret?: string;
-  /** Protected resource identifier from discovery metadata. */
-  resource?: string;
-  /** Requested scopes separated by spaces. */
-  scope?: string;
-};
-
-export type OAuthHandoffDecisionRequestBody = {
-  /** Authorization handoff identifier. */
-  handoff_id: string;
-};
-
-export type OAuthHandoffResolveRequestBody = {
-  /** Authorization handoff token from the browser or app link. */
-  handoff_token?: string;
-  /** User-entered handoff code. */
-  user_code?: string;
-};
-
-export type OAuthRevokeRequestBody = {
-  /** The token to revoke. */
-  token: string;
-  /** Optional hint: 'refresh_token' or 'access_token'. */
-  token_type_hint?: string;
-};
-
-export type OAuthTokenRequestBodyGrantType = typeof OAuthTokenRequestBodyGrantType[keyof typeof OAuthTokenRequestBodyGrantType];
-
-
-export const OAuthTokenRequestBodyGrantType = {
-  authorization_code: 'authorization_code',
-  refresh_token: 'refresh_token',
-  'urn:ietf:params:oauth:grant-type:device_code': 'urn:ietf:params:oauth:grant-type:device_code',
-} as const;
-
-export type OAuthTokenRequestBody = {
-  /** OAuth client ID. */
-  client_id?: string;
-  /** OAuth client secret for confidential clients. */
-  client_secret?: string;
-  /** Authorization code. */
-  code?: string;
-  /** PKCE verifier. */
-  code_verifier?: string;
-  /** Device code. */
-  device_code?: string;
-  grant_type: OAuthTokenRequestBodyGrantType;
-  /** Redirect URI matching authorization request. */
-  redirect_uri?: string;
-  /** Refresh token. */
-  refresh_token?: string;
-  /** Protected resource identifier from discovery metadata. */
-  resource?: string;
-  /** Requested scopes separated by spaces. */
-  scope?: string;
-};
+export interface WebSessionSignOutOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  ok: boolean;
+}
 
 export type EntityDetailParams = {
 /**
@@ -1100,6 +952,10 @@ q?: string;
  * Source filter: shortcut, frontdoor, or all
  */
 source?: string;
+/**
+ * Listing kind filter: ad, announcement, or all
+ */
+kind?: string;
 /**
  * City / municipality filter
  */
@@ -1187,6 +1043,10 @@ q?: string;
  * Source filter: shortcut, frontdoor, or all
  */
 source?: string;
+/**
+ * Listing kind filter: ad, announcement, or all
+ */
+kind?: string;
 /**
  * City / municipality filter
  */
@@ -1332,87 +1192,6 @@ page?: number;
 page_size?: number;
 };
 
-export type OauthAuthorizeHandoffApproveBody = {
-  /** Authorization handoff identifier. */
-  handoff_id: string;
-};
-
-export type OauthAuthorizeHandoffDenyBody = {
-  /** Authorization handoff identifier. */
-  handoff_id: string;
-};
-
-export type OauthAuthorizeHandoffResolveBody = {
-  /** Authorization handoff token from the browser or app link. */
-  handoff_token?: string;
-  /** User-entered handoff code. */
-  user_code?: string;
-};
-
-export type OauthDeviceAuthorizationCreateBody = {
-  /** OAuth client ID. */
-  client_id: string;
-  /** OAuth client secret for confidential clients. */
-  client_secret?: string;
-  /** Protected resource identifier from discovery metadata. */
-  resource?: string;
-  /** Requested scopes separated by spaces. */
-  scope?: string;
-};
-
-export type OauthClientRegisterCreateBodyTokenEndpointAuthMethod = typeof OauthClientRegisterCreateBodyTokenEndpointAuthMethod[keyof typeof OauthClientRegisterCreateBodyTokenEndpointAuthMethod];
-
-
-export const OauthClientRegisterCreateBodyTokenEndpointAuthMethod = {
-  none: 'none',
-} as const;
-
-export type OauthClientRegisterCreateBody = {
-  client_name?: string;
-  logo_uri?: string;
-  redirect_uris: string[];
-  scope?: string;
-  token_endpoint_auth_method?: OauthClientRegisterCreateBodyTokenEndpointAuthMethod;
-};
-
-export type OauthRevokeCreateBody = {
-  /** The token to revoke. */
-  token: string;
-  /** Optional hint: 'refresh_token' or 'access_token'. */
-  token_type_hint?: string;
-};
-
-export type OauthTokenCreateBodyGrantType = typeof OauthTokenCreateBodyGrantType[keyof typeof OauthTokenCreateBodyGrantType];
-
-
-export const OauthTokenCreateBodyGrantType = {
-  authorization_code: 'authorization_code',
-  refresh_token: 'refresh_token',
-  'urn:ietf:params:oauth:grant-type:device_code': 'urn:ietf:params:oauth:grant-type:device_code',
-} as const;
-
-export type OauthTokenCreateBody = {
-  /** OAuth client ID. */
-  client_id?: string;
-  /** OAuth client secret for confidential clients. */
-  client_secret?: string;
-  /** Authorization code. */
-  code?: string;
-  /** PKCE verifier. */
-  code_verifier?: string;
-  /** Device code. */
-  device_code?: string;
-  grant_type: OauthTokenCreateBodyGrantType;
-  /** Redirect URI matching authorization request. */
-  redirect_uri?: string;
-  /** Refresh token. */
-  refresh_token?: string;
-  /** Protected resource identifier from discovery metadata. */
-  resource?: string;
-  /** Requested scopes separated by spaces. */
-  scope?: string;
-};
-
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
@@ -1423,339 +1202,6 @@ export type HTTPStatusCode3xx = 300 | 301 | 302 | 303 | 304 | 305 | 307 | 308;
 export type HTTPStatusCode4xx = 400 | 401 | 402 | 403 | 404 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 419 | 420 | 421 | 422 | 423 | 424 | 426 | 428 | 429 | 431 | 451;
 export type HTTPStatusCode5xx = 500 | 501 | 502 | 503 | 504 | 505 | 507 | 511;
 export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatusCode3xx | HTTPStatusCode4xx | HTTPStatusCode5xx;
-
-
-/**
- * @summary Get OAuth authorization server metadata
- */
-export type oauthAuthorizationServerMetadataGetResponse200 = {
-  data: OAuthAuthorizationServerMetadataResponse
-  status: 200
-}
-
-export type oauthAuthorizationServerMetadataGetResponseSuccess = (oauthAuthorizationServerMetadataGetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type oauthAuthorizationServerMetadataGetResponse = (oauthAuthorizationServerMetadataGetResponseSuccess)
-
-export const getOauthAuthorizationServerMetadataGetUrl = () => {
-
-
-
-
-  return `/.well-known/oauth-authorization-server`
-}
-
-export const oauthAuthorizationServerMetadataGet = async ( options?: RequestInit): Promise<oauthAuthorizationServerMetadataGetResponse> => {
-
-  return customInstance<oauthAuthorizationServerMetadataGetResponse>(getOauthAuthorizationServerMetadataGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getOauthAuthorizationServerMetadataGetQueryKey = () => {
-    return [
-    `/.well-known/oauth-authorization-server`
-    ] as const;
-    }
-
-
-export const getOauthAuthorizationServerMetadataGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getOauthAuthorizationServerMetadataGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>> = ({ signal }) => oauthAuthorizationServerMetadataGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type OauthAuthorizationServerMetadataGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>>
-export type OauthAuthorizationServerMetadataGetQueryError = ErrorType<unknown>
-
-
-export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get OAuth authorization server metadata
- */
-
-export function useOauthAuthorizationServerMetadataGet<TData = Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizationServerMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getOauthAuthorizationServerMetadataGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * @summary Get OAuth protected resource metadata (root)
- */
-export type oauthProtectedResourceMetadataRootGetResponse200 = {
-  data: OAuthProtectedResourceMetadataResponse
-  status: 200
-}
-
-export type oauthProtectedResourceMetadataRootGetResponseSuccess = (oauthProtectedResourceMetadataRootGetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type oauthProtectedResourceMetadataRootGetResponse = (oauthProtectedResourceMetadataRootGetResponseSuccess)
-
-export const getOauthProtectedResourceMetadataRootGetUrl = () => {
-
-
-
-
-  return `/.well-known/oauth-protected-resource`
-}
-
-export const oauthProtectedResourceMetadataRootGet = async ( options?: RequestInit): Promise<oauthProtectedResourceMetadataRootGetResponse> => {
-
-  return customInstance<oauthProtectedResourceMetadataRootGetResponse>(getOauthProtectedResourceMetadataRootGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getOauthProtectedResourceMetadataRootGetQueryKey = () => {
-    return [
-    `/.well-known/oauth-protected-resource`
-    ] as const;
-    }
-
-
-export const getOauthProtectedResourceMetadataRootGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getOauthProtectedResourceMetadataRootGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>> = ({ signal }) => oauthProtectedResourceMetadataRootGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type OauthProtectedResourceMetadataRootGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>>
-export type OauthProtectedResourceMetadataRootGetQueryError = ErrorType<unknown>
-
-
-export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get OAuth protected resource metadata (root)
- */
-
-export function useOauthProtectedResourceMetadataRootGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataRootGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getOauthProtectedResourceMetadataRootGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * @summary Get OAuth protected resource metadata
- */
-export type oauthProtectedResourceMetadataGetResponse200 = {
-  data: OAuthProtectedResourceMetadataResponse
-  status: 200
-}
-
-export type oauthProtectedResourceMetadataGetResponseSuccess = (oauthProtectedResourceMetadataGetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type oauthProtectedResourceMetadataGetResponse = (oauthProtectedResourceMetadataGetResponseSuccess)
-
-export const getOauthProtectedResourceMetadataGetUrl = () => {
-
-
-
-
-  return `/.well-known/oauth-protected-resource/mcp`
-}
-
-export const oauthProtectedResourceMetadataGet = async ( options?: RequestInit): Promise<oauthProtectedResourceMetadataGetResponse> => {
-
-  return customInstance<oauthProtectedResourceMetadataGetResponse>(getOauthProtectedResourceMetadataGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getOauthProtectedResourceMetadataGetQueryKey = () => {
-    return [
-    `/.well-known/oauth-protected-resource/mcp`
-    ] as const;
-    }
-
-
-export const getOauthProtectedResourceMetadataGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getOauthProtectedResourceMetadataGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>> = ({ signal }) => oauthProtectedResourceMetadataGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type OauthProtectedResourceMetadataGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>>
-export type OauthProtectedResourceMetadataGetQueryError = ErrorType<unknown>
-
-
-export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get OAuth protected resource metadata
- */
-
-export function useOauthProtectedResourceMetadataGet<TData = Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthProtectedResourceMetadataGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getOauthProtectedResourceMetadataGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
 
 
 /**
@@ -3688,7 +3134,7 @@ export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnTyp
 
 
 /**
- * Fetch a sale listing by public ID, canonical ID, or source URL
+ * Fetch a canonical sale offering by UUID
  * @summary Get sale listing detail
  */
 export type saleListingsDetailResponse200 = {
@@ -3937,7 +3383,7 @@ export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = E
  * @summary Sign in with Apple (web)
  */
 export type authAppleWebResponse200 = {
-  data: AppleWebAuthOutputBody
+  data: AuthTokenBody
   status: 200
 }
 
@@ -4028,7 +3474,7 @@ export const useAuthAppleWeb = <TError = ErrorType<ErrorModel>,
  * @summary Confirm email sign-in
  */
 export type authEmailConfirmResponse200 = {
-  data: PasskeyAuthOutputBody
+  data: AuthTokenBody
   status: 200
 }
 
@@ -4210,7 +3656,7 @@ export const useAuthEmailRequest = <TError = ErrorType<ErrorModel>,
  * @summary Complete passkey authentication
  */
 export type authPasskeyAuthenticateResponse200 = {
-  data: PasskeyAuthOutputBody
+  data: AuthTokenBody
   status: 200
 }
 
@@ -4568,869 +4014,252 @@ export const useAuthPasskeyRegisterOptions = <TError = ErrorType<ErrorModel>,
     }
 
 /**
- * @summary Approve OAuth authorization handoff
+ * Rotate the web refresh cookie and return a new access token
+ * @summary Refresh web session
  */
-export type oauthAuthorizeHandoffApproveResponse200 = {
-  data: OAuthHandoffApproveSuccessResponse
+export type authSessionRefreshResponse200 = {
+  data: WebSessionRefreshOutputBody
   status: 200
 }
 
-export type oauthAuthorizeHandoffApproveResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
+export type authSessionRefreshResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type oauthAuthorizeHandoffApproveResponse401 = {
-  data: OAuthErrorResponse
-  status: 401
-}
-
-export type oauthAuthorizeHandoffApproveResponse404 = {
-  data: OAuthErrorResponse
-  status: 404
-}
-
-export type oauthAuthorizeHandoffApproveResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthAuthorizeHandoffApproveResponseSuccess = (oauthAuthorizeHandoffApproveResponse200) & {
+export type authSessionRefreshResponseSuccess = (authSessionRefreshResponse200) & {
   headers: Headers;
 };
-export type oauthAuthorizeHandoffApproveResponseError = (oauthAuthorizeHandoffApproveResponse400 | oauthAuthorizeHandoffApproveResponse401 | oauthAuthorizeHandoffApproveResponse404 | oauthAuthorizeHandoffApproveResponse500) & {
+export type authSessionRefreshResponseError = (authSessionRefreshResponseDefault) & {
   headers: Headers;
 };
 
-export type oauthAuthorizeHandoffApproveResponse = (oauthAuthorizeHandoffApproveResponseSuccess | oauthAuthorizeHandoffApproveResponseError)
+export type authSessionRefreshResponse = (authSessionRefreshResponseSuccess | authSessionRefreshResponseError)
 
-export const getOauthAuthorizeHandoffApproveUrl = () => {
-
-
+export const getAuthSessionRefreshUrl = () => {
 
 
-  return `/oauth/authorize/handoff/approve`
+
+
+  return `/auth/session/refresh`
 }
 
-export const oauthAuthorizeHandoffApprove = async (oauthAuthorizeHandoffApproveBody: OauthAuthorizeHandoffApproveBody, options?: RequestInit): Promise<oauthAuthorizeHandoffApproveResponse> => {
+export const authSessionRefresh = async ( options?: RequestInit): Promise<authSessionRefreshResponse> => {
 
-  return customInstance<oauthAuthorizeHandoffApproveResponse>(getOauthAuthorizeHandoffApproveUrl(),
+  return customInstance<authSessionRefreshResponse>(getAuthSessionRefreshUrl(),
   {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthSessionRefreshMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSessionRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSessionRefresh>>, TError,void, TContext> => {
+
+const mutationKey = ['authSessionRefresh'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSessionRefresh>>, void> = () => {
+
+
+          return  authSessionRefresh(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSessionRefreshMutationResult = NonNullable<Awaited<ReturnType<typeof authSessionRefresh>>>
+
+    export type AuthSessionRefreshMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Refresh web session
+ */
+export const useAuthSessionRefresh = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSessionRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSessionRefresh>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthSessionRefreshMutationOptions(options), queryClient);
+    }
+
+/**
+ * Revoke the web refresh token and clear the session cookie
+ * @summary Sign out web session
+ */
+export type authSessionSignOutResponse200 = {
+  data: WebSessionSignOutOutputBody
+  status: 200
+}
+
+export type authSessionSignOutResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authSessionSignOutResponseSuccess = (authSessionSignOutResponse200) & {
+  headers: Headers;
+};
+export type authSessionSignOutResponseError = (authSessionSignOutResponseDefault) & {
+  headers: Headers;
+};
+
+export type authSessionSignOutResponse = (authSessionSignOutResponseSuccess | authSessionSignOutResponseError)
+
+export const getAuthSessionSignOutUrl = () => {
+
+
+
+
+  return `/auth/session/sign-out`
+}
+
+export const authSessionSignOut = async ( options?: RequestInit): Promise<authSessionSignOutResponse> => {
+
+  return customInstance<authSessionSignOutResponse>(getAuthSessionSignOutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthSessionSignOutMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSessionSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSessionSignOut>>, TError,void, TContext> => {
+
+const mutationKey = ['authSessionSignOut'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSessionSignOut>>, void> = () => {
+
+
+          return  authSessionSignOut(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSessionSignOutMutationResult = NonNullable<Awaited<ReturnType<typeof authSessionSignOut>>>
+
+    export type AuthSessionSignOutMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Sign out web session
+ */
+export const useAuthSessionSignOut = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSessionSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSessionSignOut>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthSessionSignOutMutationOptions(options), queryClient);
+    }
+
+export type OAuthHandoffResolveSuccessResponse = {
+  handoff_id: string;
+  client_id?: string;
+  client_display_name: string;
+  client_name?: string;
+  redirect_host: string;
+  redirect_uri?: string;
+  scopes: string[];
+  user_code?: string;
+  expires_at?: string;
+  expires_at_unix: number;
+}
+
+export type OAuthHandoffResolveBody = {
+  handoff_token?: string;
+  user_code?: string;
+}
+
+export type OAuthHandoffDecisionBody = {
+  handoff_id: string;
+}
+
+export type OAuthHandoffApproveResponse = {
+  redirect_url?: string;
+}
+
+type OAuthHandoffResolveResponse = {
+  data: OAuthHandoffResolveSuccessResponse;
+  status: number;
+  headers: Headers;
+}
+
+type OAuthHandoffApproveResult = {
+  data: OAuthHandoffApproveResponse;
+  status: number;
+  headers: Headers;
+}
+
+type OAuthHandoffDenyResult = {
+  data: Record<string, never>;
+  status: number;
+  headers: Headers;
+}
+
+export const oauthAuthorizeHandoffResolve = async (body: OAuthHandoffResolveBody, options?: RequestInit): Promise<OAuthHandoffResolveResponse> => {
+  return customInstance<OAuthHandoffResolveResponse>('/oauth/authorize/handoff/resolve', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      oauthAuthorizeHandoffApproveBody,)
-  }
-);}
-
-
-
-
-export const getOauthAuthorizeHandoffApproveMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext> => {
-
-const mutationKey = ['oauthAuthorizeHandoffApprove'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, {data: BodyType<OauthAuthorizeHandoffApproveBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthAuthorizeHandoffApprove(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthAuthorizeHandoffApproveMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>>
-    export type OauthAuthorizeHandoffApproveMutationBody = BodyType<OauthAuthorizeHandoffApproveBody>
-    export type OauthAuthorizeHandoffApproveMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Approve OAuth authorization handoff
- */
-export const useOauthAuthorizeHandoffApprove = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>, TError,{data: BodyType<OauthAuthorizeHandoffApproveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthAuthorizeHandoffApprove>>,
-        TError,
-        {data: BodyType<OauthAuthorizeHandoffApproveBody>},
-        TContext
-      > => {
-      return useMutation(getOauthAuthorizeHandoffApproveMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary Deny OAuth authorization handoff
- */
-export type oauthAuthorizeHandoffDenyResponse200 = {
-  data: OAuthHandoffDenySuccessResponse
-  status: 200
+    body: JSON.stringify(body),
+  })
 }
 
-export type oauthAuthorizeHandoffDenyResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthAuthorizeHandoffDenyResponse401 = {
-  data: OAuthErrorResponse
-  status: 401
-}
-
-export type oauthAuthorizeHandoffDenyResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthAuthorizeHandoffDenyResponseSuccess = (oauthAuthorizeHandoffDenyResponse200) & {
-  headers: Headers;
-};
-export type oauthAuthorizeHandoffDenyResponseError = (oauthAuthorizeHandoffDenyResponse400 | oauthAuthorizeHandoffDenyResponse401 | oauthAuthorizeHandoffDenyResponse500) & {
-  headers: Headers;
-};
-
-export type oauthAuthorizeHandoffDenyResponse = (oauthAuthorizeHandoffDenyResponseSuccess | oauthAuthorizeHandoffDenyResponseError)
-
-export const getOauthAuthorizeHandoffDenyUrl = () => {
-
-
-
-
-  return `/oauth/authorize/handoff/deny`
-}
-
-export const oauthAuthorizeHandoffDeny = async (oauthAuthorizeHandoffDenyBody: OauthAuthorizeHandoffDenyBody, options?: RequestInit): Promise<oauthAuthorizeHandoffDenyResponse> => {
-
-  return customInstance<oauthAuthorizeHandoffDenyResponse>(getOauthAuthorizeHandoffDenyUrl(),
-  {
+export const oauthAuthorizeHandoffApprove = async (body: OAuthHandoffDecisionBody, options?: RequestInit): Promise<OAuthHandoffApproveResult> => {
+  return customInstance<OAuthHandoffApproveResult>('/oauth/authorize/handoff/approve', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      oauthAuthorizeHandoffDenyBody,)
-  }
-);}
-
-
-
-
-export const getOauthAuthorizeHandoffDenyMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext> => {
-
-const mutationKey = ['oauthAuthorizeHandoffDeny'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, {data: BodyType<OauthAuthorizeHandoffDenyBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthAuthorizeHandoffDeny(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthAuthorizeHandoffDenyMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>>
-    export type OauthAuthorizeHandoffDenyMutationBody = BodyType<OauthAuthorizeHandoffDenyBody>
-    export type OauthAuthorizeHandoffDenyMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Deny OAuth authorization handoff
- */
-export const useOauthAuthorizeHandoffDeny = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>, TError,{data: BodyType<OauthAuthorizeHandoffDenyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthAuthorizeHandoffDeny>>,
-        TError,
-        {data: BodyType<OauthAuthorizeHandoffDenyBody>},
-        TContext
-      > => {
-      return useMutation(getOauthAuthorizeHandoffDenyMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary Resolve OAuth authorization handoff
- */
-export type oauthAuthorizeHandoffResolveResponse200 = {
-  data: OAuthHandoffResolveSuccessResponse
-  status: 200
+    body: JSON.stringify(body),
+  })
 }
 
-export type oauthAuthorizeHandoffResolveResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthAuthorizeHandoffResolveResponse401 = {
-  data: OAuthErrorResponse
-  status: 401
-}
-
-export type oauthAuthorizeHandoffResolveResponse404 = {
-  data: OAuthErrorResponse
-  status: 404
-}
-
-export type oauthAuthorizeHandoffResolveResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthAuthorizeHandoffResolveResponseSuccess = (oauthAuthorizeHandoffResolveResponse200) & {
-  headers: Headers;
-};
-export type oauthAuthorizeHandoffResolveResponseError = (oauthAuthorizeHandoffResolveResponse400 | oauthAuthorizeHandoffResolveResponse401 | oauthAuthorizeHandoffResolveResponse404 | oauthAuthorizeHandoffResolveResponse500) & {
-  headers: Headers;
-};
-
-export type oauthAuthorizeHandoffResolveResponse = (oauthAuthorizeHandoffResolveResponseSuccess | oauthAuthorizeHandoffResolveResponseError)
-
-export const getOauthAuthorizeHandoffResolveUrl = () => {
-
-
-
-
-  return `/oauth/authorize/handoff/resolve`
-}
-
-export const oauthAuthorizeHandoffResolve = async (oauthAuthorizeHandoffResolveBody: OauthAuthorizeHandoffResolveBody, options?: RequestInit): Promise<oauthAuthorizeHandoffResolveResponse> => {
-
-  return customInstance<oauthAuthorizeHandoffResolveResponse>(getOauthAuthorizeHandoffResolveUrl(),
-  {
+export const oauthAuthorizeHandoffDeny = async (body: OAuthHandoffDecisionBody, options?: RequestInit): Promise<OAuthHandoffDenyResult> => {
+  return customInstance<OAuthHandoffDenyResult>('/oauth/authorize/handoff/deny', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      oauthAuthorizeHandoffResolveBody,)
-  }
-);}
-
-
-
-
-export const getOauthAuthorizeHandoffResolveMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext> => {
-
-const mutationKey = ['oauthAuthorizeHandoffResolve'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, {data: BodyType<OauthAuthorizeHandoffResolveBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthAuthorizeHandoffResolve(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthAuthorizeHandoffResolveMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>>
-    export type OauthAuthorizeHandoffResolveMutationBody = BodyType<OauthAuthorizeHandoffResolveBody>
-    export type OauthAuthorizeHandoffResolveMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Resolve OAuth authorization handoff
- */
-export const useOauthAuthorizeHandoffResolve = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>, TError,{data: BodyType<OauthAuthorizeHandoffResolveBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthAuthorizeHandoffResolve>>,
-        TError,
-        {data: BodyType<OauthAuthorizeHandoffResolveBody>},
-        TContext
-      > => {
-      return useMutation(getOauthAuthorizeHandoffResolveMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary Create OAuth device authorization request
- */
-export type oauthDeviceAuthorizationCreateResponse200 = {
-  data: OAuthDeviceAuthorizationSuccessResponse
-  status: 200
+    body: JSON.stringify(body),
+  })
 }
-
-export type oauthDeviceAuthorizationCreateResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthDeviceAuthorizationCreateResponse401 = {
-  data: OAuthErrorResponse
-  status: 401
-}
-
-export type oauthDeviceAuthorizationCreateResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthDeviceAuthorizationCreateResponseSuccess = (oauthDeviceAuthorizationCreateResponse200) & {
-  headers: Headers;
-};
-export type oauthDeviceAuthorizationCreateResponseError = (oauthDeviceAuthorizationCreateResponse400 | oauthDeviceAuthorizationCreateResponse401 | oauthDeviceAuthorizationCreateResponse500) & {
-  headers: Headers;
-};
-
-export type oauthDeviceAuthorizationCreateResponse = (oauthDeviceAuthorizationCreateResponseSuccess | oauthDeviceAuthorizationCreateResponseError)
-
-export const getOauthDeviceAuthorizationCreateUrl = () => {
-
-
-
-
-  return `/oauth/device_authorization`
-}
-
-export const oauthDeviceAuthorizationCreate = async (oauthDeviceAuthorizationCreateBody: OauthDeviceAuthorizationCreateBody, options?: RequestInit): Promise<oauthDeviceAuthorizationCreateResponse> => {
-    const formUrlEncoded = new URLSearchParams();
-formUrlEncoded.append(`client_id`, oauthDeviceAuthorizationCreateBody.client_id);
-if(oauthDeviceAuthorizationCreateBody.client_secret !== undefined) {
- formUrlEncoded.append(`client_secret`, oauthDeviceAuthorizationCreateBody.client_secret);
- }
-if(oauthDeviceAuthorizationCreateBody.resource !== undefined) {
- formUrlEncoded.append(`resource`, oauthDeviceAuthorizationCreateBody.resource);
- }
-if(oauthDeviceAuthorizationCreateBody.scope !== undefined) {
- formUrlEncoded.append(`scope`, oauthDeviceAuthorizationCreateBody.scope);
- }
-
-  return customInstance<oauthDeviceAuthorizationCreateResponse>(getOauthDeviceAuthorizationCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
-    body:
-      formUrlEncoded,
-  }
-);}
-
-
-
-
-export const getOauthDeviceAuthorizationCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext> => {
-
-const mutationKey = ['oauthDeviceAuthorizationCreate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, {data: BodyType<OauthDeviceAuthorizationCreateBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthDeviceAuthorizationCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthDeviceAuthorizationCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>>
-    export type OauthDeviceAuthorizationCreateMutationBody = BodyType<OauthDeviceAuthorizationCreateBody>
-    export type OauthDeviceAuthorizationCreateMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Create OAuth device authorization request
- */
-export const useOauthDeviceAuthorizationCreate = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>, TError,{data: BodyType<OauthDeviceAuthorizationCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthDeviceAuthorizationCreate>>,
-        TError,
-        {data: BodyType<OauthDeviceAuthorizationCreateBody>},
-        TContext
-      > => {
-      return useMutation(getOauthDeviceAuthorizationCreateMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary Get JSON Web Key Set
- */
-export type oauthJwksGetResponse200 = {
-  data: OAuthJWKSResponse
-  status: 200
-}
-
-export type oauthJwksGetResponseSuccess = (oauthJwksGetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type oauthJwksGetResponse = (oauthJwksGetResponseSuccess)
-
-export const getOauthJwksGetUrl = () => {
-
-
-
-
-  return `/oauth/jwks`
-}
-
-export const oauthJwksGet = async ( options?: RequestInit): Promise<oauthJwksGetResponse> => {
-
-  return customInstance<oauthJwksGetResponse>(getOauthJwksGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getOauthJwksGetQueryKey = () => {
-    return [
-    `/oauth/jwks`
-    ] as const;
-    }
-
-
-export const getOauthJwksGetQueryOptions = <TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getOauthJwksGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthJwksGet>>> = ({ signal }) => oauthJwksGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type OauthJwksGetQueryResult = NonNullable<Awaited<ReturnType<typeof oauthJwksGet>>>
-export type OauthJwksGetQueryError = ErrorType<unknown>
-
-
-export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthJwksGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthJwksGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof oauthJwksGet>>,
-          TError,
-          Awaited<ReturnType<typeof oauthJwksGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get JSON Web Key Set
- */
-
-export function useOauthJwksGet<TData = Awaited<ReturnType<typeof oauthJwksGet>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof oauthJwksGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getOauthJwksGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Registers an external OAuth client for authorization code + PKCE flows.
- * @summary Register OAuth client dynamically
- */
-export type oauthClientRegisterCreateResponse201 = {
-  data: OAuthClientRegistrationSuccessResponse
-  status: 201
-}
-
-export type oauthClientRegisterCreateResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthClientRegisterCreateResponse403 = {
-  data: OAuthErrorResponse
-  status: 403
-}
-
-export type oauthClientRegisterCreateResponse429 = {
-  data: OAuthErrorResponse
-  status: 429
-}
-
-export type oauthClientRegisterCreateResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthClientRegisterCreateResponseSuccess = (oauthClientRegisterCreateResponse201) & {
-  headers: Headers;
-};
-export type oauthClientRegisterCreateResponseError = (oauthClientRegisterCreateResponse400 | oauthClientRegisterCreateResponse403 | oauthClientRegisterCreateResponse429 | oauthClientRegisterCreateResponse500) & {
-  headers: Headers;
-};
-
-export type oauthClientRegisterCreateResponse = (oauthClientRegisterCreateResponseSuccess | oauthClientRegisterCreateResponseError)
-
-export const getOauthClientRegisterCreateUrl = () => {
-
-
-
-
-  return `/oauth/register`
-}
-
-export const oauthClientRegisterCreate = async (oauthClientRegisterCreateBody: OauthClientRegisterCreateBody, options?: RequestInit): Promise<oauthClientRegisterCreateResponse> => {
-
-  return customInstance<oauthClientRegisterCreateResponse>(getOauthClientRegisterCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      oauthClientRegisterCreateBody,)
-  }
-);}
-
-
-
-
-export const getOauthClientRegisterCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext> => {
-
-const mutationKey = ['oauthClientRegisterCreate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, {data: BodyType<OauthClientRegisterCreateBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthClientRegisterCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthClientRegisterCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthClientRegisterCreate>>>
-    export type OauthClientRegisterCreateMutationBody = BodyType<OauthClientRegisterCreateBody>
-    export type OauthClientRegisterCreateMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Register OAuth client dynamically
- */
-export const useOauthClientRegisterCreate = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthClientRegisterCreate>>, TError,{data: BodyType<OauthClientRegisterCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthClientRegisterCreate>>,
-        TError,
-        {data: BodyType<OauthClientRegisterCreateBody>},
-        TContext
-      > => {
-      return useMutation(getOauthClientRegisterCreateMutationOptions(options), queryClient);
-    }
-
-/**
- * Revokes a refresh token. Access tokens (JWTs) cannot be revoked server-side and expire naturally. Returns 200 OK even if the token is already invalid.
- * @summary Revoke an OAuth token (RFC 7009)
- */
-export type oauthRevokeCreateResponse200 = {
-  data: void
-  status: 200
-}
-
-export type oauthRevokeCreateResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthRevokeCreateResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthRevokeCreateResponseSuccess = (oauthRevokeCreateResponse200) & {
-  headers: Headers;
-};
-export type oauthRevokeCreateResponseError = (oauthRevokeCreateResponse400 | oauthRevokeCreateResponse500) & {
-  headers: Headers;
-};
-
-export type oauthRevokeCreateResponse = (oauthRevokeCreateResponseSuccess | oauthRevokeCreateResponseError)
-
-export const getOauthRevokeCreateUrl = () => {
-
-
-
-
-  return `/oauth/revoke`
-}
-
-export const oauthRevokeCreate = async (oauthRevokeCreateBody: OauthRevokeCreateBody, options?: RequestInit): Promise<oauthRevokeCreateResponse> => {
-    const formUrlEncoded = new URLSearchParams();
-formUrlEncoded.append(`token`, oauthRevokeCreateBody.token);
-if(oauthRevokeCreateBody.token_type_hint !== undefined) {
- formUrlEncoded.append(`token_type_hint`, oauthRevokeCreateBody.token_type_hint);
- }
-
-  return customInstance<oauthRevokeCreateResponse>(getOauthRevokeCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
-    body:
-      formUrlEncoded,
-  }
-);}
-
-
-
-
-export const getOauthRevokeCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext> => {
-
-const mutationKey = ['oauthRevokeCreate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthRevokeCreate>>, {data: BodyType<OauthRevokeCreateBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthRevokeCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthRevokeCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthRevokeCreate>>>
-    export type OauthRevokeCreateMutationBody = BodyType<OauthRevokeCreateBody>
-    export type OauthRevokeCreateMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Revoke an OAuth token (RFC 7009)
- */
-export const useOauthRevokeCreate = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevokeCreate>>, TError,{data: BodyType<OauthRevokeCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthRevokeCreate>>,
-        TError,
-        {data: BodyType<OauthRevokeCreateBody>},
-        TContext
-      > => {
-      return useMutation(getOauthRevokeCreateMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary Exchange OAuth token grants
- */
-export type oauthTokenCreateResponse200 = {
-  data: OAuthTokenSuccessResponse
-  status: 200
-}
-
-export type oauthTokenCreateResponse400 = {
-  data: OAuthErrorResponse
-  status: 400
-}
-
-export type oauthTokenCreateResponse401 = {
-  data: OAuthErrorResponse
-  status: 401
-}
-
-export type oauthTokenCreateResponse500 = {
-  data: OAuthErrorResponse
-  status: 500
-}
-
-export type oauthTokenCreateResponseSuccess = (oauthTokenCreateResponse200) & {
-  headers: Headers;
-};
-export type oauthTokenCreateResponseError = (oauthTokenCreateResponse400 | oauthTokenCreateResponse401 | oauthTokenCreateResponse500) & {
-  headers: Headers;
-};
-
-export type oauthTokenCreateResponse = (oauthTokenCreateResponseSuccess | oauthTokenCreateResponseError)
-
-export const getOauthTokenCreateUrl = () => {
-
-
-
-
-  return `/oauth/token`
-}
-
-export const oauthTokenCreate = async (oauthTokenCreateBody: OauthTokenCreateBody, options?: RequestInit): Promise<oauthTokenCreateResponse> => {
-    const formUrlEncoded = new URLSearchParams();
-if(oauthTokenCreateBody.client_id !== undefined) {
- formUrlEncoded.append(`client_id`, oauthTokenCreateBody.client_id);
- }
-if(oauthTokenCreateBody.client_secret !== undefined) {
- formUrlEncoded.append(`client_secret`, oauthTokenCreateBody.client_secret);
- }
-if(oauthTokenCreateBody.code !== undefined) {
- formUrlEncoded.append(`code`, oauthTokenCreateBody.code);
- }
-if(oauthTokenCreateBody.code_verifier !== undefined) {
- formUrlEncoded.append(`code_verifier`, oauthTokenCreateBody.code_verifier);
- }
-if(oauthTokenCreateBody.device_code !== undefined) {
- formUrlEncoded.append(`device_code`, oauthTokenCreateBody.device_code);
- }
-formUrlEncoded.append(`grant_type`, oauthTokenCreateBody.grant_type);
-if(oauthTokenCreateBody.redirect_uri !== undefined) {
- formUrlEncoded.append(`redirect_uri`, oauthTokenCreateBody.redirect_uri);
- }
-if(oauthTokenCreateBody.refresh_token !== undefined) {
- formUrlEncoded.append(`refresh_token`, oauthTokenCreateBody.refresh_token);
- }
-if(oauthTokenCreateBody.resource !== undefined) {
- formUrlEncoded.append(`resource`, oauthTokenCreateBody.resource);
- }
-if(oauthTokenCreateBody.scope !== undefined) {
- formUrlEncoded.append(`scope`, oauthTokenCreateBody.scope);
- }
-
-  return customInstance<oauthTokenCreateResponse>(getOauthTokenCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
-    body:
-      formUrlEncoded,
-  }
-);}
-
-
-
-
-export const getOauthTokenCreateMutationOptions = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext> => {
-
-const mutationKey = ['oauthTokenCreate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthTokenCreate>>, {data: BodyType<OauthTokenCreateBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  oauthTokenCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type OauthTokenCreateMutationResult = NonNullable<Awaited<ReturnType<typeof oauthTokenCreate>>>
-    export type OauthTokenCreateMutationBody = BodyType<OauthTokenCreateBody>
-    export type OauthTokenCreateMutationError = ErrorType<OAuthErrorResponse>
-
-    /**
- * @summary Exchange OAuth token grants
- */
-export const useOauthTokenCreate = <TError = ErrorType<OAuthErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthTokenCreate>>, TError,{data: BodyType<OauthTokenCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof oauthTokenCreate>>,
-        TError,
-        {data: BodyType<OauthTokenCreateBody>},
-        TContext
-      > => {
-      return useMutation(getOauthTokenCreateMutationOptions(options), queryClient);
-    }

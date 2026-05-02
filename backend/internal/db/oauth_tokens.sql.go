@@ -241,7 +241,22 @@ type CreateOAuthRefreshTokenParams struct {
 	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
 }
 
-func (q *Queries) CreateOAuthRefreshToken(ctx context.Context, arg CreateOAuthRefreshTokenParams) (OauthRefreshToken, error) {
+type CreateOAuthRefreshTokenRow struct {
+	OauthRefreshTokenID          uuid.UUID  `json:"oauth_refresh_token_id"`
+	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
+	OauthClientID                string     `json:"oauth_client_id"`
+	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
+	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
+	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
+	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
+	OauthRefreshTokenRevokedAt   *time.Time `json:"oauth_refresh_token_revoked_at"`
+	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
+	OauthRefreshTokenCreatedAt   time.Time  `json:"oauth_refresh_token_created_at"`
+	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
+}
+
+func (q *Queries) CreateOAuthRefreshToken(ctx context.Context, arg CreateOAuthRefreshTokenParams) (CreateOAuthRefreshTokenRow, error) {
 	row := q.db.QueryRow(ctx, createOAuthRefreshToken,
 		arg.OauthRefreshTokenTokenHash,
 		arg.OauthClientID,
@@ -252,7 +267,7 @@ func (q *Queries) CreateOAuthRefreshToken(ctx context.Context, arg CreateOAuthRe
 		arg.OauthRefreshTokenExpiresAt,
 		arg.OauthRefreshTokenRotatedFrom,
 	)
-	var i OauthRefreshToken
+	var i CreateOAuthRefreshTokenRow
 	err := row.Scan(
 		&i.OauthRefreshTokenID,
 		&i.OauthRefreshTokenTokenHash,
@@ -291,9 +306,24 @@ where
 for update
 `
 
-func (q *Queries) GetOAuthRefreshTokenByHashForUpdate(ctx context.Context, oauthRefreshTokenTokenHash string) (OauthRefreshToken, error) {
+type GetOAuthRefreshTokenByHashForUpdateRow struct {
+	OauthRefreshTokenID          uuid.UUID  `json:"oauth_refresh_token_id"`
+	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
+	OauthClientID                string     `json:"oauth_client_id"`
+	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
+	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
+	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
+	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
+	OauthRefreshTokenRevokedAt   *time.Time `json:"oauth_refresh_token_revoked_at"`
+	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
+	OauthRefreshTokenCreatedAt   time.Time  `json:"oauth_refresh_token_created_at"`
+	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
+}
+
+func (q *Queries) GetOAuthRefreshTokenByHashForUpdate(ctx context.Context, oauthRefreshTokenTokenHash string) (GetOAuthRefreshTokenByHashForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthRefreshTokenByHashForUpdate, oauthRefreshTokenTokenHash)
-	var i OauthRefreshToken
+	var i GetOAuthRefreshTokenByHashForUpdateRow
 	err := row.Scan(
 		&i.OauthRefreshTokenID,
 		&i.OauthRefreshTokenTokenHash,
@@ -444,9 +474,24 @@ returning
   oauth_refresh_token_updated_at
 `
 
-func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefreshTokenTokenHash string) (OauthRefreshToken, error) {
+type RevokeOAuthRefreshTokenByHashRow struct {
+	OauthRefreshTokenID          uuid.UUID  `json:"oauth_refresh_token_id"`
+	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
+	OauthClientID                string     `json:"oauth_client_id"`
+	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
+	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
+	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
+	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
+	OauthRefreshTokenRevokedAt   *time.Time `json:"oauth_refresh_token_revoked_at"`
+	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
+	OauthRefreshTokenCreatedAt   time.Time  `json:"oauth_refresh_token_created_at"`
+	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
+}
+
+func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefreshTokenTokenHash string) (RevokeOAuthRefreshTokenByHashRow, error) {
 	row := q.db.QueryRow(ctx, revokeOAuthRefreshTokenByHash, oauthRefreshTokenTokenHash)
-	var i OauthRefreshToken
+	var i RevokeOAuthRefreshTokenByHashRow
 	err := row.Scan(
 		&i.OauthRefreshTokenID,
 		&i.OauthRefreshTokenTokenHash,
@@ -494,9 +539,24 @@ type RevokeOAuthRefreshTokenByHashAndClientIDParams struct {
 	OauthClientID              string `json:"oauth_client_id"`
 }
 
-func (q *Queries) RevokeOAuthRefreshTokenByHashAndClientID(ctx context.Context, arg RevokeOAuthRefreshTokenByHashAndClientIDParams) (OauthRefreshToken, error) {
+type RevokeOAuthRefreshTokenByHashAndClientIDRow struct {
+	OauthRefreshTokenID          uuid.UUID  `json:"oauth_refresh_token_id"`
+	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
+	OauthClientID                string     `json:"oauth_client_id"`
+	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
+	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
+	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
+	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
+	OauthRefreshTokenRevokedAt   *time.Time `json:"oauth_refresh_token_revoked_at"`
+	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
+	OauthRefreshTokenCreatedAt   time.Time  `json:"oauth_refresh_token_created_at"`
+	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
+}
+
+func (q *Queries) RevokeOAuthRefreshTokenByHashAndClientID(ctx context.Context, arg RevokeOAuthRefreshTokenByHashAndClientIDParams) (RevokeOAuthRefreshTokenByHashAndClientIDRow, error) {
 	row := q.db.QueryRow(ctx, revokeOAuthRefreshTokenByHashAndClientID, arg.OauthRefreshTokenTokenHash, arg.OauthClientID)
-	var i OauthRefreshToken
+	var i RevokeOAuthRefreshTokenByHashAndClientIDRow
 	err := row.Scan(
 		&i.OauthRefreshTokenID,
 		&i.OauthRefreshTokenTokenHash,

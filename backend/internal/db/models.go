@@ -298,7 +298,6 @@ type OauthRefreshToken struct {
 	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
 	OauthClientID                string     `json:"oauth_client_id"`
 	UserUuid                     uuid.UUID  `json:"user_uuid"`
-	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
 	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
 	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
 	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
@@ -306,6 +305,7 @@ type OauthRefreshToken struct {
 	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
 	OauthRefreshTokenCreatedAt   time.Time  `json:"oauth_refresh_token_created_at"`
 	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
+	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
 }
 
 type PersonalAccessToken struct {
@@ -400,6 +400,110 @@ type PricesTransaction struct {
 	PricesTransactionUpdatedAt           time.Time  `json:"prices_transaction_updated_at"`
 	PricesTransactionCategory            string     `json:"prices_transaction_category"`
 	PricesNeighborhoodID                 *uuid.UUID `json:"prices_neighborhood_id"`
+	PricesTransactionPlotOwned           *bool      `json:"prices_transaction_plot_owned"`
+}
+
+type PropertyBuilding struct {
+	PropertyBuildingID                    uuid.UUID       `json:"property_building_id"`
+	PropertyBuildingIdentityKey           string          `json:"property_building_identity_key"`
+	PropertyBuildingPostalNorm            *string         `json:"property_building_postal_norm"`
+	PropertyBuildingCityNorm              *string         `json:"property_building_city_norm"`
+	PropertyBuildingAddressNorm           *string         `json:"property_building_address_norm"`
+	PropertyBuildingHousingCompany        *string         `json:"property_building_housing_company"`
+	PropertyBuildingBusinessID            *string         `json:"property_building_business_id"`
+	PropertyBuildingBuildYear             *int32          `json:"property_building_build_year"`
+	PropertyBuildingFloorCount            *int32          `json:"property_building_floor_count"`
+	PropertyBuildingApartmentCount        *int32          `json:"property_building_apartment_count"`
+	PropertyBuildingElevator              *bool           `json:"property_building_elevator"`
+	PropertyBuildingEnergyEfficiencyLabel *string         `json:"property_building_energy_efficiency_label"`
+	PropertyBuildingMatchReasons          json.RawMessage `json:"property_building_match_reasons"`
+	PropertyBuildingCreatedAt             time.Time       `json:"property_building_created_at"`
+	PropertyBuildingUpdatedAt             time.Time       `json:"property_building_updated_at"`
+	PropertyBuildingGeom                  interface{}     `json:"property_building_geom"`
+}
+
+type PropertyOffering struct {
+	PropertyOfferingID            uuid.UUID       `json:"property_offering_id"`
+	PropertyUnitID                uuid.UUID       `json:"property_unit_id"`
+	PropertyOfferingIdentityKey   string          `json:"property_offering_identity_key"`
+	PropertyOfferingType          string          `json:"property_offering_type"`
+	PropertyOfferingHeadline      string          `json:"property_offering_headline"`
+	PropertyOfferingAskingPrice   *int64          `json:"property_offering_asking_price"`
+	PropertyOfferingDebtFreePrice *int64          `json:"property_offering_debt_free_price"`
+	PropertyOfferingPricePerM2    *float64        `json:"property_offering_price_per_m2"`
+	PropertyOfferingFirstSeenAt   *time.Time      `json:"property_offering_first_seen_at"`
+	PropertyOfferingLastSeenAt    *time.Time      `json:"property_offering_last_seen_at"`
+	PropertyOfferingStatus        *string         `json:"property_offering_status"`
+	PrimarySaleListingID          *uuid.UUID      `json:"primary_sale_listing_id"`
+	PropertyOfferingMatchReasons  json.RawMessage `json:"property_offering_match_reasons"`
+	PropertyOfferingCreatedAt     time.Time       `json:"property_offering_created_at"`
+	PropertyOfferingUpdatedAt     time.Time       `json:"property_offering_updated_at"`
+}
+
+type PropertyOfferingSource struct {
+	PropertyOfferingSourceID          uuid.UUID       `json:"property_offering_source_id"`
+	PropertyOfferingID                uuid.UUID       `json:"property_offering_id"`
+	SaleListingID                     uuid.UUID       `json:"sale_listing_id"`
+	PropertyOfferingSourceLinkStatus  string          `json:"property_offering_source_link_status"`
+	PropertyOfferingSourceLinkMethod  string          `json:"property_offering_source_link_method"`
+	PropertyOfferingSourceLinkScore   int32           `json:"property_offering_source_link_score"`
+	PropertyOfferingSourceLinkReasons json.RawMessage `json:"property_offering_source_link_reasons"`
+	PropertyOfferingSourceCreatedAt   time.Time       `json:"property_offering_source_created_at"`
+	PropertyOfferingSourceUpdatedAt   time.Time       `json:"property_offering_source_updated_at"`
+}
+
+type PropertyOfferingSourceMatchCandidate struct {
+	PropertyOfferingSourceMatchCandidateID       uuid.UUID       `json:"property_offering_source_match_candidate_id"`
+	PropertyOfferingSourceMatchRunID             uuid.UUID       `json:"property_offering_source_match_run_id"`
+	SourceSaleListingID                          uuid.UUID       `json:"source_sale_listing_id"`
+	SourcePropertyOfferingID                     uuid.UUID       `json:"source_property_offering_id"`
+	TargetPropertyOfferingID                     uuid.UUID       `json:"target_property_offering_id"`
+	TargetSaleListingID                          uuid.UUID       `json:"target_sale_listing_id"`
+	PropertyOfferingSourceMatchScore             int32           `json:"property_offering_source_match_score"`
+	PropertyOfferingSourceMatchConfidence        string          `json:"property_offering_source_match_confidence"`
+	PropertyOfferingSourceMatchStatus            string          `json:"property_offering_source_match_status"`
+	PropertyOfferingSourceMatchReasons           json.RawMessage `json:"property_offering_source_match_reasons"`
+	PropertyOfferingSourceMatchPriceDeltaPercent *float64        `json:"property_offering_source_match_price_delta_percent"`
+	PropertyOfferingSourceMatchCreatedAt         time.Time       `json:"property_offering_source_match_created_at"`
+}
+
+type PropertyOfferingSourceMatchRun struct {
+	PropertyOfferingSourceMatchRunID            uuid.UUID  `json:"property_offering_source_match_run_id"`
+	PropertyOfferingSourceMatchRunMode          string     `json:"property_offering_source_match_run_mode"`
+	PropertyOfferingSourceMatchScoreThreshold   int32      `json:"property_offering_source_match_score_threshold"`
+	PropertyOfferingSourceMatchCompetitorMargin int32      `json:"property_offering_source_match_competitor_margin"`
+	PropertyOfferingSourceMatchCandidatesCount  int32      `json:"property_offering_source_match_candidates_count"`
+	PropertyOfferingSourceMatchAutoLinkedCount  int32      `json:"property_offering_source_match_auto_linked_count"`
+	PropertyOfferingSourceMatchAmbiguousCount   int32      `json:"property_offering_source_match_ambiguous_count"`
+	PropertyOfferingSourceMatchStartedAt        time.Time  `json:"property_offering_source_match_started_at"`
+	PropertyOfferingSourceMatchFinishedAt       *time.Time `json:"property_offering_source_match_finished_at"`
+}
+
+type PropertyOfferingTransaction struct {
+	PropertyOfferingTransactionID          uuid.UUID       `json:"property_offering_transaction_id"`
+	PropertyOfferingID                     uuid.UUID       `json:"property_offering_id"`
+	PricesTransactionID                    uuid.UUID       `json:"prices_transaction_id"`
+	PropertyOfferingTransactionLinkStatus  string          `json:"property_offering_transaction_link_status"`
+	PropertyOfferingTransactionLinkMethod  string          `json:"property_offering_transaction_link_method"`
+	PropertyOfferingTransactionLinkScore   int32           `json:"property_offering_transaction_link_score"`
+	PropertyOfferingTransactionLinkReasons json.RawMessage `json:"property_offering_transaction_link_reasons"`
+	PropertyOfferingTransactionCreatedAt   time.Time       `json:"property_offering_transaction_created_at"`
+	PropertyOfferingTransactionUpdatedAt   time.Time       `json:"property_offering_transaction_updated_at"`
+}
+
+type PropertyUnit struct {
+	PropertyUnitID             uuid.UUID       `json:"property_unit_id"`
+	PropertyBuildingID         uuid.UUID       `json:"property_building_id"`
+	PropertyUnitIdentityKey    string          `json:"property_unit_identity_key"`
+	PropertyUnitAddressNorm    *string         `json:"property_unit_address_norm"`
+	PropertyUnitFloorLevel     *int32          `json:"property_unit_floor_level"`
+	PropertyUnitAreaValue      *float64        `json:"property_unit_area_value"`
+	PropertyUnitRoomsCount     *int32          `json:"property_unit_rooms_count"`
+	PropertyUnitRoomLayout     *string         `json:"property_unit_room_layout"`
+	PropertyUnitLayoutMatchKey *string         `json:"property_unit_layout_match_key"`
+	PropertyUnitMatchReasons   json.RawMessage `json:"property_unit_match_reasons"`
+	PropertyUnitCreatedAt      time.Time       `json:"property_unit_created_at"`
+	PropertyUnitUpdatedAt      time.Time       `json:"property_unit_updated_at"`
 }
 
 type Role struct {
@@ -490,6 +594,12 @@ type SaleListing struct {
 	SaleListingPricesMatchAttemptCount      int32           `json:"sale_listing_prices_match_attempt_count"`
 	SaleListingPricesMatchExpiresAt         *time.Time      `json:"sale_listing_prices_match_expires_at"`
 	SaleListingPricesMatchRunID             *uuid.UUID      `json:"sale_listing_prices_match_run_id"`
+	SaleListingPlotOwned                    *bool           `json:"sale_listing_plot_owned"`
+	SaleListingSourceMatchStatus            *string         `json:"sale_listing_source_match_status"`
+	SaleListingSourceMatchNextAttemptAt     *time.Time      `json:"sale_listing_source_match_next_attempt_at"`
+	SaleListingSourceMatchLastAttemptedAt   *time.Time      `json:"sale_listing_source_match_last_attempted_at"`
+	SaleListingSourceMatchAttemptCount      int32           `json:"sale_listing_source_match_attempt_count"`
+	SaleListingSourceMatchRunID             *uuid.UUID      `json:"sale_listing_source_match_run_id"`
 }
 
 type SaleListingPlotTypeAlias struct {

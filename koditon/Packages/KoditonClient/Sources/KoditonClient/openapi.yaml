@@ -1,479 +1,4 @@
 components:
-  examples:
-    OAuthClientRegistrationRequestDefault:
-      value:
-        client_name: ChatGPT MCP Client
-        logo_uri: https://chatgpt.com/favicon.ico
-        redirect_uris:
-          - https://chat.openai.com/aip/callback
-        scope: mcp:core:read
-        token_endpoint_auth_method: none
-    OAuthDeviceAuthorizationRequestDefault:
-      value:
-        client_id: koditon-cli
-        scope: mcp:core:read
-    OAuthRevokeRequestDefault:
-      value:
-        token: refresh-token-value
-        token_type_hint: refresh_token
-    OAuthTokenRequestAuthorizationCode:
-      value:
-        client_id: koditon-apple
-        code: auth-code-value
-        code_verifier: pkce-verifier
-        grant_type: authorization_code
-        redirect_uri: koditon://oauth/callback
-    OAuthTokenRequestDeviceCode:
-      value:
-        client_id: koditon-cli
-        device_code: device-code-value
-        grant_type: urn:ietf:params:oauth:grant-type:device_code
-    OAuthTokenRequestRefreshToken:
-      value:
-        client_id: koditon-apple
-        grant_type: refresh_token
-        refresh_token: refresh-token-value
-  requestBodies:
-    OAuthClientRegistrationRequest:
-      content:
-        application/json:
-          examples:
-            default:
-              $ref: "#/components/examples/OAuthClientRegistrationRequestDefault"
-          schema:
-            properties:
-              client_name:
-                type: string
-              logo_uri:
-                format: uri
-                type: string
-              redirect_uris:
-                items:
-                  type: string
-                type: array
-              scope:
-                type: string
-              token_endpoint_auth_method:
-                enum:
-                  - none
-                type: string
-            required:
-              - redirect_uris
-            type: object
-      required: true
-    OAuthDeviceAuthorizationRequest:
-      content:
-        application/x-www-form-urlencoded:
-          examples:
-            device_authorization_default:
-              $ref: "#/components/examples/OAuthDeviceAuthorizationRequestDefault"
-          schema:
-            properties:
-              client_id:
-                description: OAuth client ID.
-                type: string
-              client_secret:
-                description: OAuth client secret for confidential clients.
-                type: string
-              resource:
-                description: Protected resource identifier from discovery metadata.
-                type: string
-              scope:
-                description: Requested scopes separated by spaces.
-                type: string
-            required:
-              - client_id
-            type: object
-      required: true
-    OAuthHandoffDecisionRequest:
-      content:
-        application/json:
-          schema:
-            properties:
-              handoff_id:
-                description: Authorization handoff identifier.
-                format: uuid
-                type: string
-            required:
-              - handoff_id
-            type: object
-      required: true
-    OAuthHandoffResolveRequest:
-      content:
-        application/json:
-          schema:
-            properties:
-              handoff_token:
-                description: Authorization handoff token from the browser or app link.
-                type: string
-              user_code:
-                description: User-entered handoff code.
-                type: string
-            type: object
-      required: true
-    OAuthRevokeRequest:
-      content:
-        application/x-www-form-urlencoded:
-          examples:
-            default:
-              $ref: "#/components/examples/OAuthRevokeRequestDefault"
-          schema:
-            properties:
-              token:
-                description: The token to revoke.
-                type: string
-              token_type_hint:
-                description: "Optional hint: 'refresh_token' or 'access_token'."
-                type: string
-            required:
-              - token
-            type: object
-      required: true
-    OAuthTokenRequest:
-      content:
-        application/x-www-form-urlencoded:
-          examples:
-            authorization_code:
-              $ref: "#/components/examples/OAuthTokenRequestAuthorizationCode"
-            device_code:
-              $ref: "#/components/examples/OAuthTokenRequestDeviceCode"
-            refresh_token:
-              $ref: "#/components/examples/OAuthTokenRequestRefreshToken"
-          schema:
-            properties:
-              client_id:
-                description: OAuth client ID.
-                type: string
-              client_secret:
-                description: OAuth client secret for confidential clients.
-                type: string
-              code:
-                description: Authorization code.
-                type: string
-              code_verifier:
-                description: PKCE verifier.
-                type: string
-              device_code:
-                description: Device code.
-                type: string
-              grant_type:
-                enum:
-                  - authorization_code
-                  - refresh_token
-                  - urn:ietf:params:oauth:grant-type:device_code
-                type: string
-              redirect_uri:
-                description: Redirect URI matching authorization request.
-                type: string
-              refresh_token:
-                description: Refresh token.
-                type: string
-              resource:
-                description: Protected resource identifier from discovery metadata.
-                type: string
-              scope:
-                description: Requested scopes separated by spaces.
-                type: string
-            required:
-              - grant_type
-            type: object
-      required: true
-  responses:
-    OAuthAuthorizationServerMetadata:
-      content:
-        application/json:
-          schema:
-            properties:
-              authorization_endpoint:
-                description: Authorization endpoint URL.
-                type: string
-              code_challenge_methods_supported:
-                items:
-                  type: string
-                type: array
-              device_authorization_endpoint:
-                description: Device authorization endpoint URL.
-                type: string
-              grant_types_supported:
-                items:
-                  type: string
-                type: array
-              issuer:
-                description: Authorization server issuer.
-                type: string
-              jwks_uri:
-                description: JWKS endpoint URL.
-                type: string
-              registration_endpoint:
-                description: Dynamic client registration endpoint URL.
-                type: string
-              response_types_supported:
-                items:
-                  type: string
-                type: array
-              revocation_endpoint:
-                description: Token revocation endpoint URL (RFC 7009).
-                type: string
-              scopes_supported:
-                items:
-                  type: string
-                type: array
-              token_endpoint:
-                description: Token endpoint URL.
-                type: string
-              token_endpoint_auth_methods_supported:
-                items:
-                  type: string
-                type: array
-            required:
-              - issuer
-              - authorization_endpoint
-              - token_endpoint
-              - device_authorization_endpoint
-              - jwks_uri
-              - scopes_supported
-              - response_types_supported
-              - grant_types_supported
-              - token_endpoint_auth_methods_supported
-              - code_challenge_methods_supported
-            type: object
-      description: OAuth authorization server metadata.
-    OAuthClientRegistrationSuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              client_id:
-                type: string
-              client_id_issued_at:
-                format: int64
-                type: integer
-              client_name:
-                type: string
-              grant_types:
-                items:
-                  type: string
-                type: array
-              logo_uri:
-                format: uri
-                type: string
-              redirect_uris:
-                items:
-                  type: string
-                type: array
-              response_types:
-                items:
-                  type: string
-                type: array
-              scope:
-                type: string
-              token_endpoint_auth_method:
-                type: string
-            required:
-              - client_id
-              - client_id_issued_at
-              - redirect_uris
-              - token_endpoint_auth_method
-              - grant_types
-              - response_types
-              - scope
-            type: object
-      description: OAuth dynamic client registration response.
-    OAuthDeviceAuthorizationSuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              device_code:
-                description: Device code for token polling.
-                type: string
-              expires_in:
-                description: Expiration in seconds.
-                format: int64
-                type: integer
-              interval:
-                description: Recommended polling interval in seconds.
-                format: int64
-                type: integer
-              user_code:
-                description: User-entered verification code.
-                type: string
-              verification_uri:
-                description: Verification URL for user interaction.
-                type: string
-              verification_uri_complete:
-                description: Verification URL with user code prefilled.
-                type: string
-            required:
-              - device_code
-              - user_code
-              - verification_uri
-              - verification_uri_complete
-              - expires_in
-              - interval
-            type: object
-      description: OAuth device authorization response.
-    OAuthError:
-      content:
-        application/json:
-          schema:
-            properties:
-              error:
-                description: OAuth error code.
-                type: string
-              error_code:
-                description: Optional app-specific error code.
-                type: string
-              error_description:
-                description: Human-readable OAuth error description.
-                type: string
-            required:
-              - error
-              - error_description
-            type: object
-      description: OAuth error response.
-    OAuthHandoffApproveSuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              ok:
-                type: boolean
-              redirect_url:
-                description: OAuth redirect URL with the generated authorization code.
-                type: string
-            required:
-              - ok
-              - redirect_url
-            type: object
-      description: OAuth authorization handoff approval response.
-    OAuthHandoffDenySuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              ok:
-                type: boolean
-            required:
-              - ok
-            type: object
-      description: OAuth authorization handoff denial response.
-    OAuthHandoffResolveSuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              client_display_name:
-                description: Display name for the OAuth client.
-                type: string
-              client_id:
-                description: OAuth client ID.
-                type: string
-              expires_at_unix:
-                format: int64
-                type: integer
-              handoff_id:
-                format: uuid
-                type: string
-              redirect_host:
-                description: Redirect URI host.
-                type: string
-              scopes:
-                items:
-                  type: string
-                type: array
-            required:
-              - handoff_id
-              - client_id
-              - client_display_name
-              - redirect_host
-              - scopes
-              - expires_at_unix
-            type: object
-      description: OAuth authorization handoff response.
-    OAuthJWKS:
-      content:
-        application/json:
-          schema:
-            properties:
-              keys:
-                items:
-                  additionalProperties: true
-                  type: object
-                type: array
-            required:
-              - keys
-            type: object
-      description: OAuth JWKS response.
-    OAuthProtectedResourceMetadata:
-      content:
-        application/json:
-          schema:
-            properties:
-              authorization_servers:
-                items:
-                  type: string
-                type: array
-              bearer_methods_supported:
-                items:
-                  type: string
-                type: array
-              resource:
-                description: Protected resource identifier.
-                type: string
-              resource_name:
-                description: Display name for the protected resource.
-                type: string
-              scopes_supported:
-                items:
-                  type: string
-                type: array
-            required:
-              - resource
-              - authorization_servers
-              - scopes_supported
-              - bearer_methods_supported
-              - resource_name
-            type: object
-      description: OAuth protected resource metadata.
-    OAuthTokenSuccess:
-      content:
-        application/json:
-          schema:
-            properties:
-              access_token:
-                description: Bearer access token.
-                type: string
-              expires_in:
-                description: Access token expiration in seconds.
-                format: int64
-                type: integer
-              refresh_token:
-                description: Refresh token.
-                type: string
-              refresh_token_expires_in:
-                description: Refresh token expiration in seconds.
-                format: int64
-                type: integer
-              scope:
-                description: Granted scopes separated by spaces.
-                type: string
-              session_id:
-                description: Associated device session identifier when available.
-                format: uuid
-                type: string
-              token_type:
-                description: Token type.
-                type: string
-            required:
-              - token_type
-              - access_token
-              - expires_in
-              - refresh_token
-              - refresh_token_expires_in
-              - scope
-            type: object
-      description: OAuth token response.
   schemas:
     AppleWebAuthInputBody:
       additionalProperties: false
@@ -490,13 +15,13 @@ components:
       required:
         - code
       type: object
-    AppleWebAuthOutputBody:
+    AuthTokenBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/AppleWebAuthOutputBody.json
+            - https://example.com/schemas/AuthTokenBody.json
           format: uri
           readOnly: true
           type: string
@@ -515,8 +40,6 @@ components:
       required:
         - access_token
         - access_token_expires_at
-        - refresh_token
-        - refresh_token_expires_at
         - user_id
       type: object
     AvailableCategoriesOutputBody:
@@ -815,6 +338,23 @@ components:
         - kind
         - native_id
       type: object
+    CanonicalOffering:
+      additionalProperties: false
+      properties:
+        building_id:
+          type: string
+        offering_id:
+          type: string
+        primary_source_listing_id:
+          type: string
+        source_count:
+          format: int32
+          type: integer
+        unit_id:
+          type: string
+      required:
+        - offering_id
+      type: object
     Charges:
       additionalProperties: false
       properties:
@@ -949,259 +489,6 @@ components:
         unpublished_at:
           format: date-time
           type: string
-      type: object
-    PriceTransactionMatch:
-      additionalProperties: false
-      properties:
-        area_m2:
-          format: double
-          type: number
-        build_year:
-          format: int32
-          type: integer
-        condition:
-          type: string
-        description:
-          type: string
-        elevator:
-          type: boolean
-        energy_class:
-          type: string
-        floor:
-          type: string
-        id:
-          type: string
-        match_confidence:
-          type: string
-        match_score:
-          format: int32
-          type: integer
-        match_status:
-          type: string
-        period_identifier:
-          type: string
-        plot:
-          type: string
-        price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: int64
-          type: integer
-        type:
-          type: string
-      required:
-        - id
-      type: object
-    TransactionMatchCandidate:
-      additionalProperties: false
-      properties:
-        confidence:
-          type: string
-        created_at:
-          type: string
-        id:
-          type: string
-        listing:
-          $ref: "#/components/schemas/TransactionMatchListingCandidate"
-        price_delta_percent:
-          format: double
-          type: number
-        reasons:
-          additionalProperties: true
-          type: object
-        score:
-          format: int32
-          type: integer
-        status:
-          type: string
-        transaction:
-          $ref: "#/components/schemas/TransactionMatchTransaction"
-      required:
-        - id
-        - status
-        - score
-        - confidence
-        - listing
-        - transaction
-      type: object
-    TransactionMatchCandidatesOutputBody:
-      additionalProperties: false
-      properties:
-        candidates:
-          items:
-            $ref: "#/components/schemas/TransactionMatchCandidate"
-          type:
-            - array
-            - "null"
-      required:
-        - candidates
-      type: object
-    TransactionMatchListingCandidate:
-      additionalProperties: false
-      properties:
-        area_m2:
-          format: double
-          type: number
-        asking_price:
-          format: int64
-          type: integer
-        build_year:
-          format: int32
-          type: integer
-        canonical_id:
-          type: string
-        city:
-          type: string
-        condition:
-          type: string
-        condition_match_code:
-          type: string
-        elevator:
-          type: boolean
-        energy_label:
-          type: string
-        energy_match_code:
-          type: string
-        floor_level:
-          format: int32
-          type: integer
-        first_seen_at:
-          type: string
-        headline:
-          type: string
-        id:
-          type: string
-        last_seen_at:
-          type: string
-        plot_owned:
-          type: boolean
-        plot_ownership_raw:
-          type: string
-        postal:
-          type: string
-        price_per_m2:
-          format: double
-          type: number
-        room_layout:
-          type: string
-        source_provider:
-          type: string
-        street_address:
-          type: string
-        total_floors:
-          format: int32
-          type: integer
-        url:
-          type: string
-      required:
-        - id
-        - canonical_id
-        - source_provider
-      type: object
-    TransactionMatchPostalSummary:
-      additionalProperties: false
-      properties:
-        ambiguous_count:
-          format: int64
-          type: integer
-        candidate_count:
-          format: int64
-          type: integer
-        high_count:
-          format: int64
-          type: integer
-        latest_at:
-          type: string
-        listing_count:
-          format: int64
-          type: integer
-        low_count:
-          format: int64
-          type: integer
-        medium_count:
-          format: int64
-          type: integer
-        municipality_name:
-          type: string
-        name_fi:
-          type: string
-        postal:
-          type: string
-        transaction_count:
-          format: int64
-          type: integer
-      required:
-        - postal
-        - candidate_count
-        - listing_count
-        - transaction_count
-        - high_count
-        - medium_count
-        - low_count
-        - ambiguous_count
-      type: object
-    TransactionMatchPostalsOutputBody:
-      additionalProperties: false
-      properties:
-        postals:
-          items:
-            $ref: "#/components/schemas/TransactionMatchPostalSummary"
-          type:
-            - array
-            - "null"
-      required:
-        - postals
-      type: object
-    TransactionMatchTransaction:
-      additionalProperties: false
-      properties:
-        area_m2:
-          format: double
-          type: number
-        build_year:
-          format: int32
-          type: integer
-        category:
-          type: string
-        condition:
-          type: string
-        condition_match_code:
-          type: string
-        created_at:
-          type: string
-        description:
-          type: string
-        elevator:
-          type: boolean
-        energy_class:
-          type: string
-        energy_match_code:
-          type: string
-        floor:
-          type: string
-        id:
-          type: string
-        period_identifier:
-          type: string
-        plot:
-          type: string
-        plot_owned:
-          type: boolean
-        price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: int64
-          type: integer
-        type:
-          type: string
-      required:
-        - id
-        - area_m2
-        - price
-        - price_per_m2
-        - elevator
       type: object
     Contact:
       additionalProperties: false
@@ -1591,6 +878,48 @@ components:
         main_image:
           $ref: "#/components/schemas/Image"
       type: object
+    OfferingSourceRecord:
+      additionalProperties: false
+      properties:
+        canonical_id:
+          type: string
+        first_seen_at:
+          format: date-time
+          type: string
+        headline:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        last_seen_at:
+          format: date-time
+          type: string
+        link_method:
+          type: string
+        link_score:
+          format: int32
+          type: integer
+        link_status:
+          type: string
+        native_id:
+          type: string
+        provider:
+          type: string
+        public_id:
+          type: string
+        url:
+          type: string
+      required:
+        - id
+        - provider
+        - kind
+        - canonical_id
+        - native_id
+        - link_status
+        - link_method
+        - link_score
+      type: object
     PageRentalSummary:
       additionalProperties: false
       properties:
@@ -1687,35 +1016,6 @@ components:
       required:
         - challenge_id
         - options
-      type: object
-    PasskeyAuthOutputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/PasskeyAuthOutputBody.json
-          format: uri
-          readOnly: true
-          type: string
-        access_token:
-          type: string
-        access_token_expires_at:
-          format: int64
-          type: integer
-        refresh_token:
-          type: string
-        refresh_token_expires_at:
-          format: int64
-          type: integer
-        user_id:
-          type: string
-      required:
-        - access_token
-        - access_token_expires_at
-        - refresh_token
-        - refresh_token_expires_at
-        - user_id
       type: object
     PasskeyRegisterFinishInputBody:
       additionalProperties: false
@@ -1856,6 +1156,49 @@ components:
         - id
         - code
         - name_fi
+      type: object
+    PriceTransactionMatch:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        build_year:
+          format: int32
+          type: integer
+        condition:
+          type: string
+        description:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        floor:
+          type: string
+        id:
+          type: string
+        match_confidence:
+          type: string
+        match_score:
+          format: int32
+          type: integer
+        match_status:
+          type: string
+        period_identifier:
+          type: string
+        plot:
+          type: string
+        price:
+          format: int64
+          type: integer
+        price_per_m2:
+          format: int64
+          type: integer
+        type:
+          type: string
+      required:
+        - id
       type: object
     PricesTransaction:
       additionalProperties: false
@@ -2106,6 +1449,8 @@ components:
           type: string
         building:
           $ref: "#/components/schemas/BuildingDetails"
+        canonical:
+          $ref: "#/components/schemas/CanonicalOffering"
         commercial:
           $ref: "#/components/schemas/CommercialDetails"
         contacts:
@@ -2138,12 +1483,19 @@ components:
           $ref: "#/components/schemas/SiteDetails"
         source:
           $ref: "#/components/schemas/ListingSource"
+        source_records:
+          items:
+            $ref: "#/components/schemas/OfferingSourceRecord"
+          type:
+            - array
+            - "null"
         texts:
           $ref: "#/components/schemas/TextSections"
         unit:
           $ref: "#/components/schemas/UnitDetails"
       required:
         - id
+        - canonical
         - source
         - headline
         - unit
@@ -2326,6 +1678,228 @@ components:
         transport:
           type: string
       type: object
+    TransactionMatchCandidate:
+      additionalProperties: false
+      properties:
+        confidence:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        listing:
+          $ref: "#/components/schemas/TransactionMatchListingCandidate"
+        price_delta_percent:
+          format: double
+          type: number
+        reasons: {}
+        score:
+          format: int32
+          type: integer
+        status:
+          type: string
+        transaction:
+          $ref: "#/components/schemas/TransactionMatchTransaction"
+      required:
+        - id
+        - status
+        - score
+        - confidence
+        - listing
+        - transaction
+      type: object
+    TransactionMatchCandidatesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/TransactionMatchCandidatesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        candidates:
+          items:
+            $ref: "#/components/schemas/TransactionMatchCandidate"
+          type:
+            - array
+            - "null"
+      required:
+        - candidates
+      type: object
+    TransactionMatchListingCandidate:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        asking_price:
+          format: int64
+          type: integer
+        build_year:
+          format: int32
+          type: integer
+        canonical_id:
+          type: string
+        city:
+          type: string
+        condition:
+          type: string
+        condition_match_code:
+          type: string
+        elevator:
+          type: boolean
+        energy_label:
+          type: string
+        energy_match_code:
+          type: string
+        first_seen_at:
+          type: string
+        floor_level:
+          format: int32
+          type: integer
+        headline:
+          type: string
+        id:
+          type: string
+        last_seen_at:
+          type: string
+        plot_owned:
+          type: boolean
+        plot_ownership_raw:
+          type: string
+        postal:
+          type: string
+        price_per_m2:
+          format: double
+          type: number
+        room_layout:
+          type: string
+        source_provider:
+          type: string
+        street_address:
+          type: string
+        total_floors:
+          format: int32
+          type: integer
+        url:
+          type: string
+      required:
+        - id
+        - canonical_id
+        - source_provider
+      type: object
+    TransactionMatchPostalSummary:
+      additionalProperties: false
+      properties:
+        ambiguous_count:
+          format: int64
+          type: integer
+        candidate_count:
+          format: int64
+          type: integer
+        high_count:
+          format: int64
+          type: integer
+        latest_at:
+          type: string
+        listing_count:
+          format: int64
+          type: integer
+        low_count:
+          format: int64
+          type: integer
+        medium_count:
+          format: int64
+          type: integer
+        municipality_name:
+          type: string
+        name_fi:
+          type: string
+        postal:
+          type: string
+        transaction_count:
+          format: int64
+          type: integer
+      required:
+        - postal
+        - candidate_count
+        - listing_count
+        - transaction_count
+        - high_count
+        - medium_count
+        - low_count
+        - ambiguous_count
+      type: object
+    TransactionMatchPostalsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/TransactionMatchPostalsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        postals:
+          items:
+            $ref: "#/components/schemas/TransactionMatchPostalSummary"
+          type:
+            - array
+            - "null"
+      required:
+        - postals
+      type: object
+    TransactionMatchTransaction:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        build_year:
+          format: int32
+          type: integer
+        category:
+          type: string
+        condition:
+          type: string
+        condition_match_code:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        elevator:
+          type: boolean
+        energy_class:
+          type: string
+        energy_match_code:
+          type: string
+        floor:
+          type: string
+        id:
+          type: string
+        period_identifier:
+          type: string
+        plot:
+          type: string
+        plot_owned:
+          type: boolean
+        price:
+          format: int64
+          type: integer
+        price_per_m2:
+          format: int64
+          type: integer
+        type:
+          type: string
+      required:
+        - id
+        - area_m2
+        - price
+        - price_per_m2
+        - elevator
+      type: object
     TranslatedValue:
       additionalProperties: false
       properties:
@@ -2410,102 +1984,61 @@ components:
       required:
         - location
       type: object
+    WebSessionRefreshOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WebSessionRefreshOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        access_token:
+          type: string
+        access_token_expires_at:
+          format: int64
+          type: integer
+        user_id:
+          type: string
+      required:
+        - access_token
+        - access_token_expires_at
+        - user_id
+      type: object
+    WebSessionSignOutOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WebSessionSignOutOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        ok:
+          type: boolean
+      required:
+        - ok
+      type: object
   securitySchemes:
     bearer:
       description: OAuth 2.0 access token
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8089/oauth/authorize
+          authorizationUrl: /oauth/authorize
           scopes:
             core:read: core:read
             mcp:core:read: mcp:core:read
             profile:read: profile:read
             profile:write: profile:write
-          tokenUrl: http://localhost:8089/oauth/token
+          tokenUrl: /oauth/token
       type: oauth2
 info:
   title: Koditon API
   version: 0.1.0
 openapi: 3.1.0
 paths:
-  /.well-known/oauth-authorization-server:
-    get:
-      operationId: oauth-authorization-server-metadata-get
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthAuthorizationServerMetadata"
-      summary: Get OAuth authorization server metadata
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: false
-        retry:
-          backoff:
-            base_delay_ms: 120
-            jitter: full
-            strategy: exponential
-          max_attempts: 2
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 502
-              - 503
-              - 504
-            transport_errors: true
-  /.well-known/oauth-protected-resource:
-    get:
-      operationId: oauth-protected-resource-metadata-root-get
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthProtectedResourceMetadata"
-      summary: Get OAuth protected resource metadata (root)
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: false
-        retry:
-          backoff:
-            base_delay_ms: 120
-            jitter: full
-            strategy: exponential
-          max_attempts: 2
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 502
-              - 503
-              - 504
-            transport_errors: true
-  /.well-known/oauth-protected-resource/mcp:
-    get:
-      operationId: oauth-protected-resource-metadata-get
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthProtectedResourceMetadata"
-      summary: Get OAuth protected resource metadata
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: false
-        retry:
-          backoff:
-            base_delay_ms: 120
-            jitter: full
-            strategy: exponential
-          max_attempts: 2
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 502
-              - 503
-              - 504
-            transport_errors: true
   /api/v1/availability/categories:
     get:
       description: Returns distinct building categories (e.g., Kerrostalo, Rivitalo, Omakotitalo)
@@ -2603,12 +2136,12 @@ paths:
       description: Fetch building details by public ID, canonical ID, or source URL
       operationId: buildings-detail
       parameters:
-        - description: Public ID, canonical ID, or source URL
+        - description: Canonical offering UUID
           in: path
           name: id
           required: true
           schema:
-            description: Public ID, canonical ID, or source URL
+            description: Canonical offering UUID
             type: string
       responses:
         "200":
@@ -2988,12 +2521,12 @@ paths:
       description: Fetch a rental by public ID, canonical ID, or source URL
       operationId: rentals-detail
       parameters:
-        - description: Public ID, canonical ID, or source URL
+        - description: Canonical offering UUID
           in: path
           name: id
           required: true
           schema:
-            description: Public ID, canonical ID, or source URL
+            description: Canonical offering UUID
             type: string
       responses:
         "200":
@@ -3291,15 +2824,15 @@ paths:
         - core:read
   /api/v1/sale-listings/{id}:
     get:
-      description: Fetch a sale listing by public ID, canonical ID, or source URL
+      description: Fetch a canonical sale offering by UUID
       operationId: sale-listings-detail
       parameters:
-        - description: Public ID, canonical ID, or source URL
+        - description: Canonical offering UUID
           in: path
           name: id
           required: true
           schema:
-            description: Public ID, canonical ID, or source URL
+            description: Canonical offering UUID
             type: string
       responses:
         "200":
@@ -3449,8 +2982,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AppleWebAuthOutputBody"
+                $ref: "#/components/schemas/AuthTokenBody"
           description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3480,8 +3017,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PasskeyAuthOutputBody"
+                $ref: "#/components/schemas/AuthTokenBody"
           description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3537,8 +3078,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PasskeyAuthOutputBody"
+                $ref: "#/components/schemas/AuthTokenBody"
           description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3624,352 +3169,73 @@ paths:
         - Authentication
       x-koditon-scopes:
         - profile:write
-  /oauth/authorize/handoff/approve:
+  /auth/session/refresh:
     post:
-      operationId: oauth-authorize-handoff-approve
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                handoff_id:
-                  description: Authorization handoff identifier.
-                  format: uuid
-                  type: string
-              required:
-                - handoff_id
-              type: object
-        required: true
+      description: Rotate the web refresh cookie and return a new access token
+      operationId: auth-session-refresh
+      parameters:
+        - in: cookie
+          name: __Host-koditon_refresh
+          schema:
+            type: string
+        - in: cookie
+          name: koditon_refresh
+          schema:
+            type: string
       responses:
         "200":
-          $ref: "#/components/responses/OAuthHandoffApproveSuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "401":
-          $ref: "#/components/responses/OAuthError"
-        "404":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      security:
-        - bearer: []
-      summary: Approve OAuth authorization handoff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSessionRefreshOutputBody"
+          description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Refresh web session
       tags:
-        - OAuth
-        - Auth
-  /oauth/authorize/handoff/deny:
+        - Authentication
+  /auth/session/sign-out:
     post:
-      operationId: oauth-authorize-handoff-deny
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                handoff_id:
-                  description: Authorization handoff identifier.
-                  format: uuid
-                  type: string
-              required:
-                - handoff_id
-              type: object
-        required: true
+      description: Revoke the web refresh token and clear the session cookie
+      operationId: auth-session-sign-out
+      parameters:
+        - in: cookie
+          name: __Host-koditon_refresh
+          schema:
+            type: string
+        - in: cookie
+          name: koditon_refresh
+          schema:
+            type: string
+        - in: header
+          name: Authorization
+          schema:
+            type: string
       responses:
         "200":
-          $ref: "#/components/responses/OAuthHandoffDenySuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "401":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      security:
-        - bearer: []
-      summary: Deny OAuth authorization handoff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSessionSignOutOutputBody"
+          description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Sign out web session
       tags:
-        - OAuth
-        - Auth
-  /oauth/authorize/handoff/resolve:
-    post:
-      operationId: oauth-authorize-handoff-resolve
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                handoff_token:
-                  description: Authorization handoff token from the browser or app link.
-                  type: string
-                user_code:
-                  description: User-entered handoff code.
-                  type: string
-              type: object
-        required: true
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthHandoffResolveSuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "401":
-          $ref: "#/components/responses/OAuthError"
-        "404":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      security:
-        - bearer: []
-      summary: Resolve OAuth authorization handoff
-      tags:
-        - OAuth
-        - Auth
-  /oauth/device_authorization:
-    post:
-      operationId: oauth-device-authorization-create
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              properties:
-                client_id:
-                  description: OAuth client ID.
-                  type: string
-                client_secret:
-                  description: OAuth client secret for confidential clients.
-                  type: string
-                resource:
-                  description: Protected resource identifier from discovery metadata.
-                  type: string
-                scope:
-                  description: Requested scopes separated by spaces.
-                  type: string
-              required:
-                - client_id
-              type: object
-        required: true
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthDeviceAuthorizationSuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "401":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      summary: Create OAuth device authorization request
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: true
-        retry:
-          backoff:
-            base_delay_ms: 0
-            jitter: none
-            strategy: exponential
-          max_attempts: 1
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 503
-            transport_errors: false
-  /oauth/jwks:
-    get:
-      operationId: oauth-jwks-get
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthJWKS"
-      summary: Get JSON Web Key Set
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: false
-        retry:
-          backoff:
-            base_delay_ms: 120
-            jitter: full
-            strategy: exponential
-          max_attempts: 2
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 502
-              - 503
-              - 504
-            transport_errors: true
-  /oauth/register:
-    post:
-      description: Registers an external OAuth client for authorization code + PKCE flows.
-      operationId: oauth-client-register-create
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                client_name:
-                  type: string
-                logo_uri:
-                  format: uri
-                  type: string
-                redirect_uris:
-                  items:
-                    type: string
-                  type: array
-                scope:
-                  type: string
-                token_endpoint_auth_method:
-                  enum:
-                    - none
-                  type: string
-              required:
-                - redirect_uris
-              type: object
-        required: true
-      responses:
-        "201":
-          $ref: "#/components/responses/OAuthClientRegistrationSuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "403":
-          $ref: "#/components/responses/OAuthError"
-        "429":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      summary: Register OAuth client dynamically
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: true
-        retry:
-          backoff:
-            base_delay_ms: 0
-            jitter: none
-            strategy: exponential
-          max_attempts: 1
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 503
-            transport_errors: false
-  /oauth/revoke:
-    post:
-      description: Revokes a refresh token. Access tokens (JWTs) cannot be revoked server-side and expire naturally. Returns 200 OK even if the token is already invalid.
-      operationId: oauth-revoke-create
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              properties:
-                token:
-                  description: The token to revoke.
-                  type: string
-                token_type_hint:
-                  description: "Optional hint: 'refresh_token' or 'access_token'."
-                  type: string
-              required:
-                - token
-              type: object
-        required: true
-      responses:
-        "200":
-          description: Token revoked successfully (or was already invalid).
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      summary: Revoke an OAuth token (RFC 7009)
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: true
-        retry:
-          backoff:
-            base_delay_ms: 120
-            jitter: full
-            strategy: exponential
-          max_attempts: 2
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 502
-              - 503
-              - 504
-            transport_errors: true
-  /oauth/token:
-    post:
-      operationId: oauth-token-create
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              properties:
-                client_id:
-                  description: OAuth client ID.
-                  type: string
-                client_secret:
-                  description: OAuth client secret for confidential clients.
-                  type: string
-                code:
-                  description: Authorization code.
-                  type: string
-                code_verifier:
-                  description: PKCE verifier.
-                  type: string
-                device_code:
-                  description: Device code.
-                  type: string
-                grant_type:
-                  enum:
-                    - authorization_code
-                    - refresh_token
-                    - urn:ietf:params:oauth:grant-type:device_code
-                  type: string
-                redirect_uri:
-                  description: Redirect URI matching authorization request.
-                  type: string
-                refresh_token:
-                  description: Refresh token.
-                  type: string
-                resource:
-                  description: Protected resource identifier from discovery metadata.
-                  type: string
-                scope:
-                  description: Requested scopes separated by spaces.
-                  type: string
-              required:
-                - grant_type
-              type: object
-        required: true
-      responses:
-        "200":
-          $ref: "#/components/responses/OAuthTokenSuccess"
-        "400":
-          $ref: "#/components/responses/OAuthError"
-        "401":
-          $ref: "#/components/responses/OAuthError"
-        "500":
-          $ref: "#/components/responses/OAuthError"
-      summary: Exchange OAuth token grants
-      tags:
-        - OAuth
-        - Auth
-      x-koditon-operation-policy:
-        mutation: true
-        retry:
-          backoff:
-            base_delay_ms: 0
-            jitter: none
-            strategy: exponential
-          max_attempts: 1
-          respect_retry_after_header: true
-          retry_on:
-            http_status_codes:
-              - 429
-              - 503
-            transport_errors: false
+        - Authentication

@@ -8,7 +8,7 @@ import (
 func TestSaleSummaryUsesNormalizedSections(t *testing.T) {
 	area := 42.5
 	price := int64(210000)
-	row := listingSearchRow{Source: "frontdoor", Kind: "ad", NativeID: "123", CanonicalID: "frontdoor:ad:123", PublicID: publicID("l", "frontdoor:ad:123"), URL: "https://example.test/a", Headline: "Test listing", Address: "Testikatu 1", City: "Helsinki", Postal: "00100", Price: &price, Area: &area, RoomLayout: "2h+k"}
+	row := listingSearchRow{Source: "frontdoor", Kind: "ad", NativeID: "123", CanonicalID: "frontdoor:ad:123", PublicID: "08daecb8-dabb-44ef-8566-92ca0ca889a4", URL: "https://example.test/a", Headline: "Test listing", Address: "Testikatu 1", City: "Helsinki", Postal: "00100", Price: &price, Area: &area, RoomLayout: "2h+k"}
 	body, err := json.Marshal(row.toSaleSummary())
 	if err != nil {
 		t.Fatalf("marshal summary: %v", err)
@@ -27,7 +27,7 @@ func TestSaleSummaryUsesNormalizedSections(t *testing.T) {
 			t.Fatalf("section %q missing from summary: %s", section, body)
 		}
 	}
-	if decoded["id"] == row.CanonicalID {
-		t.Fatalf("expected public id instead of canonical id: %s", body)
+	if decoded["id"] != row.PublicID {
+		t.Fatalf("expected canonical offering UUID as id: %s", body)
 	}
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 type propertySearchInput struct {
 	Query         string  `query:"q"                doc:"Free text search"`
 	Source        string  `query:"source"           doc:"Source filter: shortcut, frontdoor, or all"`
+	Kind          string  `query:"kind"             doc:"Listing kind filter: ad, announcement, or all"`
 	City          string  `query:"city"             doc:"City / municipality filter"`
 	Postal        string  `query:"postal"           doc:"Postal code prefix filter"`
 	MinPrice      int64   `query:"min_price"        doc:"Minimum price (EUR, 0 = no minimum)"`
@@ -35,7 +37,12 @@ type propertySearchInput struct {
 }
 
 type propertyDetailInput struct {
-	ID string `path:"id" required:"true" doc:"Public ID, canonical ID, or source URL"`
+	ID string `path:"id" required:"true" doc:"Canonical offering UUID"`
+}
+
+type propertySourceRawInput struct {
+	ID       string `path:"id"        required:"true" doc:"Canonical offering UUID"`
+	SourceID string `path:"sourceID"  required:"true" doc:"Source sale listing UUID"`
 }
 
 type transactionMatchPostalsInput struct {
@@ -65,12 +72,30 @@ type saleListingsSearchOutput struct {
 	Body properties.Page[properties.SaleListingSummary]
 }
 
+type saleListingsMapInput struct {
+	MinLat float64 `query:"min_lat" doc:"Minimum latitude"`
+	MinLng float64 `query:"min_lng" doc:"Minimum longitude"`
+	MaxLat float64 `query:"max_lat" doc:"Maximum latitude"`
+	MaxLng float64 `query:"max_lng" doc:"Maximum longitude"`
+	Source string  `query:"source"  doc:"Source filter: shortcut, frontdoor, or all"`
+	Kind   string  `query:"kind"    doc:"Listing kind filter: ad, announcement, or all"`
+	Limit  int32   `query:"limit"   doc:"Maximum markers to return"`
+}
+
+type saleListingsMapOutput struct {
+	Body properties.SaleListingMap
+}
+
 type rentalsSearchOutput struct {
 	Body properties.Page[properties.RentalSummary]
 }
 
 type saleListingDetailOutput struct {
 	Body properties.SaleListing
+}
+
+type saleListingSourceRawOutput struct {
+	Body json.RawMessage
 }
 
 type rentalDetailOutput struct {
@@ -103,6 +128,16 @@ func (a *API) saleListingsSearchHandler(ctx context.Context, input *propertySear
 	return &saleListingsSearchOutput{Body: page}, nil
 }
 
+func (a *API) saleListingsMapHandler(ctx context.Context, input *saleListingsMapInput) (*saleListingsMapOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.sale_listings_map"))
+	markers, err := a.propertiesService.SaleListingMap(ctx, propertyMapBounds(input))
+	if err != nil {
+		logger.ErrorContext(ctx, "sale listing map failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("sale listing map failed")
+	}
+	return &saleListingsMapOutput{Body: markers}, nil
+}
+
 func (a *API) rentalsSearchHandler(ctx context.Context, input *propertySearchInput) (*rentalsSearchOutput, error) {
 	logger := logging.With(a.logger, logging.Op("api.rentals_search"))
 	page, err := a.propertiesService.SearchRentals(ctx, propertySearchParams(input))
@@ -123,6 +158,18 @@ func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetai
 		return nil, huma.Error400BadRequest("invalid sale listing canonical ID")
 	}
 	return &saleListingDetailOutput{Body: listing}, nil
+}
+
+func (a *API) saleListingSourceRawHandler(ctx context.Context, input *propertySourceRawInput) (*saleListingSourceRawOutput, error) {
+	payload, err := a.propertiesService.SaleOfferingSourceRawPayload(ctx, input.ID, input.SourceID)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("source payload not found")
+		}
+		a.logger.ErrorContext(ctx, "sale listing source payload failed", "id", input.ID, "source_id", input.SourceID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("invalid source payload request")
+	}
+	return &saleListingSourceRawOutput{Body: payload.Payload}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {
@@ -195,7 +242,18 @@ func propertySearchParams(input *propertySearchInput) properties.SearchParams {
 	if pageSize <= 0 {
 		pageSize = 25
 	}
-	return properties.SearchParams{Query: input.Query, Source: input.Source, City: input.City, Postal: input.Postal, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), MinPricePerM2: positiveFloat64Ptr(input.MinPricePerM2), MaxPricePerM2: positiveFloat64Ptr(input.MaxPricePerM2), Rooms: positiveInt32Ptr(input.Rooms), Floor: positiveInt32Ptr(input.Floor), MinBuildYear: positiveInt32Ptr(input.MinBuildYear), MaxBuildYear: positiveInt32Ptr(input.MaxBuildYear), Condition: input.Condition, EnergyClass: input.EnergyClass, Sort: input.Sort, Page: page, PageSize: pageSize}
+	return properties.SearchParams{Query: input.Query, Source: input.Source, Kind: input.Kind, City: input.City, Postal: input.Postal, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), MinPricePerM2: positiveFloat64Ptr(input.MinPricePerM2), MaxPricePerM2: positiveFloat64Ptr(input.MaxPricePerM2), Rooms: positiveInt32Ptr(input.Rooms), Floor: positiveInt32Ptr(input.Floor), MinBuildYear: positiveInt32Ptr(input.MinBuildYear), MaxBuildYear: positiveInt32Ptr(input.MaxBuildYear), Condition: input.Condition, EnergyClass: input.EnergyClass, Sort: input.Sort, Page: page, PageSize: pageSize}
+}
+
+func propertyMapBounds(input *saleListingsMapInput) properties.MapBounds {
+	var minLat, minLng, maxLat, maxLng *float64
+	if input.MinLat != 0 || input.MinLng != 0 || input.MaxLat != 0 || input.MaxLng != 0 {
+		minLat = &input.MinLat
+		minLng = &input.MinLng
+		maxLat = &input.MaxLat
+		maxLng = &input.MaxLng
+	}
+	return properties.MapBounds{MinLat: minLat, MinLng: minLng, MaxLat: maxLat, MaxLng: maxLng, Source: input.Source, Kind: input.Kind, Limit: input.Limit}
 }
 
 func positiveInt64Ptr(value int64) *int64 {

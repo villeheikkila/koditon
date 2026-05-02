@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   useBuildingsDetail,
@@ -62,6 +63,7 @@ function ErrorMessage({ error }: { error: unknown }) {
 }
 
 function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listing' | 'rental' }) {
+  const [transactionOpen, setTransactionOpen] = useState(false)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -71,6 +73,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const charges = commercial.charges
   const price = commercial.asking_price ?? commercial.rent
   const isRental = kind === 'rental'
+  const saleDetail = kind === 'listing' ? d as SaleListing : undefined
   const site = d.site
   const siteRows = site ? [
     site.plot_type,
@@ -95,6 +98,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const mainImage = d.media?.main_image?.variants?.gallery || d.media?.main_image?.variants?.large || d.media?.main_image?.url
   const images = d.media?.images?.filter(image => image.url !== mainImage) ?? []
   const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
+  const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
 
   return (
     <div className="listing-layout">
@@ -135,10 +139,10 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               <div className="listing-price-sqm">{fmtEur(commercial.price_per_m2)} / m²</div>
             )}
             {matchedTransaction?.price != null && (
-              <div className="listing-price-transaction">
+              <button type="button" className="listing-price-transaction" onClick={() => setTransactionOpen(true)}>
                 Sold {fmtPrice(matchedTransaction.price)}
-                {matchedTransaction.period_identifier ? ` · ${matchedTransaction.period_identifier}` : ''}
-              </div>
+                {transactionDate ? ` · ${transactionDate}` : ''}
+              </button>
             )}
           </div>
         </div>
@@ -157,6 +161,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
         <div className="listing-body">
           <Section title="Source & Timing">
             <div className="listing-table">
+              {saleDetail?.canonical.offering_id && <Row label="Offering ID" value={saleDetail.canonical.offering_id} />}
+              {saleDetail?.canonical.primary_source_listing_id && <Row label="Primary source row" value={saleDetail.canonical.primary_source_listing_id} />}
+              {saleDetail?.canonical.source_count != null && <Row label="Linked source rows" value={String(saleDetail.canonical.source_count)} />}
               <Row label="Provider" value={providerLabel(d.source.provider)} />
               <Row label="Source kind" value={d.source.kind} />
               <Row label="Native ID" value={d.source.native_id} />
@@ -174,6 +181,39 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               {d.source.original_url && <Row label="Original URL" value={<a href={d.source.original_url} target="_blank" rel="noopener noreferrer">{d.source.original_url}</a>} />}
             </div>
           </Section>
+          {saleDetail?.source_records?.length ? (
+            <Section title="Linked Source Rows">
+              <div className="listing-table">
+                {saleDetail.source_records.map(record => (
+                  <Row
+                    key={record.id}
+                    label={`${providerLabel(record.provider)} ${record.kind}`}
+                    value={(
+                      <div className="source-row-value">
+                        <span>
+                          {[
+                            record.public_id || record.id,
+                            record.native_id,
+                            record.headline,
+                            record.last_seen_at && `last seen ${fmtDateTime(record.last_seen_at)}`,
+                            `${record.link_status} ${record.link_score}`,
+                          ].filter(Boolean).join(' · ')}
+                        </span>
+                        <a
+                          href={`/api/v1/sale-listings/${encodeURIComponent(saleDetail.id)}/source-records/${encodeURIComponent(record.id)}/raw`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="source-json-link"
+                        >
+                          JSON
+                        </a>
+                      </div>
+                    )}
+                  />
+                ))}
+              </div>
+            </Section>
+          ) : null}
           {texts?.description && (
             <Section title="Description">
               <TextBlock text={texts.description} />
@@ -406,6 +446,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           </div>
         </div>
       </div>
+      {matchedTransaction && transactionOpen && (
+        <TransactionModal transaction={matchedTransaction} onClose={() => setTransactionOpen(false)} />
+      )}
     </div>
   )
 }
@@ -476,6 +519,46 @@ function Row({ label, value, highlight }: { label: string; value: React.ReactNod
   )
 }
 
+function TransactionModal({ transaction, onClose }: { transaction: NonNullable<SaleListing['commercial']['matched_transaction']>; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="transaction-modal" onClick={e => e.stopPropagation()}>
+        <div className="transaction-modal-header">
+          <div>
+            <div className="listing-type-pill listing-type-pill--listing">Transaction</div>
+            <h2 className="transaction-modal-title">{transaction.description || transaction.id}</h2>
+          </div>
+          <button type="button" className="transaction-modal-close" onClick={onClose} aria-label="Close transaction details">×</button>
+        </div>
+        <div className="listing-table">
+          <Row label="ID" value={transaction.id} />
+          {transaction.first_seen_at && <Row label="First seen" value={fmtDateTime(transaction.first_seen_at)} highlight />}
+          {transaction.updated_at && <Row label="Updated" value={fmtDateTime(transaction.updated_at)} />}
+          {transaction.period_identifier && <Row label="Period" value={transaction.period_identifier} />}
+          {transaction.price != null && <Row label="Price" value={fmtPrice(transaction.price)} highlight />}
+          {transaction.price_per_m2 != null && <Row label="Price / m²" value={fmtEur(transaction.price_per_m2)} />}
+          {transaction.area_m2 != null && <Row label="Area" value={`${transaction.area_m2.toFixed(1)} m²`} />}
+          {transaction.type && <Row label="Type" value={transaction.type} />}
+          {transaction.category && <Row label="Category" value={transaction.category} />}
+          {transaction.build_year != null && <Row label="Build year" value={String(transaction.build_year)} />}
+          {transaction.floor && <Row label="Floor" value={transaction.floor} />}
+          {transaction.elevator != null && <Row label="Elevator" value={fmtBool(transaction.elevator)} />}
+          {transaction.condition && <Row label="Condition" value={transaction.condition} />}
+          {transaction.plot && <Row label="Plot" value={transaction.plot} />}
+          {transaction.plot_owned != null && <Row label="Plot owned" value={fmtBool(transaction.plot_owned)} />}
+          {transaction.energy_class && <Row label="Energy" value={transaction.energy_class} />}
+          {transaction.city && <Row label="City" value={transaction.city} />}
+          {transaction.neighborhood && <Row label="Neighborhood" value={transaction.neighborhood} />}
+          {transaction.postal_code && <Row label="Postal code" value={transaction.postal_code} />}
+          {transaction.match_status && <Row label="Match status" value={transaction.match_status} />}
+          {transaction.match_score != null && <Row label="Match score" value={String(transaction.match_score)} />}
+          {transaction.match_confidence && <Row label="Match confidence" value={transaction.match_confidence} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TextBlock({ text, muted }: { text: string; muted?: boolean }) {
   return (
     <p className={`listing-text${muted ? ' listing-text--muted' : ''}`}>
@@ -502,6 +585,10 @@ function fmtBool(value: boolean): string {
 
 function fmtDateTime(value: string): string {
   return new Date(value).toLocaleString('fi-FI', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function fmtDate(value: string): string {
+  return new Date(value).toLocaleDateString('fi-FI', { dateStyle: 'medium' })
 }
 
 function renovationItems(records: ListingDetail['building']['renovations'], doneText?: string, plannedText?: string): RenovationItem[] {

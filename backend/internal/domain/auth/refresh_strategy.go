@@ -36,7 +36,7 @@ type refreshStrategy interface {
 	rotate(ctx context.Context, tx pgx.Tx, queries *db.Queries, state refreshFlowState) (refreshFlowState, error)
 }
 
-func refreshTokenStateFromLockedRow(row db.OauthRefreshToken, audience string) refreshFlowState {
+func refreshTokenStateFromLockedRow(row db.GetOAuthRefreshTokenByHashForUpdateRow, audience string) refreshFlowState {
 	return refreshFlowState{
 		UserID:         row.UserUuid,
 		SessionID:      uuidValue(row.DeviceSessionUuid),

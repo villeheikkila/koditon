@@ -17,6 +17,12 @@ const SOURCE_OPTIONS = [
   { value: 'frontdoor', label: 'Frontdoor' },
 ]
 
+const KIND_OPTIONS = [
+  { value: '', label: 'All listing kinds' },
+  { value: 'ad', label: 'Full ads only' },
+  { value: 'announcement', label: 'Announcements only' },
+]
+
 const SORT_OPTIONS = [
   { value: 'seen_desc', label: 'Recently seen' },
   { value: 'price_asc', label: 'Price ↑' },
@@ -53,6 +59,7 @@ export default function SearchPage() {
   const [city, setCity]       = useState(() => urlParams.get('city') ?? '')
   const [postal, setPostal]   = useState(() => urlParams.get('postal') ?? '')
   const [source, setSource]   = useState(() => urlParams.get('source') ?? '')
+  const [listingKind, setListingKind] = useState(() => urlParams.get('kind') ?? '')
   const [minPrice, setMinPrice] = useState(() => urlParams.get('min_price') ?? '')
   const [maxPrice, setMaxPrice] = useState(() => urlParams.get('max_price') ?? '')
   const [minArea, setMinArea]   = useState(() => urlParams.get('min_area') ?? '')
@@ -79,6 +86,7 @@ export default function SearchPage() {
     if (dCity)    p.city    = dCity
     if (dPostal)  p.postal  = dPostal
     if (source)   p.source  = source
+    if (listingKind) p.kind = listingKind
     if (minPrice) p.min_price = minPrice
     if (maxPrice) p.max_price = maxPrice
     if (minArea)  p.min_area  = minArea
@@ -94,15 +102,16 @@ export default function SearchPage() {
     if (sort !== 'seen_desc') p.sort = sort
     if (page > 1) p.page = String(page)
     setUrlParams(p, { replace: true })
-  }, [dQuery, dCity, dPostal, source, minPrice, maxPrice, minArea, maxArea, minPriceM2, maxPriceM2, rooms, floor, minBuildYear, maxBuildYear, condition, energyClass, sort, page, setUrlParams])
+  }, [dQuery, dCity, dPostal, source, listingKind, minPrice, maxPrice, minArea, maxArea, minPriceM2, maxPriceM2, rooms, floor, minBuildYear, maxBuildYear, condition, energyClass, sort, page, setUrlParams])
 
-  const hasFilters = !!(dQuery || dCity || dPostal || source || minPrice || maxPrice || minArea || maxArea || minPriceM2 || maxPriceM2 || rooms || floor || minBuildYear || maxBuildYear || condition || energyClass)
+  const hasFilters = !!(dQuery || dCity || dPostal || source || listingKind || minPrice || maxPrice || minArea || maxArea || minPriceM2 || maxPriceM2 || rooms || floor || minBuildYear || maxBuildYear || condition || energyClass)
 
   const params: SaleListingsSearchParams = {
     q:         dQuery   || undefined,
     city:      dCity    || undefined,
     postal:    dPostal  || undefined,
     source:    source   || undefined,
+    kind:      listingKind || undefined,
     min_price: minPrice ? Number(minPrice) : undefined,
     max_price: maxPrice ? Number(maxPrice) : undefined,
     min_area:  minArea  ? Number(minArea)  : undefined,
@@ -136,7 +145,7 @@ export default function SearchPage() {
 
   function clearAll() {
     setQuery(''); setCity(''); setPostal('')
-    setSource('')
+    setSource(''); setListingKind('')
     setMinPrice(''); setMaxPrice(''); setMinArea(''); setMaxArea('')
     setMinPriceM2(''); setMaxPriceM2(''); setRooms(''); setFloor('')
     setMinBuildYear(''); setMaxBuildYear(''); setCondition(''); setEnergyClass('')
@@ -201,6 +210,12 @@ export default function SearchPage() {
               <label className="search-filter-label">Source</label>
               <select className="search-select" value={source} onChange={e => updateFilter(setSource, e.target.value)}>
                 {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div className="search-filter-group">
+              <label className="search-filter-label">Kind</label>
+              <select className="search-select" value={listingKind} onChange={e => updateFilter(setListingKind, e.target.value)}>
+                {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -416,6 +431,7 @@ export default function SearchPage() {
 
 function SearchCard({ row }: { row: SaleListingSummary }) {
   const navigate = useNavigate()
+  const sourceProviders = ((row as SaleListingSummary & { source_providers?: string[] }).source_providers?.length ? (row as SaleListingSummary & { source_providers?: string[] }).source_providers : [row.source.provider]) ?? [row.source.provider]
   const locationData = row.unit.location
   const title = locationData.street_address || row.headline || row.id
   const sub = [row.unit.room_layout, row.unit.area_m2 != null ? `${row.unit.area_m2.toFixed(1)} m²` : null, row.unit.rooms_count != null ? `${row.unit.rooms_count} rooms` : null]
@@ -445,7 +461,9 @@ function SearchCard({ row }: { row: SaleListingSummary }) {
       <div className="search-card-header">
         <div className="search-card-title">{title}</div>
         <div className="search-card-badges">
-          <span className={`search-badge search-badge--${row.source.provider}`}>{row.source.provider}</span>
+          {sourceProviders.map(provider => (
+            <span key={provider} className={`search-badge search-badge--${provider}`}>{provider}</span>
+          ))}
           <span className="search-badge search-badge--mode-listings">sale</span>
           {row.source.kind !== 'ad' && <span className="search-badge search-badge--kind">{row.source.kind}</span>}
         </div>

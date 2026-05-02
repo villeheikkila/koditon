@@ -27,7 +27,7 @@ func md5Hex(value string) string {
 }
 
 func normalizeParams(params SearchParams) SearchParams {
-	out := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, MinPricePerM2: params.MinPricePerM2, MaxPricePerM2: params.MaxPricePerM2, Rooms: params.Rooms, Floor: params.Floor, MinBuildYear: params.MinBuildYear, MaxBuildYear: params.MaxBuildYear, Condition: strings.TrimSpace(params.Condition), EnergyClass: strings.TrimSpace(params.EnergyClass), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
+	out := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeListingKind(params.Kind), City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, MinPricePerM2: params.MinPricePerM2, MaxPricePerM2: params.MaxPricePerM2, Rooms: params.Rooms, Floor: params.Floor, MinBuildYear: params.MinBuildYear, MaxBuildYear: params.MaxBuildYear, Condition: strings.TrimSpace(params.Condition), EnergyClass: strings.TrimSpace(params.EnergyClass), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
 	if out.Page < 1 {
 		out.Page = 1
 	}
@@ -38,6 +38,15 @@ func normalizeSource(source string) string {
 	switch strings.ToLower(strings.TrimSpace(source)) {
 	case "shortcut", "frontdoor":
 		return strings.ToLower(strings.TrimSpace(source))
+	default:
+		return "all"
+	}
+}
+
+func normalizeListingKind(kind string) string {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "ad", "announcement":
+		return strings.ToLower(strings.TrimSpace(kind))
 	default:
 		return "all"
 	}
@@ -73,17 +82,25 @@ func valueOrEmpty(value *string) string {
 	if value == nil {
 		return ""
 	}
-	return strings.TrimSpace(*value)
+	return cleanDisplayString(*value)
 }
 
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
+		trimmed := cleanDisplayString(value)
 		if trimmed != "" {
 			return trimmed
 		}
 	}
 	return ""
+}
+
+func cleanDisplayString(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "<nil>" {
+		return ""
+	}
+	return trimmed
 }
 
 func firstFloat64(values ...*float64) *float64 {
@@ -159,7 +176,7 @@ func valueAtPath(value any, path ...string) string {
 	}
 	switch v := current.(type) {
 	case string:
-		return strings.TrimSpace(v)
+		return cleanDisplayString(v)
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
 	case bool:

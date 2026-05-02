@@ -11,6 +11,7 @@ import (
 type SearchParams struct {
 	Query           string
 	Source          string
+	Kind            string
 	City            string
 	Postal          string
 	MinPrice        *int64
@@ -39,6 +40,56 @@ type Page[T any] struct {
 	PageSize int32 `json:"page_size"`
 }
 
+type MapBounds struct {
+	MinLat *float64
+	MinLng *float64
+	MaxLat *float64
+	MaxLng *float64
+	Source string
+	Kind   string
+	Limit  int32
+}
+
+type SaleListingMapMarker struct {
+	Lat           float64                 `json:"lat"`
+	Lng           float64                 `json:"lng"`
+	Count         int64                   `json:"count"`
+	Address       string                  `json:"address,omitempty"`
+	City          string                  `json:"city,omitempty"`
+	Postal        string                  `json:"postal,omitempty"`
+	MinPrice      *int64                  `json:"min_price,omitempty"`
+	MaxPrice      *int64                  `json:"max_price,omitempty"`
+	MinAreaM2     *float64                `json:"min_area_m2,omitempty"`
+	MaxAreaM2     *float64                `json:"max_area_m2,omitempty"`
+	LastSeenAt    *time.Time              `json:"last_seen_at,omitempty"`
+	Providers     []string                `json:"providers,omitempty"`
+	Kinds         []string                `json:"kinds,omitempty"`
+	ListingIDs    []string                `json:"listing_ids,omitempty"`
+	Listings      []SaleListingMapListing `json:"listings,omitempty"`
+	BuildingID    string                  `json:"building_id,omitempty"`
+	BuildingCount int64                   `json:"building_count"`
+}
+
+type SaleListingMapListing struct {
+	ID         string     `json:"id"`
+	Headline   string     `json:"headline,omitempty"`
+	Address    string     `json:"address,omitempty"`
+	City       string     `json:"city,omitempty"`
+	Postal     string     `json:"postal,omitempty"`
+	Layout     string     `json:"layout,omitempty"`
+	AreaM2     *float64   `json:"area_m2,omitempty"`
+	Price      *int64     `json:"price,omitempty"`
+	PricePerM2 *float64   `json:"price_per_m2,omitempty"`
+	BuildYear  *int32     `json:"build_year,omitempty"`
+	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
+	Providers  []string   `json:"providers,omitempty"`
+	Kinds      []string   `json:"kinds,omitempty"`
+}
+
+type SaleListingMap struct {
+	Markers []SaleListingMapMarker `json:"markers"`
+}
+
 type ListingSource struct {
 	Provider    string          `json:"provider"`
 	Kind        string          `json:"kind"`
@@ -54,6 +105,40 @@ type ListingSource struct {
 	Status      string          `json:"status,omitempty"`
 	Flags       map[string]bool `json:"flags,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
+}
+
+type CanonicalOffering struct {
+	OfferingID           string `json:"offering_id"`
+	BuildingID           string `json:"building_id,omitempty"`
+	UnitID               string `json:"unit_id,omitempty"`
+	PrimarySourceListing string `json:"primary_source_listing_id,omitempty"`
+	SourceCount          int32  `json:"source_count,omitempty"`
+}
+
+type OfferingSourceRecord struct {
+	ID          string     `json:"id"`
+	PublicID    string     `json:"public_id,omitempty"`
+	Provider    string     `json:"provider"`
+	Kind        string     `json:"kind"`
+	CanonicalID string     `json:"canonical_id"`
+	NativeID    string     `json:"native_id"`
+	URL         string     `json:"url,omitempty"`
+	Headline    string     `json:"headline,omitempty"`
+	FirstSeenAt *time.Time `json:"first_seen_at,omitempty"`
+	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
+	LinkStatus  string     `json:"link_status"`
+	LinkMethod  string     `json:"link_method"`
+	LinkScore   int32      `json:"link_score"`
+}
+
+type OfferingSourceRawPayload struct {
+	ID        string          `json:"id"`
+	PublicID  string          `json:"public_id,omitempty"`
+	Provider  string          `json:"provider"`
+	Kind      string          `json:"kind"`
+	NativeID  string          `json:"native_id"`
+	Canonical string          `json:"canonical_id"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 type BuildingIdentity struct {
@@ -209,22 +294,29 @@ type CommercialDetails struct {
 }
 
 type PriceTransactionMatch struct {
-	ID                  string   `json:"id"`
-	Description         string   `json:"description,omitempty"`
-	Type                string   `json:"type,omitempty"`
-	AreaM2              *float64 `json:"area_m2,omitempty"`
-	Price               *int64   `json:"price,omitempty"`
-	PricePerSquareMeter *int64   `json:"price_per_m2,omitempty"`
-	BuildYear           *int32   `json:"build_year,omitempty"`
-	Floor               string   `json:"floor,omitempty"`
-	Elevator            *bool    `json:"elevator,omitempty"`
-	Condition           string   `json:"condition,omitempty"`
-	Plot                string   `json:"plot,omitempty"`
-	EnergyClass         string   `json:"energy_class,omitempty"`
-	PeriodIdentifier    string   `json:"period_identifier,omitempty"`
-	MatchStatus         string   `json:"match_status,omitempty"`
-	MatchScore          *int32   `json:"match_score,omitempty"`
-	MatchConfidence     string   `json:"match_confidence,omitempty"`
+	ID                  string     `json:"id"`
+	FirstSeenAt         *time.Time `json:"first_seen_at,omitempty"`
+	UpdatedAt           *time.Time `json:"updated_at,omitempty"`
+	Description         string     `json:"description,omitempty"`
+	Type                string     `json:"type,omitempty"`
+	Category            string     `json:"category,omitempty"`
+	AreaM2              *float64   `json:"area_m2,omitempty"`
+	Price               *int64     `json:"price,omitempty"`
+	PricePerSquareMeter *int64     `json:"price_per_m2,omitempty"`
+	BuildYear           *int32     `json:"build_year,omitempty"`
+	Floor               string     `json:"floor,omitempty"`
+	Elevator            *bool      `json:"elevator,omitempty"`
+	Condition           string     `json:"condition,omitempty"`
+	Plot                string     `json:"plot,omitempty"`
+	PlotOwned           *bool      `json:"plot_owned,omitempty"`
+	EnergyClass         string     `json:"energy_class,omitempty"`
+	PeriodIdentifier    string     `json:"period_identifier,omitempty"`
+	City                string     `json:"city,omitempty"`
+	Neighborhood        string     `json:"neighborhood,omitempty"`
+	PostalCode          string     `json:"postal_code,omitempty"`
+	MatchStatus         string     `json:"match_status,omitempty"`
+	MatchScore          *int32     `json:"match_score,omitempty"`
+	MatchConfidence     string     `json:"match_confidence,omitempty"`
 }
 
 type TransactionMatchPostalSummary struct {
@@ -382,14 +474,15 @@ type Insight struct {
 }
 
 type SaleListingSummary struct {
-	ID         string            `json:"id"`
-	Source     ListingSource     `json:"source"`
-	Headline   string            `json:"headline"`
-	Unit       UnitDetails       `json:"unit"`
-	Building   BuildingDetails   `json:"building"`
-	Site       SiteDetails       `json:"site,omitempty"`
-	Commercial CommercialDetails `json:"commercial"`
-	Media      Media             `json:"media,omitempty"`
+	ID              string            `json:"id"`
+	Source          ListingSource     `json:"source"`
+	SourceProviders []string          `json:"source_providers,omitempty"`
+	Headline        string            `json:"headline"`
+	Unit            UnitDetails       `json:"unit"`
+	Building        BuildingDetails   `json:"building"`
+	Site            SiteDetails       `json:"site,omitempty"`
+	Commercial      CommercialDetails `json:"commercial"`
+	Media           Media             `json:"media,omitempty"`
 }
 
 type RentalSummary struct {
@@ -404,19 +497,21 @@ type RentalSummary struct {
 }
 
 type SaleListing struct {
-	ID         string            `json:"id"`
-	Source     ListingSource     `json:"source"`
-	Headline   string            `json:"headline"`
-	Unit       UnitDetails       `json:"unit"`
-	Building   BuildingDetails   `json:"building"`
-	Site       SiteDetails       `json:"site,omitempty"`
-	Commercial CommercialDetails `json:"commercial"`
-	Texts      TextSections      `json:"texts,omitempty"`
-	Media      Media             `json:"media,omitempty"`
-	Contacts   []Contact         `json:"contacts,omitempty"`
-	Showings   []Showing         `json:"showings,omitempty"`
-	Links      []Link            `json:"links,omitempty"`
-	Insights   ListingInsights   `json:"insights,omitempty"`
+	ID            string                 `json:"id"`
+	Canonical     CanonicalOffering      `json:"canonical"`
+	Source        ListingSource          `json:"source"`
+	SourceRecords []OfferingSourceRecord `json:"source_records,omitempty"`
+	Headline      string                 `json:"headline"`
+	Unit          UnitDetails            `json:"unit"`
+	Building      BuildingDetails        `json:"building"`
+	Site          SiteDetails            `json:"site,omitempty"`
+	Commercial    CommercialDetails      `json:"commercial"`
+	Texts         TextSections           `json:"texts,omitempty"`
+	Media         Media                  `json:"media,omitempty"`
+	Contacts      []Contact              `json:"contacts,omitempty"`
+	Showings      []Showing              `json:"showings,omitempty"`
+	Links         []Link                 `json:"links,omitempty"`
+	Insights      ListingInsights        `json:"insights,omitempty"`
 }
 
 type Rental struct {

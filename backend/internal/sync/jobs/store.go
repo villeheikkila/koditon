@@ -147,23 +147,26 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			CapacityClassInternalDB:      8,
 		},
 		KindMaxInProgress: map[string]int{
-			"frontdoor_sitemap_sync":               1,
-			"frontdoor_buildings_sitemap_sync":     1,
-			"frontdoor_sync":                       2,
-			"shortcut_sitemap_sync":                1,
-			"shortcut_buildings_sitemap_sync":      1,
-			"shortcut_scraper_sync":                1,
-			"shortcut_api_sync":                    2,
-			"prices_cities_init":                   1,
-			"prices_sync":                          1,
-			"prices_postal_code_sync":              1,
-			"prices_postal_code_page_sync":         1,
-			"prices_neighborhood_postal_code_sync": 1,
-			"prices_sync_all":                      1,
-			"prices_match_sale_listings_backfill":  1,
-			"prices_match_sale_listings_fanout":    1,
-			"prices_match_sale_listing":            8,
-			"postal_sync":                          1,
+			"frontdoor_sitemap_sync":                        1,
+			"frontdoor_buildings_sitemap_sync":              1,
+			"frontdoor_sync":                                2,
+			"shortcut_sitemap_sync":                         1,
+			"shortcut_buildings_sitemap_sync":               1,
+			"shortcut_scraper_sync":                         1,
+			"shortcut_api_sync":                             2,
+			"prices_cities_init":                            1,
+			"prices_sync":                                   1,
+			"prices_postal_code_sync":                       1,
+			"prices_postal_code_page_sync":                  1,
+			"prices_neighborhood_postal_code_sync":          1,
+			"prices_sync_all":                               1,
+			"prices_match_sale_listings_backfill":           1,
+			"prices_match_sale_listings_fanout":             1,
+			"prices_match_sale_listing":                     8,
+			"canonical_match_sale_listing_sources_backfill": 1,
+			"canonical_match_sale_listing_sources_fanout":   1,
+			"canonical_match_sale_listing_source":           8,
+			"postal_sync":                                   1,
 		},
 		BaseDeferDelay: 5 * time.Second,
 		MaxDeferDelay:  5 * time.Minute,
@@ -177,6 +180,8 @@ func QueueNameForProvider(provider string) string {
 	case "shortcut":
 		return "shortcut"
 	case "prices":
+		return "prices"
+	case "canonical":
 		return "prices"
 	case "postal":
 		return "postal"
@@ -199,6 +204,8 @@ func CapacityClassForJob(provider, kind string) string {
 			return CapacityClassInternalDB
 		}
 		return CapacityClassPrices
+	case "canonical":
+		return CapacityClassInternalDB
 	case "postal":
 		return CapacityClassPostal
 	default:

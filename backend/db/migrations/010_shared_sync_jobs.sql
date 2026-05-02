@@ -68,6 +68,7 @@ BEGIN
         WHEN 'frontdoor' THEN 'frontdoor'
         WHEN 'shortcut' THEN 'shortcut'
         WHEN 'prices' THEN 'prices'
+        WHEN 'canonical' THEN 'prices'
         WHEN 'postal' THEN 'postal'
         ELSE NULL
     END;
@@ -99,6 +100,7 @@ BEGIN
             WHEN 'frontdoor' THEN 'provider_frontdoor'
             WHEN 'shortcut' THEN CASE WHEN p_kind = 'shortcut_scraper_sync' THEN 'provider_shortcut_scraper' ELSE 'provider_shortcut_api' END
             WHEN 'prices' THEN 'provider_prices'
+            WHEN 'canonical' THEN 'internal_db'
             WHEN 'postal' THEN 'provider_postal'
             ELSE 'default'
         END,

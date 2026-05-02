@@ -106,11 +106,11 @@ func frontdoorMedia(payload rawMap) Media {
 		if !ok {
 			continue
 		}
-		uri := strings.TrimSpace(fmt.Sprint(image["uri"]))
+		uri := cleanAnyString(image["uri"])
 		if uri == "" {
 			continue
 		}
-		images = append(images, frontdoorImageFromTemplate(uri, strings.TrimSpace(fmt.Sprint(item["id"])), strings.TrimSpace(fmt.Sprint(image["id"])), strings.TrimSpace(fmt.Sprint(image["description"])), strings.TrimSpace(fmt.Sprint(item["propertyImageType"])), int32FromAny(item["ordinal"])))
+		images = append(images, frontdoorImageFromTemplate(uri, cleanAnyString(item["id"]), cleanAnyString(image["id"]), cleanAnyString(image["description"]), cleanAnyString(item["propertyImageType"]), int32FromAny(item["ordinal"])))
 	}
 	sortImages(images)
 	var main *Image
@@ -139,7 +139,7 @@ func shortcutContacts(payload rawMap) []Contact {
 	if !ok {
 		return nil
 	}
-	out := Contact{Name: strings.TrimSpace(fmt.Sprint(contact["name"])), Phone: strings.TrimSpace(fmt.Sprint(contact["phone"])), Email: strings.TrimSpace(fmt.Sprint(contact["email"])), OfficeName: strings.TrimSpace(fmt.Sprint(contact["officeName"]))}
+	out := Contact{Name: cleanAnyString(contact["name"]), Phone: cleanAnyString(contact["phone"]), Email: cleanAnyString(contact["email"]), OfficeName: cleanAnyString(contact["officeName"])}
 	if out == (Contact{}) {
 		return nil
 	}
@@ -151,7 +151,7 @@ func frontdoorContacts(payload rawMap) []Contact {
 	if !ok {
 		return nil
 	}
-	out := Contact{Name: strings.TrimSpace(fmt.Sprint(info["name"])), Phone: firstNonEmpty(strings.TrimSpace(fmt.Sprint(info["phone"])), strings.TrimSpace(fmt.Sprint(info["mobilePhone"]))), OfficeName: strings.TrimSpace(fmt.Sprint(info["officeName"])), Title: strings.TrimSpace(fmt.Sprint(info["title"]))}
+	out := Contact{Name: cleanAnyString(info["name"]), Phone: firstNonEmpty(cleanAnyString(info["phone"]), cleanAnyString(info["mobilePhone"])), OfficeName: cleanAnyString(info["officeName"]), Title: cleanAnyString(info["title"])}
 	if out == (Contact{}) {
 		return nil
 	}
@@ -215,6 +215,46 @@ func firstBool(values ...*bool) *bool {
 		}
 	}
 	return nil
+}
+
+func buildingRenovation(kind string, done *bool, year *int32) BuildingRenovation {
+	if year != nil && *year <= 0 {
+		year = nil
+	}
+	if done != nil && !*done && year == nil {
+		done = nil
+	}
+	if done == nil && year == nil {
+		return BuildingRenovation{}
+	}
+	return BuildingRenovation{Kind: kind, Done: done, Year: year}
+}
+
+func compactRenovations(values []BuildingRenovation) []BuildingRenovation {
+	out := make([]BuildingRenovation, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		kind := cleanDisplayString(value.Kind)
+		if kind == "" || (value.Done == nil && value.Year == nil) {
+			continue
+		}
+		year := ""
+		if value.Year != nil {
+			year = strconv.FormatInt(int64(*value.Year), 10)
+		}
+		done := ""
+		if value.Done != nil && *value.Done {
+			done = "true"
+		}
+		key := strings.ToLower(kind + ":" + year + ":" + done)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		value.Kind = kind
+		out = append(out, value)
+	}
+	return out
 }
 
 func boolTextPtr(value *string) *bool {

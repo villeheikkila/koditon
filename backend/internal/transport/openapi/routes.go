@@ -74,6 +74,12 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search sale listings using the shared provider-neutral sale listing model"
 		op.Tags = []string{"Sale Listings"}
 	})
+	huma.Get(api, "/api/v1/sale-listings/map", a.saleListingsMapHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-map"
+		op.Summary = "Map sale listing locations"
+		op.Description = "Return grouped map markers for canonical sale offerings by exact building location"
+		op.Tags = []string{"Sale Listings"}
+	})
 	huma.Get(api, "/api/v1/sale-listings/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-transaction-match-postals"
 		op.Summary = "List postal codes with potential transaction matches"
@@ -91,7 +97,13 @@ func addRoutes(a *API, api huma.API) {
 	huma.Get(api, "/api/v1/sale-listings/{id}", a.saleListingDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-detail"
 		op.Summary = "Get sale listing detail"
-		op.Description = "Fetch a sale listing by public ID, canonical ID, or source URL"
+		op.Description = "Fetch a canonical sale offering by UUID"
+		op.Tags = []string{"Sale Listings"}
+	})
+	huma.Get(api, "/api/v1/sale-listings/{id}/source-records/{sourceID}/raw", a.saleListingSourceRawHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-source-raw"
+		op.Summary = "Get sale listing source raw payload"
+		op.Description = "Fetch the original provider JSON payload for a source row linked to a canonical sale offering"
 		op.Tags = []string{"Sale Listings"}
 	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {

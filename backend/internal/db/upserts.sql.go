@@ -290,7 +290,7 @@ ON CONFLICT (
 SET prices_transaction_updated_at = now(),
     prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
 WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months'
-RETURNING prices_transaction_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_period_identifier, prices_transaction_created_at, prices_transaction_updated_at, prices_transaction_category, prices_neighborhood_id
+RETURNING prices_transaction_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_period_identifier, prices_transaction_created_at, prices_transaction_updated_at, prices_transaction_category, prices_neighborhood_id, prices_transaction_plot_owned
 `
 
 type UpsertPricesTransactionParams struct {
@@ -346,6 +346,7 @@ func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg UpsertPricesT
 		&i.PricesTransactionUpdatedAt,
 		&i.PricesTransactionCategory,
 		&i.PricesNeighborhoodID,
+		&i.PricesTransactionPlotOwned,
 	)
 	return i, err
 }

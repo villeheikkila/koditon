@@ -2,39 +2,68 @@ package properties
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
 const searchSaleListingsSQL = `
 SELECT
-    sale_listing_source_provider,
-    sale_listing_source_kind,
-    sale_listing_native_id,
-    sale_listing_canonical_id,
-    sale_listing_public_id,
-    COALESCE(sale_listing_url, ''),
-    COALESCE(sale_listing_headline, ''),
-    COALESCE(sale_listing_street_address, ''),
-    COALESCE(sale_listing_city, ''),
-    COALESCE(sale_listing_postal, ''),
-    sale_listing_asking_price,
-    sale_listing_area_value,
-    COALESCE(sale_listing_room_layout, ''),
-    sale_listing_price_per_m2,
-    sale_listing_debt_free_price,
-    sale_listing_debt_share_amount,
-    sale_listing_rooms_count,
-    sale_listing_floor_level,
-    sale_listing_total_floors,
-    sale_listing_build_year,
-    sale_listing_condition,
-    sale_listing_energy_class,
-    sale_listing_energy_efficiency_label,
-    sale_listing_last_seen_at::text,
-    sale_listing_published_at::text,
-    COALESCE(sale_listing_street_address, '')
-FROM public.sale_listings sl
-WHERE ($4 = 'all' OR sl.sale_listing_source_provider = $4)
+    sl.sale_listing_source_provider,
+    sl.sale_listing_source_kind,
+    sl.sale_listing_native_id,
+    sl.sale_listing_canonical_id,
+    po.property_offering_id::text,
+    COALESCE(sl.sale_listing_url, ''),
+    COALESCE(sl.sale_listing_headline, ''),
+    COALESCE(sl.sale_listing_street_address, ''),
+    COALESCE(sl.sale_listing_city, ''),
+    COALESCE(sl.sale_listing_postal, ''),
+    sl.sale_listing_asking_price,
+    sl.sale_listing_area_value,
+    COALESCE(sl.sale_listing_room_layout, ''),
+    sl.sale_listing_price_per_m2,
+    sl.sale_listing_debt_free_price,
+    sl.sale_listing_debt_share_amount,
+    sl.sale_listing_rooms_count,
+    sl.sale_listing_floor_level,
+    sl.sale_listing_total_floors,
+    sl.sale_listing_build_year,
+    sl.sale_listing_condition,
+    sl.sale_listing_energy_class,
+    sl.sale_listing_energy_efficiency_label,
+    sl.sale_listing_last_seen_at::text,
+    sl.sale_listing_published_at::text,
+    COALESCE(sl.sale_listing_street_address, ''),
+    source_badges.source_providers
+FROM public.property_offerings po
+JOIN public.sale_listings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+JOIN LATERAL (
+    SELECT array_agg(provider ORDER BY provider)::text[] AS source_providers
+    FROM (
+        SELECT DISTINCT source_sl.sale_listing_source_provider AS provider
+        FROM public.property_offering_sources source_pos
+        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        WHERE source_pos.property_offering_id = po.property_offering_id
+            AND source_pos.property_offering_source_link_status <> 'rejected'
+    ) providers
+) source_badges ON true
+WHERE EXISTS (
+    SELECT 1
+    FROM public.property_offering_sources active_pos
+    WHERE active_pos.property_offering_id = po.property_offering_id
+        AND active_pos.property_offering_source_link_status <> 'rejected'
+)
+  AND (
+    $4 = 'all'
+    OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_sources source_pos
+        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        WHERE source_pos.property_offering_id = po.property_offering_id
+            AND source_pos.property_offering_source_link_status <> 'rejected'
+            AND source_sl.sale_listing_source_provider = $4
+    )
+  )
   AND ($5::text IS NULL OR trim($5::text) = '' OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text)) LIKE ('%' || lower(trim($5::text)) || '%'))
   AND ($6::text IS NULL OR trim($6::text) = '' OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($6::text)) || '%'))
   AND ($7::text IS NULL OR trim($7::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
@@ -52,16 +81,17 @@ WHERE ($4 = 'all' OR sl.sale_listing_source_provider = $4)
   AND ($19::int4 IS NULL OR sl.sale_listing_build_year <= $19::int4)
   AND ($20::text IS NULL OR trim($20::text) = '' OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
   AND ($21::text IS NULL OR trim($21::text) = '' OR lower(COALESCE(sl.sale_listing_energy_class, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
+  AND ($22 = 'all' OR sl.sale_listing_source_kind = $22)
 ORDER BY
-    CASE WHEN $1 = 'price_asc' THEN sale_listing_asking_price END ASC NULLS LAST,
-    CASE WHEN $1 = 'price_desc' THEN sale_listing_asking_price END DESC NULLS LAST,
-    CASE WHEN $1 = 'area_asc' THEN sale_listing_area_value END ASC NULLS LAST,
-    CASE WHEN $1 = 'area_desc' THEN sale_listing_area_value END DESC NULLS LAST,
-    CASE WHEN $1 = 'price_m2_asc' THEN sale_listing_price_per_m2 END ASC NULLS LAST,
-    CASE WHEN $1 = 'price_m2_desc' THEN sale_listing_price_per_m2 END DESC NULLS LAST,
-    CASE WHEN $1 = 'build_year_desc' THEN sale_listing_build_year END DESC NULLS LAST,
-    CASE WHEN $1 = 'seen_desc' THEN sale_listing_last_seen_at END DESC NULLS LAST,
-    sale_listing_last_seen_at DESC
+    CASE WHEN $1 = 'price_asc' THEN sl.sale_listing_asking_price END ASC NULLS LAST,
+    CASE WHEN $1 = 'price_desc' THEN sl.sale_listing_asking_price END DESC NULLS LAST,
+    CASE WHEN $1 = 'area_asc' THEN sl.sale_listing_area_value END ASC NULLS LAST,
+    CASE WHEN $1 = 'area_desc' THEN sl.sale_listing_area_value END DESC NULLS LAST,
+    CASE WHEN $1 = 'price_m2_asc' THEN sl.sale_listing_price_per_m2 END ASC NULLS LAST,
+    CASE WHEN $1 = 'price_m2_desc' THEN sl.sale_listing_price_per_m2 END DESC NULLS LAST,
+    CASE WHEN $1 = 'build_year_desc' THEN sl.sale_listing_build_year END DESC NULLS LAST,
+    CASE WHEN $1 = 'seen_desc' THEN sl.sale_listing_last_seen_at END DESC NULLS LAST,
+    sl.sale_listing_last_seen_at DESC
 LIMIT $3::int OFFSET $2::int`
 
 const searchRentalsSQL = `
@@ -76,7 +106,7 @@ WITH unified AS (
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
 )
-SELECT source, kind, native_id, canonical_id, ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id, url, headline, address, city, postal, price, area, room_layout, NULL::float8, NULL::bigint, NULL::bigint, NULL::int4, NULL::int4, NULL::int4, NULL::int4, NULL::text, NULL::text, NULL::text, last_seen_at::text, published_at::text, address
+SELECT source, kind, native_id, canonical_id, ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id, url, headline, address, city, postal, price, area, room_layout, NULL::float8, NULL::bigint, NULL::bigint, NULL::int4, NULL::int4, NULL::int4, NULL::int4, NULL::text, NULL::text, NULL::text, last_seen_at::text, published_at::text, address, ARRAY[source]::text[]
 FROM unified u
 WHERE ($4 = 'all' OR u.source = $4)
   AND ($5::text IS NULL OR trim($5::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim($5::text)) || '%'))
@@ -99,8 +129,25 @@ LIMIT $3::int OFFSET $2::int`
 
 const countSaleListingsSQL = `
 SELECT count(*)::bigint
-FROM public.sale_listings sl
-WHERE ($1 = 'all' OR sl.sale_listing_source_provider = $1)
+FROM public.property_offerings po
+JOIN public.sale_listings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+WHERE EXISTS (
+    SELECT 1
+    FROM public.property_offering_sources active_pos
+    WHERE active_pos.property_offering_id = po.property_offering_id
+        AND active_pos.property_offering_source_link_status <> 'rejected'
+)
+  AND (
+    $1 = 'all'
+    OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_sources source_pos
+        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        WHERE source_pos.property_offering_id = po.property_offering_id
+            AND source_pos.property_offering_source_link_status <> 'rejected'
+            AND source_sl.sale_listing_source_provider = $1
+    )
+  )
   AND ($2::text IS NULL OR trim($2::text) = '' OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text)) LIKE ('%' || lower(trim($2::text)) || '%'))
   AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
   AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
@@ -117,7 +164,8 @@ WHERE ($1 = 'all' OR sl.sale_listing_source_provider = $1)
   AND ($15::int4 IS NULL OR sl.sale_listing_build_year >= $15::int4)
   AND ($16::int4 IS NULL OR sl.sale_listing_build_year <= $16::int4)
   AND ($17::text IS NULL OR trim($17::text) = '' OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($17::text)) || '%'))
-  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(sl.sale_listing_energy_class, '')) LIKE ('%' || lower(trim($18::text)) || '%'))`
+  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(sl.sale_listing_energy_class, '')) LIKE ('%' || lower(trim($18::text)) || '%'))
+  AND ($19 = 'all' OR sl.sale_listing_source_kind = $19)`
 
 const countRentalsSQL = `
 WITH unified AS (
@@ -180,7 +228,7 @@ LIMIT 1`
 
 func (s *Service) searchListings(ctx context.Context, params SearchParams, listingType string) ([]listingSearchRow, error) {
 	query := searchSaleListingsSQL
-	args := []any{params.Sort, (params.Page - 1) * params.PageSize, params.PageSize, params.Source, emptyToNil(params.Query), emptyToNil(params.City), emptyToNil(params.Postal), params.MinPrice, params.MaxPrice, params.MinArea, params.MaxArea, params.PublishedAfter, params.PublishedBefore, params.MinPricePerM2, params.MaxPricePerM2, params.Rooms, params.Floor, params.MinBuildYear, params.MaxBuildYear, emptyToNil(params.Condition), emptyToNil(params.EnergyClass)}
+	args := []any{params.Sort, (params.Page - 1) * params.PageSize, params.PageSize, params.Source, emptyToNil(params.Query), emptyToNil(params.City), emptyToNil(params.Postal), params.MinPrice, params.MaxPrice, params.MinArea, params.MaxArea, params.PublishedAfter, params.PublishedBefore, params.MinPricePerM2, params.MaxPricePerM2, params.Rooms, params.Floor, params.MinBuildYear, params.MaxBuildYear, emptyToNil(params.Condition), emptyToNil(params.EnergyClass), params.Kind}
 	if listingType == "rental" {
 		query = searchRentalsSQL
 		args = args[:13]
@@ -193,7 +241,7 @@ func (s *Service) searchListings(ctx context.Context, params SearchParams, listi
 	out := []listingSearchRow{}
 	for rows.Next() {
 		var row listingSearchRow
-		if err := rows.Scan(&row.Source, &row.Kind, &row.NativeID, &row.CanonicalID, &row.PublicID, &row.URL, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Price, &row.Area, &row.RoomLayout, &row.PricePerM2, &row.DebtFreePrice, &row.DebtShareAmount, &row.RoomsCount, &row.FloorLevel, &row.TotalFloors, &row.BuildYear, &row.Condition, &row.EnergyClass, &row.EnergyEfficiencyLabel, &row.LastSeenAt, &row.PublishedAt, &row.BuildingKeyAddress); err != nil {
+		if err := rows.Scan(&row.Source, &row.Kind, &row.NativeID, &row.CanonicalID, &row.PublicID, &row.URL, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Price, &row.Area, &row.RoomLayout, &row.PricePerM2, &row.DebtFreePrice, &row.DebtShareAmount, &row.RoomsCount, &row.FloorLevel, &row.TotalFloors, &row.BuildYear, &row.Condition, &row.EnergyClass, &row.EnergyEfficiencyLabel, &row.LastSeenAt, &row.PublishedAt, &row.BuildingKeyAddress, &row.SourceProviders); err != nil {
 			return nil, fmt.Errorf("scan %s listing: %w", listingType, err)
 		}
 		out = append(out, row)
@@ -206,7 +254,7 @@ func (s *Service) searchListings(ctx context.Context, params SearchParams, listi
 
 func (s *Service) countListings(ctx context.Context, params SearchParams, listingType string) (int64, error) {
 	query := countSaleListingsSQL
-	args := []any{params.Source, emptyToNil(params.Query), emptyToNil(params.City), emptyToNil(params.Postal), params.MinPrice, params.MaxPrice, params.MinArea, params.MaxArea, params.PublishedAfter, params.PublishedBefore, params.MinPricePerM2, params.MaxPricePerM2, params.Rooms, params.Floor, params.MinBuildYear, params.MaxBuildYear, emptyToNil(params.Condition), emptyToNil(params.EnergyClass)}
+	args := []any{params.Source, emptyToNil(params.Query), emptyToNil(params.City), emptyToNil(params.Postal), params.MinPrice, params.MaxPrice, params.MinArea, params.MaxArea, params.PublishedAfter, params.PublishedBefore, params.MinPricePerM2, params.MaxPricePerM2, params.Rooms, params.Floor, params.MinBuildYear, params.MaxBuildYear, emptyToNil(params.Condition), emptyToNil(params.EnergyClass), params.Kind}
 	if listingType == "rental" {
 		query = countRentalsSQL
 		args = args[:10]
@@ -217,4 +265,173 @@ func (s *Service) countListings(ctx context.Context, params SearchParams, listin
 		return 0, fmt.Errorf("count %s listings: %w", listingType, err)
 	}
 	return count, nil
+}
+
+func (s *Service) SaleListingMap(ctx context.Context, bounds MapBounds) (SaleListingMap, error) {
+	source := normalizeSource(bounds.Source)
+	kind := normalizeListingKind(bounds.Kind)
+	limit := bounds.Limit
+	if limit <= 0 || limit > 1000 {
+		limit = 500
+	}
+	rows, err := s.db.Query(ctx, `
+WITH visible_base AS (
+    SELECT
+        pb.property_building_id,
+        postgis.ST_SnapToGrid(pb.property_building_geom, 0.000001) AS marker_geom,
+        postgis.ST_AsEWKT(postgis.ST_SnapToGrid(pb.property_building_geom, 0.000001)) AS marker_key,
+        pb.property_building_address_norm,
+        pb.property_building_city_norm,
+        pb.property_building_postal_norm,
+        pb.property_building_build_year,
+        po.property_offering_id,
+        po.property_offering_headline,
+        po.property_offering_asking_price,
+        po.property_offering_price_per_m2,
+        pu.property_unit_area_value,
+        pu.property_unit_room_layout,
+        po.property_offering_last_seen_at,
+        sl.sale_listing_street_address,
+        sl.sale_listing_city,
+        sl.sale_listing_postal,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_source_kind,
+        row_number() OVER (
+            PARTITION BY po.property_offering_id
+            ORDER BY
+                CASE
+                    WHEN sl.frontdoor_ad_id IS NOT NULL THEN 0
+                    WHEN sl.shortcut_ad_id IS NOT NULL THEN 1
+                    ELSE 2
+                END,
+                sl.sale_listing_last_seen_at DESC NULLS LAST,
+                sl.sale_listing_created_at DESC
+        ) AS source_rank
+    FROM public.property_buildings pb
+    JOIN public.property_units pu ON pu.property_building_id = pb.property_building_id
+    JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+    JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+    WHERE pb.property_building_geom IS NOT NULL
+        AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
+        AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
+        AND (
+            $3::double precision IS NULL
+            OR postgis.ST_Intersects(
+                pb.property_building_geom,
+                postgis.ST_MakeEnvelope($4::double precision, $3::double precision, $6::double precision, $5::double precision, 4326)
+            )
+        )
+),
+visible AS (
+    SELECT *
+    FROM visible_base
+    WHERE source_rank = 1
+),
+source_summary AS (
+    SELECT
+        property_offering_id,
+        array_agg(DISTINCT sale_listing_source_provider ORDER BY sale_listing_source_provider) AS offering_providers,
+        array_agg(DISTINCT sale_listing_source_kind ORDER BY sale_listing_source_kind) AS offering_kinds
+    FROM visible_base
+    GROUP BY property_offering_id
+),
+grouped AS (
+    SELECT
+        marker_geom,
+        marker_key,
+        count(DISTINCT property_offering_id)::bigint AS offering_count,
+        count(DISTINCT property_building_id)::bigint AS building_count,
+        min(property_building_address_norm) AS address,
+        min(property_building_city_norm) AS city,
+        min(property_building_postal_norm) AS postal,
+        min(property_offering_asking_price) AS min_price,
+        max(property_offering_asking_price) AS max_price,
+        min(property_unit_area_value) AS min_area,
+        max(property_unit_area_value) AS max_area,
+        max(property_offering_last_seen_at) AS last_seen_at,
+        array_agg(DISTINCT sale_listing_source_provider ORDER BY sale_listing_source_provider) AS providers,
+        array_agg(DISTINCT sale_listing_source_kind ORDER BY sale_listing_source_kind) AS kinds,
+        (array_agg(DISTINCT property_offering_id::text))[1:8] AS listing_ids,
+        min(property_building_id::text) AS building_id
+    FROM visible
+    GROUP BY marker_geom, marker_key
+),
+listing_cards AS (
+    SELECT
+        marker_key,
+        jsonb_agg(listing ORDER BY property_offering_last_seen_at DESC NULLS LAST, property_offering_asking_price ASC NULLS LAST) AS listings
+    FROM (
+        SELECT
+            visible.marker_key,
+            visible.property_offering_last_seen_at,
+            visible.property_offering_asking_price,
+            jsonb_build_object(
+                'id', visible.property_offering_id::text,
+                'headline', visible.property_offering_headline,
+                'address', COALESCE(NULLIF(visible.sale_listing_street_address, ''), visible.property_building_address_norm),
+                'city', COALESCE(NULLIF(visible.sale_listing_city, ''), visible.property_building_city_norm),
+                'postal', COALESCE(NULLIF(visible.sale_listing_postal, ''), visible.property_building_postal_norm),
+                'layout', visible.property_unit_room_layout,
+                'area_m2', visible.property_unit_area_value,
+                'price', visible.property_offering_asking_price,
+                'price_per_m2', visible.property_offering_price_per_m2,
+                'build_year', visible.property_building_build_year,
+                'last_seen_at', visible.property_offering_last_seen_at,
+                'providers', COALESCE(source_summary.offering_providers, ARRAY[]::text[]),
+                'kinds', COALESCE(source_summary.offering_kinds, ARRAY[]::text[])
+            ) AS listing,
+            row_number() OVER (
+                PARTITION BY visible.marker_key
+                ORDER BY visible.property_offering_last_seen_at DESC NULLS LAST, visible.property_offering_asking_price ASC NULLS LAST
+            ) AS listing_rank
+        FROM visible
+        LEFT JOIN source_summary ON source_summary.property_offering_id = visible.property_offering_id
+    ) ranked
+    WHERE listing_rank <= 24
+    GROUP BY marker_key
+)
+SELECT
+    postgis.ST_Y(marker_geom)::double precision AS lat,
+    postgis.ST_X(marker_geom)::double precision AS lng,
+    offering_count,
+    COALESCE(address, ''),
+    COALESCE(city, ''),
+    COALESCE(postal, ''),
+    min_price,
+    max_price,
+    min_area,
+    max_area,
+    last_seen_at,
+    providers,
+    kinds,
+    listing_ids,
+    COALESCE(listing_cards.listings, '[]'::jsonb),
+    building_id,
+    building_count
+FROM grouped
+LEFT JOIN listing_cards USING (marker_key)
+ORDER BY last_seen_at DESC NULLS LAST, offering_count DESC
+LIMIT $7::int`, source, kind, bounds.MinLat, bounds.MinLng, bounds.MaxLat, bounds.MaxLng, limit)
+	if err != nil {
+		return SaleListingMap{}, fmt.Errorf("query sale listing map: %w", err)
+	}
+	defer rows.Close()
+	out := SaleListingMap{Markers: []SaleListingMapMarker{}}
+	for rows.Next() {
+		var marker SaleListingMapMarker
+		var listingsJSON []byte
+		if err := rows.Scan(&marker.Lat, &marker.Lng, &marker.Count, &marker.Address, &marker.City, &marker.Postal, &marker.MinPrice, &marker.MaxPrice, &marker.MinAreaM2, &marker.MaxAreaM2, &marker.LastSeenAt, &marker.Providers, &marker.Kinds, &marker.ListingIDs, &listingsJSON, &marker.BuildingID, &marker.BuildingCount); err != nil {
+			return SaleListingMap{}, fmt.Errorf("scan sale listing map marker: %w", err)
+		}
+		if err := json.Unmarshal(listingsJSON, &marker.Listings); err != nil {
+			return SaleListingMap{}, fmt.Errorf("decode sale listing map listings: %w", err)
+		}
+		out.Markers = append(out.Markers, marker)
+	}
+	if err := rows.Err(); err != nil {
+		return SaleListingMap{}, fmt.Errorf("iterate sale listing map markers: %w", err)
+	}
+	return out, nil
 }
