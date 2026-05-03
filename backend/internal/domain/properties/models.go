@@ -51,23 +51,23 @@ type MapBounds struct {
 }
 
 type SaleListingMapMarker struct {
-	Lat           float64                 `json:"lat"`
-	Lng           float64                 `json:"lng"`
-	Count         int64                   `json:"count"`
-	Address       string                  `json:"address,omitempty"`
-	City          string                  `json:"city,omitempty"`
-	Postal        string                  `json:"postal,omitempty"`
-	MinPrice      *int64                  `json:"min_price,omitempty"`
-	MaxPrice      *int64                  `json:"max_price,omitempty"`
-	MinAreaM2     *float64                `json:"min_area_m2,omitempty"`
-	MaxAreaM2     *float64                `json:"max_area_m2,omitempty"`
-	LastSeenAt    *time.Time              `json:"last_seen_at,omitempty"`
-	Providers     []string                `json:"providers,omitempty"`
-	Kinds         []string                `json:"kinds,omitempty"`
-	ListingIDs    []string                `json:"listing_ids,omitempty"`
-	Listings      []SaleListingMapListing `json:"listings,omitempty"`
-	BuildingID    string                  `json:"building_id,omitempty"`
-	BuildingCount int64                   `json:"building_count"`
+	Lat                 float64                 `json:"lat"`
+	Lng                 float64                 `json:"lng"`
+	Count               int64                   `json:"count"`
+	Address             string                  `json:"address,omitempty"`
+	City                string                  `json:"city,omitempty"`
+	Postal              string                  `json:"postal,omitempty"`
+	MinPrice            *int64                  `json:"min_price,omitempty"`
+	MaxPrice            *int64                  `json:"max_price,omitempty"`
+	MinAreaM2           *float64                `json:"min_area_m2,omitempty"`
+	MaxAreaM2           *float64                `json:"max_area_m2,omitempty"`
+	LastSeenAt          *time.Time              `json:"last_seen_at,omitempty"`
+	Providers           []string                `json:"providers,omitempty"`
+	Kinds               []string                `json:"kinds,omitempty"`
+	ListingIDs          []string                `json:"listing_ids,omitempty"`
+	Listings            []SaleListingMapListing `json:"listings,omitempty"`
+	HousingCompanyID    string                  `json:"housing_company_id,omitempty"`
+	HousingCompanyCount int64                   `json:"housing_company_count"`
 }
 
 type SaleListingMapListing struct {
@@ -93,7 +93,7 @@ type SaleListingMap struct {
 type ListingSource struct {
 	Provider    string          `json:"provider"`
 	Kind        string          `json:"kind"`
-	CanonicalID string          `json:"canonical_id"`
+	CanonicalID string          `json:"-"`
 	NativeID    string          `json:"native_id"`
 	ExternalID  string          `json:"external_id,omitempty"`
 	FriendlyID  string          `json:"friendly_id,omitempty"`
@@ -108,19 +108,19 @@ type ListingSource struct {
 }
 
 type CanonicalOffering struct {
-	OfferingID           string `json:"offering_id"`
-	BuildingID           string `json:"building_id,omitempty"`
-	UnitID               string `json:"unit_id,omitempty"`
-	PrimarySourceListing string `json:"primary_source_listing_id,omitempty"`
-	SourceCount          int32  `json:"source_count,omitempty"`
+	OfferingID           string   `json:"offering_id"`
+	HousingCompanyID     string   `json:"housing_company_id,omitempty"`
+	UnitID               string   `json:"unit_id,omitempty"`
+	PrimarySourceListing string   `json:"primary_source_listing_id,omitempty"`
+	SourceCount          int32    `json:"source_count,omitempty"`
+	MergeDecisionCount   int32    `json:"merge_decision_count,omitempty"`
+	MergedFrom           []string `json:"merged_from,omitempty"`
 }
 
 type OfferingSourceRecord struct {
 	ID          string     `json:"id"`
-	PublicID    string     `json:"public_id,omitempty"`
 	Provider    string     `json:"provider"`
 	Kind        string     `json:"kind"`
-	CanonicalID string     `json:"canonical_id"`
 	NativeID    string     `json:"native_id"`
 	URL         string     `json:"url,omitempty"`
 	Headline    string     `json:"headline,omitempty"`
@@ -132,13 +132,11 @@ type OfferingSourceRecord struct {
 }
 
 type OfferingSourceRawPayload struct {
-	ID        string          `json:"id"`
-	PublicID  string          `json:"public_id,omitempty"`
-	Provider  string          `json:"provider"`
-	Kind      string          `json:"kind"`
-	NativeID  string          `json:"native_id"`
-	Canonical string          `json:"canonical_id"`
-	Payload   json.RawMessage `json:"payload"`
+	ID       string          `json:"id"`
+	Provider string          `json:"provider"`
+	Kind     string          `json:"kind"`
+	NativeID string          `json:"native_id"`
+	Payload  json.RawMessage `json:"payload"`
 }
 
 type BuildingIdentity struct {
@@ -546,16 +544,21 @@ type RelatedListings struct {
 }
 
 type RelatedListing struct {
-	ID         string   `json:"id"`
-	Kind       string   `json:"kind,omitempty"`
-	FriendlyID string   `json:"friendly_id,omitempty"`
-	Address    string   `json:"address,omitempty"`
-	RoomLayout string   `json:"room_layout,omitempty"`
-	AreaM2     *float64 `json:"area_m2,omitempty"`
-	Price      *int64   `json:"price,omitempty"`
-	RentPeriod string   `json:"rent_period,omitempty"`
-	Published  *bool    `json:"published,omitempty"`
-	MainImage  *Image   `json:"main_image,omitempty"`
+	ID         string     `json:"id"`
+	Kind       string     `json:"kind,omitempty"`
+	FriendlyID string     `json:"friendly_id,omitempty"`
+	Address    string     `json:"address,omitempty"`
+	RoomLayout string     `json:"room_layout,omitempty"`
+	AreaM2     *float64   `json:"area_m2,omitempty"`
+	Price      *int64     `json:"price,omitempty"`
+	PricePerM2 *float64   `json:"price_per_m2,omitempty"`
+	BuildYear  *int32     `json:"build_year,omitempty"`
+	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
+	Providers  []string   `json:"providers,omitempty"`
+	Kinds      []string   `json:"kinds,omitempty"`
+	RentPeriod string     `json:"rent_period,omitempty"`
+	Published  *bool      `json:"published,omitempty"`
+	MainImage  *Image     `json:"main_image,omitempty"`
 }
 
 type BuildingRenovation struct {
@@ -568,15 +571,23 @@ type rawMap map[string]any
 
 func parseShortcutRaw(payload json.RawMessage) rawMap {
 	_, out, err := shortcutpayload.DecodeStoredAd(payload)
-	if err != nil {
-		return nil
+	if err == nil {
+		return rawMap(out)
 	}
-	return rawMap(out)
+	return parseRawMap(payload)
 }
 
 func parseFrontdoorRaw(payload json.RawMessage) rawMap {
 	_, out, err := frontdoorpayload.DecodeStoredAd(payload)
-	if err != nil {
+	if err == nil {
+		return rawMap(out)
+	}
+	return parseRawMap(payload)
+}
+
+func parseRawMap(payload json.RawMessage) rawMap {
+	var out map[string]any
+	if err := json.Unmarshal(payload, &out); err != nil {
 		return nil
 	}
 	return rawMap(out)

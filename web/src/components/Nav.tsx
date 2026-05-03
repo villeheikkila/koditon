@@ -25,8 +25,7 @@ export default function Nav({ actions }: NavProps) {
           Map
         </NavLink>
         <NavLink
-          to="/"
-          end
+          to="/prices"
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
         >
           Prices

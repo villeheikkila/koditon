@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
@@ -50,12 +51,12 @@ type pricesMatchBackfillPayload struct {
 }
 
 type pricesMatchSaleListingPayload struct {
-	ListingPublicID string `json:"listing_public_id"`
-	Attempt         int32  `json:"attempt,omitempty"`
+	SaleListingID string `json:"sale_listing_id"`
+	Attempt       int32  `json:"attempt,omitempty"`
 }
 
 type pricesMatchSaleListingRow struct {
-	PublicID      string
+	ID            string
 	LastSeenAt    *time.Time
 	TransactionID *string
 	Status        *string
@@ -342,7 +343,7 @@ func (c *Consumer) handlePricesMatchSaleListingsFanout(ctx context.Context, logg
 		payload.Limit = 5000
 	}
 	rows, err := c.pool.Query(ctx, `
-SELECT sale_listing_public_id, COALESCE(sale_listing_prices_match_attempt_count, 0)
+SELECT sale_listing_id::text, COALESCE(sale_listing_prices_match_attempt_count, 0)
 FROM public.sale_listings
 WHERE sale_listing_source_kind = 'ad'
     AND prices_transaction_id IS NULL
@@ -359,12 +360,12 @@ LIMIT $1`, payload.Limit)
 	defer rows.Close()
 	enqueued := 0
 	for rows.Next() {
-		var publicID string
+		var saleListingID string
 		var attempt int32
-		if err := rows.Scan(&publicID, &attempt); err != nil {
+		if err := rows.Scan(&saleListingID, &attempt); err != nil {
 			return fmt.Errorf("scan sale listing match fanout row: %w", err)
 		}
-		if err := c.enqueuePricesMatchSaleListing(ctx, publicID, attempt+1, time.Now()); err != nil {
+		if err := c.enqueuePricesMatchSaleListing(ctx, saleListingID, attempt+1, time.Now()); err != nil {
 			return err
 		}
 		enqueued++
@@ -382,7 +383,7 @@ func (c *Consumer) handlePricesMatchSaleListing(ctx context.Context, logger *slo
 	if err != nil {
 		return taskqueue.NewPermanentError(err, "invalid payload")
 	}
-	row, err := c.loadPricesMatchSaleListing(ctx, payload.ListingPublicID)
+	row, err := c.loadPricesMatchSaleListing(ctx, payload.SaleListingID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -391,47 +392,47 @@ func (c *Consumer) handlePricesMatchSaleListing(ctx context.Context, logger *slo
 	}
 	now := time.Now().UTC()
 	if row.TransactionID != nil {
-		return c.updatePricesMatchState(ctx, row.PublicID, "auto_linked", nil, nil, nil)
+		return c.updatePricesMatchState(ctx, row.ID, "auto_linked", nil, nil, nil)
 	}
 	if row.LastSeenAt == nil {
 		next := now.Add(pricesMatchRetryDelay)
-		if err := c.updatePricesMatchState(ctx, row.PublicID, "deferred", &next, nil, nil); err != nil {
+		if err := c.updatePricesMatchState(ctx, row.ID, "deferred", &next, nil, nil); err != nil {
 			return err
 		}
-		return c.enqueuePricesMatchSaleListing(ctx, row.PublicID, row.AttemptCount+2, next)
+		return c.enqueuePricesMatchSaleListing(ctx, row.ID, row.AttemptCount+2, next)
 	}
 	firstEligible := row.LastSeenAt.Add(pricesMatchInitialDelay)
 	expiresAt := row.LastSeenAt.Add(pricesMatchMaxAge)
 	if now.Before(firstEligible) {
-		if err := c.updatePricesMatchState(ctx, row.PublicID, "deferred", &firstEligible, nil, &expiresAt); err != nil {
+		if err := c.updatePricesMatchState(ctx, row.ID, "deferred", &firstEligible, nil, &expiresAt); err != nil {
 			return err
 		}
-		return c.enqueuePricesMatchSaleListing(ctx, row.PublicID, row.AttemptCount+2, firstEligible)
+		return c.enqueuePricesMatchSaleListing(ctx, row.ID, row.AttemptCount+2, firstEligible)
 	}
 	if now.After(expiresAt) {
-		return c.updatePricesMatchState(ctx, row.PublicID, "expired", nil, nil, &expiresAt)
+		return c.updatePricesMatchState(ctx, row.ID, "expired", nil, nil, &expiresAt)
 	}
-	run, err := c.runPricesMatchForSaleListing(ctx, row.PublicID)
+	run, err := c.runPricesMatchForSaleListing(ctx, row.ID)
 	if err != nil {
 		return err
 	}
 	if run.AutoLinked > 0 {
-		logger.InfoContext(ctx, "prices sale listing auto-linked", "listing", row.PublicID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
-		return c.updatePricesMatchState(ctx, row.PublicID, "auto_linked", nil, &run.RunID, &expiresAt)
+		logger.InfoContext(ctx, "prices sale listing auto-linked", "sale_listing_id", row.ID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
+		return c.updatePricesMatchState(ctx, row.ID, "auto_linked", nil, &run.RunID, &expiresAt)
 	}
 	if run.Ambiguous > 0 {
-		logger.InfoContext(ctx, "prices sale listing needs review", "listing", row.PublicID, "run_id", run.RunID, "candidates", run.Ambiguous)
-		return c.updatePricesMatchState(ctx, row.PublicID, "needs_review", nil, &run.RunID, &expiresAt)
+		logger.InfoContext(ctx, "prices sale listing needs review", "sale_listing_id", row.ID, "run_id", run.RunID, "candidates", run.Ambiguous)
+		return c.updatePricesMatchState(ctx, row.ID, "needs_review", nil, &run.RunID, &expiresAt)
 	}
 	next := now.Add(pricesMatchRetryDelay)
 	if next.After(expiresAt) {
-		return c.updatePricesMatchState(ctx, row.PublicID, "expired", nil, &run.RunID, &expiresAt)
+		return c.updatePricesMatchState(ctx, row.ID, "expired", nil, &run.RunID, &expiresAt)
 	}
-	if err := c.updatePricesMatchState(ctx, row.PublicID, "deferred", &next, &run.RunID, &expiresAt); err != nil {
+	if err := c.updatePricesMatchState(ctx, row.ID, "deferred", &next, &run.RunID, &expiresAt); err != nil {
 		return err
 	}
-	logger.InfoContext(ctx, "prices sale listing match deferred", "listing", row.PublicID, "next_attempt_at", next)
-	return c.enqueuePricesMatchSaleListing(ctx, row.PublicID, row.AttemptCount+2, next)
+	logger.InfoContext(ctx, "prices sale listing match deferred", "sale_listing_id", row.ID, "next_attempt_at", next)
+	return c.enqueuePricesMatchSaleListing(ctx, row.ID, row.AttemptCount+2, next)
 }
 
 func decodePricesMatchSaleListingPayload(job db.SyncJob) (pricesMatchSaleListingPayload, error) {
@@ -441,39 +442,43 @@ func decodePricesMatchSaleListingPayload(job db.SyncJob) (pricesMatchSaleListing
 			return pricesMatchSaleListingPayload{}, fmt.Errorf("decode prices sale listing match payload: %w", err)
 		}
 	}
-	if payload.ListingPublicID == "" {
+	if payload.SaleListingID == "" {
 		_, value, err := parseJobEntity(job.SyncJobEntityID)
 		if err != nil {
 			return pricesMatchSaleListingPayload{}, fmt.Errorf("parse listing entity: %w", err)
 		}
-		payload.ListingPublicID = strings.TrimSpace(value)
+		value, _, _ = strings.Cut(value, ":attempt:")
+		payload.SaleListingID = strings.TrimSpace(value)
 	}
-	if payload.ListingPublicID == "" {
-		return pricesMatchSaleListingPayload{}, fmt.Errorf("listing_public_id is required")
+	if payload.SaleListingID == "" {
+		return pricesMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
+	}
+	if _, err := uuid.Parse(payload.SaleListingID); err != nil {
+		return pricesMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id must be a uuid: %w", err)
 	}
 	return payload, nil
 }
 
-func (c *Consumer) loadPricesMatchSaleListing(ctx context.Context, publicID string) (pricesMatchSaleListingRow, error) {
+func (c *Consumer) loadPricesMatchSaleListing(ctx context.Context, saleListingID string) (pricesMatchSaleListingRow, error) {
 	var row pricesMatchSaleListingRow
 	var transactionID *string
 	err := c.pool.QueryRow(ctx, `
 SELECT
-    sale_listing_public_id,
+    sale_listing_id::text,
     sale_listing_last_seen_at,
     prices_transaction_id::text,
     sale_listing_prices_match_status,
     sale_listing_prices_match_attempt_count,
     sale_listing_prices_match_expires_at
 FROM public.sale_listings
-WHERE sale_listing_public_id = $1`, publicID).Scan(&row.PublicID, &row.LastSeenAt, &transactionID, &row.Status, &row.AttemptCount, &row.ExpiresAt)
+WHERE sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LastSeenAt, &transactionID, &row.Status, &row.AttemptCount, &row.ExpiresAt)
 	row.TransactionID = transactionID
 	return row, err
 }
 
-func (c *Consumer) runPricesMatchForSaleListing(ctx context.Context, publicID string) (pricesMatchRunSummary, error) {
+func (c *Consumer) runPricesMatchForSaleListing(ctx context.Context, saleListingID string) (pricesMatchRunSummary, error) {
 	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, 90, 15, $1)::text`, publicID).Scan(&runID); err != nil {
+	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, 90, 15, $1::uuid)::text`, saleListingID).Scan(&runID); err != nil {
 		return pricesMatchRunSummary{}, fmt.Errorf("run prices sale listing match: %w", err)
 	}
 	var summary pricesMatchRunSummary
@@ -493,7 +498,7 @@ WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&sum
 
 func (c *Consumer) runPricesMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (pricesMatchRunSummary, error) {
 	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, $1, $2, NULL)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
+	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, $1, $2, NULL::uuid)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
 		return pricesMatchRunSummary{}, fmt.Errorf("run prices sale listing match backfill: %w", err)
 	}
 	var summary pricesMatchRunSummary
@@ -511,7 +516,7 @@ WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&sum
 	return summary, nil
 }
 
-func (c *Consumer) updatePricesMatchState(ctx context.Context, publicID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {
+func (c *Consumer) updatePricesMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {
 	_, err := c.pool.Exec(ctx, `
 UPDATE public.sale_listings
 SET
@@ -522,22 +527,22 @@ SET
     sale_listing_prices_match_run_id = COALESCE($4::uuid, sale_listing_prices_match_run_id),
     sale_listing_prices_match_expires_at = COALESCE($5, sale_listing_prices_match_expires_at),
     sale_listing_updated_at = now()
-WHERE sale_listing_public_id = $1`, publicID, status, nextAttemptAt, runID, expiresAt)
+WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID, expiresAt)
 	if err != nil {
 		return fmt.Errorf("update prices match state: %w", err)
 	}
 	return nil
 }
 
-func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, publicID string, attempt int32, runAfter time.Time) error {
-	payload, err := json.Marshal(pricesMatchSaleListingPayload{ListingPublicID: publicID, Attempt: attempt})
+func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, saleListingID string, attempt int32, runAfter time.Time) error {
+	payload, err := json.Marshal(pricesMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
 	if err != nil {
 		return fmt.Errorf("marshal prices sale listing match payload: %w", err)
 	}
 	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
 		Provider:    "prices",
 		Kind:        TaskTypePricesMatchSaleListing,
-		EntityID:    fmt.Sprintf("listing:%s:attempt:%d", publicID, attempt),
+		EntityID:    fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
 		Priority:    int32(taskqueue.PriorityLow),
 		MaxAttempts: 3,
 		RunAfter:    runAfter,

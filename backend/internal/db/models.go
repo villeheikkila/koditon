@@ -226,6 +226,74 @@ type FrontdoorBuildingAnnouncement struct {
 	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
 }
 
+type HousingCompany struct {
+	HousingCompanyID                    uuid.UUID       `json:"housing_company_id"`
+	HousingCompanyIdentityKey           string          `json:"housing_company_identity_key"`
+	HousingCompanyPostalNorm            *string         `json:"housing_company_postal_norm"`
+	HousingCompanyCityNorm              *string         `json:"housing_company_city_norm"`
+	HousingCompanyAddressNorm           *string         `json:"housing_company_address_norm"`
+	HousingCompanyName                  *string         `json:"housing_company_name"`
+	HousingCompanyBusinessID            *string         `json:"housing_company_business_id"`
+	HousingCompanyBuildYear             *int32          `json:"housing_company_build_year"`
+	HousingCompanyFloorCount            *int32          `json:"housing_company_floor_count"`
+	HousingCompanyApartmentCount        *int32          `json:"housing_company_apartment_count"`
+	HousingCompanyElevator              *bool           `json:"housing_company_elevator"`
+	HousingCompanyEnergyEfficiencyLabel *string         `json:"housing_company_energy_efficiency_label"`
+	HousingCompanyMatchReasons          json.RawMessage `json:"housing_company_match_reasons"`
+	HousingCompanyCreatedAt             time.Time       `json:"housing_company_created_at"`
+	HousingCompanyUpdatedAt             time.Time       `json:"housing_company_updated_at"`
+	HousingCompanyGeom                  interface{}     `json:"housing_company_geom"`
+}
+
+type HousingCompanyFact struct {
+	HousingCompanyFactID          uuid.UUID       `json:"housing_company_fact_id"`
+	HousingCompanyID              uuid.UUID       `json:"housing_company_id"`
+	HousingCompanySourceID        *uuid.UUID      `json:"housing_company_source_id"`
+	HousingCompanyFactKey         string          `json:"housing_company_fact_key"`
+	HousingCompanyFactValueText   *string         `json:"housing_company_fact_value_text"`
+	HousingCompanyFactValueNumber *float64        `json:"housing_company_fact_value_number"`
+	HousingCompanyFactValueBool   *bool           `json:"housing_company_fact_value_bool"`
+	HousingCompanyFactValueJson   json.RawMessage `json:"housing_company_fact_value_json"`
+	HousingCompanyFactRawValue    *string         `json:"housing_company_fact_raw_value"`
+	HousingCompanyFactConfidence  int32           `json:"housing_company_fact_confidence"`
+	HousingCompanyFactFirstSeenAt *time.Time      `json:"housing_company_fact_first_seen_at"`
+	HousingCompanyFactLastSeenAt  *time.Time      `json:"housing_company_fact_last_seen_at"`
+	HousingCompanyFactCreatedAt   time.Time       `json:"housing_company_fact_created_at"`
+	HousingCompanyFactUpdatedAt   time.Time       `json:"housing_company_fact_updated_at"`
+}
+
+type HousingCompanyMergeDecision struct {
+	HousingCompanyMergeDecisionID         uuid.UUID       `json:"housing_company_merge_decision_id"`
+	SourceHousingCompanyID                uuid.UUID       `json:"source_housing_company_id"`
+	TargetHousingCompanyID                uuid.UUID       `json:"target_housing_company_id"`
+	HousingCompanyMergeDecisionStatus     string          `json:"housing_company_merge_decision_status"`
+	HousingCompanyMergeDecisionMethod     string          `json:"housing_company_merge_decision_method"`
+	HousingCompanyMergeDecisionScore      *int32          `json:"housing_company_merge_decision_score"`
+	HousingCompanyMergeDecisionConfidence *string         `json:"housing_company_merge_decision_confidence"`
+	HousingCompanyMergeDecisionReasons    json.RawMessage `json:"housing_company_merge_decision_reasons"`
+	HousingCompanyMergeDecisionCreatedAt  time.Time       `json:"housing_company_merge_decision_created_at"`
+	HousingCompanyMergeDecisionDecidedAt  time.Time       `json:"housing_company_merge_decision_decided_at"`
+}
+
+type HousingCompanySource struct {
+	HousingCompanySourceID          uuid.UUID       `json:"housing_company_source_id"`
+	HousingCompanyID                uuid.UUID       `json:"housing_company_id"`
+	HousingCompanySourceProvider    string          `json:"housing_company_source_provider"`
+	HousingCompanySourceKind        string          `json:"housing_company_source_kind"`
+	HousingCompanySourceTable       string          `json:"housing_company_source_table"`
+	HousingCompanySourceIDValue     string          `json:"housing_company_source_id_value"`
+	HousingCompanySourceExternalID  *string         `json:"housing_company_source_external_id"`
+	HousingCompanySourceUrl         *string         `json:"housing_company_source_url"`
+	HousingCompanySourceLinkStatus  string          `json:"housing_company_source_link_status"`
+	HousingCompanySourceLinkMethod  string          `json:"housing_company_source_link_method"`
+	HousingCompanySourceLinkScore   int32           `json:"housing_company_source_link_score"`
+	HousingCompanySourceLinkReasons json.RawMessage `json:"housing_company_source_link_reasons"`
+	HousingCompanySourceFirstSeenAt *time.Time      `json:"housing_company_source_first_seen_at"`
+	HousingCompanySourceLastSeenAt  *time.Time      `json:"housing_company_source_last_seen_at"`
+	HousingCompanySourceCreatedAt   time.Time       `json:"housing_company_source_created_at"`
+	HousingCompanySourceUpdatedAt   time.Time       `json:"housing_company_source_updated_at"`
+}
+
 type OauthAuthorizationCode struct {
 	OauthAuthorizationCodeID                  uuid.UUID  `json:"oauth_authorization_code_id"`
 	OauthAuthorizationCodeCodeHash            string     `json:"oauth_authorization_code_code_hash"`
@@ -403,25 +471,6 @@ type PricesTransaction struct {
 	PricesTransactionPlotOwned           *bool      `json:"prices_transaction_plot_owned"`
 }
 
-type PropertyBuilding struct {
-	PropertyBuildingID                    uuid.UUID       `json:"property_building_id"`
-	PropertyBuildingIdentityKey           string          `json:"property_building_identity_key"`
-	PropertyBuildingPostalNorm            *string         `json:"property_building_postal_norm"`
-	PropertyBuildingCityNorm              *string         `json:"property_building_city_norm"`
-	PropertyBuildingAddressNorm           *string         `json:"property_building_address_norm"`
-	PropertyBuildingHousingCompany        *string         `json:"property_building_housing_company"`
-	PropertyBuildingBusinessID            *string         `json:"property_building_business_id"`
-	PropertyBuildingBuildYear             *int32          `json:"property_building_build_year"`
-	PropertyBuildingFloorCount            *int32          `json:"property_building_floor_count"`
-	PropertyBuildingApartmentCount        *int32          `json:"property_building_apartment_count"`
-	PropertyBuildingElevator              *bool           `json:"property_building_elevator"`
-	PropertyBuildingEnergyEfficiencyLabel *string         `json:"property_building_energy_efficiency_label"`
-	PropertyBuildingMatchReasons          json.RawMessage `json:"property_building_match_reasons"`
-	PropertyBuildingCreatedAt             time.Time       `json:"property_building_created_at"`
-	PropertyBuildingUpdatedAt             time.Time       `json:"property_building_updated_at"`
-	PropertyBuildingGeom                  interface{}     `json:"property_building_geom"`
-}
-
 type PropertyOffering struct {
 	PropertyOfferingID            uuid.UUID       `json:"property_offering_id"`
 	PropertyUnitID                uuid.UUID       `json:"property_unit_id"`
@@ -438,6 +487,20 @@ type PropertyOffering struct {
 	PropertyOfferingMatchReasons  json.RawMessage `json:"property_offering_match_reasons"`
 	PropertyOfferingCreatedAt     time.Time       `json:"property_offering_created_at"`
 	PropertyOfferingUpdatedAt     time.Time       `json:"property_offering_updated_at"`
+}
+
+type PropertyOfferingMergeDecision struct {
+	PropertyOfferingMergeDecisionID         uuid.UUID       `json:"property_offering_merge_decision_id"`
+	SourcePropertyOfferingID                uuid.UUID       `json:"source_property_offering_id"`
+	TargetPropertyOfferingID                uuid.UUID       `json:"target_property_offering_id"`
+	PropertyOfferingSourceMatchCandidateID  *uuid.UUID      `json:"property_offering_source_match_candidate_id"`
+	PropertyOfferingMergeDecisionStatus     string          `json:"property_offering_merge_decision_status"`
+	PropertyOfferingMergeDecisionMethod     string          `json:"property_offering_merge_decision_method"`
+	PropertyOfferingMergeDecisionScore      *int32          `json:"property_offering_merge_decision_score"`
+	PropertyOfferingMergeDecisionConfidence *string         `json:"property_offering_merge_decision_confidence"`
+	PropertyOfferingMergeDecisionReasons    json.RawMessage `json:"property_offering_merge_decision_reasons"`
+	PropertyOfferingMergeDecisionCreatedAt  time.Time       `json:"property_offering_merge_decision_created_at"`
+	PropertyOfferingMergeDecisionDecidedAt  time.Time       `json:"property_offering_merge_decision_decided_at"`
 }
 
 type PropertyOfferingSource struct {
@@ -493,7 +556,7 @@ type PropertyOfferingTransaction struct {
 
 type PropertyUnit struct {
 	PropertyUnitID             uuid.UUID       `json:"property_unit_id"`
-	PropertyBuildingID         uuid.UUID       `json:"property_building_id"`
+	HousingCompanyID           uuid.UUID       `json:"housing_company_id"`
 	PropertyUnitIdentityKey    string          `json:"property_unit_identity_key"`
 	PropertyUnitAddressNorm    *string         `json:"property_unit_address_norm"`
 	PropertyUnitFloorLevel     *int32          `json:"property_unit_floor_level"`
@@ -529,7 +592,6 @@ type RuntimeKvStore struct {
 
 type SaleListing struct {
 	SaleListingID                           uuid.UUID       `json:"sale_listing_id"`
-	SaleListingPublicID                     string          `json:"sale_listing_public_id"`
 	ShortcutAdID                            *int64          `json:"shortcut_ad_id"`
 	FrontdoorAdID                           *uuid.UUID      `json:"frontdoor_ad_id"`
 	FrontdoorBuildingAnnouncementID         *uuid.UUID      `json:"frontdoor_building_announcement_id"`

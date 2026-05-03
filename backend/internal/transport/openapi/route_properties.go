@@ -50,9 +50,10 @@ type transactionMatchPostalsInput struct {
 }
 
 type transactionMatchCandidatesInput struct {
-	Postal string `query:"postal" doc:"Postal code filter"`
-	Status string `query:"status" doc:"Candidate status filter: candidate or ambiguous"`
-	Limit  int32  `query:"limit"  doc:"Maximum candidates to return"`
+	Postal      string `query:"postal"      doc:"Postal code filter"`
+	Status      string `query:"status"      doc:"Candidate status filter: candidate or ambiguous"`
+	Transaction string `query:"transaction" doc:"Prices transaction UUID filter"`
+	Limit       int32  `query:"limit"       doc:"Maximum candidates to return"`
 }
 
 type resolveCanonicalIDInput struct {
@@ -102,7 +103,7 @@ type rentalDetailOutput struct {
 	Body properties.Rental
 }
 
-type buildingDetailOutput struct {
+type housingCompanyDetailOutput struct {
 	Body properties.Building
 }
 
@@ -184,7 +185,7 @@ func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transac
 }
 
 func (a *API) transactionMatchCandidatesHandler(ctx context.Context, input *transactionMatchCandidatesInput) (*transactionMatchCandidatesOutput, error) {
-	candidates, err := a.propertiesService.TransactionMatchCandidates(ctx, input.Postal, input.Status, input.Limit)
+	candidates, err := a.propertiesService.TransactionMatchCandidates(ctx, input.Postal, input.Status, input.Transaction, input.Limit)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "transaction match candidate list failed", "postal", input.Postal, "status", input.Status, "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("transaction match candidate list failed")
@@ -205,15 +206,15 @@ func (a *API) rentalDetailHandler(ctx context.Context, input *propertyDetailInpu
 	return &rentalDetailOutput{Body: rental}, nil
 }
 
-func (a *API) buildingDetailHandler(ctx context.Context, input *propertyDetailInput) (*buildingDetailOutput, error) {
+func (a *API) housingCompanyDetailHandler(ctx context.Context, input *propertyDetailInput) (*housingCompanyDetailOutput, error) {
 	building, err := a.propertiesService.BuildingByID(ctx, input.ID, "", "")
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
-			return nil, huma.Error404NotFound("building not found")
+			return nil, huma.Error404NotFound("housing company not found")
 		}
-		return nil, huma.Error400BadRequest("invalid building canonical ID")
+		return nil, huma.Error400BadRequest("invalid housing company canonical ID")
 	}
-	return &buildingDetailOutput{Body: building}, nil
+	return &housingCompanyDetailOutput{Body: building}, nil
 }
 
 func (a *API) resolveCanonicalIDHandler(ctx context.Context, input *resolveCanonicalIDInput) (*resolveCanonicalIDOutput, error) {

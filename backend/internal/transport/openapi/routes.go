@@ -59,13 +59,13 @@ func addRoutes(a *API, api huma.API) {
 	huma.Get(api, "/api/v1/entity", a.entityDetailHandler, func(op *huma.Operation) {
 		op.OperationID = "entity-detail"
 		op.Summary = "Get entity detail"
-		op.Description = "Fetch canonical detail for an ad or building by canonical ID or source URL"
+		op.Description = "Fetch canonical detail for an ad or housing company by canonical ID or source URL"
 		op.Tags = []string{"Entity"}
 	})
 	huma.Get(api, "/api/v1/search", a.searchHandler, func(op *huma.Operation) {
 		op.OperationID = "search"
 		op.Summary = "Search entities"
-		op.Description = "Search ads and buildings by free text, address, city, postal code, price, and area"
+		op.Description = "Search ads and housing companies by free text, address, city, postal code, price, and area"
 		op.Tags = []string{"Entity"}
 	})
 	huma.Get(api, "/api/v1/sale-listings", a.saleListingsSearchHandler, func(op *huma.Operation) {
@@ -77,7 +77,7 @@ func addRoutes(a *API, api huma.API) {
 	huma.Get(api, "/api/v1/sale-listings/map", a.saleListingsMapHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-map"
 		op.Summary = "Map sale listing locations"
-		op.Description = "Return grouped map markers for canonical sale offerings by exact building location"
+		op.Description = "Return grouped map markers for canonical sale offerings by exact housing company location"
 		op.Tags = []string{"Sale Listings"}
 	})
 	huma.Get(api, "/api/v1/sale-listings/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
@@ -118,11 +118,11 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Fetch a rental by public ID, canonical ID, or source URL"
 		op.Tags = []string{"Rentals"}
 	})
-	huma.Get(api, "/api/v1/buildings/{id}", a.buildingDetailHandler, func(op *huma.Operation) {
-		op.OperationID = "buildings-detail"
-		op.Summary = "Get building detail"
-		op.Description = "Fetch building details by public ID, canonical ID, or source URL"
-		op.Tags = []string{"Buildings"}
+	huma.Get(api, "/api/v1/housing-companies/{id}", a.housingCompanyDetailHandler, func(op *huma.Operation) {
+		op.OperationID = "housing-companies-detail"
+		op.Summary = "Get housing company detail"
+		op.Description = "Fetch housing company details by UUID, canonical ID, or source URL"
+		op.Tags = []string{"Housing Companies"}
 	})
 	huma.Get(api, "/api/v1/resolve", a.resolveCanonicalIDHandler, func(op *huma.Operation) {
 		op.OperationID = "resolve-canonical-id"

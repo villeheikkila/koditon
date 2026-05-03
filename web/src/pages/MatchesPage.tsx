@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import {
   useSaleListingsTransactionMatchCandidates,
@@ -62,8 +62,10 @@ function highlightedPrefix(value?: string, matchWith?: string) {
 }
 
 export default function MatchesPage() {
-  const [selectedPostal, setSelectedPostal] = useState('')
-  const [status, setStatus] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedPostal, setSelectedPostal] = useState(() => searchParams.get('postal') ?? '')
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '')
+  const selectedTransaction = searchParams.get('transaction') ?? ''
   const [postalSearch, setPostalSearch] = useState('')
   const postalsQuery = useSaleListingsTransactionMatchPostals({ limit: 250 }, { query: { staleTime: 30_000 } })
   const postals = useMemo(
@@ -83,6 +85,7 @@ export default function MatchesPage() {
   const candidatesQuery = useSaleListingsTransactionMatchCandidates({
     postal: activePostal || undefined,
     status: status || undefined,
+    transaction: selectedTransaction || undefined,
     limit: LIMIT,
   }, {
     query: { enabled: !!activePostal, staleTime: 15_000 },
@@ -91,10 +94,31 @@ export default function MatchesPage() {
     () => candidatesQuery.data?.status === 200 ? (candidatesQuery.data.data.candidates ?? []) : [],
     [candidatesQuery.data],
   )
+  const visibleCandidates = candidates
   const activeSummary = postals.find(p => p.postal === activePostal)
-  const highCount = candidates.filter(c => c.confidence === 'high').length
-  const ambiguousCount = candidates.filter(c => c.status === 'ambiguous').length
+  const highCount = visibleCandidates.filter(c => c.confidence === 'high').length
+  const ambiguousCount = visibleCandidates.filter(c => c.status === 'ambiguous').length
   const activeTitle = [activePostal, activeSummary?.name_fi || activeSummary?.municipality_name].filter(Boolean).join(' ')
+  function selectPostal(postal: string) {
+    setSelectedPostal(postal)
+    const next = new URLSearchParams(searchParams)
+    if (postal) next.set('postal', postal)
+    else next.delete('postal')
+    next.delete('transaction')
+    setSearchParams(next, { replace: true })
+  }
+  function selectStatus(nextStatus: string) {
+    setStatus(nextStatus)
+    const next = new URLSearchParams(searchParams)
+    if (nextStatus) next.set('status', nextStatus)
+    else next.delete('status')
+    setSearchParams(next, { replace: true })
+  }
+  function clearTransactionFocus() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('transaction')
+    setSearchParams(next, { replace: true })
+  }
   return (
     <div className="matches-layout">
       <Nav actions={<span className="search-total">{postals.length.toLocaleString('fi-FI')} postal codes</span>} />
@@ -102,7 +126,7 @@ export default function MatchesPage() {
         <aside className="matches-sidebar">
           <div className="matches-sidebar-head">
             <div className="sidebar-label">Potential Matches</div>
-            <select className="filter-select" value={status} onChange={e => setStatus(e.target.value)}>
+            <select className="filter-select" value={status} onChange={e => selectStatus(e.target.value)}>
               <option value="">All unresolved</option>
               <option value="ambiguous">Ambiguous</option>
               <option value="candidate">Candidate</option>
@@ -127,7 +151,7 @@ export default function MatchesPage() {
                   key={postal.postal}
                   postal={postal}
                   active={postal.postal === activePostal}
-                  onClick={() => setSelectedPostal(postal.postal)}
+                  onClick={() => selectPostal(postal.postal)}
                 />
               ))
             )}
@@ -155,8 +179,14 @@ export default function MatchesPage() {
           </div>
           <div className="section-header">
             <span className="section-title">Candidates</span>
-            {candidates.length > 0 && <span className="section-count">{candidates.length} rows</span>}
+            {visibleCandidates.length > 0 && <span className="section-count">{visibleCandidates.length} rows</span>}
           </div>
+          {selectedTransaction && (
+            <div className="match-focus-banner">
+              <span>Showing likely matches for transaction {selectedTransaction}</span>
+              <button type="button" onClick={clearTransactionFocus}>Show all in postal code</button>
+            </div>
+          )}
           <div className="matches-table-shell">
             {!activePostal ? (
               <div className="empty-state">No postal code has potential matches</div>
@@ -164,10 +194,10 @@ export default function MatchesPage() {
               <div className="loading-state"><div className="spinner" /></div>
             ) : candidatesQuery.isError ? (
               <div className="error-state">Failed to load potential matches</div>
-            ) : candidates.length === 0 ? (
+            ) : visibleCandidates.length === 0 ? (
               <div className="empty-state">No candidates for this filter</div>
             ) : (
-              <CandidateCards candidates={candidates} />
+              <CandidateCards candidates={visibleCandidates} />
             )}
           </div>
         </main>

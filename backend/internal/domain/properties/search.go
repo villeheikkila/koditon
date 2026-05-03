@@ -192,12 +192,6 @@ WHERE ($1 = 'all' OR u.source = $1)
   AND ($9::timestamptz IS NULL OR u.published_at >= $9::timestamptz)
   AND ($10::timestamptz IS NULL OR u.published_at <= $10::timestamptz)`
 
-const resolveSaleListingPublicIDSQL = `
-SELECT sale_listing_canonical_id
-FROM public.sale_listings
-WHERE sale_listing_public_id = $1
-LIMIT 1`
-
 const resolveRentalPublicIDSQL = `
 WITH unified AS (
     SELECT ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id
@@ -277,13 +271,13 @@ func (s *Service) SaleListingMap(ctx context.Context, bounds MapBounds) (SaleLis
 	rows, err := s.db.Query(ctx, `
 WITH visible_base AS (
     SELECT
-        pb.property_building_id,
-        postgis.ST_SnapToGrid(pb.property_building_geom, 0.000001) AS marker_geom,
-        postgis.ST_AsEWKT(postgis.ST_SnapToGrid(pb.property_building_geom, 0.000001)) AS marker_key,
-        pb.property_building_address_norm,
-        pb.property_building_city_norm,
-        pb.property_building_postal_norm,
-        pb.property_building_build_year,
+        pb.housing_company_id,
+        postgis.ST_SnapToGrid(pb.housing_company_geom, 0.000001) AS marker_geom,
+        postgis.ST_AsEWKT(postgis.ST_SnapToGrid(pb.housing_company_geom, 0.000001)) AS marker_key,
+        pb.housing_company_address_norm,
+        pb.housing_company_city_norm,
+        pb.housing_company_postal_norm,
+        pb.housing_company_build_year,
         po.property_offering_id,
         po.property_offering_headline,
         po.property_offering_asking_price,
@@ -307,19 +301,19 @@ WITH visible_base AS (
                 sl.sale_listing_last_seen_at DESC NULLS LAST,
                 sl.sale_listing_created_at DESC
         ) AS source_rank
-    FROM public.property_buildings pb
-    JOIN public.property_units pu ON pu.property_building_id = pb.property_building_id
+    FROM public.housing_companies pb
+    JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
     JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
     JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
     JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
-    WHERE pb.property_building_geom IS NOT NULL
+    WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
         AND (
             $3::double precision IS NULL
             OR postgis.ST_Intersects(
-                pb.property_building_geom,
+                pb.housing_company_geom,
                 postgis.ST_MakeEnvelope($4::double precision, $3::double precision, $6::double precision, $5::double precision, 4326)
             )
         )
@@ -342,10 +336,10 @@ grouped AS (
         marker_geom,
         marker_key,
         count(DISTINCT property_offering_id)::bigint AS offering_count,
-        count(DISTINCT property_building_id)::bigint AS building_count,
-        min(property_building_address_norm) AS address,
-        min(property_building_city_norm) AS city,
-        min(property_building_postal_norm) AS postal,
+        count(DISTINCT housing_company_id)::bigint AS housing_company_count,
+        min(housing_company_address_norm) AS address,
+        min(housing_company_city_norm) AS city,
+        min(housing_company_postal_norm) AS postal,
         min(property_offering_asking_price) AS min_price,
         max(property_offering_asking_price) AS max_price,
         min(property_unit_area_value) AS min_area,
@@ -354,7 +348,7 @@ grouped AS (
         array_agg(DISTINCT sale_listing_source_provider ORDER BY sale_listing_source_provider) AS providers,
         array_agg(DISTINCT sale_listing_source_kind ORDER BY sale_listing_source_kind) AS kinds,
         (array_agg(DISTINCT property_offering_id::text))[1:8] AS listing_ids,
-        min(property_building_id::text) AS building_id
+        min(housing_company_id::text) AS housing_company_id
     FROM visible
     GROUP BY marker_geom, marker_key
 ),
@@ -370,14 +364,14 @@ listing_cards AS (
             jsonb_build_object(
                 'id', visible.property_offering_id::text,
                 'headline', visible.property_offering_headline,
-                'address', COALESCE(NULLIF(visible.sale_listing_street_address, ''), visible.property_building_address_norm),
-                'city', COALESCE(NULLIF(visible.sale_listing_city, ''), visible.property_building_city_norm),
-                'postal', COALESCE(NULLIF(visible.sale_listing_postal, ''), visible.property_building_postal_norm),
+                'address', COALESCE(NULLIF(visible.sale_listing_street_address, ''), visible.housing_company_address_norm),
+                'city', COALESCE(NULLIF(visible.sale_listing_city, ''), visible.housing_company_city_norm),
+                'postal', COALESCE(NULLIF(visible.sale_listing_postal, ''), visible.housing_company_postal_norm),
                 'layout', visible.property_unit_room_layout,
                 'area_m2', visible.property_unit_area_value,
                 'price', visible.property_offering_asking_price,
                 'price_per_m2', visible.property_offering_price_per_m2,
-                'build_year', visible.property_building_build_year,
+                'build_year', visible.housing_company_build_year,
                 'last_seen_at', visible.property_offering_last_seen_at,
                 'providers', COALESCE(source_summary.offering_providers, ARRAY[]::text[]),
                 'kinds', COALESCE(source_summary.offering_kinds, ARRAY[]::text[])
@@ -408,8 +402,8 @@ SELECT
     kinds,
     listing_ids,
     COALESCE(listing_cards.listings, '[]'::jsonb),
-    building_id,
-    building_count
+    housing_company_id,
+    housing_company_count
 FROM grouped
 LEFT JOIN listing_cards USING (marker_key)
 ORDER BY last_seen_at DESC NULLS LAST, offering_count DESC
@@ -422,7 +416,7 @@ LIMIT $7::int`, source, kind, bounds.MinLat, bounds.MinLng, bounds.MaxLat, bound
 	for rows.Next() {
 		var marker SaleListingMapMarker
 		var listingsJSON []byte
-		if err := rows.Scan(&marker.Lat, &marker.Lng, &marker.Count, &marker.Address, &marker.City, &marker.Postal, &marker.MinPrice, &marker.MaxPrice, &marker.MinAreaM2, &marker.MaxAreaM2, &marker.LastSeenAt, &marker.Providers, &marker.Kinds, &marker.ListingIDs, &listingsJSON, &marker.BuildingID, &marker.BuildingCount); err != nil {
+		if err := rows.Scan(&marker.Lat, &marker.Lng, &marker.Count, &marker.Address, &marker.City, &marker.Postal, &marker.MinPrice, &marker.MaxPrice, &marker.MinAreaM2, &marker.MaxAreaM2, &marker.LastSeenAt, &marker.Providers, &marker.Kinds, &marker.ListingIDs, &listingsJSON, &marker.HousingCompanyID, &marker.HousingCompanyCount); err != nil {
 			return SaleListingMap{}, fmt.Errorf("scan sale listing map marker: %w", err)
 		}
 		if err := json.Unmarshal(listingsJSON, &marker.Listings); err != nil {

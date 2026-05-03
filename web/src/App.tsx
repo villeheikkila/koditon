@@ -52,22 +52,15 @@ export default function App() {
         {/* Public routes */}
         <Route path="/listing/:id" element={<DetailPage kind="listing" />} />
         <Route path="/rental/:id" element={<DetailPage kind="rental" />} />
-        <Route path="/building/:id" element={<DetailPage kind="building" />} />
+        <Route path="/housing-company/:id" element={<DetailPage kind="housingCompany" />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/prices" element={authenticated ? <DashboardPage onSignOut={handleSignOut} /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/matches" element={authenticated ? <MatchesPage /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
         <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />
 
-        {/* Auth-gated root */}
-        <Route
-          path="/"
-          element={
-            authenticated
-              ? <DashboardPage onSignOut={handleSignOut} />
-              : <SignInPage onSignIn={handleSignIn} />
-          }
-        />
+        <Route path="/" element={<Navigate to="/search" replace />} />
 
         {/* Catch-all: redirect to root */}
         <Route path="*" element={<Navigate to="/" replace />} />

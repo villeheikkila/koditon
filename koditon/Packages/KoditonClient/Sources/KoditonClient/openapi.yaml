@@ -341,12 +341,19 @@ components:
     CanonicalOffering:
       additionalProperties: false
       properties:
-        building_id:
+        housing_company_id:
           type: string
         offering_id:
           type: string
         primary_source_listing_id:
           type: string
+        merge_decision_count:
+          format: int32
+          type: integer
+        merged_from:
+          items:
+            type: string
+          type: array
         source_count:
           format: int32
           type: integer
@@ -808,8 +815,6 @@ components:
     ListingSource:
       additionalProperties: false
       properties:
-        canonical_id:
-          type: string
         external_id:
           type: string
         first_seen_at:
@@ -845,7 +850,6 @@ components:
       required:
         - provider
         - kind
-        - canonical_id
         - native_id
       type: object
     Location:
@@ -881,8 +885,6 @@ components:
     OfferingSourceRecord:
       additionalProperties: false
       properties:
-        canonical_id:
-          type: string
         first_seen_at:
           format: date-time
           type: string
@@ -906,15 +908,12 @@ components:
           type: string
         provider:
           type: string
-        public_id:
-          type: string
         url:
           type: string
       required:
         - id
         - provider
         - kind
-        - canonical_id
         - native_id
         - link_status
         - link_method
@@ -1300,17 +1299,38 @@ components:
         area_m2:
           format: double
           type: number
+        build_year:
+          format: int32
+          type: integer
         friendly_id:
           type: string
         id:
           type: string
         kind:
           type: string
+        kinds:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        last_seen_at:
+          format: date-time
+          type: string
         main_image:
           $ref: "#/components/schemas/Image"
         price:
           format: int64
           type: integer
+        price_per_m2:
+          format: double
+          type: number
+        providers:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         published:
           type: boolean
         rent_period:
@@ -2131,10 +2151,10 @@ paths:
       summary: List available apartment types
       x-koditon-scopes:
         - core:read
-  /api/v1/buildings/{id}:
+  /api/v1/housing-companies/{id}:
     get:
-      description: Fetch building details by public ID, canonical ID, or source URL
-      operationId: buildings-detail
+      description: Fetch housing company details by public ID, canonical ID, or source URL
+      operationId: housing-companies-detail
       parameters:
         - description: Canonical offering UUID
           in: path
@@ -2156,12 +2176,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Get building detail
+      summary: Get housing company detail
       tags:
-        - Buildings
+        - Housing Companies
   /api/v1/entity:
     get:
-      description: Fetch canonical detail for an ad or building by canonical ID or source URL
+      description: Fetch canonical detail for an ad or housing company by canonical ID or source URL
       operationId: entity-detail
       parameters:
         - description: Canonical ID or source URL
@@ -2759,6 +2779,13 @@ paths:
           schema:
             description: "Candidate status filter: candidate or ambiguous"
             type: string
+        - description: Prices transaction UUID filter
+          explode: false
+          in: query
+          name: transaction
+          schema:
+            description: Prices transaction UUID filter
+            type: string
         - description: Maximum candidates to return
           explode: false
           in: query
@@ -2852,7 +2879,7 @@ paths:
         - Sale Listings
   /api/v1/search:
     get:
-      description: Search ads and buildings by free text, address, city, postal code, price, and area
+      description: Search ads and housing companies by free text, address, city, postal code, price, and area
       operationId: search
       parameters:
         - description: Free text search

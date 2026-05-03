@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  useBuildingsDetail,
+  useHousingCompaniesDetail,
   useRentalsDetail,
   useSaleListingsDetail,
   type Building,
@@ -19,7 +19,7 @@ type RenovationItem = {
 }
 
 interface DetailPageProps {
-  kind: 'listing' | 'rental' | 'building'
+  kind: 'listing' | 'rental' | 'housingCompany'
 }
 
 export default function DetailPage({ kind }: DetailPageProps) {
@@ -27,13 +27,13 @@ export default function DetailPage({ kind }: DetailPageProps) {
   const id = params.id ? decodeURIComponent(params.id) : ''
   const sale = useSaleListingsDetail(id, { query: { enabled: !!id && kind === 'listing', retry: false } })
   const rental = useRentalsDetail(id, { query: { enabled: !!id && kind === 'rental', retry: false } })
-  const building = useBuildingsDetail(id, { query: { enabled: !!id && kind === 'building', retry: false } })
+  const housingCompany = useHousingCompaniesDetail(id, { query: { enabled: !!id && kind === 'housingCompany', retry: false } })
 
   if (!id) return <div className="error-screen">Missing entity ID</div>
-  if (kind === 'building') {
-    if (building.isPending) return <Loading />
-    if (building.isError || !building.data?.data) return <ErrorMessage error={building.error} />
-    return <BuildingView building={building.data.data as Building} />
+  if (kind === 'housingCompany') {
+    if (housingCompany.isPending) return <Loading />
+    if (housingCompany.isError || !housingCompany.data?.data) return <ErrorMessage error={housingCompany.error} />
+    return <BuildingView building={housingCompany.data.data as Building} />
   }
   if (kind === 'rental') {
     if (rental.isPending) return <Loading />
@@ -171,6 +171,8 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               {saleDetail?.canonical.offering_id && <Row label="Offering ID" value={saleDetail.canonical.offering_id} />}
               {saleDetail?.canonical.primary_source_listing_id && <Row label="Primary source row" value={saleDetail.canonical.primary_source_listing_id} />}
               {saleDetail?.canonical.source_count != null && <Row label="Linked source rows" value={String(saleDetail.canonical.source_count)} />}
+              {saleDetail?.canonical.merge_decision_count ? <Row label="Merged duplicate offerings" value={String(saleDetail.canonical.merge_decision_count)} highlight /> : null}
+              {saleDetail?.canonical.merged_from?.length ? <Row label="Merged from" value={saleDetail.canonical.merged_from.join(', ')} /> : null}
               <Row label="Provider" value={providerLabel(d.source.provider)} />
               <Row label="Source kind" value={d.source.kind} />
               <Row label="Native ID" value={d.source.native_id} />
@@ -199,7 +201,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
                       <div className="source-row-value">
                         <span>
                           {[
-                            record.public_id || record.id,
+                            record.id,
                             record.native_id,
                             record.headline,
                             record.last_seen_at && `last seen ${fmtDateTime(record.last_seen_at)}`,
@@ -306,10 +308,11 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               {unit.features?.length ? <Row label="Features" value={unit.features.join(', ')} /> : null}
             </div>
           </Section>
-          <Section title="Building Details">
+          <Section title="Housing Company Details">
             <div className="listing-table">
+              {saleDetail?.canonical?.housing_company_id && <Row label="Housing company" value={<Link to={`/housing-company/${encodeURIComponent(saleDetail.canonical.housing_company_id)}`}>Open housing company page</Link>} highlight />}
               {building.housing_company && <Row label="Housing company" value={building.housing_company} />}
-              {building.identity?.key && <Row label="Building identity" value={`${building.identity.key} · ${Math.round(building.identity.confidence * 100)}%`} />}
+              {building.identity?.key && <Row label="Housing company identity" value={`${building.identity.key} · ${Math.round(building.identity.confidence * 100)}%`} />}
               {building.business_id && <Row label="Business ID" value={building.business_id} />}
               {building.build_year != null && <Row label="Year built" value={String(building.build_year)} />}
               {building.construction_year != null && <Row label="Construction year" value={String(building.construction_year)} />}
@@ -339,7 +342,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
             </div>
           </Section>
           {renovationRows.length > 0 && (
-            <Section title="Building Renovations">
+            <Section title="Housing Company Renovations">
               <div className="renovation-list">
                 {renovationRows.map((item, index) => (
                   <div className="renovation-row" key={`${item.kind}-${item.year || 'no-year'}-${item.status}-${index}`}>
@@ -462,6 +465,37 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
 
 function BuildingView({ building }: { building: Building }) {
   const details = building.details
+  const site = building.site
+  const texts = building.texts
+  const sourceRecords = building.source_records ?? []
+  const related = building.related?.items ?? []
+  const renovationRows = renovationItems(details.renovations, texts?.renovations_done, texts?.renovations_planned)
+  const mapLatitude = details.location.latitude
+  const mapLongitude = details.location.longitude
+  const mapLabel = [details.housing_company || details.location.street_address, details.location.postal, details.location.city].filter(Boolean).join(', ')
+  const buildingFacts = [
+    details.build_year != null && ['Built', String(details.build_year)],
+    details.construction_year != null && ['Constructed', String(details.construction_year)],
+    details.floor_count != null && ['Floors', String(details.floor_count)],
+    details.apartment_count != null && ['Apartments', String(details.apartment_count)],
+  ].filter(Boolean) as string[][]
+  const hasSiteDetails = !!site && [
+    site.plot_type,
+    site.plot_ownership_type,
+    site.plot_area_m2,
+    site.lot_redemption_info,
+    site.lot_rental_agreement,
+    site.yard,
+    site.shore,
+    site.zoning,
+    site.road_access,
+    site.water_supply,
+    site.water_supply_types?.length,
+    site.sewer,
+    site.services,
+    site.transport,
+    site.driving_directions,
+  ].some(value => value != null && value !== '')
   return (
     <div className="listing-layout">
       <div className="listing-container">
@@ -475,23 +509,139 @@ function BuildingView({ building }: { building: Building }) {
         </div>
         <div className="listing-header">
           <div className="listing-header-main">
+            <div className="listing-type-pill listing-type-pill--listing">Housing company</div>
             <h1 className="listing-title">{details.housing_company || details.location.street_address || building.id}</h1>
             <div className="listing-location">
-              {[details.location.postal, details.location.city].filter(Boolean).join(' ')}
+              {[details.location.street_address, details.location.postal, details.location.city].filter(Boolean).join(' · ')}
             </div>
           </div>
         </div>
-        <Section title="Building">
+        {buildingFacts.length > 0 && (
+          <div className="listing-facts">
+            {buildingFacts.map(([label, value]) => <Fact key={label} label={label} value={value} />)}
+          </div>
+        )}
+        {mapLatitude != null && mapLongitude != null && (
+          <ListingLocationMap latitude={mapLatitude} longitude={mapLongitude} label={mapLabel || building.id} />
+        )}
+        <Section title="Housing Company">
           <div className="listing-table">
             {details.location.street_address && <Row label="Address" value={details.location.street_address} />}
+            {details.location.postal && <Row label="Postal" value={details.location.postal} />}
+            {details.location.city && <Row label="City" value={details.location.city} />}
+            {details.housing_company && <Row label="Housing company" value={details.housing_company} />}
             {details.business_id && <Row label="Business ID" value={details.business_id} />}
+            {metadataNumber(building.metadata, 'merge_decision_count') ? <Row label="Merged duplicate companies" value={String(metadataNumber(building.metadata, 'merge_decision_count'))} highlight /> : null}
+            {metadataStringArray(building.metadata, 'merged_from').length ? <Row label="Merged from" value={metadataStringArray(building.metadata, 'merged_from').join(', ')} /> : null}
             {details.build_year != null && <Row label="Year built" value={String(details.build_year)} />}
+            {details.construction_year != null && <Row label="Construction year" value={String(details.construction_year)} />}
             {details.apartment_count != null && <Row label="Apartments" value={String(details.apartment_count)} />}
+            {details.business_premise_count != null && <Row label="Business premises" value={String(details.business_premise_count)} />}
             {details.floor_count != null && <Row label="Floors" value={String(details.floor_count)} />}
+            {details.elevator != null && <Row label="Elevator" value={fmtBool(details.elevator)} />}
+            {details.sauna != null && <Row label="Sauna" value={fmtBool(details.sauna)} />}
+            {details.building_type && <Row label="Building type" value={details.building_type} />}
+            {details.building_subtype && <Row label="Building subtype" value={details.building_subtype} />}
             {details.heating && <Row label="Heating" value={details.heating} />}
+            {details.heating_description && <Row label="Heating details" value={details.heating_description} />}
+            {details.heating_fuel && <Row label="Heating fuel" value={details.heating_fuel} />}
             {details.energy_class && <Row label="Energy class" value={details.energy_class} />}
+            {details.energy_efficiency_label && details.energy_efficiency_label !== details.energy_class && <Row label="Energy label" value={details.energy_efficiency_label} />}
+            {details.building_material && <Row label="Material" value={details.building_material} />}
+            {details.wall_structure && <Row label="Wall structure" value={details.wall_structure} />}
+            {details.frame_construction_method && <Row label="Frame" value={details.frame_construction_method} />}
+            {details.roof_type && <Row label="Roof type" value={details.roof_type} />}
+            {details.roof_material && <Row label="Roof material" value={details.roof_material} />}
+            {details.management_method && <Row label="Management" value={details.management_method} />}
+            {details.property_manager && <Row label="Property manager" value={details.property_manager} />}
+            {details.maintenance_responsibility && <Row label="Maintenance responsibility" value={details.maintenance_responsibility} />}
+            {details.connectivity && <Row label="Connectivity" value={details.connectivity} />}
+            {details.common_areas && <Row label="Common areas" value={details.common_areas} />}
+            {details.car_storage && <Row label="Car storage" value={details.car_storage} />}
+            {details.other_info && <Row label="Other info" value={details.other_info} />}
           </div>
         </Section>
+        {renovationRows.length > 0 && (
+          <Section title="Renovations">
+            <div className="renovation-list">
+              {renovationRows.map((item, index) => (
+                <div className="renovation-row" key={`${item.kind}-${item.year || 'no-year'}-${item.status}-${index}`}>
+                  <div className="renovation-year">{item.year || '—'}</div>
+                  <div className="renovation-main">
+                    <div className="renovation-kind">{item.kind}</div>
+                    <div className={`renovation-status renovation-status--${item.status}`}>{item.status}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+        {site && hasSiteDetails && (
+          <Section title="Site & Area">
+            <div className="listing-table">
+              {site.plot_type && <Row label="Plot type" value={fmtPlotOwnership(site.plot_type)} />}
+              {site.plot_ownership_type && <Row label="Plot ownership" value={fmtPlotOwnership(site.plot_ownership_type)} />}
+              {site.plot_area_m2 != null && <Row label="Plot area" value={`${site.plot_area_m2.toFixed(0)} m²`} />}
+              {site.lot_redemption_info && <Row label="Lot redemption" value={site.lot_redemption_info} />}
+              {site.lot_rental_agreement && <Row label="Lot rental agreement" value={site.lot_rental_agreement} />}
+              {site.yard && <Row label="Yard" value={site.yard} />}
+              {site.shore && <Row label="Shore" value={site.shore} />}
+              {site.zoning && <Row label="Zoning" value={site.zoning} />}
+              {site.road_access && <Row label="Road access" value={site.road_access} />}
+              {site.water_supply && <Row label="Water supply" value={site.water_supply} />}
+              {site.water_supply_types?.length ? <Row label="Water supply types" value={site.water_supply_types.join(', ')} /> : null}
+              {site.sewer && <Row label="Sewer" value={site.sewer} />}
+              {site.services && <Row label="Services" value={site.services} />}
+              {site.transport && <Row label="Transport" value={site.transport} />}
+              {site.driving_directions && <Row label="Driving directions" value={site.driving_directions} />}
+            </div>
+          </Section>
+        )}
+        {(texts?.description || texts?.building || texts?.additional_info || texts?.area || texts?.amenities || texts?.transport || texts?.charges) && (
+          <Section title="Source Texts">
+            {texts.description && <TextBlock text={texts.description} />}
+            {texts.building && <TextBlock text={texts.building} />}
+            {texts.additional_info && <TextBlock text={texts.additional_info} />}
+            {texts.area && <TextBlock text={texts.area} />}
+            {texts.amenities && <TextBlock text={texts.amenities} />}
+            {texts.transport && <TextBlock text={texts.transport} />}
+            {texts.charges && <TextBlock text={texts.charges} />}
+          </Section>
+        )}
+        {sourceRecords.length > 0 && (
+          <Section title="Sources">
+            <div className="listing-table">
+              {sourceRecords.map(source => (
+                <Row
+                  key={`${source.provider}-${source.kind}-${source.native_id}`}
+                  label={`${providerLabel(source.provider)} ${source.kind}`}
+                  value={source.url ? <a className="listing-source-link" href={source.url} target="_blank" rel="noopener noreferrer">{source.native_id || source.external_id || source.url}</a> : source.native_id || source.external_id || source.kind}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+        {related.length > 0 && (
+          <Section title="Listings In Housing Company">
+            <div className="building-related-grid">
+              {related.map(item => (
+                <Link key={item.id} className="building-related-card" to={`/listing/${encodeURIComponent(item.id)}`}>
+                  <div className="building-related-title">{item.friendly_id || item.room_layout || item.address || item.id}</div>
+                  <div className="building-related-meta">
+                    {[item.room_layout, item.area_m2 != null && `${item.area_m2.toFixed(1)} m²`, item.build_year != null && `Built ${item.build_year}`].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="building-related-meta">
+                    {[item.price_per_m2 != null && `${fmtEur(item.price_per_m2)} / m²`, item.last_seen_at && `Seen ${fmtDate(item.last_seen_at)}`].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="building-related-footer">
+                    {item.price != null && <span>{fmtPrice(item.price)}</span>}
+                    <span>{[...(item.providers ?? []), ...(item.kinds ?? [])].join(' · ')}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   )
@@ -588,6 +738,16 @@ function fmtEur(n: number): string {
 
 function fmtBool(value: boolean): string {
   return value ? 'Yes' : 'No'
+}
+
+function metadataNumber(metadata: Record<string, unknown> | undefined, key: string): number | null {
+  const value = metadata?.[key]
+  return typeof value === 'number' ? value : null
+}
+
+function metadataStringArray(metadata: Record<string, unknown> | undefined, key: string): string[] {
+  const value = metadata?.[key]
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 }
 
 function fmtDateTime(value: string): string {

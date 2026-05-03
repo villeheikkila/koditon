@@ -113,6 +113,7 @@ WHERE latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate
     AND sl.prices_transaction_id IS NULL
     AND ($1::text IS NULL OR sl.sale_listing_postal_norm = public.fnc__normalize_postal($1::text))
     AND ($2::text IS NULL OR latest.sale_listing_prices_transaction_match_status = $2::text)
+    AND ($3::uuid IS NULL OR pt.prices_transaction_id = $3::uuid)
     AND NOT EXISTS (
         SELECT 1
         FROM public.sale_listings linked
@@ -123,7 +124,7 @@ ORDER BY
     latest.sale_listing_prices_transaction_match_price_delta_percent ASC NULLS LAST,
     sl.sale_listing_postal_norm,
     sl.sale_listing_street_address
-LIMIT $3`
+LIMIT $4`
 
 func (s *Service) TransactionMatchPostals(ctx context.Context, limit int32) ([]TransactionMatchPostalSummary, error) {
 	if limit <= 0 || limit > 500 {
@@ -148,14 +149,14 @@ func (s *Service) TransactionMatchPostals(ctx context.Context, limit int32) ([]T
 	return out, nil
 }
 
-func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string, status string, limit int32) ([]TransactionMatchCandidate, error) {
+func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string, status string, transactionID string, limit int32) ([]TransactionMatchCandidate, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 	if status != "candidate" && status != "ambiguous" {
 		status = ""
 	}
-	rows, err := s.db.Query(ctx, transactionMatchCandidatesSQL, emptyToNil(postal), emptyToNil(status), limit)
+	rows, err := s.db.Query(ctx, transactionMatchCandidatesSQL, emptyToNil(postal), emptyToNil(status), emptyToNil(transactionID), limit)
 	if err != nil {
 		return nil, fmt.Errorf("list transaction match candidates: %w", err)
 	}

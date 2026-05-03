@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
@@ -33,12 +34,12 @@ type canonicalMatchBackfillPayload struct {
 }
 
 type canonicalMatchSaleListingPayload struct {
-	ListingPublicID string `json:"listing_public_id"`
-	Attempt         int32  `json:"attempt,omitempty"`
+	SaleListingID string `json:"sale_listing_id"`
+	Attempt       int32  `json:"attempt,omitempty"`
 }
 
 type canonicalMatchSaleListingRow struct {
-	PublicID     string
+	ID           string
 	LinkMethod   *string
 	LinkStatus   *string
 	Status       *string
@@ -102,7 +103,7 @@ func (c *Consumer) handleCanonicalMatchSaleListingSourcesFanout(ctx context.Cont
 		payload.Limit = 5000
 	}
 	rows, err := c.pool.Query(ctx, `
-SELECT sl.sale_listing_public_id, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
+SELECT sl.sale_listing_id::text, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
 FROM public.sale_listings sl
 JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
 WHERE sl.sale_listing_source_kind = 'ad'
@@ -118,12 +119,12 @@ LIMIT $1`, payload.Limit)
 	defer rows.Close()
 	enqueued := 0
 	for rows.Next() {
-		var publicID string
+		var saleListingID string
 		var attempt int32
-		if err := rows.Scan(&publicID, &attempt); err != nil {
+		if err := rows.Scan(&saleListingID, &attempt); err != nil {
 			return fmt.Errorf("scan canonical source match fanout row: %w", err)
 		}
-		if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, publicID, attempt+1, time.Now()); err != nil {
+		if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID, attempt+1, time.Now()); err != nil {
 			return err
 		}
 		enqueued++
@@ -141,7 +142,7 @@ func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, lo
 	if err != nil {
 		return taskqueue.NewPermanentError(err, "invalid payload")
 	}
-	row, err := c.loadCanonicalMatchSaleListing(ctx, payload.ListingPublicID)
+	row, err := c.loadCanonicalMatchSaleListing(ctx, payload.SaleListingID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -149,25 +150,25 @@ func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, lo
 		return err
 	}
 	if row.LinkMethod != nil && *row.LinkMethod == "manual" {
-		return c.updateCanonicalSourceMatchState(ctx, row.PublicID, "manual_linked", nil, nil)
+		return c.updateCanonicalSourceMatchState(ctx, row.ID, "manual_linked", nil, nil)
 	}
-	run, err := c.runCanonicalSourceMatchForSaleListing(ctx, row.PublicID)
+	run, err := c.runCanonicalSourceMatchForSaleListing(ctx, row.ID)
 	if err != nil {
 		return err
 	}
 	if run.AutoLinked > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source auto-linked", "listing", row.PublicID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
-		return c.updateCanonicalSourceMatchState(ctx, row.PublicID, "auto_linked", nil, &run.RunID)
+		logger.InfoContext(ctx, "canonical sale listing source auto-linked", "sale_listing_id", row.ID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
+		return c.updateCanonicalSourceMatchState(ctx, row.ID, "auto_linked", nil, &run.RunID)
 	}
 	if run.Ambiguous > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source needs review", "listing", row.PublicID, "run_id", run.RunID, "candidates", run.Ambiguous)
-		return c.updateCanonicalSourceMatchState(ctx, row.PublicID, "needs_review", nil, &run.RunID)
+		logger.InfoContext(ctx, "canonical sale listing source needs review", "sale_listing_id", row.ID, "run_id", run.RunID, "candidates", run.Ambiguous)
+		return c.updateCanonicalSourceMatchState(ctx, row.ID, "needs_review", nil, &run.RunID)
 	}
 	next := time.Now().UTC().Add(7 * 24 * time.Hour)
 	if run.Candidates == 0 {
-		return c.updateCanonicalSourceMatchState(ctx, row.PublicID, "noop", &next, &run.RunID)
+		return c.updateCanonicalSourceMatchState(ctx, row.ID, "noop", &next, &run.RunID)
 	}
-	return c.updateCanonicalSourceMatchState(ctx, row.PublicID, "deferred", &next, &run.RunID)
+	return c.updateCanonicalSourceMatchState(ctx, row.ID, "deferred", &next, &run.RunID)
 }
 
 func decodeCanonicalMatchSaleListingPayload(job db.SyncJob) (canonicalMatchSaleListingPayload, error) {
@@ -177,24 +178,27 @@ func decodeCanonicalMatchSaleListingPayload(job db.SyncJob) (canonicalMatchSaleL
 			return canonicalMatchSaleListingPayload{}, fmt.Errorf("decode canonical sale listing source match payload: %w", err)
 		}
 	}
-	if payload.ListingPublicID == "" {
+	if payload.SaleListingID == "" {
 		_, value, err := parseJobEntity(job.SyncJobEntityID)
 		if err != nil {
-			return canonicalMatchSaleListingPayload{}, fmt.Errorf("parse listing entity: %w", err)
+			return canonicalMatchSaleListingPayload{}, fmt.Errorf("parse sale listing entity: %w", err)
 		}
-		payload.ListingPublicID = strings.TrimSpace(value)
+		payload.SaleListingID, _, _ = strings.Cut(strings.TrimSpace(value), ":attempt:")
 	}
-	if payload.ListingPublicID == "" {
-		return canonicalMatchSaleListingPayload{}, fmt.Errorf("listing_public_id is required")
+	if payload.SaleListingID == "" {
+		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
+	}
+	if _, err := uuid.Parse(payload.SaleListingID); err != nil {
+		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id must be a uuid: %w", err)
 	}
 	return payload, nil
 }
 
-func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, publicID string) (canonicalMatchSaleListingRow, error) {
+func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, saleListingID string) (canonicalMatchSaleListingRow, error) {
 	var row canonicalMatchSaleListingRow
 	err := c.pool.QueryRow(ctx, `
 SELECT
-    sl.sale_listing_public_id,
+    sl.sale_listing_id::text,
     pos.property_offering_source_link_method,
     pos.property_offering_source_link_status,
     sl.sale_listing_source_match_status,
@@ -202,13 +206,13 @@ SELECT
 FROM public.sale_listings sl
 LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
-WHERE sl.sale_listing_public_id = $1`, publicID).Scan(&row.PublicID, &row.LinkMethod, &row.LinkStatus, &row.Status, &row.AttemptCount)
+WHERE sl.sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LinkMethod, &row.LinkStatus, &row.Status, &row.AttemptCount)
 	return row, err
 }
 
-func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, publicID string) (canonicalMatchRunSummary, error) {
+func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, saleListingID string) (canonicalMatchRunSummary, error) {
 	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, 95, 10, $1)::text`, publicID).Scan(&runID); err != nil {
+	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, 95, 10, $1::uuid)::text`, saleListingID).Scan(&runID); err != nil {
 		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match: %w", err)
 	}
 	return c.loadCanonicalSourceMatchRun(ctx, runID)
@@ -216,7 +220,7 @@ func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, pu
 
 func (c *Consumer) runCanonicalSourceMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (canonicalMatchRunSummary, error) {
 	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, $1, $2, NULL)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
+	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, $1, $2, NULL::uuid)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
 		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match backfill: %w", err)
 	}
 	return c.loadCanonicalSourceMatchRun(ctx, runID)
@@ -238,7 +242,7 @@ WHERE property_offering_source_match_run_id = $1::uuid`, runID).Scan(&summary.Ru
 	return summary, nil
 }
 
-func (c *Consumer) updateCanonicalSourceMatchState(ctx context.Context, publicID, status string, nextAttemptAt *time.Time, runID *string) error {
+func (c *Consumer) updateCanonicalSourceMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string) error {
 	_, err := c.pool.Exec(ctx, `
 UPDATE public.sale_listings
 SET
@@ -248,22 +252,22 @@ SET
     sale_listing_source_match_attempt_count = sale_listing_source_match_attempt_count + 1,
     sale_listing_source_match_run_id = COALESCE($4::uuid, sale_listing_source_match_run_id),
     sale_listing_updated_at = now()
-WHERE sale_listing_public_id = $1`, publicID, status, nextAttemptAt, runID)
+WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID)
 	if err != nil {
 		return fmt.Errorf("update canonical source match state: %w", err)
 	}
 	return nil
 }
 
-func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, publicID string, attempt int32, runAfter time.Time) error {
-	payload, err := json.Marshal(canonicalMatchSaleListingPayload{ListingPublicID: publicID, Attempt: attempt})
+func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, saleListingID string, attempt int32, runAfter time.Time) error {
+	payload, err := json.Marshal(canonicalMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
 	if err != nil {
 		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)
 	}
 	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
 		Provider:    "canonical",
 		Kind:        TaskTypeCanonicalMatchSaleListingSource,
-		EntityID:    fmt.Sprintf("listing:%s:attempt:%d", publicID, attempt),
+		EntityID:    fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
 		Priority:    int32(taskqueue.PriorityLow),
 		MaxAttempts: 3,
 		RunAfter:    runAfter,

@@ -218,11 +218,18 @@ export interface Image {
 export interface RelatedListing {
   address?: string;
   area_m2?: number;
+  build_year?: number;
   friendly_id?: string;
   id: string;
   kind?: string;
+  /** @nullable */
+  kinds?: string[] | null;
+  last_seen_at?: string;
   main_image?: Image;
   price?: number;
+  price_per_m2?: number;
+  /** @nullable */
+  providers?: string[] | null;
   published?: boolean;
   rent_period?: string;
   room_layout?: string;
@@ -257,7 +264,6 @@ export type ListingSourceFlags = {[key: string]: boolean};
 export type ListingSourceMetadata = {[key: string]: unknown};
 
 export interface ListingSource {
-  canonical_id: string;
   external_id?: string;
   first_seen_at?: string;
   flags?: ListingSourceFlags;
@@ -305,7 +311,9 @@ export interface Building {
 }
 
 export interface CanonicalOffering {
-  building_id?: string;
+  housing_company_id?: string;
+  merge_decision_count?: number;
+  merged_from?: string[];
   offering_id: string;
   primary_source_listing_id?: string;
   source_count?: number;
@@ -521,7 +529,6 @@ export interface Media {
 }
 
 export interface OfferingSourceRecord {
-  canonical_id: string;
   first_seen_at?: string;
   headline?: string;
   id: string;
@@ -532,7 +539,6 @@ export interface OfferingSourceRecord {
   link_status: string;
   native_id: string;
   provider: string;
-  public_id?: string;
   url?: string;
 }
 
@@ -596,7 +602,6 @@ export interface SaleListingSummary {
   media?: Media;
   site?: SiteDetails;
   source: ListingSource;
-  source_providers?: string[];
   unit: UnitDetails;
 }
 
@@ -953,10 +958,6 @@ q?: string;
  */
 source?: string;
 /**
- * Listing kind filter: ad, announcement, or all
- */
-kind?: string;
-/**
  * City / municipality filter
  */
 city?: string;
@@ -1044,7 +1045,7 @@ q?: string;
  */
 source?: string;
 /**
- * Listing kind filter: ad, announcement, or all
+ * Listing kind filter: full, announcement, or all
  */
 kind?: string;
 /**
@@ -1127,6 +1128,10 @@ postal?: string;
  * Candidate status filter: candidate or ambiguous
  */
 status?: string;
+/**
+ * Prices transaction UUID filter
+ */
+transaction?: string;
 /**
  * Maximum candidates to return
  */
@@ -1681,39 +1686,39 @@ export function useAvailabilityTypes<TData = Awaited<ReturnType<typeof availabil
 
 
 /**
- * Fetch building details by public ID, canonical ID, or source URL
- * @summary Get building detail
+ * Fetch housing company details by public ID, canonical ID, or source URL
+ * @summary Get housing company detail
  */
-export type buildingsDetailResponse200 = {
+export type housingCompaniesDetailResponse200 = {
   data: Building
   status: 200
 }
 
-export type buildingsDetailResponseDefault = {
+export type housingCompaniesDetailResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type buildingsDetailResponseSuccess = (buildingsDetailResponse200) & {
+export type housingCompaniesDetailResponseSuccess = (housingCompaniesDetailResponse200) & {
   headers: Headers;
 };
-export type buildingsDetailResponseError = (buildingsDetailResponseDefault) & {
+export type housingCompaniesDetailResponseError = (housingCompaniesDetailResponseDefault) & {
   headers: Headers;
 };
 
-export type buildingsDetailResponse = (buildingsDetailResponseSuccess | buildingsDetailResponseError)
+export type housingCompaniesDetailResponse = (housingCompaniesDetailResponseSuccess | housingCompaniesDetailResponseError)
 
-export const getBuildingsDetailUrl = (id: string,) => {
-
-
+export const getHousingCompaniesDetailUrl = (id: string,) => {
 
 
-  return `/api/v1/buildings/${id}`
+
+
+  return `/api/v1/housing-companies/${id}`
 }
 
-export const buildingsDetail = async (id: string, options?: RequestInit): Promise<buildingsDetailResponse> => {
+export const housingCompaniesDetail = async (id: string, options?: RequestInit): Promise<housingCompaniesDetailResponse> => {
 
-  return customInstance<buildingsDetailResponse>(getBuildingsDetailUrl(id),
+  return customInstance<housingCompaniesDetailResponse>(getHousingCompaniesDetailUrl(id),
   {
     ...options,
     method: 'GET'
@@ -1726,69 +1731,69 @@ export const buildingsDetail = async (id: string, options?: RequestInit): Promis
 
 
 
-export const getBuildingsDetailQueryKey = (id: string,) => {
+export const getHousingCompaniesDetailQueryKey = (id: string,) => {
     return [
-    `/api/v1/buildings/${id}`
+    `/api/v1/housing-companies/${id}`
     ] as const;
     }
 
 
-export const getBuildingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getHousingCompaniesDetailQueryOptions = <TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getBuildingsDetailQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getHousingCompaniesDetailQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildingsDetail>>> = ({ signal }) => buildingsDetail(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof housingCompaniesDetail>>> = ({ signal }) => housingCompaniesDetail(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type BuildingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof buildingsDetail>>>
-export type BuildingsDetailQueryError = ErrorType<ErrorModel>
+export type HousingCompaniesDetailQueryResult = NonNullable<Awaited<ReturnType<typeof housingCompaniesDetail>>>
+export type HousingCompaniesDetailQueryError = ErrorType<ErrorModel>
 
 
-export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof buildingsDetail>>,
+          Awaited<ReturnType<typeof housingCompaniesDetail>>,
           TError,
-          Awaited<ReturnType<typeof buildingsDetail>>
+          Awaited<ReturnType<typeof housingCompaniesDetail>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>> & Pick<
+export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof buildingsDetail>>,
+          Awaited<ReturnType<typeof housingCompaniesDetail>>,
           TError,
-          Awaited<ReturnType<typeof buildingsDetail>>
+          Awaited<ReturnType<typeof housingCompaniesDetail>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get building detail
+ * @summary Get housing company detail
  */
 
-export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof buildingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getBuildingsDetailQueryOptions(id,options)
+  const queryOptions = getHousingCompaniesDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1800,7 +1805,7 @@ export function useBuildingsDetail<TData = Awaited<ReturnType<typeof buildingsDe
 
 
 /**
- * Fetch canonical detail for an ad or building by canonical ID or source URL
+ * Fetch canonical detail for an ad or housing company by canonical ID or source URL
  * @summary Get entity detail
  */
 export type entityDetailResponse200 = {
@@ -3253,7 +3258,7 @@ export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleList
 
 
 /**
- * Search ads and buildings by free text, address, city, postal code, price, and area
+ * Search ads and housing companies by free text, address, city, postal code, price, and area
  * @summary Search entities
  */
 export type searchResponse200 = {
@@ -4193,73 +4198,83 @@ export const useAuthSessionSignOut = <TError = ErrorType<ErrorModel>,
       return useMutation(getAuthSessionSignOutMutationOptions(options), queryClient);
     }
 
-export type OAuthHandoffResolveSuccessResponse = {
-  handoff_id: string;
-  client_id?: string;
-  client_display_name: string;
-  client_name?: string;
-  redirect_host: string;
-  redirect_uri?: string;
-  scopes: string[];
-  user_code?: string;
-  expires_at?: string;
-  expires_at_unix: number;
-}
-
-export type OAuthHandoffResolveBody = {
+export type OAuthHandoffResolveRequest = {
   handoff_token?: string;
   user_code?: string;
-}
+};
 
-export type OAuthHandoffDecisionBody = {
+export type OAuthHandoffDecisionRequest = {
   handoff_id: string;
-}
+};
 
-export type OAuthHandoffApproveResponse = {
-  redirect_url?: string;
-}
+export type OAuthHandoffResolveSuccessResponse = {
+  client_display_name: string;
+  client_id: string;
+  expires_at_unix: number;
+  handoff_id: string;
+  redirect_host: string;
+  scopes: string[];
+};
 
-type OAuthHandoffResolveResponse = {
+export type OAuthHandoffApproveSuccessResponse = {
+  ok: boolean;
+  redirect_url: string;
+};
+
+export type OAuthHandoffDenySuccessResponse = {
+  ok: boolean;
+};
+
+export type oauthAuthorizeHandoffResolveResponse = {
   data: OAuthHandoffResolveSuccessResponse;
-  status: number;
+  status: 200;
   headers: Headers;
-}
+};
 
-type OAuthHandoffApproveResult = {
-  data: OAuthHandoffApproveResponse;
-  status: number;
+export type oauthAuthorizeHandoffApproveResponse = {
+  data: OAuthHandoffApproveSuccessResponse;
+  status: 200;
   headers: Headers;
-}
+};
 
-type OAuthHandoffDenyResult = {
-  data: Record<string, never>;
-  status: number;
+export type oauthAuthorizeHandoffDenyResponse = {
+  data: OAuthHandoffDenySuccessResponse;
+  status: 200;
   headers: Headers;
-}
+};
 
-export const oauthAuthorizeHandoffResolve = async (body: OAuthHandoffResolveBody, options?: RequestInit): Promise<OAuthHandoffResolveResponse> => {
-  return customInstance<OAuthHandoffResolveResponse>('/oauth/authorize/handoff/resolve', {
+export const oauthAuthorizeHandoffResolve = async (
+  body: BodyType<OAuthHandoffResolveRequest>,
+  options?: RequestInit,
+): Promise<oauthAuthorizeHandoffResolveResponse> => {
+  return customInstance<oauthAuthorizeHandoffResolveResponse>('/oauth/authorize/handoff/resolve', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(body),
-  })
-}
+  });
+};
 
-export const oauthAuthorizeHandoffApprove = async (body: OAuthHandoffDecisionBody, options?: RequestInit): Promise<OAuthHandoffApproveResult> => {
-  return customInstance<OAuthHandoffApproveResult>('/oauth/authorize/handoff/approve', {
+export const oauthAuthorizeHandoffApprove = async (
+  body: BodyType<OAuthHandoffDecisionRequest>,
+  options?: RequestInit,
+): Promise<oauthAuthorizeHandoffApproveResponse> => {
+  return customInstance<oauthAuthorizeHandoffApproveResponse>('/oauth/authorize/handoff/approve', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(body),
-  })
-}
+  });
+};
 
-export const oauthAuthorizeHandoffDeny = async (body: OAuthHandoffDecisionBody, options?: RequestInit): Promise<OAuthHandoffDenyResult> => {
-  return customInstance<OAuthHandoffDenyResult>('/oauth/authorize/handoff/deny', {
+export const oauthAuthorizeHandoffDeny = async (
+  body: BodyType<OAuthHandoffDecisionRequest>,
+  options?: RequestInit,
+): Promise<oauthAuthorizeHandoffDenyResponse> => {
+  return customInstance<oauthAuthorizeHandoffDenyResponse>('/oauth/authorize/handoff/deny', {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(body),
-  })
-}
+  });
+};

@@ -10,8 +10,8 @@ export default function HomePage() {
     const trimmed = input.trim()
     if (!trimmed) return
     const id = encodeURIComponent(trimmed)
-    if (trimmed.startsWith('b_') || trimmed.split(':')[1] === 'building') {
-      navigate(`/building/${id}`)
+    if (trimmed.split(':')[1] === 'housing-company') {
+      navigate(`/housing-company/${id}`)
       return
     }
     if (trimmed.startsWith('r_')) {
@@ -28,7 +28,7 @@ export default function HomePage() {
           <span className="header-logo-dot" style={{ width: 10, height: 10 }} />
           Koditon
         </div>
-        <p className="home-desc">Look up Finnish real estate listing and building details by ID or source URL.</p>
+        <p className="home-desc">Look up Finnish real estate listing and housing company details by ID or source URL.</p>
         <form className="home-search-form" onSubmit={handleSearch}>
           <input
             className="filter-input home-search-input"
@@ -43,7 +43,7 @@ export default function HomePage() {
           </button>
         </form>
         <p className="home-hint">
-          Examples: <code>l_abc123...</code>, <code>b_abc123...</code>
+          Examples: <code>l_abc123...</code>, <code>housing-company:...</code>
         </p>
       </div>
     </div>

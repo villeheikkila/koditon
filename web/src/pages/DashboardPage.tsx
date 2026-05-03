@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import Nav from '../components/Nav'
 import {
   useAvailabilityLocations,
@@ -322,25 +323,28 @@ function TransactionsTable({ transactions }: { transactions: PricesTransaction[]
           </tr>
         </thead>
         <tbody>
-          {transactions.map(t => (
-            <tr key={t.id}>
-              <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {t.description || <span className="dim">—</span>}
-              </td>
-              <td>
-                <span className="badge badge-default">{t.category}</span>
-              </td>
-              <td className="muted">{t.type}</td>
-              <td className="right mono">{t.area.toFixed(1)}</td>
-              <td className="right mono">{fmt(t.price)}</td>
-              <td className="right mono" style={{ color: 'var(--accent)' }}>
-                {fmt(t.price_per_square_meter)}
-              </td>
-              <td className="dim">{t.build_year > 0 ? t.build_year : '—'}</td>
-              <td className="dim">{t.period_identifier}</td>
-              <td className="dim">{t.postal_code_code} {t.postal_code_name_fi}</td>
-            </tr>
-          ))}
+          {transactions.map(t => {
+            const matchURL = `/matches?postal=${encodeURIComponent(t.postal_code_code)}&transaction=${encodeURIComponent(t.id)}`
+            return (
+              <tr key={t.id} className="clickable-row">
+                <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Link className="transaction-row-link" to={matchURL}>{t.description || '—'}</Link>
+                </td>
+                <td>
+                  <Link className="transaction-row-link" to={matchURL}><span className="badge badge-default">{t.category}</span></Link>
+                </td>
+                <td className="muted"><Link className="transaction-row-link muted" to={matchURL}>{t.type}</Link></td>
+                <td className="right mono"><Link className="transaction-row-link mono" to={matchURL}>{t.area.toFixed(1)}</Link></td>
+                <td className="right mono"><Link className="transaction-row-link mono" to={matchURL}>{fmt(t.price)}</Link></td>
+                <td className="right mono">
+                  <Link className="transaction-row-link mono accent-link" to={matchURL}>{fmt(t.price_per_square_meter)}</Link>
+                </td>
+                <td className="dim"><Link className="transaction-row-link dim" to={matchURL}>{t.build_year > 0 ? t.build_year : '—'}</Link></td>
+                <td className="dim"><Link className="transaction-row-link dim" to={matchURL}>{t.period_identifier}</Link></td>
+                <td className="dim"><Link className="transaction-row-link dim" to={matchURL}>{t.postal_code_code} {t.postal_code_name_fi}</Link></td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

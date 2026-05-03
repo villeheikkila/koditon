@@ -255,6 +255,92 @@ CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings
 CREATE INDEX idx_frontdoor_building_business_id ON public.frontdoor_buildings USING btree (frontdoor_building_business_id);
 CREATE INDEX idx_frontdoor_building_processed_at ON public.frontdoor_buildings USING btree (frontdoor_building_processed_at);
 
+create table public.housing_companies (
+  housing_company_id uuid default gen_random_uuid() not null constraint property_buildings_pkey primary key,
+  housing_company_identity_key text not null constraint property_buildings_property_building_identity_key_key unique,
+  housing_company_postal_norm text,
+  housing_company_city_norm text,
+  housing_company_address_norm text,
+  housing_company_name text,
+  housing_company_business_id text,
+  housing_company_build_year integer,
+  housing_company_floor_count integer,
+  housing_company_apartment_count integer,
+  housing_company_elevator boolean,
+  housing_company_energy_efficiency_label text,
+  housing_company_match_reasons jsonb default '{}'::jsonb not null,
+  housing_company_created_at timestamp with time zone default now() not null,
+  housing_company_updated_at timestamp with time zone default now() not null,
+  housing_company_geom postgis.geometry(Point,4326)
+);
+
+CREATE INDEX idx_housing_companies_address ON public.housing_companies USING btree (housing_company_postal_norm, housing_company_city_norm, housing_company_address_norm);
+CREATE INDEX idx_housing_companies_business_id ON public.housing_companies USING btree (housing_company_business_id) WHERE ((housing_company_business_id IS NOT NULL) AND (housing_company_business_id <> ''::text));
+CREATE INDEX idx_housing_companies_geom ON public.housing_companies USING gist (housing_company_geom);
+
+create table public.housing_company_facts (
+  housing_company_fact_id uuid default gen_random_uuid() not null constraint housing_company_facts_pkey primary key,
+  housing_company_id uuid not null constraint housing_company_facts_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  housing_company_source_id uuid constraint housing_company_facts_housing_company_source_id_fkey references housing_company_sources(housing_company_source_id) ON DELETE SET NULL,
+  housing_company_fact_key text not null,
+  housing_company_fact_value_text text,
+  housing_company_fact_value_number double precision,
+  housing_company_fact_value_bool boolean,
+  housing_company_fact_value_json jsonb,
+  housing_company_fact_raw_value text,
+  housing_company_fact_confidence integer default 100 not null,
+  housing_company_fact_first_seen_at timestamp with time zone,
+  housing_company_fact_last_seen_at timestamp with time zone,
+  housing_company_fact_created_at timestamp with time zone default now() not null,
+  housing_company_fact_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_housing_company_facts_company_key ON public.housing_company_facts USING btree (housing_company_id, housing_company_fact_key);
+CREATE UNIQUE INDEX idx_housing_company_facts_unique_source_hash ON public.housing_company_facts USING btree (housing_company_id, housing_company_source_id, housing_company_fact_key, md5(COALESCE(housing_company_fact_raw_value, ''::text)));
+
+create table public.housing_company_merge_decisions (
+  housing_company_merge_decision_id uuid default gen_random_uuid() not null constraint housing_company_merge_decisions_pkey primary key,
+  source_housing_company_id uuid not null constraint housing_company_merge_decisions_source_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  target_housing_company_id uuid not null constraint housing_company_merge_decisions_target_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  housing_company_merge_decision_status text default 'accepted'::text not null,
+  housing_company_merge_decision_method text not null,
+  housing_company_merge_decision_score integer,
+  housing_company_merge_decision_confidence text,
+  housing_company_merge_decision_reasons jsonb default '{}'::jsonb not null,
+  housing_company_merge_decision_created_at timestamp with time zone default now() not null,
+  housing_company_merge_decision_decided_at timestamp with time zone default now() not null,
+  constraint housing_company_merge_decision_distinct_check CHECK ((source_housing_company_id <> target_housing_company_id)),
+  constraint housing_company_merge_decision_method_check CHECK ((housing_company_merge_decision_method = ANY (ARRAY['source_match_auto'::text, 'manual'::text, 'backfill_auto'::text]))),
+  constraint housing_company_merge_decision_status_check CHECK ((housing_company_merge_decision_status = ANY (ARRAY['proposed'::text, 'accepted'::text, 'rejected'::text, 'superseded'::text])))
+);
+
+CREATE UNIQUE INDEX idx_housing_company_merge_decisions_active_pair ON public.housing_company_merge_decisions USING btree (source_housing_company_id, target_housing_company_id) WHERE (housing_company_merge_decision_status <> 'rejected'::text);
+CREATE INDEX idx_housing_company_merge_decisions_source ON public.housing_company_merge_decisions USING btree (source_housing_company_id, housing_company_merge_decision_status);
+CREATE INDEX idx_housing_company_merge_decisions_target ON public.housing_company_merge_decisions USING btree (target_housing_company_id, housing_company_merge_decision_status);
+
+create table public.housing_company_sources (
+  housing_company_source_id uuid default gen_random_uuid() not null constraint housing_company_sources_pkey primary key,
+  housing_company_id uuid not null constraint housing_company_sources_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  housing_company_source_provider text not null,
+  housing_company_source_kind text not null,
+  housing_company_source_table text not null,
+  housing_company_source_id_value text not null,
+  housing_company_source_external_id text,
+  housing_company_source_url text,
+  housing_company_source_link_status text default 'confirmed'::text not null,
+  housing_company_source_link_method text not null,
+  housing_company_source_link_score integer default 100 not null,
+  housing_company_source_link_reasons jsonb default '{}'::jsonb not null,
+  housing_company_source_first_seen_at timestamp with time zone,
+  housing_company_source_last_seen_at timestamp with time zone,
+  housing_company_source_created_at timestamp with time zone default now() not null,
+  housing_company_source_updated_at timestamp with time zone default now() not null,
+  constraint housing_company_sources_unique_source UNIQUE (housing_company_source_provider, housing_company_source_kind, housing_company_source_table, housing_company_source_id_value),
+  constraint housing_company_sources_status_check CHECK ((housing_company_source_link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text])))
+);
+
+CREATE INDEX idx_housing_company_sources_company ON public.housing_company_sources USING btree (housing_company_id);
+
 create table public.oauth_authorization_codes (
   oauth_authorization_code_id uuid default gen_random_uuid() not null constraint oauth_authorization_codes_pkey primary key,
   oauth_authorization_code_code_hash text not null constraint oauth_authorization_codes_oauth_authorization_code_code_has_key unique,
@@ -472,26 +558,26 @@ CREATE INDEX idx_prices_transaction_period_identifier ON public.prices_transacti
 CREATE INDEX idx_prices_transactions_plot_owned ON public.prices_transactions USING btree (prices_transaction_plot_owned);
 CREATE UNIQUE INDEX prices_transactions_unique_key ON public.prices_transactions USING btree (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category) NULLS NOT DISTINCT;
 
-create table public.property_buildings (
-  property_building_id uuid default gen_random_uuid() not null constraint property_buildings_pkey primary key,
-  property_building_identity_key text not null constraint property_buildings_property_building_identity_key_key unique,
-  property_building_postal_norm text,
-  property_building_city_norm text,
-  property_building_address_norm text,
-  property_building_housing_company text,
-  property_building_business_id text,
-  property_building_build_year integer,
-  property_building_floor_count integer,
-  property_building_apartment_count integer,
-  property_building_elevator boolean,
-  property_building_energy_efficiency_label text,
-  property_building_match_reasons jsonb default '{}'::jsonb not null,
-  property_building_created_at timestamp with time zone default now() not null,
-  property_building_updated_at timestamp with time zone default now() not null,
-  property_building_geom postgis.geometry(Point,4326)
+create table public.property_offering_merge_decisions (
+  property_offering_merge_decision_id uuid default gen_random_uuid() not null constraint property_offering_merge_decisions_pkey primary key,
+  source_property_offering_id uuid not null constraint property_offering_merge_decisi_source_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
+  target_property_offering_id uuid not null constraint property_offering_merge_decisi_target_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
+  property_offering_source_match_candidate_id uuid constraint property_offering_merge_decis_property_offering_source_mat_fkey references property_offering_source_match_candidates(property_offering_source_match_candidate_id) ON DELETE SET NULL,
+  property_offering_merge_decision_status text default 'accepted'::text not null,
+  property_offering_merge_decision_method text not null,
+  property_offering_merge_decision_score integer,
+  property_offering_merge_decision_confidence text,
+  property_offering_merge_decision_reasons jsonb default '{}'::jsonb not null,
+  property_offering_merge_decision_created_at timestamp with time zone default now() not null,
+  property_offering_merge_decision_decided_at timestamp with time zone default now() not null,
+  constraint property_offering_merge_decision_distinct_check CHECK ((source_property_offering_id <> target_property_offering_id)),
+  constraint property_offering_merge_decision_method_check CHECK ((property_offering_merge_decision_method = ANY (ARRAY['source_match_auto'::text, 'manual'::text, 'backfill_auto'::text]))),
+  constraint property_offering_merge_decision_status_check CHECK ((property_offering_merge_decision_status = ANY (ARRAY['proposed'::text, 'accepted'::text, 'rejected'::text, 'superseded'::text])))
 );
 
-CREATE INDEX idx_property_buildings_geom ON public.property_buildings USING gist (property_building_geom);
+CREATE UNIQUE INDEX idx_property_offering_merge_decisions_active_pair ON public.property_offering_merge_decisions USING btree (source_property_offering_id, target_property_offering_id) WHERE (property_offering_merge_decision_status <> 'rejected'::text);
+CREATE INDEX idx_property_offering_merge_decisions_source ON public.property_offering_merge_decisions USING btree (source_property_offering_id, property_offering_merge_decision_status);
+CREATE INDEX idx_property_offering_merge_decisions_target ON public.property_offering_merge_decisions USING btree (target_property_offering_id, property_offering_merge_decision_status);
 
 create table public.property_offering_source_match_candidates (
   property_offering_source_match_candidate_id uuid default gen_random_uuid() not null constraint property_offering_source_match_candidates_pkey primary key,
@@ -584,7 +670,7 @@ CREATE INDEX idx_property_offerings_unit ON public.property_offerings USING btre
 
 create table public.property_units (
   property_unit_id uuid default gen_random_uuid() not null constraint property_units_pkey primary key,
-  property_building_id uuid not null constraint property_units_property_building_id_fkey references property_buildings(property_building_id) ON DELETE CASCADE,
+  housing_company_id uuid not null constraint property_units_property_building_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
   property_unit_identity_key text not null constraint property_units_property_unit_identity_key_key unique,
   property_unit_address_norm text,
   property_unit_floor_level integer,
@@ -597,7 +683,7 @@ create table public.property_units (
   property_unit_updated_at timestamp with time zone default now() not null
 );
 
-CREATE INDEX idx_property_units_building ON public.property_units USING btree (property_building_id);
+CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
 
 create table public.role_feature_flags (
   flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
@@ -671,7 +757,6 @@ create table public.sale_listing_room_category_aliases (
 
 create table public.sale_listings (
   sale_listing_id uuid default gen_random_uuid() not null constraint sale_listings_pkey primary key,
-  sale_listing_public_id text not null constraint sale_listings_public_id_key unique,
   shortcut_ad_id bigint constraint sale_listings_shortcut_ad_id_fkey references shortcut_ads(shortcut_ad_id) ON DELETE SET NULL,
   frontdoor_ad_id uuid constraint sale_listings_frontdoor_ad_id_fkey references frontdoor_ads(frontdoor_ad_id) ON DELETE SET NULL,
   frontdoor_building_announcement_id uuid constraint sale_listings_frontdoor_building_announcement_id_fkey references frontdoor_building_announcements(frontdoor_building_announcement_id) ON DELETE SET NULL,
