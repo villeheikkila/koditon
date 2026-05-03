@@ -94,7 +94,7 @@ type ListingSource struct {
 	Provider    string          `json:"provider"`
 	Kind        string          `json:"kind"`
 	CanonicalID string          `json:"-"`
-	NativeID    string          `json:"native_id"`
+	NativeID    string          `json:"native_id,omitempty"`
 	ExternalID  string          `json:"external_id,omitempty"`
 	FriendlyID  string          `json:"friendly_id,omitempty"`
 	URL         string          `json:"url,omitempty"`
@@ -121,7 +121,7 @@ type OfferingSourceRecord struct {
 	ID          string     `json:"id"`
 	Provider    string     `json:"provider"`
 	Kind        string     `json:"kind"`
-	NativeID    string     `json:"native_id"`
+	NativeID    string     `json:"native_id,omitempty"`
 	URL         string     `json:"url,omitempty"`
 	Headline    string     `json:"headline,omitempty"`
 	FirstSeenAt *time.Time `json:"first_seen_at,omitempty"`

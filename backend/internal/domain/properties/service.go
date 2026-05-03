@@ -22,17 +22,6 @@ type Service struct {
 	queries *db.Queries
 }
 
-type saleListingSourceRow struct {
-	SaleListingID                   uuid.UUID
-	Provider                        string
-	Kind                            string
-	NativeID                        string
-	CanonicalID                     string
-	ShortcutAdID                    *int64
-	FrontdoorAdID                   *uuid.UUID
-	FrontdoorBuildingAnnouncementID *uuid.UUID
-}
-
 func NewService(dbtx db.DBTX) *Service {
 	return &Service{db: dbtx, queries: db.New(dbtx)}
 }
@@ -104,59 +93,139 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 }
 
 func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.UUID) (SaleListing, error) {
-	source, err := s.saleListingSourceRow(ctx, saleListingID)
-	if err != nil {
-		return SaleListing{}, err
-	}
-	switch {
-	case source.ShortcutAdID != nil:
-		row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, *source.ShortcutAdID)
-		if err != nil {
-			return SaleListing{}, mapNotFound(err)
-		}
-		if row.ShortcutAdType != "listing" {
-			return SaleListing{}, fmt.Errorf("%w: not a sale listing", ErrNotFound)
-		}
-		return saleFromShortcutAd(source.CanonicalID, source.NativeID, row), nil
-	case source.FrontdoorAdID != nil:
-		row, err := s.queries.GetFrontdoorAdUnifiedDetail(ctx, source.NativeID)
-		if err != nil {
-			return SaleListing{}, mapNotFound(err)
-		}
-		return saleFromFrontdoorAd(source.CanonicalID, source.NativeID, row), nil
-	case source.FrontdoorBuildingAnnouncementID != nil:
-		row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, *source.FrontdoorBuildingAnnouncementID)
-		if err != nil {
-			return SaleListing{}, mapNotFound(err)
-		}
-		if row.FrontdoorBuildingAnnouncementRentPeriod != nil || row.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
-			return SaleListing{}, fmt.Errorf("%w: not a sale listing", ErrNotFound)
-		}
-		return saleFromFrontdoorAnnouncement(source.CanonicalID, source.NativeID, row), nil
-	default:
-		return SaleListing{}, fmt.Errorf("%w: sale listing has no source row", ErrNotFound)
-	}
-}
-
-func (s *Service) saleListingSourceRow(ctx context.Context, saleListingID uuid.UUID) (saleListingSourceRow, error) {
-	var source saleListingSourceRow
+	var listing SaleListing
+	var plotOwned *bool
+	var saleListingIDText string
+	var provider, kind, url, headline, streetAddress, city, postal, roomLayout, propertyType, condition, energyClass, energyLabel, plotType, plotCode, description, availability, renovationsDone, renovationsPlanned, additionalInfo, chargesText, housingCompanyName, housingCompanyBusinessID, buildingMaterial, heatingSystem, roofType, roofMaterial, carStorage, buildingDescription, buildingOtherInfo string
 	err := s.db.QueryRow(ctx, `
 SELECT
-    sale_listing_id,
-    sale_listing_source_provider,
-    sale_listing_source_kind,
-    sale_listing_native_id,
-    sale_listing_canonical_id,
-    shortcut_ad_id,
-    frontdoor_ad_id,
-    frontdoor_building_announcement_id
-FROM public.property_source_offerings
-WHERE sale_listing_id = $1
-LIMIT 1`, saleListingID).Scan(&source.SaleListingID, &source.Provider, &source.Kind, &source.NativeID, &source.CanonicalID, &source.ShortcutAdID, &source.FrontdoorAdID, &source.FrontdoorBuildingAnnouncementID)
+    sl.sale_listing_id::text,
+    sl.sale_listing_source_provider,
+    sl.sale_listing_source_kind,
+    COALESCE(sl.sale_listing_url, ''),
+    COALESCE(sl.sale_listing_headline, ''),
+    COALESCE(sl.sale_listing_street_address, ''),
+    COALESCE(sl.sale_listing_city, ''),
+    COALESCE(sl.sale_listing_postal, ''),
+    sl.sale_listing_latitude,
+    sl.sale_listing_longitude,
+    COALESCE(sl.sale_listing_room_layout, ''),
+    sl.sale_listing_rooms_count,
+    sl.sale_listing_area_value,
+    sl.sale_listing_floor_level,
+    COALESCE(sl.sale_listing_property_type_raw, ''),
+    COALESCE(sl.sale_listing_condition, ''),
+    sl.sale_listing_elevator,
+    COALESCE(sl.sale_listing_energy_class, ''),
+    COALESCE(sl.sale_listing_energy_efficiency_label, ''),
+    COALESCE(sl.sale_listing_plot_type_raw, ''),
+    COALESCE(sl.sale_listing_plot_type_code, ''),
+    sl.sale_listing_plot_owned,
+    sl.sale_listing_asking_price,
+    sl.sale_listing_debt_free_price,
+    sl.sale_listing_debt_share_amount,
+    sl.sale_listing_price_per_m2,
+    sl.sale_listing_first_seen_at,
+    sl.sale_listing_last_seen_at,
+    sl.sale_listing_published_at,
+    sl.sale_listing_build_year,
+    sl.sale_listing_total_floors,
+    sl.sale_listing_apartment_count,
+    COALESCE(sl.sale_listing_description_text, ''),
+    COALESCE(sl.sale_listing_availability_text, ''),
+    COALESCE(sl.sale_listing_renovations_done_text, ''),
+    COALESCE(sl.sale_listing_renovations_planned_text, ''),
+    COALESCE(sl.sale_listing_additional_info_text, ''),
+    COALESCE(sl.sale_listing_charges_text, ''),
+    sl.sale_listing_maintenance_charge_monthly,
+    sl.sale_listing_total_charge_monthly,
+    sl.sale_listing_water_charge,
+    COALESCE(sl.sale_listing_housing_company_name, ''),
+    COALESCE(sl.sale_listing_housing_company_business_id, ''),
+    COALESCE(sl.sale_listing_building_material, ''),
+    COALESCE(sl.sale_listing_heating_system, ''),
+    COALESCE(sl.sale_listing_roof_type, ''),
+    COALESCE(sl.sale_listing_roof_material, ''),
+    COALESCE(sl.sale_listing_car_storage_text, ''),
+    COALESCE(sl.sale_listing_building_description_text, ''),
+    COALESCE(sl.sale_listing_building_other_info_text, '')
+FROM public.property_source_offerings sl
+WHERE sl.sale_listing_id = $1
+    AND sl.sale_listing_source_kind IN ('ad', 'announcement')
+LIMIT 1`, saleListingID).Scan(&saleListingIDText, &provider, &kind, &url, &headline, &streetAddress, &city, &postal, &listing.Unit.Location.Latitude, &listing.Unit.Location.Longitude, &roomLayout, &listing.Unit.RoomsCount, &listing.Unit.AreaM2, &listing.Unit.FloorLevel, &propertyType, &condition, &listing.Building.Elevator, &energyClass, &energyLabel, &plotType, &plotCode, &plotOwned, &listing.Commercial.AskingPrice, &listing.Commercial.DebtFreePrice, &listing.Commercial.DebtShareAmount, &listing.Commercial.PricePerSquareMeter, &listing.Commercial.FirstSeenAt, &listing.Commercial.LastSeenAt, &listing.Commercial.PublishedAt, &listing.Building.BuildYear, &listing.Building.FloorCount, &listing.Building.ApartmentCount, &description, &availability, &renovationsDone, &renovationsPlanned, &additionalInfo, &chargesText, &listing.Commercial.Charges.MaintenanceMonthly, &listing.Commercial.Charges.TotalMonthly, &listing.Commercial.Charges.Water, &housingCompanyName, &housingCompanyBusinessID, &buildingMaterial, &heatingSystem, &roofType, &roofMaterial, &carStorage, &buildingDescription, &buildingOtherInfo)
 	if err != nil {
-		return saleListingSourceRow{}, mapNotFound(err)
+		return SaleListing{}, mapNotFound(err)
 	}
-	return source, nil
+	listing.ID = saleListingIDText
+	listing.Source = ListingSource{Provider: provider, Kind: kind, URL: url, OriginalURL: url, FirstSeenAt: listing.Commercial.FirstSeenAt, LastSeenAt: listing.Commercial.LastSeenAt, PublishedAt: listing.Commercial.PublishedAt}
+	listing.Headline = headline
+	listing.Unit.Location.StreetAddress = streetAddress
+	listing.Unit.Location.City = city
+	listing.Unit.Location.Postal = postal
+	listing.Unit.PropertyType = propertyType
+	listing.Unit.RoomLayout = roomLayout
+	listing.Unit.Condition = condition
+	listing.Building.Location = listing.Unit.Location
+	listing.Building.HousingCompany = housingCompanyName
+	listing.Building.BusinessID = housingCompanyBusinessID
+	listing.Building.EnergyClass = firstNonEmpty(energyClass, energyLabel)
+	listing.Building.EnergyEfficiencyLabel = firstNonEmpty(energyLabel, energyClass)
+	listing.Building.BuildingMaterial = buildingMaterial
+	listing.Building.Heating = heatingSystem
+	listing.Building.RoofType = roofType
+	listing.Building.RoofMaterial = roofMaterial
+	listing.Building.CarStorage = carStorage
+	listing.Building.OtherInfo = buildingOtherInfo
+	listing.Site.PlotType = firstNonEmpty(plotType, plotCode)
+	if plotOwned != nil {
+		if *plotOwned {
+			listing.Site.PlotOwnershipType = "owned"
+		} else {
+			listing.Site.PlotOwnershipType = "rented"
+		}
+	}
+	listing.Texts = TextSections{Description: description, Availability: availability, RenovationsDone: renovationsDone, RenovationsPlanned: renovationsPlanned, AdditionalInfo: additionalInfo, Charges: chargesText, Building: firstNonEmpty(buildingDescription, buildingOtherInfo)}
+	listing.Commercial.FeesInfo = chargesText
+	listing.Commercial.Charges.Notes = chargesText
+	if kind == "announcement" {
+		listing.Commercial.IsCompanyAnnouncement = ptrBool(true)
+	}
+	if err := s.enrichSaleListingRenovations(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
+	return listing, nil
+}
+
+func (s *Service) enrichSaleListingRenovations(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	rows, err := s.db.Query(ctx, `
+SELECT
+    property_source_offering_renovation_category,
+    property_source_offering_renovation_status,
+    property_source_offering_renovation_year
+FROM public.property_source_offering_renovations
+WHERE sale_listing_id = $1
+ORDER BY property_source_offering_renovation_category, property_source_offering_renovation_year NULLS LAST`, saleListingID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var category, status string
+		var year *int32
+		if err := rows.Scan(&category, &status, &year); err != nil {
+			return err
+		}
+		var done *bool
+		if status == "done" {
+			done = ptrBool(true)
+		}
+		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(category, done, year))
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	listing.Building.Renovations = compactRenovations(listing.Building.Renovations)
+	return nil
 }
 
 func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (Rental, error) {
@@ -287,6 +356,9 @@ LIMIT 1`, housingCompanyID).Scan(&building.ID, &building.Details.Identity.Key, &
 			"merged_from":          mergedFrom,
 		}
 	}
+	if err := s.enrichBuildingFromFacts(ctx, &building, housingCompanyID); err != nil {
+		return Building{}, err
+	}
 	if err := s.enrichBuildingFromOfferingSources(ctx, &building, housingCompanyID); err != nil {
 		return Building{}, err
 	}
@@ -296,6 +368,72 @@ LIMIT 1`, housingCompanyID).Scan(&building.ID, &building.Details.Identity.Key, &
 	}
 	building.Related.Items = related
 	return building, nil
+}
+
+func (s *Service) enrichBuildingFromFacts(ctx context.Context, building *Building, buildingID uuid.UUID) error {
+	rows, err := s.db.Query(ctx, `
+SELECT
+    housing_company_fact_key,
+    housing_company_fact_value_text,
+    housing_company_fact_value_number::int4,
+    housing_company_fact_value_bool
+FROM public.housing_company_facts
+WHERE housing_company_id = $1
+ORDER BY housing_company_fact_updated_at DESC`, buildingID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var text *string
+		var number *int32
+		var valueBool *bool
+		if err := rows.Scan(&key, &text, &number, &valueBool); err != nil {
+			return err
+		}
+		switch key {
+		case "housing_company_name":
+			building.Details.HousingCompany = firstNonEmpty(building.Details.HousingCompany, valueOrEmpty(text))
+		case "housing_company_business_id":
+			building.Details.BusinessID = firstNonEmpty(building.Details.BusinessID, valueOrEmpty(text))
+		case "build_year":
+			building.Details.BuildYear = firstInt32(building.Details.BuildYear, number)
+		case "floor_count":
+			building.Details.FloorCount = firstInt32(building.Details.FloorCount, number)
+		case "apartment_count":
+			building.Details.ApartmentCount = firstInt32(building.Details.ApartmentCount, number)
+		case "elevator":
+			building.Details.Elevator = firstBool(building.Details.Elevator, valueBool)
+		case "energy_label":
+			building.Details.EnergyEfficiencyLabel = firstNonEmpty(building.Details.EnergyEfficiencyLabel, valueOrEmpty(text))
+			building.Details.EnergyClass = firstNonEmpty(building.Details.EnergyClass, valueOrEmpty(text))
+		case "building_material":
+			building.Details.BuildingMaterial = firstNonEmpty(building.Details.BuildingMaterial, valueOrEmpty(text))
+		case "heating_system":
+			building.Details.Heating = firstNonEmpty(building.Details.Heating, valueOrEmpty(text))
+		case "roof_type":
+			building.Details.RoofType = firstNonEmpty(building.Details.RoofType, valueOrEmpty(text))
+		case "roof_material":
+			building.Details.RoofMaterial = firstNonEmpty(building.Details.RoofMaterial, valueOrEmpty(text))
+		case "car_storage":
+			building.Details.CarStorage = firstNonEmpty(building.Details.CarStorage, valueOrEmpty(text))
+		case "description":
+			building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(text))
+		case "other_info":
+			building.Details.OtherInfo = firstNonEmpty(building.Details.OtherInfo, valueOrEmpty(text))
+			building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(text))
+		default:
+			if strings.HasPrefix(key, "renovation.") {
+				building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(strings.TrimPrefix(key, "renovation."), ptrBool(true), number))
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	building.Details.Renovations = compactRenovations(building.Details.Renovations)
+	return nil
 }
 
 func (s *Service) enrichBuildingFromOfferingSources(ctx context.Context, building *Building, buildingID uuid.UUID) error {
@@ -471,7 +609,6 @@ LIMIT 1`, offeringID).Scan(&offering.OfferingID, &offering.HousingCompanyID, &of
 	if err != nil {
 		return CanonicalOffering{}, uuid.UUID{}, mapNotFound(err)
 	}
-	offering.PrimarySourceListing = sourceListingID.String()
 	return offering, sourceListingID, nil
 }
 
@@ -481,7 +618,7 @@ SELECT
     sl.sale_listing_id::text,
     sl.sale_listing_source_provider,
     sl.sale_listing_source_kind,
-    sl.sale_listing_native_id,
+    ''::text,
     COALESCE(sl.sale_listing_url, ''),
     COALESCE(sl.sale_listing_headline, ''),
     sl.sale_listing_first_seen_at,
@@ -828,55 +965,38 @@ LIMIT 1`, offeringID, sourceID).Scan(&out.ID, &out.Provider, &out.Kind, &out.Nat
 }
 
 func (s *Service) enrichSaleListingFromCanonicalBuilding(ctx context.Context, listing *SaleListing, offeringID uuid.UUID, saleListingID uuid.UUID) error {
-	var housingCompany, businessID, address, postal, city, energyLabel, heating, heatingFuel, roofMaterial, roofType, carStorage, otherInfo *string
+	var housingCompany, businessID, address, postal, city, energyLabel, buildingMaterial, heating, roofMaterial, roofType, carStorage, description, otherInfo *string
 	var buildYear, floorCount, apartmentCount *int32
-	var elevator, sauna *bool
+	var elevator *bool
 	var latitude, longitude *float64
-	var elevatorRenovated, facadeRenovated, windowRenovated, roofRenovated, pipeRenovated, balconyRenovated, electricityRenovated *bool
-	var elevatorRenovatedYear, facadeRenovatedYear, windowRenovatedYear, roofRenovatedYear, pipeRenovatedYear, balconyRenovatedYear, electricityRenovatedYear *int32
 	err := s.db.QueryRow(ctx, `
 SELECT
-    COALESCE(NULLIF(fb.frontdoor_building_company_name, ''), pb.housing_company_name),
-    COALESCE(NULLIF(fb.frontdoor_building_business_id, ''), pb.housing_company_business_id),
-    COALESCE(NULLIF(trim(concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number)), ''), pb.housing_company_address_norm),
-    COALESCE(NULLIF(fb.frontdoor_building_postcode, ''), pb.housing_company_postal_norm),
-    COALESCE(NULLIF(fb.frontdoor_building_municipality, ''), pb.housing_company_city_norm),
-    COALESCE(fb.frontdoor_building_build_year, fb.frontdoor_building_construction_end_year, pb.housing_company_build_year)::int4,
-    COALESCE(fb.frontdoor_building_floor_count, pb.housing_company_floor_count)::int4,
-    COALESCE(fb.frontdoor_building_apartment_count, pb.housing_company_apartment_count)::int4,
-    COALESCE(fb.frontdoor_building_has_elevator, pb.housing_company_elevator),
-    fb.frontdoor_building_has_sauna,
-    COALESCE(NULLIF(fb.frontdoor_building_energy_certificate_code, ''), pb.housing_company_energy_efficiency_label),
-    fb.frontdoor_building_heating,
-    fb.frontdoor_building_heating_fuel,
-    fb.frontdoor_building_outer_roof_material,
-    fb.frontdoor_building_outer_roof_type,
-    fb.frontdoor_building_car_storage_description,
-    fb.frontdoor_building_other_info,
-    fb.frontdoor_building_elevator_renovated,
-    fb.frontdoor_building_elevator_renovated_year,
-    fb.frontdoor_building_facade_renovated,
-    fb.frontdoor_building_facade_renovated_year,
-    fb.frontdoor_building_window_renovated,
-    fb.frontdoor_building_window_renovated_year,
-    fb.frontdoor_building_roof_renovated,
-    fb.frontdoor_building_roof_renovated_year,
-    fb.frontdoor_building_pipe_renovated,
-    fb.frontdoor_building_pipe_renovated_year,
-    fb.frontdoor_building_balcony_renovated,
-    fb.frontdoor_building_balcony_renovated_year,
-    fb.frontdoor_building_electricity_renovated,
-    fb.frontdoor_building_electricity_renovated_year,
-    postgis.ST_Y(pb.housing_company_geom)::double precision,
-    postgis.ST_X(pb.housing_company_geom)::double precision
+    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'housing_company_name'), ''), hc.housing_company_name),
+    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'housing_company_business_id'), ''), hc.housing_company_business_id),
+    hc.housing_company_address_norm,
+    hc.housing_company_postal_norm,
+    hc.housing_company_city_norm,
+    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'build_year')::int4, hc.housing_company_build_year),
+    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'floor_count')::int4, hc.housing_company_floor_count),
+    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'apartment_count')::int4, hc.housing_company_apartment_count),
+    COALESCE(bool_or(hcf.housing_company_fact_value_bool) FILTER (WHERE hcf.housing_company_fact_key = 'elevator'), hc.housing_company_elevator),
+    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'energy_label'), ''), hc.housing_company_energy_efficiency_label),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'building_material'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'heating_system'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'roof_material'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'roof_type'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'car_storage'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'description'),
+    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'other_info'),
+    CASE WHEN hc.housing_company_geom IS NULL THEN NULL ELSE postgis.ST_Y(hc.housing_company_geom)::double precision END,
+    CASE WHEN hc.housing_company_geom IS NULL THEN NULL ELSE postgis.ST_X(hc.housing_company_geom)::double precision END
 FROM public.property_offerings po
 JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-JOIN public.housing_companies pb ON pb.housing_company_id = pu.housing_company_id
-LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = $2
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+LEFT JOIN public.housing_company_facts hcf ON hcf.housing_company_id = hc.housing_company_id
 WHERE po.property_offering_id = $1
-LIMIT 1`, offeringID, saleListingID).Scan(&housingCompany, &businessID, &address, &postal, &city, &buildYear, &floorCount, &apartmentCount, &elevator, &sauna, &energyLabel, &heating, &heatingFuel, &roofMaterial, &roofType, &carStorage, &otherInfo, &elevatorRenovated, &elevatorRenovatedYear, &facadeRenovated, &facadeRenovatedYear, &windowRenovated, &windowRenovatedYear, &roofRenovated, &roofRenovatedYear, &pipeRenovated, &pipeRenovatedYear, &balconyRenovated, &balconyRenovatedYear, &electricityRenovated, &electricityRenovatedYear, &latitude, &longitude)
+GROUP BY hc.housing_company_id
+LIMIT 1`, offeringID).Scan(&housingCompany, &businessID, &address, &postal, &city, &buildYear, &floorCount, &apartmentCount, &elevator, &energyLabel, &buildingMaterial, &heating, &roofMaterial, &roofType, &carStorage, &description, &otherInfo, &latitude, &longitude)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -896,24 +1016,47 @@ LIMIT 1`, offeringID, saleListingID).Scan(&housingCompany, &businessID, &address
 	listing.Building.FloorCount = firstInt32(listing.Building.FloorCount, floorCount)
 	listing.Building.ApartmentCount = firstInt32(listing.Building.ApartmentCount, apartmentCount)
 	listing.Building.Elevator = firstBool(listing.Building.Elevator, elevator)
-	listing.Building.Sauna = firstBool(listing.Building.Sauna, sauna)
 	listing.Building.EnergyClass = firstNonEmpty(listing.Building.EnergyClass, valueOrEmpty(energyLabel))
 	listing.Building.EnergyEfficiencyLabel = firstNonEmpty(listing.Building.EnergyEfficiencyLabel, valueOrEmpty(energyLabel))
+	listing.Building.BuildingMaterial = firstNonEmpty(listing.Building.BuildingMaterial, valueOrEmpty(buildingMaterial))
 	listing.Building.Heating = firstNonEmpty(listing.Building.Heating, valueOrEmpty(heating))
-	listing.Building.HeatingFuel = firstNonEmpty(listing.Building.HeatingFuel, valueOrEmpty(heatingFuel))
 	listing.Building.RoofMaterial = firstNonEmpty(listing.Building.RoofMaterial, valueOrEmpty(roofMaterial))
 	listing.Building.RoofType = firstNonEmpty(listing.Building.RoofType, valueOrEmpty(roofType))
 	listing.Building.CarStorage = firstNonEmpty(listing.Building.CarStorage, valueOrEmpty(carStorage))
 	listing.Building.OtherInfo = firstNonEmpty(listing.Building.OtherInfo, valueOrEmpty(otherInfo))
-	listing.Building.Renovations = append(listing.Building.Renovations,
-		buildingRenovation("Elevator", elevatorRenovated, elevatorRenovatedYear),
-		buildingRenovation("Facade", facadeRenovated, facadeRenovatedYear),
-		buildingRenovation("Windows", windowRenovated, windowRenovatedYear),
-		buildingRenovation("Roof", roofRenovated, roofRenovatedYear),
-		buildingRenovation("Pipes", pipeRenovated, pipeRenovatedYear),
-		buildingRenovation("Balcony", balconyRenovated, balconyRenovatedYear),
-		buildingRenovation("Electricity", electricityRenovated, electricityRenovatedYear),
-	)
+	listing.Texts.Building = firstNonEmpty(listing.Texts.Building, valueOrEmpty(description), valueOrEmpty(otherInfo))
+	if err := s.enrichSaleListingFromHousingCompanyFacts(ctx, listing, offeringID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) enrichSaleListingFromHousingCompanyFacts(ctx context.Context, listing *SaleListing, offeringID uuid.UUID) error {
+	rows, err := s.db.Query(ctx, `
+SELECT
+    hcf.housing_company_fact_key,
+    hcf.housing_company_fact_value_number::int4
+FROM public.property_offerings po
+JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+JOIN public.housing_company_facts hcf ON hcf.housing_company_id = pu.housing_company_id
+WHERE po.property_offering_id = $1
+    AND hcf.housing_company_fact_key LIKE 'renovation.%'
+ORDER BY hcf.housing_company_fact_key, hcf.housing_company_fact_value_number NULLS LAST`, offeringID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var year *int32
+		if err := rows.Scan(&key, &year); err != nil {
+			return err
+		}
+		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(strings.TrimPrefix(key, "renovation."), ptrBool(true), year))
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	listing.Building.Renovations = compactRenovations(listing.Building.Renovations)
 	return nil
 }

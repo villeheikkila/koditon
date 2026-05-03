@@ -62,6 +62,15 @@ UNION ALL
          OR shortcut_ad_data_changed_at > shortcut_ad_data_normalized_at
          OR shortcut_ad_data_normalized_version < $2)
  ORDER BY shortcut_ad_updated_at ASC NULLS FIRST
+ LIMIT $1)
+UNION ALL
+(SELECT 'frontdoor_building_announcement'::text AS source_table, frontdoor_building_announcement_id::text AS source_id
+ FROM public.frontdoor_building_announcements
+ WHERE frontdoor_building_announcement_rent_period IS NULL
+     AND frontdoor_building_announcement_rental_unique_no IS NULL
+     AND (frontdoor_building_announcement_data_normalized_at IS NULL
+         OR frontdoor_building_announcement_data_normalized_version < $2)
+ ORDER BY frontdoor_building_announcement_last_seen_at ASC
  LIMIT $1)`, payload.Limit, currentSourceAdCanonicalizationVersion)
 	if err != nil {
 		return fmt.Errorf("list source ads for canonicalization: %w", err)
@@ -97,9 +106,49 @@ func (c *Consumer) handleCanonicalizeSourceAd(ctx context.Context, logger *slog.
 		return c.canonicalizeFrontdoorAd(ctx, logger, payload.SourceID)
 	case "shortcut_ad":
 		return c.canonicalizeShortcutAd(ctx, logger, payload.SourceID)
+	case "frontdoor_building_announcement":
+		return c.canonicalizeFrontdoorBuildingAnnouncement(ctx, logger, payload.SourceID)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown source table %q", payload.SourceTable), "invalid source table")
 	}
+}
+
+func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context, logger *slog.Logger, sourceID string) error {
+	announcementID, err := uuid.Parse(sourceID)
+	if err != nil {
+		return taskqueue.NewPermanentError(fmt.Errorf("frontdoor announcement source id must be a uuid: %w", err), "invalid source id")
+	}
+	announcement, err := c.queries.GetFrontdoorBuildingAnnouncementByID(ctx, announcementID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("load frontdoor building announcement for canonicalization: %w", err)
+	}
+	if announcement.FrontdoorBuildingAnnouncementRentPeriod != nil || announcement.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
+		if err := c.queries.DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx, &announcementID); err != nil {
+			return fmt.Errorf("delete rental frontdoor announcement source offering: %w", err)
+		}
+		return c.queries.MarkFrontdoorBuildingAnnouncementDataNormalized(ctx, db.MarkFrontdoorBuildingAnnouncementDataNormalizedParams{FrontdoorBuildingAnnouncementDataNormalizedVersion: currentSourceAdCanonicalizationVersion, FrontdoorBuildingAnnouncementID: announcementID})
+	}
+	saleListingID, err := c.queries.CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx, announcementID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("canonicalize frontdoor building announcement: %w", err)
+	}
+	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, saleListingID); err != nil {
+		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
+	}
+	if err := c.queries.RefreshHousingCompanyFactsForPropertySourceOffering(ctx, saleListingID); err != nil {
+		return fmt.Errorf("refresh housing company facts for source offering: %w", err)
+	}
+	if err := c.queries.MarkFrontdoorBuildingAnnouncementDataNormalized(ctx, db.MarkFrontdoorBuildingAnnouncementDataNormalizedParams{FrontdoorBuildingAnnouncementDataNormalizedVersion: currentSourceAdCanonicalizationVersion, FrontdoorBuildingAnnouncementID: announcementID}); err != nil {
+		return fmt.Errorf("mark frontdoor announcement data normalized: %w", err)
+	}
+	logger.InfoContext(ctx, "frontdoor building announcement canonicalized", "frontdoor_building_announcement_id", sourceID, "sale_listing_id", saleListingID.String(), "outcome", logging.OutcomeSuccess)
+	return nil
 }
 
 func decodeCanonicalizeSourceAdPayload(job db.SyncJob) (canonicalizeSourceAdPayload, error) {
@@ -150,6 +199,9 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	if err := c.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdDataNormalizedVersion: currentSourceAdCanonicalizationVersion, FrontdoorAdExternalID: ad.FrontdoorAdExternalID, FrontdoorAdDataHash: ad.FrontdoorAdDataHash}); err != nil {
 		return fmt.Errorf("mark frontdoor ad data normalized: %w", err)
 	}
+	if err := c.queries.RefreshHousingCompanyFactsForPropertySourceOffering(ctx, saleListingID); err != nil {
+		return fmt.Errorf("refresh housing company facts for frontdoor ad source offering: %w", err)
+	}
 	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1, time.Now()); err != nil {
 		return err
 	}
@@ -187,6 +239,9 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 	}
 	if err := c.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdDataNormalizedVersion: currentSourceAdCanonicalizationVersion, ShortcutAdID: shortcutAdID, ShortcutAdDataHash: ad.ShortcutAdDataHash}); err != nil {
 		return fmt.Errorf("mark shortcut ad data normalized: %w", err)
+	}
+	if err := c.queries.RefreshHousingCompanyFactsForPropertySourceOffering(ctx, saleListingID); err != nil {
+		return fmt.Errorf("refresh housing company facts for shortcut ad source offering: %w", err)
 	}
 	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1, time.Now()); err != nil {
 		return err

@@ -213,6 +213,137 @@ func (q *Queries) CanonicalizeFrontdoorAdSaleListing(ctx context.Context, frontd
 	return sale_listing_id, err
 }
 
+const canonicalizeFrontdoorBuildingAnnouncementSourceOffering = `-- name: CanonicalizeFrontdoorBuildingAnnouncementSourceOffering :one
+INSERT INTO public.property_source_offerings (
+    frontdoor_building_announcement_id,
+    sale_listing_source_provider,
+    sale_listing_source_kind,
+    sale_listing_native_id,
+    sale_listing_canonical_id,
+    sale_listing_url,
+    sale_listing_headline,
+    sale_listing_street_address,
+    sale_listing_city,
+    sale_listing_postal,
+    sale_listing_asking_price,
+    sale_listing_area_value,
+    sale_listing_room_layout,
+    sale_listing_last_seen_at,
+    sale_listing_published_at,
+    sale_listing_search_text,
+    sale_listing_price_per_m2,
+    sale_listing_rooms_count,
+    sale_listing_total_floors,
+    sale_listing_build_year,
+    sale_listing_property_type_raw,
+    sale_listing_elevator,
+    sale_listing_energy_class,
+    sale_listing_energy_efficiency_label,
+    sale_listing_housing_company_name,
+    sale_listing_housing_company_business_id,
+    sale_listing_building_material,
+    sale_listing_heating_system,
+    sale_listing_roof_type,
+    sale_listing_roof_material,
+    sale_listing_apartment_count,
+    sale_listing_car_storage_text,
+    sale_listing_building_description_text,
+    sale_listing_building_other_info_text,
+    sale_listing_latitude,
+    sale_listing_longitude,
+    sale_listing_first_seen_at,
+    sale_listing_updated_at
+)
+SELECT
+    fba.frontdoor_building_announcement_id,
+    'frontdoor',
+    'announcement',
+    fba.frontdoor_building_announcement_id::text,
+    'frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text,
+    fb.frontdoor_building_url,
+    COALESCE(fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_id::text),
+    concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2),
+    COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area),
+    fb.frontdoor_building_postcode,
+    CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END,
+    fba.frontdoor_building_announcement_area,
+    fba.frontdoor_building_announcement_room_structure,
+    fba.frontdoor_building_announcement_last_seen_at,
+    NULL::timestamptz,
+    concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure, fb.frontdoor_building_company_name, fb.frontdoor_building_business_id),
+    fba.frontdoor_building_announcement_price_per_square,
+    NULL::integer,
+    fb.frontdoor_building_floor_count,
+    COALESCE(fba.frontdoor_building_announcement_construction_finished_year, fb.frontdoor_building_build_year, fb.frontdoor_building_construction_end_year),
+    NULLIF(trim(COALESCE(fba.frontdoor_building_announcement_property_subtype, fba.frontdoor_building_announcement_property_type)), ''),
+    fb.frontdoor_building_has_elevator,
+    fb.frontdoor_building_energy_certificate_code,
+    fb.frontdoor_building_energy_certificate_code,
+    fb.frontdoor_building_company_name,
+    fb.frontdoor_building_business_id,
+    NULL::text,
+    concat_ws(', ', fb.frontdoor_building_heating, array_to_string(fb.frontdoor_building_heating_fuel, ', ')),
+    fb.frontdoor_building_outer_roof_type,
+    fb.frontdoor_building_outer_roof_material,
+    fb.frontdoor_building_apartment_count,
+    fb.frontdoor_building_car_storage_description,
+    fb.frontdoor_building_description,
+    fb.frontdoor_building_other_info,
+    fb.frontdoor_building_latitude,
+    fb.frontdoor_building_longitude,
+    fba.frontdoor_building_announcement_first_seen_at,
+    now()
+FROM public.frontdoor_building_announcements fba
+JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+WHERE fba.frontdoor_building_announcement_id = $1
+    AND fba.frontdoor_building_announcement_rent_period IS NULL
+    AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
+ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
+    frontdoor_building_announcement_id = EXCLUDED.frontdoor_building_announcement_id,
+    sale_listing_source_provider = EXCLUDED.sale_listing_source_provider,
+    sale_listing_source_kind = EXCLUDED.sale_listing_source_kind,
+    sale_listing_native_id = EXCLUDED.sale_listing_native_id,
+    sale_listing_url = EXCLUDED.sale_listing_url,
+    sale_listing_headline = EXCLUDED.sale_listing_headline,
+    sale_listing_street_address = EXCLUDED.sale_listing_street_address,
+    sale_listing_city = EXCLUDED.sale_listing_city,
+    sale_listing_postal = EXCLUDED.sale_listing_postal,
+    sale_listing_asking_price = EXCLUDED.sale_listing_asking_price,
+    sale_listing_area_value = EXCLUDED.sale_listing_area_value,
+    sale_listing_room_layout = EXCLUDED.sale_listing_room_layout,
+    sale_listing_last_seen_at = EXCLUDED.sale_listing_last_seen_at,
+    sale_listing_search_text = EXCLUDED.sale_listing_search_text,
+    sale_listing_price_per_m2 = EXCLUDED.sale_listing_price_per_m2,
+    sale_listing_total_floors = EXCLUDED.sale_listing_total_floors,
+    sale_listing_build_year = EXCLUDED.sale_listing_build_year,
+    sale_listing_property_type_raw = EXCLUDED.sale_listing_property_type_raw,
+    sale_listing_elevator = EXCLUDED.sale_listing_elevator,
+    sale_listing_energy_class = EXCLUDED.sale_listing_energy_class,
+    sale_listing_energy_efficiency_label = EXCLUDED.sale_listing_energy_efficiency_label,
+    sale_listing_housing_company_name = EXCLUDED.sale_listing_housing_company_name,
+    sale_listing_housing_company_business_id = EXCLUDED.sale_listing_housing_company_business_id,
+    sale_listing_building_material = EXCLUDED.sale_listing_building_material,
+    sale_listing_heating_system = EXCLUDED.sale_listing_heating_system,
+    sale_listing_roof_type = EXCLUDED.sale_listing_roof_type,
+    sale_listing_roof_material = EXCLUDED.sale_listing_roof_material,
+    sale_listing_apartment_count = EXCLUDED.sale_listing_apartment_count,
+    sale_listing_car_storage_text = EXCLUDED.sale_listing_car_storage_text,
+    sale_listing_building_description_text = EXCLUDED.sale_listing_building_description_text,
+    sale_listing_building_other_info_text = EXCLUDED.sale_listing_building_other_info_text,
+    sale_listing_latitude = EXCLUDED.sale_listing_latitude,
+    sale_listing_longitude = EXCLUDED.sale_listing_longitude,
+    sale_listing_first_seen_at = EXCLUDED.sale_listing_first_seen_at,
+    sale_listing_updated_at = now()
+RETURNING sale_listing_id
+`
+
+func (q *Queries) CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx context.Context, frontdoorBuildingAnnouncementID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, canonicalizeFrontdoorBuildingAnnouncementSourceOffering, frontdoorBuildingAnnouncementID)
+	var sale_listing_id uuid.UUID
+	err := row.Scan(&sale_listing_id)
+	return sale_listing_id, err
+}
+
 const canonicalizeShortcutAdSaleListing = `-- name: CanonicalizeShortcutAdSaleListing :one
 INSERT INTO public.property_source_offerings (
     shortcut_ad_id,
@@ -423,15 +554,15 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'announcement'::text AS kind,
-        COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city,
-        fb.frontdoor_building_postcode AS postal,
-        CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS price,
-        COALESCE(fba.frontdoor_building_announcement_area, 0::float8) AS area,
-        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable,
+        sl.sale_listing_city AS city,
+        sl.sale_listing_postal AS postal,
+        sl.sale_listing_asking_price AS price,
+        COALESCE(sl.sale_listing_area_value, 0::float8) AS area,
+        sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
-        NULL::timestamptz AS published_at
-    FROM public.frontdoor_building_announcements fba
-    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+        sl.sale_listing_published_at AS published_at
+    FROM public.property_source_offerings sl
+    WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -592,6 +723,16 @@ WHERE expires_at <= now()
 
 func (q *Queries) DeleteExpiredRuntimeKV(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, deleteExpiredRuntimeKV)
+	return err
+}
+
+const deletePropertySourceOfferingForFrontdoorBuildingAnnouncement = `-- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
+DELETE FROM public.property_source_offerings
+WHERE frontdoor_building_announcement_id = $1
+`
+
+func (q *Queries) DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePropertySourceOfferingForFrontdoorBuildingAnnouncement, frontdoorBuildingAnnouncementID)
 	return err
 }
 
@@ -1763,6 +1904,63 @@ func (q *Queries) Read(ctx context.Context, arg ReadParams) ([]ReadRow, error) {
 	return items, nil
 }
 
+const refreshHousingCompanyFactsForPropertySourceOffering = `-- name: RefreshHousingCompanyFactsForPropertySourceOffering :exec
+SELECT public.fnc__refresh_housing_company_facts_for_property_source_offering($1)
+`
+
+func (q *Queries) RefreshHousingCompanyFactsForPropertySourceOffering(ctx context.Context, saleListingID interface{}) error {
+	_, err := q.db.Exec(ctx, refreshHousingCompanyFactsForPropertySourceOffering, saleListingID)
+	return err
+}
+
+const refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding = `-- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
+WITH listing AS (
+    SELECT sl.sale_listing_id, fb.frontdoor_building_id, fb.frontdoor_building_url, fb.frontdoor_building_first_seen_at, fb.frontdoor_building_last_seen_at, fb.frontdoor_building_updated_at, fb.frontdoor_building_company_name, fb.frontdoor_building_business_id, fb.frontdoor_building_apartment_count, fb.frontdoor_building_floor_count, fb.frontdoor_building_construction_end_year, fb.frontdoor_building_build_year, fb.frontdoor_building_has_elevator, fb.frontdoor_building_has_sauna, fb.frontdoor_building_energy_certificate_code, fb.frontdoor_building_plot_holding_type, fb.frontdoor_building_outer_roof_material, fb.frontdoor_building_outer_roof_type, fb.frontdoor_building_heating, fb.frontdoor_building_heating_fuel, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality, fb.frontdoor_building_district, fb.frontdoor_building_latitude, fb.frontdoor_building_longitude, fb.frontdoor_building_elevator_renovated, fb.frontdoor_building_elevator_renovated_year, fb.frontdoor_building_facade_renovated, fb.frontdoor_building_facade_renovated_year, fb.frontdoor_building_window_renovated, fb.frontdoor_building_window_renovated_year, fb.frontdoor_building_roof_renovated, fb.frontdoor_building_roof_renovated_year, fb.frontdoor_building_pipe_renovated, fb.frontdoor_building_pipe_renovated_year, fb.frontdoor_building_balcony_renovated, fb.frontdoor_building_balcony_renovated_year, fb.frontdoor_building_electricity_renovated, fb.frontdoor_building_electricity_renovated_year, fb.frontdoor_building_contact_phone, fb.frontdoor_building_contact_office_name, fb.frontdoor_building_contact_office_id, fb.frontdoor_building_description, fb.frontdoor_building_car_storage_description, fb.frontdoor_building_other_info, fb.frontdoor_building_additional_addresses, fb.frontdoor_building_links, fb.frontdoor_building_data, fb.frontdoor_building_processed_at, fb.frontdoor_building_housing_company_id, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_geom
+    FROM public.property_source_offerings sl
+    JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE sl.sale_listing_id = $1
+),
+deleted AS (
+    DELETE FROM public.property_source_offering_renovations
+    WHERE sale_listing_id = $1
+)
+INSERT INTO public.property_source_offering_renovations (
+    sale_listing_id,
+    property_source_offering_renovation_source_field,
+    property_source_offering_renovation_category,
+    property_source_offering_renovation_status,
+    property_source_offering_renovation_year,
+    property_source_offering_renovation_text,
+    property_source_offering_renovation_confidence
+)
+SELECT
+    listing.sale_listing_id,
+    renovation.source_field,
+    renovation.category,
+    'done',
+    renovation.year,
+    renovation.text,
+    100
+FROM listing
+CROSS JOIN LATERAL (
+    VALUES
+        ('frontdoor_building_elevator_renovated', 'elevator', listing.frontdoor_building_elevator_renovated, listing.frontdoor_building_elevator_renovated_year, NULL::text),
+        ('frontdoor_building_facade_renovated', 'facade', listing.frontdoor_building_facade_renovated, listing.frontdoor_building_facade_renovated_year, NULL::text),
+        ('frontdoor_building_window_renovated', 'window', listing.frontdoor_building_window_renovated, listing.frontdoor_building_window_renovated_year, NULL::text),
+        ('frontdoor_building_roof_renovated', 'roof', listing.frontdoor_building_roof_renovated, listing.frontdoor_building_roof_renovated_year, NULL::text),
+        ('frontdoor_building_pipe_renovated', 'pipe', listing.frontdoor_building_pipe_renovated, listing.frontdoor_building_pipe_renovated_year, NULL::text),
+        ('frontdoor_building_balcony_renovated', 'balcony', listing.frontdoor_building_balcony_renovated, listing.frontdoor_building_balcony_renovated_year, NULL::text),
+        ('frontdoor_building_electricity_renovated', 'electricity', listing.frontdoor_building_electricity_renovated, listing.frontdoor_building_electricity_renovated_year, NULL::text)
+) AS renovation(source_field, category, done, year, text)
+WHERE renovation.done IS TRUE
+`
+
+func (q *Queries) RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx context.Context, saleListingID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding, saleListingID)
+	return err
+}
+
 const searchUnifiedEntities = `-- name: SearchUnifiedEntities :many
 WITH unified AS (
     SELECT
@@ -1835,22 +2033,22 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'announcement'::text AS kind,
-        fba.frontdoor_building_announcement_id::text AS native_id,
-        ('frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text) AS canonical_id,
-        COALESCE(fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_id::text) AS headline,
-        concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2) AS address,
-        COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city,
-        fb.frontdoor_building_postcode AS postal,
-        CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS price,
-        COALESCE(fba.frontdoor_building_announcement_area, 0::float8) AS area,
-        fba.frontdoor_building_announcement_room_structure AS room_layout,
-        fb.frontdoor_building_url AS url,
-        fba.frontdoor_building_announcement_last_seen_at AS last_seen_at,
-        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable,
+        sl.sale_listing_native_id AS native_id,
+        sl.sale_listing_id::text AS canonical_id,
+        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
+        sl.sale_listing_street_address AS address,
+        sl.sale_listing_city AS city,
+        sl.sale_listing_postal AS postal,
+        sl.sale_listing_asking_price AS price,
+        COALESCE(sl.sale_listing_area_value, 0::float8) AS area,
+        sl.sale_listing_room_layout AS room_layout,
+        sl.sale_listing_url AS url,
+        sl.sale_listing_last_seen_at AS last_seen_at,
+        sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
-        NULL::timestamptz AS published_at
-    FROM public.frontdoor_building_announcements fba
-    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+        sl.sale_listing_published_at AS published_at
+    FROM public.property_source_offerings sl
+    WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
         'frontdoor'::text AS source,

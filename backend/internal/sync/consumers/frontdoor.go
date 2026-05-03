@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
+
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
@@ -87,6 +89,19 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 		if ad.FrontdoorAdDataHash != nil {
 			if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_ad", ad.FrontdoorAdID.String(), int32(taskqueue.PriorityNormal)); err != nil {
 				return err
+			}
+		}
+	} else if err == nil && entityType == "building" {
+		buildingID, parseErr := uuid.Parse(externalID)
+		if parseErr == nil {
+			announcements, loadErr := c.queries.ListFrontdoorBuildingAnnouncements(ctx, buildingID)
+			if loadErr != nil {
+				return fmt.Errorf("load synced frontdoor building announcements for canonicalization enqueue: %w", loadErr)
+			}
+			for _, announcement := range announcements {
+				if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_building_announcement", announcement.FrontdoorBuildingAnnouncementID.String(), int32(taskqueue.PriorityNormal)); err != nil {
+					return err
+				}
 			}
 		}
 	}

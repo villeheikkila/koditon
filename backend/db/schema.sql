@@ -151,11 +151,14 @@ create table public.frontdoor_building_announcements (
   frontdoor_building_id uuid not null constraint frontdoor_building_announceme_frontdoor_building_announcem_fkey references frontdoor_buildings(frontdoor_building_id) ON DELETE CASCADE,
   frontdoor_building_announcement_first_seen_at timestamp with time zone default now() not null,
   frontdoor_building_announcement_last_seen_at timestamp with time zone default now() not null,
-  frontdoor_building_announcement_unpublishing_time_date date
+  frontdoor_building_announcement_unpublishing_time_date date,
+  frontdoor_building_announcement_data_normalized_at timestamp with time zone,
+  frontdoor_building_announcement_data_normalized_version integer default 0 not null
 );
 
 CREATE UNIQUE INDEX frontdoor_building_announcements_ext_id_unpub_time_price_key ON public.frontdoor_building_announcements USING btree (frontdoor_building_announcement_external_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_search_price);
 CREATE INDEX idx_frontdoor_building_announcement_building_id ON public.frontdoor_building_announcements USING btree (frontdoor_building_id);
+CREATE INDEX idx_frontdoor_building_announcements_normalized ON public.frontdoor_building_announcements USING btree (frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version);
 
 create table public.frontdoor_buildings (
   frontdoor_building_id uuid default gen_random_uuid() not null constraint frontdoor_buildings_pkey primary key,
@@ -632,6 +635,23 @@ create table public.property_offerings (
 CREATE INDEX idx_property_offerings_primary_sale_listing ON public.property_offerings USING btree (primary_sale_listing_id);
 CREATE INDEX idx_property_offerings_unit ON public.property_offerings USING btree (property_unit_id);
 
+create table public.property_source_offering_renovations (
+  property_source_offering_renovation_id uuid default gen_random_uuid() not null constraint property_source_offering_renovations_pkey primary key,
+  sale_listing_id uuid not null constraint property_source_offering_renovations_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
+  property_source_offering_renovation_source_field text not null,
+  property_source_offering_renovation_category text not null,
+  property_source_offering_renovation_status text not null,
+  property_source_offering_renovation_year integer,
+  property_source_offering_renovation_text text,
+  property_source_offering_renovation_confidence integer default 100 not null,
+  property_source_offering_renovation_created_at timestamp with time zone default now() not null,
+  property_source_offering_renovation_updated_at timestamp with time zone default now() not null,
+  constraint property_source_offering_renovation_status_check CHECK ((property_source_offering_renovation_status = ANY (ARRAY['done'::text, 'planned'::text, 'unknown'::text])))
+);
+
+CREATE INDEX idx_property_source_offering_renovations_listing ON public.property_source_offering_renovations USING btree (sale_listing_id);
+CREATE UNIQUE INDEX idx_property_source_offering_renovations_unique ON public.property_source_offering_renovations USING btree (sale_listing_id, property_source_offering_renovation_source_field, property_source_offering_renovation_category, property_source_offering_renovation_status);
+
 create table public.property_source_offerings (
   sale_listing_id uuid default gen_random_uuid() not null constraint sale_listings_pkey primary key,
   shortcut_ad_id bigint constraint sale_listings_shortcut_ad_id_fkey references shortcut_ads(shortcut_ad_id) ON DELETE SET NULL,
@@ -712,6 +732,18 @@ create table public.property_source_offerings (
   sale_listing_maintenance_charge_monthly double precision,
   sale_listing_total_charge_monthly double precision,
   sale_listing_water_charge double precision,
+  sale_listing_housing_company_name text,
+  sale_listing_housing_company_business_id text,
+  sale_listing_building_material text,
+  sale_listing_heating_system text,
+  sale_listing_roof_type text,
+  sale_listing_roof_material text,
+  sale_listing_apartment_count integer,
+  sale_listing_car_storage_text text,
+  sale_listing_building_description_text text,
+  sale_listing_building_other_info_text text,
+  sale_listing_latitude double precision,
+  sale_listing_longitude double precision,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
   constraint sale_listings_prices_match_status_check CHECK (((sale_listing_prices_match_status IS NULL) OR (sale_listing_prices_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'expired'::text, 'noop'::text])))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),

@@ -194,6 +194,8 @@ type FrontdoorBuildingAnnouncement struct {
 	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time  `json:"frontdoor_building_announcement_first_seen_at"`
 	FrontdoorBuildingAnnouncementLastSeenAt               time.Time  `json:"frontdoor_building_announcement_last_seen_at"`
 	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementDataNormalizedAt         *time.Time `json:"frontdoor_building_announcement_data_normalized_at"`
+	FrontdoorBuildingAnnouncementDataNormalizedVersion    int32      `json:"frontdoor_building_announcement_data_normalized_version"`
 }
 
 type HousingCompany struct {
@@ -604,6 +606,31 @@ type PropertySourceOffering struct {
 	SaleListingMaintenanceChargeMonthly     *float64        `json:"sale_listing_maintenance_charge_monthly"`
 	SaleListingTotalChargeMonthly           *float64        `json:"sale_listing_total_charge_monthly"`
 	SaleListingWaterCharge                  *float64        `json:"sale_listing_water_charge"`
+	SaleListingHousingCompanyName           *string         `json:"sale_listing_housing_company_name"`
+	SaleListingHousingCompanyBusinessID     *string         `json:"sale_listing_housing_company_business_id"`
+	SaleListingBuildingMaterial             *string         `json:"sale_listing_building_material"`
+	SaleListingHeatingSystem                *string         `json:"sale_listing_heating_system"`
+	SaleListingRoofType                     *string         `json:"sale_listing_roof_type"`
+	SaleListingRoofMaterial                 *string         `json:"sale_listing_roof_material"`
+	SaleListingApartmentCount               *int32          `json:"sale_listing_apartment_count"`
+	SaleListingCarStorageText               *string         `json:"sale_listing_car_storage_text"`
+	SaleListingBuildingDescriptionText      *string         `json:"sale_listing_building_description_text"`
+	SaleListingBuildingOtherInfoText        *string         `json:"sale_listing_building_other_info_text"`
+	SaleListingLatitude                     *float64        `json:"sale_listing_latitude"`
+	SaleListingLongitude                    *float64        `json:"sale_listing_longitude"`
+}
+
+type PropertySourceOfferingRenovation struct {
+	PropertySourceOfferingRenovationID          uuid.UUID `json:"property_source_offering_renovation_id"`
+	SaleListingID                               uuid.UUID `json:"sale_listing_id"`
+	PropertySourceOfferingRenovationSourceField string    `json:"property_source_offering_renovation_source_field"`
+	PropertySourceOfferingRenovationCategory    string    `json:"property_source_offering_renovation_category"`
+	PropertySourceOfferingRenovationStatus      string    `json:"property_source_offering_renovation_status"`
+	PropertySourceOfferingRenovationYear        *int32    `json:"property_source_offering_renovation_year"`
+	PropertySourceOfferingRenovationText        *string   `json:"property_source_offering_renovation_text"`
+	PropertySourceOfferingRenovationConfidence  int32     `json:"property_source_offering_renovation_confidence"`
+	PropertySourceOfferingRenovationCreatedAt   time.Time `json:"property_source_offering_renovation_created_at"`
+	PropertySourceOfferingRenovationUpdatedAt   time.Time `json:"property_source_offering_renovation_updated_at"`
 }
 
 type PropertyUnit struct {

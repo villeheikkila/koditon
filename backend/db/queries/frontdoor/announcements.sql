@@ -67,5 +67,13 @@ SET frontdoor_building_announcement_last_seen_at = now(),
     frontdoor_building_announcement_published = COALESCE(EXCLUDED.frontdoor_building_announcement_published, frontdoor_building_announcements.frontdoor_building_announcement_published),
     frontdoor_building_announcement_rent_period = COALESCE(EXCLUDED.frontdoor_building_announcement_rent_period, frontdoor_building_announcements.frontdoor_building_announcement_rent_period),
     frontdoor_building_announcement_rental_unique_no = COALESCE(EXCLUDED.frontdoor_building_announcement_rental_unique_no, frontdoor_building_announcements.frontdoor_building_announcement_rental_unique_no),
-    frontdoor_building_announcement_unpublishing_time_date = COALESCE(EXCLUDED.frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcements.frontdoor_building_announcement_unpublishing_time_date)
+    frontdoor_building_announcement_unpublishing_time_date = COALESCE(EXCLUDED.frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcements.frontdoor_building_announcement_unpublishing_time_date),
+    frontdoor_building_announcement_data_normalized_at = NULL,
+    frontdoor_building_announcement_data_normalized_version = 0
 RETURNING *;
+
+-- name: MarkFrontdoorBuildingAnnouncementDataNormalized :exec
+UPDATE public.frontdoor_building_announcements
+SET frontdoor_building_announcement_data_normalized_at = now(),
+    frontdoor_building_announcement_data_normalized_version = sqlc.arg(frontdoor_building_announcement_data_normalized_version)
+WHERE frontdoor_building_announcement_id = sqlc.arg(frontdoor_building_announcement_id);
