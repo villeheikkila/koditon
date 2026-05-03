@@ -2,6 +2,7 @@ package consumers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -15,7 +16,12 @@ const (
 	TaskTypeFrontdoorSitemapSync          = "frontdoor_sitemap_sync"
 	TaskTypeFrontdoorBuildingsSitemapSync = "frontdoor_buildings_sitemap_sync"
 	TaskTypeFrontdoorSync                 = "frontdoor_sync"
+	TaskTypeFrontdoorAdDataHashBackfill   = "frontdoor_ad_data_hash_backfill"
 )
+
+type sourceAdDataHashBackfillPayload struct {
+	Limit int32 `json:"limit,omitempty"`
+}
 
 func (c *Consumer) handleFrontdoorTask(ctx context.Context, msg taskqueue.Message) error {
 	logger := logging.With(c.logger,
@@ -76,6 +82,23 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 	return nil
 }
 
+func (c *Consumer) handleFrontdoorAdDataHashBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.frontdoor.ad_data_hash_backfill"))
+	payload := sourceAdDataHashBackfillPayload{Limit: 1000}
+	if len(job.SyncJobPayload) > 0 {
+		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
+			return taskqueue.NewPermanentError(fmt.Errorf("decode frontdoor ad data hash backfill payload: %w", err), "invalid payload")
+		}
+	}
+	scanned, updated, batches, err := c.syncRunner.FrontdoorBackfillAdDataHashes(ctx, payload.Limit)
+	if err != nil {
+		logger.ErrorContext(ctx, "frontdoor ad data hash backfill failed", "error", err, "outcome", logging.OutcomeError)
+		return err
+	}
+	logger.InfoContext(ctx, "frontdoor ad data hash backfill completed", "scanned", scanned, "updated", updated, "batches", batches, "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
 func (c *Consumer) enqueueFrontdoorTask(ctx context.Context, _ *taskqueue.Queue, entityID, taskType string) error {
 	_, err := c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
 		Provider:    "frontdoor",
@@ -96,6 +119,8 @@ func (c *Consumer) runFrontdoorSyncJob(ctx context.Context, logger *slog.Logger,
 		return c.handleFrontdoorBuildingsSitemapSync(ctx, logger, msg)
 	case TaskTypeFrontdoorSync:
 		return c.handleFrontdoorEntitySync(ctx, logger, msg)
+	case TaskTypeFrontdoorAdDataHashBackfill:
+		return c.handleFrontdoorAdDataHashBackfill(ctx, logger, job)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown frontdoor sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
 	}

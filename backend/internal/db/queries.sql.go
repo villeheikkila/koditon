@@ -70,15 +70,23 @@ WITH unified AS (
     SELECT
         'shortcut'::text AS source,
         'ad'::text AS kind,
-        sa.shortcut_ad_city AS city,
-        sa.shortcut_ad_postal AS postal,
-        sa.shortcut_ad_price AS price,
-        COALESCE(sa.shortcut_ad_area_value, 0::float8) AS area,
-        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable,
+        raw.city::text AS city,
+        raw.postal::text AS postal,
+        raw.price::bigint AS price,
+        COALESCE(raw.area, 0::float8)::float8 AS area,
+        trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable,
         sa.shortcut_ad_type AS listing_type,
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    CROSS JOIN LATERAL (
+        SELECT
+            public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data) AS street_address,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '') AS city,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '') AS postal,
+            COALESCE(public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceSell}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,price}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerDay}')) AS price,
+            COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,size}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeTotal}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeLiving}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeMin}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}')) AS area
+    ) raw
     UNION ALL
     SELECT
         'shortcut'::text AS source,
@@ -95,14 +103,15 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'ad'::text AS kind,
-        fa.frontdoor_ad_city AS city,
-        fa.frontdoor_ad_postal AS postal,
-        fa.frontdoor_ad_price AS price,
-        COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS area,
-        fa.frontdoor_ad_search_text AS searchable,
+        sl.sale_listing_city AS city,
+        sl.sale_listing_postal AS postal,
+        sl.sale_listing_asking_price AS price,
+        COALESCE(sl.sale_listing_area_value, 0::float8) AS area,
+        sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
-        fa.frontdoor_ad_publishing_time AS published_at
+        sl.sale_listing_published_at AS published_at
     FROM public.frontdoor_ads fa
+    JOIN public.sale_listings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -294,43 +303,49 @@ const findCrossSourceAdMatches = `-- name: FindCrossSourceAdMatches :many
 SELECT
     sa.shortcut_ad_id,
     fa.frontdoor_ad_external_id,
-    sa.shortcut_ad_address_key AS address_key,
-    sa.shortcut_ad_street_address AS shortcut_street,
-    fa.frontdoor_ad_street_address AS frontdoor_street,
-    sa.shortcut_ad_postal AS shortcut_postal,
-    fa.frontdoor_ad_postal AS frontdoor_postal,
-    sa.shortcut_ad_city AS shortcut_city,
-    fa.frontdoor_ad_city AS frontdoor_city,
-    sa.shortcut_ad_price AS shortcut_price,
-    fa.frontdoor_ad_price AS frontdoor_price,
-    sa.shortcut_ad_area_value AS shortcut_area,
-    fa.frontdoor_ad_area_value AS frontdoor_area
-FROM public.shortcut_ads sa
-JOIN public.frontdoor_ads fa ON sa.shortcut_ad_address_key = fa.frontdoor_ad_address_key
-WHERE sa.shortcut_ad_address_key IS NOT NULL
-  AND sa.shortcut_ad_address_key <> ''
-  AND ($1::text IS NULL OR trim($1::text) = '' OR lower(COALESCE(sa.shortcut_ad_city, fa.frontdoor_ad_city, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
+    ssl.sale_listing_unit_match_key AS address_key,
+    ssl.sale_listing_street_address AS shortcut_street,
+    fsl.sale_listing_street_address AS frontdoor_street,
+    ssl.sale_listing_postal AS shortcut_postal,
+    fsl.sale_listing_postal AS frontdoor_postal,
+    ssl.sale_listing_city AS shortcut_city,
+    fsl.sale_listing_city AS frontdoor_city,
+    ssl.sale_listing_asking_price AS shortcut_price,
+    fsl.sale_listing_asking_price AS frontdoor_price,
+    ssl.sale_listing_area_value AS shortcut_area,
+    fsl.sale_listing_area_value AS frontdoor_area
+FROM public.sale_listings ssl
+JOIN public.sale_listings fsl ON fsl.sale_listing_unit_match_key = ssl.sale_listing_unit_match_key
+JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = ssl.shortcut_ad_id
+JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = fsl.frontdoor_ad_id
+WHERE ssl.sale_listing_source_provider = 'shortcut'
+  AND fsl.sale_listing_source_provider = 'frontdoor'
+  AND ssl.sale_listing_source_kind = 'ad'
+  AND fsl.sale_listing_source_kind = 'ad'
+  AND ssl.sale_listing_unit_match_key IS NOT NULL
+  AND ssl.sale_listing_unit_match_key <> ''
+  AND ($1::text IS NULL OR trim($1::text) = '' OR lower(COALESCE(ssl.sale_listing_city, fsl.sale_listing_city, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
   AND (
       $2::bigint IS NULL
       OR (
-          sa.shortcut_ad_price IS NOT NULL
-          AND fa.frontdoor_ad_price IS NOT NULL
-          AND abs(sa.shortcut_ad_price - fa.frontdoor_ad_price) <= $2::bigint
+          ssl.sale_listing_asking_price IS NOT NULL
+          AND fsl.sale_listing_asking_price IS NOT NULL
+          AND abs(ssl.sale_listing_asking_price - fsl.sale_listing_asking_price) <= $2::bigint
       )
   )
   AND (
       $3::float8 IS NULL
       OR (
-          sa.shortcut_ad_area_value IS NOT NULL
-          AND fa.frontdoor_ad_area_value IS NOT NULL
-          AND abs(sa.shortcut_ad_area_value - fa.frontdoor_ad_area_value) <= $3::float8
+          ssl.sale_listing_area_value IS NOT NULL
+          AND fsl.sale_listing_area_value IS NOT NULL
+          AND abs(ssl.sale_listing_area_value - fsl.sale_listing_area_value) <= $3::float8
       )
   )
 ORDER BY
-    abs(COALESCE(sa.shortcut_ad_price, 0) - COALESCE(fa.frontdoor_ad_price, 0)) ASC,
-    abs(COALESCE(sa.shortcut_ad_area_value, 0) - COALESCE(fa.frontdoor_ad_area_value, 0)) ASC,
-    sa.shortcut_ad_last_seen_at DESC,
-    fa.frontdoor_ad_last_seen_at DESC
+    abs(COALESCE(ssl.sale_listing_asking_price, 0) - COALESCE(fsl.sale_listing_asking_price, 0)) ASC,
+    abs(COALESCE(ssl.sale_listing_area_value, 0) - COALESCE(fsl.sale_listing_area_value, 0)) ASC,
+    ssl.sale_listing_last_seen_at DESC,
+    fsl.sale_listing_last_seen_at DESC
 LIMIT $4::int
 `
 
@@ -450,36 +465,41 @@ SELECT
     fa.frontdoor_ad_url,
     fa.frontdoor_ad_last_seen_at,
     fa.frontdoor_ad_page_not_found,
-    fa.frontdoor_ad_street_address AS ad_address,
-    fa.frontdoor_ad_city AS ad_city,
-    fa.frontdoor_ad_postal AS ad_postal,
-    fa.frontdoor_ad_price AS ad_price,
-    COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS ad_area,
-    CAST(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}', '') AS text) AS ad_room_layout,
-    CAST(COALESCE(fa.frontdoor_ad_data #>> '{property,apartmentType}', '') AS text) AS ad_property_type,
-    CAST(COALESCE(fa.frontdoor_ad_data #>> '{property,condition}', '') AS text) AS ad_condition,
-    fa.frontdoor_ad_description_text,
-    fa.frontdoor_ad_availability_text,
-    fa.frontdoor_ad_renovations_done_text,
-    fa.frontdoor_ad_renovations_planned_text,
-    fa.frontdoor_ad_additional_info_text,
-    fa.frontdoor_ad_charges_text,
-    fa.frontdoor_ad_maintenance_charge_monthly,
-    fa.frontdoor_ad_total_charge_monthly,
-    fa.frontdoor_ad_water_charge,
-    fa.frontdoor_ad_debt_free_price,
-    fa.frontdoor_ad_debt_share_amount,
-    fa.frontdoor_ad_price_per_m2,
-    fa.frontdoor_ad_floor_level,
-    fa.frontdoor_ad_total_floors,
-    fa.frontdoor_ad_build_year,
-    fa.frontdoor_ad_energy_class,
-    fa.frontdoor_ad_plot_type,
-    fa.frontdoor_ad_elevator,
-    fa.frontdoor_ad_sauna,
-    fa.frontdoor_ad_rooms_count,
+    sl.sale_listing_street_address AS ad_address,
+    sl.sale_listing_city AS ad_city,
+    sl.sale_listing_postal AS ad_postal,
+    sl.sale_listing_asking_price AS ad_price,
+    COALESCE(sl.sale_listing_area_value, 0::float8) AS ad_area,
+    COALESCE(sl.sale_listing_room_layout, '')::text AS ad_room_layout,
+    COALESCE(sl.sale_listing_property_type_raw, '')::text AS ad_property_type,
+    COALESCE(sl.sale_listing_condition, '')::text AS ad_condition,
+    COALESCE(sl.sale_listing_description_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{basicDetails,description}'), '')) AS frontdoor_ad_description_text,
+    COALESCE(sl.sale_listing_availability_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,freeingDescription}'), '')) AS frontdoor_ad_availability_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}'), '')) AS frontdoor_ad_renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}'), '')) AS frontdoor_ad_renovations_planned_text,
+    COALESCE(sl.sale_listing_additional_info_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,additionalInfo}'), '')) AS frontdoor_ad_additional_info_text,
+    COALESCE(sl.sale_listing_charges_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', fa.frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}')), '')) AS frontdoor_ad_charges_text,
+    COALESCE(sl.sale_listing_maintenance_charge_monthly, public.fnc__jsonb_periodic_charge_price(fa.frontdoor_ad_data, 'HOUSING_COMPANY_MAINTENANCE_CHARGE')) AS frontdoor_ad_maintenance_charge_monthly,
+    COALESCE(sl.sale_listing_total_charge_monthly, public.fnc__jsonb_periodic_charge_price(fa.frontdoor_ad_data, 'HOUSING_COMPANY_TOTAL_CHARGE')) AS frontdoor_ad_total_charge_monthly,
+    COALESCE(sl.sale_listing_water_charge, public.fnc__jsonb_periodic_charge_price(fa.frontdoor_ad_data, 'WATER')) AS frontdoor_ad_water_charge,
+    sl.sale_listing_debt_free_price AS frontdoor_ad_debt_free_price,
+    sl.sale_listing_debt_share_amount AS frontdoor_ad_debt_share_amount,
+    sl.sale_listing_price_per_m2 AS frontdoor_ad_price_per_m2,
+    sl.sale_listing_floor_level AS frontdoor_ad_floor_level,
+    sl.sale_listing_total_floors AS frontdoor_ad_total_floors,
+    sl.sale_listing_build_year AS frontdoor_ad_build_year,
+    sl.sale_listing_energy_class AS frontdoor_ad_energy_class,
+    sl.sale_listing_plot_type_raw AS frontdoor_ad_plot_type,
+    sl.sale_listing_elevator AS frontdoor_ad_elevator,
+    (CASE
+        WHEN jsonb_path_exists(COALESCE(fa.frontdoor_ad_data, '{}'::jsonb), '$.residenceDetailsDTO.generalDwellingFeatures[*] ? (@ == "HAS_NO_SAUNA")') THEN false
+        WHEN jsonb_path_exists(COALESCE(fa.frontdoor_ad_data, '{}'::jsonb), '$.residenceDetailsDTO.generalDwellingFeatures[*] ? (@ == "HAS_SAUNA")') THEN true
+        ELSE NULL
+    END)::boolean AS frontdoor_ad_sauna,
+    sl.sale_listing_rooms_count AS frontdoor_ad_rooms_count,
     fa.frontdoor_ad_data
 FROM public.frontdoor_ads fa
+LEFT JOIN public.sale_listings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
 WHERE fa.frontdoor_ad_external_id = $1
 LIMIT 1
 `
@@ -516,7 +536,7 @@ type GetFrontdoorAdUnifiedDetailRow struct {
 	FrontdoorAdEnergyClass              *string         `json:"frontdoor_ad_energy_class"`
 	FrontdoorAdPlotType                 *string         `json:"frontdoor_ad_plot_type"`
 	FrontdoorAdElevator                 *bool           `json:"frontdoor_ad_elevator"`
-	FrontdoorAdSauna                    *bool           `json:"frontdoor_ad_sauna"`
+	FrontdoorAdSauna                    bool            `json:"frontdoor_ad_sauna"`
 	FrontdoorAdRoomsCount               *int32          `json:"frontdoor_ad_rooms_count"`
 	FrontdoorAdData                     json.RawMessage `json:"frontdoor_ad_data"`
 }
@@ -851,33 +871,33 @@ SELECT
     sa.shortcut_ad_type,
     sa.shortcut_ad_last_seen_at,
     sa.shortcut_building_id,
-    sa.shortcut_ad_street_address AS ad_address,
-    sa.shortcut_ad_city AS ad_city,
-    sa.shortcut_ad_postal AS ad_postal,
-    (sa.shortcut_ad_data #>> '{adData,roomConfiguration}')::text AS ad_room_layout,
-    sa.shortcut_ad_price AS ad_price,
-    COALESCE(sa.shortcut_ad_area_value, 0::float8) AS ad_area,
-    sa.shortcut_ad_description_text,
-    sa.shortcut_ad_availability_text,
-    sa.shortcut_ad_renovations_done_text,
-    sa.shortcut_ad_renovations_planned_text,
-    sa.shortcut_ad_additional_info_text,
-    sa.shortcut_ad_charges_text,
-    sa.shortcut_ad_maintenance_charge_monthly,
-    sa.shortcut_ad_total_charge_monthly,
-    sa.shortcut_ad_water_charge,
-    sa.shortcut_ad_debt_free_price,
-    sa.shortcut_ad_debt_share_amount,
-    sa.shortcut_ad_price_per_m2,
-    sa.shortcut_ad_floor_level,
-    sa.shortcut_ad_total_floors,
-    sa.shortcut_ad_build_year,
-    sa.shortcut_ad_condition,
-    sa.shortcut_ad_energy_class,
-    sa.shortcut_ad_plot_type,
-    sa.shortcut_ad_elevator,
-    sa.shortcut_ad_sauna,
-    sa.shortcut_ad_rooms_count,
+    COALESCE(sl.sale_listing_street_address, public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data), sb.shortcut_building_address) AS ad_address,
+    COALESCE(sl.sale_listing_city, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '')) AS ad_city,
+    COALESCE(sl.sale_listing_postal, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '')) AS ad_postal,
+    COALESCE(sl.sale_listing_room_layout, sa.shortcut_ad_data #>> '{adData,roomConfiguration}')::text AS ad_room_layout,
+    COALESCE(sl.sale_listing_asking_price, COALESCE(public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceSell}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,price}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerDay}'))) AS ad_price,
+    COALESCE(sl.sale_listing_area_value, COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,size}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeTotal}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeLiving}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeMin}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}')), 0::float8) AS ad_area,
+    COALESCE(sl.sale_listing_description_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,description}', sa.shortcut_ad_data #>> '{description}', sa.shortcut_ad_data #>> '{text}')), '')) AS shortcut_ad_description_text,
+    COALESCE(sl.sale_listing_availability_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,availabilityDescription}', sa.shortcut_ad_data #>> '{availabilityDescription}', sa.shortcut_ad_data #>> '{adData,availableFrom}')), '')) AS shortcut_ad_availability_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), '')) AS shortcut_ad_renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), '')) AS shortcut_ad_renovations_planned_text,
+    COALESCE(sl.sale_listing_additional_info_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,additionalInfo}', sa.shortcut_ad_data #>> '{moreInformationAvailableFrom}', sa.shortcut_ad_data #>> '{property,otherInfo}')), '')) AS shortcut_ad_additional_info_text,
+    COALESCE(sl.sale_listing_charges_text, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{priceData,chargesText}', sa.shortcut_ad_data #>> '{priceData,additionalInfo}', sa.shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', sa.shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '')) AS shortcut_ad_charges_text,
+    COALESCE(sl.sale_listing_maintenance_charge_monthly, COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,maintenanceCharge}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,monthlyFee}'))) AS shortcut_ad_maintenance_charge_monthly,
+    COALESCE(sl.sale_listing_total_charge_monthly, COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,totalCharge}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,monthlyFee}'))) AS shortcut_ad_total_charge_monthly,
+    COALESCE(sl.sale_listing_water_charge, public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,waterFee}')) AS shortcut_ad_water_charge,
+    COALESCE(sl.sale_listing_debt_free_price, COALESCE(public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceDebtFree}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceSell}'))) AS shortcut_ad_debt_free_price,
+    COALESCE(sl.sale_listing_debt_share_amount, public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,debtShare}')) AS shortcut_ad_debt_share_amount,
+    COALESCE(sl.sale_listing_price_per_m2, COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,pricePerSqm}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{priceData,pricePerSquareMeter}'))) AS shortcut_ad_price_per_m2,
+    COALESCE(sl.sale_listing_floor_level, COALESCE(public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{adData,floor}'), public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{floor}'))) AS shortcut_ad_floor_level,
+    COALESCE(sl.sale_listing_total_floors, COALESCE(public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{adData,totalFloors}'), public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{buildingData,floors}'))) AS shortcut_ad_total_floors,
+    COALESCE(sl.sale_listing_build_year, COALESCE(public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{buildingData,year}'), public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{adData,constructionYear}'))) AS shortcut_ad_build_year,
+    COALESCE(sl.sale_listing_condition, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,condition}', sa.shortcut_ad_data #>> '{property,condition}')), '')) AS shortcut_ad_condition,
+    COALESCE(sl.sale_listing_energy_class, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,energyClass}', sa.shortcut_ad_data #>> '{property,energyClass}')), '')) AS shortcut_ad_energy_class,
+    COALESCE(sl.sale_listing_plot_type_raw, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,plotType}', sa.shortcut_ad_data #>> '{property,plotType}', sa.shortcut_ad_data #>> '{adData,buildingOverrideLotOwnership}', sb.shortcut_building_plot_type)), '')) AS shortcut_ad_plot_type,
+    COALESCE(sl.sale_listing_elevator, public.fnc__try_parse_bool(sa.shortcut_ad_data #>> '{adData,elevator}'), public.fnc__try_parse_bool(sa.shortcut_ad_data #>> '{adData,hasElevator}')) AS shortcut_ad_elevator,
+    COALESCE(public.fnc__try_parse_bool(sa.shortcut_ad_data #>> '{adData,sauna}'), public.fnc__try_parse_bool(sa.shortcut_ad_data #>> '{adData,hasSauna}'))::boolean AS shortcut_ad_sauna,
+    COALESCE(sl.sale_listing_rooms_count, COALESCE(public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{adData,rooms}'), public.fnc__try_parse_int4(sa.shortcut_ad_data #>> '{rooms}'))) AS shortcut_ad_rooms_count,
     sa.shortcut_ad_data,
     sb.shortcut_building_external_id,
     sb.shortcut_building_url,
@@ -887,6 +907,7 @@ SELECT
     (SELECT COUNT(*)::bigint FROM public.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS building_rental_count
 FROM public.shortcut_ads sa
 LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+LEFT JOIN public.sale_listings sl ON sl.shortcut_ad_id = sa.shortcut_ad_id
 WHERE sa.shortcut_ad_id = $1
 LIMIT 1
 `
@@ -922,7 +943,7 @@ type GetShortcutAdUnifiedDetailRow struct {
 	ShortcutAdEnergyClass              *string         `json:"shortcut_ad_energy_class"`
 	ShortcutAdPlotType                 *string         `json:"shortcut_ad_plot_type"`
 	ShortcutAdElevator                 *bool           `json:"shortcut_ad_elevator"`
-	ShortcutAdSauna                    *bool           `json:"shortcut_ad_sauna"`
+	ShortcutAdSauna                    bool            `json:"shortcut_ad_sauna"`
 	ShortcutAdRoomsCount               *int32          `json:"shortcut_ad_rooms_count"`
 	ShortcutAdData                     json.RawMessage `json:"shortcut_ad_data"`
 	ShortcutBuildingExternalID         *int64          `json:"shortcut_building_external_id"`
@@ -1432,20 +1453,28 @@ WITH unified AS (
         'ad'::text AS kind,
         sa.shortcut_ad_id::text AS native_id,
         ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id,
-        COALESCE(sa.shortcut_ad_street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text) AS headline,
-        COALESCE(sa.shortcut_ad_street_address, sb.shortcut_building_address) AS address,
-        sa.shortcut_ad_city AS city,
-        sa.shortcut_ad_postal AS postal,
-        sa.shortcut_ad_price AS price,
-        COALESCE(sa.shortcut_ad_area_value, 0::float8) AS area,
+        COALESCE(raw.street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text)::text AS headline,
+        COALESCE(raw.street_address, sb.shortcut_building_address)::text AS address,
+        raw.city::text AS city,
+        raw.postal::text AS postal,
+        raw.price::bigint AS price,
+        COALESCE(raw.area, 0::float8)::float8 AS area,
         sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS room_layout,
         sa.shortcut_ad_url AS url,
         sa.shortcut_ad_last_seen_at AS last_seen_at,
-        concat_ws(' ', sa.shortcut_ad_search_text, sb.shortcut_building_address, sb.shortcut_building_housing_company) AS searchable,
+        trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable,
         sa.shortcut_ad_type AS listing_type,
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    CROSS JOIN LATERAL (
+        SELECT
+            public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data) AS street_address,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '') AS city,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '') AS postal,
+            COALESCE(public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceSell}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,price}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerDay}')) AS price,
+            COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,size}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeTotal}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeLiving}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeMin}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}')) AS area
+    ) raw
     UNION ALL
     SELECT
         'shortcut'::text AS source,
@@ -1470,20 +1499,21 @@ WITH unified AS (
         'frontdoor'::text AS source,
         'ad'::text AS kind,
         fa.frontdoor_ad_external_id AS native_id,
-        ('frontdoor:ad:' || fa.frontdoor_ad_external_id) AS canonical_id,
-        COALESCE(fa.frontdoor_ad_street_address, fa.frontdoor_ad_external_id) AS headline,
-        fa.frontdoor_ad_street_address AS address,
-        fa.frontdoor_ad_city AS city,
-        fa.frontdoor_ad_postal AS postal,
-        fa.frontdoor_ad_price AS price,
-        COALESCE(fa.frontdoor_ad_area_value, 0::float8) AS area,
-        fa.frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}' AS room_layout,
-        fa.frontdoor_ad_url AS url,
-        fa.frontdoor_ad_last_seen_at AS last_seen_at,
-        fa.frontdoor_ad_search_text AS searchable,
+        sl.sale_listing_id::text AS canonical_id,
+        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, fa.frontdoor_ad_external_id) AS headline,
+        sl.sale_listing_street_address AS address,
+        sl.sale_listing_city AS city,
+        sl.sale_listing_postal AS postal,
+        sl.sale_listing_asking_price AS price,
+        COALESCE(sl.sale_listing_area_value, 0::float8) AS area,
+        sl.sale_listing_room_layout AS room_layout,
+        COALESCE(sl.sale_listing_url, fa.frontdoor_ad_url) AS url,
+        sl.sale_listing_last_seen_at AS last_seen_at,
+        sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
-        fa.frontdoor_ad_publishing_time AS published_at
+        sl.sale_listing_published_at AS published_at
     FROM public.frontdoor_ads fa
+    JOIN public.sale_listings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -1591,12 +1621,12 @@ type SearchUnifiedEntitiesRow struct {
 	Kind        string    `json:"kind"`
 	NativeID    string    `json:"native_id"`
 	CanonicalID string    `json:"canonical_id"`
-	Headline    *string   `json:"headline"`
-	Address     *string   `json:"address"`
-	City        *string   `json:"city"`
-	Postal      *string   `json:"postal"`
-	Price       *int64    `json:"price"`
-	Area        *float64  `json:"area"`
+	Headline    string    `json:"headline"`
+	Address     string    `json:"address"`
+	City        string    `json:"city"`
+	Postal      string    `json:"postal"`
+	Price       int64     `json:"price"`
+	Area        float64   `json:"area"`
 	RoomLayout  string    `json:"room_layout"`
 	Url         string    `json:"url"`
 	LastSeenAt  time.Time `json:"last_seen_at"`

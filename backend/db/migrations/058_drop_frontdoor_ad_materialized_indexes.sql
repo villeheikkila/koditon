@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_address_key;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_area_value;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_build_year;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_floor_level;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_maintenance_charge;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_postal;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_price;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_search_trgm;
+DROP INDEX IF EXISTS public.idx_frontdoor_ads_street_trgm;

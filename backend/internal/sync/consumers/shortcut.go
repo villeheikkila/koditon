@@ -2,6 +2,7 @@ package consumers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -16,6 +17,7 @@ const (
 	TaskTypeShortcutBuildingsSitemapSync = "shortcut_buildings_sitemap_sync"
 	TaskTypeShortcutScraperSync          = "shortcut_scraper_sync"
 	TaskTypeShortcutAPISync              = "shortcut_api_sync"
+	TaskTypeShortcutAdDataHashBackfill   = "shortcut_ad_data_hash_backfill"
 )
 
 func (c *Consumer) handleShortcutTask(ctx context.Context, msg taskqueue.Message) error {
@@ -87,6 +89,23 @@ func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logge
 	return nil
 }
 
+func (c *Consumer) handleShortcutAdDataHashBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.shortcut.ad_data_hash_backfill"))
+	payload := sourceAdDataHashBackfillPayload{Limit: 1000}
+	if len(job.SyncJobPayload) > 0 {
+		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
+			return taskqueue.NewPermanentError(fmt.Errorf("decode shortcut ad data hash backfill payload: %w", err), "invalid payload")
+		}
+	}
+	scanned, updated, batches, err := c.syncRunner.ShortcutBackfillAdDataHashes(ctx, payload.Limit)
+	if err != nil {
+		logger.ErrorContext(ctx, "shortcut ad data hash backfill failed", "error", err, "outcome", logging.OutcomeError)
+		return err
+	}
+	logger.InfoContext(ctx, "shortcut ad data hash backfill completed", "scanned", scanned, "updated", updated, "batches", batches, "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
 func (c *Consumer) enqueueShortcutTask(ctx context.Context, _ *taskqueue.Queue, entityID, taskType string) error {
 	_, err := c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
 		Provider:    "shortcut",
@@ -109,6 +128,8 @@ func (c *Consumer) runShortcutSyncJob(ctx context.Context, logger *slog.Logger, 
 		return c.handleShortcutScraperSync(ctx, logger, msg)
 	case TaskTypeShortcutAPISync:
 		return c.handleShortcutAPISync(ctx, logger, msg)
+	case TaskTypeShortcutAdDataHashBackfill:
+		return c.handleShortcutAdDataHashBackfill(ctx, logger, job)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown shortcut sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
 	}

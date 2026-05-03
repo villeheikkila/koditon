@@ -108,54 +108,16 @@ create table public.frontdoor_ads (
   frontdoor_ad_data jsonb,
   frontdoor_ad_processed_at timestamp with time zone,
   frontdoor_ad_page_not_found boolean default false not null,
-  frontdoor_ad_publishing_time timestamp with time zone,
-  postal_postal_code_id uuid constraint frontdoor_ads_postal_postal_codes_id_fkey references postal_postal_codes(postal_postal_code_id),
-  frontdoor_ad_address text generated always as ((frontdoor_ad_data #>> '{property,streetAddressFreeForm}'::text[])) stored,
-  frontdoor_ad_area numeric generated always as (((frontdoor_ad_data #>> '{preparsed,area}'::text[]))::numeric) stored,
-  frontdoor_ad_room_layout text generated always as ((frontdoor_ad_data #>> '{residenceDetailsDTO,roomStructure}'::text[])) stored,
-  frontdoor_ad_asking_price numeric generated always as (COALESCE(((frontdoor_ad_data #>> '{debfFreePrice}'::text[]))::numeric, ((frontdoor_ad_data #>> '{preparsed,price}'::text[]))::numeric)) stored,
-  frontdoor_ad_street_address text,
-  frontdoor_ad_city text,
-  frontdoor_ad_postal text,
-  frontdoor_ad_price bigint,
-  frontdoor_ad_area_value double precision,
-  frontdoor_ad_address_key text,
-  frontdoor_ad_search_text text,
-  frontdoor_ad_description_text text,
-  frontdoor_ad_availability_text text,
-  frontdoor_ad_renovations_done_text text,
-  frontdoor_ad_renovations_planned_text text,
-  frontdoor_ad_additional_info_text text,
-  frontdoor_ad_charges_text text,
-  frontdoor_ad_maintenance_charge_monthly double precision,
-  frontdoor_ad_total_charge_monthly double precision,
-  frontdoor_ad_water_charge double precision,
-  frontdoor_ad_debt_free_price bigint,
-  frontdoor_ad_debt_share_amount bigint,
-  frontdoor_ad_price_per_m2 double precision,
-  frontdoor_ad_floor_level integer,
-  frontdoor_ad_total_floors integer,
-  frontdoor_ad_build_year integer,
-  frontdoor_ad_condition text,
-  frontdoor_ad_energy_class text,
-  frontdoor_ad_plot_type text,
-  frontdoor_ad_elevator boolean,
-  frontdoor_ad_sauna boolean,
-  frontdoor_ad_rooms_count integer
+  frontdoor_ad_data_hash text,
+  frontdoor_ad_data_hash_algorithm text default 'sha256'::text not null,
+  frontdoor_ad_data_changed_at timestamp with time zone,
+  frontdoor_ad_data_normalized_at timestamp with time zone
 );
 
 CREATE INDEX idx_frontdoor_ad_page_not_found ON public.frontdoor_ads USING btree (frontdoor_ad_page_not_found);
-CREATE INDEX idx_frontdoor_ad_postal_postal_code_id ON public.frontdoor_ads USING btree (postal_postal_code_id);
 CREATE INDEX idx_frontdoor_ad_processed_at ON public.frontdoor_ads USING btree (frontdoor_ad_processed_at);
-CREATE INDEX idx_frontdoor_ads_address_key ON public.frontdoor_ads USING btree (frontdoor_ad_address_key);
-CREATE INDEX idx_frontdoor_ads_area_value ON public.frontdoor_ads USING btree (frontdoor_ad_area_value);
-CREATE INDEX idx_frontdoor_ads_build_year ON public.frontdoor_ads USING btree (frontdoor_ad_build_year);
-CREATE INDEX idx_frontdoor_ads_floor_level ON public.frontdoor_ads USING btree (frontdoor_ad_floor_level);
-CREATE INDEX idx_frontdoor_ads_maintenance_charge ON public.frontdoor_ads USING btree (frontdoor_ad_maintenance_charge_monthly);
-CREATE INDEX idx_frontdoor_ads_postal ON public.frontdoor_ads USING btree (frontdoor_ad_postal);
-CREATE INDEX idx_frontdoor_ads_price ON public.frontdoor_ads USING btree (frontdoor_ad_price);
-CREATE INDEX idx_frontdoor_ads_search_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_search_text) gin_trgm_ops);
-CREATE INDEX idx_frontdoor_ads_street_trgm ON public.frontdoor_ads USING gin (lower(frontdoor_ad_street_address) gin_trgm_ops);
+CREATE INDEX idx_frontdoor_ads_data_hash ON public.frontdoor_ads USING btree (frontdoor_ad_data_hash);
+CREATE INDEX idx_frontdoor_ads_data_normalized ON public.frontdoor_ads USING btree (frontdoor_ad_data_normalized_at) WHERE (frontdoor_ad_data_hash IS NOT NULL);
 
 create table public.frontdoor_building_announcements (
   frontdoor_building_announcement_id uuid default gen_random_uuid() not null constraint frontdoor_building_announcements_pkey primary key,
@@ -827,6 +789,14 @@ create table public.sale_listings (
   sale_listing_source_match_last_attempted_at timestamp with time zone,
   sale_listing_source_match_attempt_count integer default 0 not null,
   sale_listing_source_match_run_id uuid constraint sale_listings_sale_listing_source_match_run_id_fkey references property_offering_source_match_runs(property_offering_source_match_run_id) ON DELETE SET NULL,
+  sale_listing_availability_text text,
+  sale_listing_renovations_done_text text,
+  sale_listing_renovations_planned_text text,
+  sale_listing_additional_info_text text,
+  sale_listing_charges_text text,
+  sale_listing_maintenance_charge_monthly double precision,
+  sale_listing_total_charge_monthly double precision,
+  sale_listing_water_charge double precision,
   constraint sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
   constraint sale_listings_prices_match_status_check CHECK (((sale_listing_prices_match_status IS NULL) OR (sale_listing_prices_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'expired'::text, 'noop'::text])))),
   constraint sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
@@ -878,51 +848,15 @@ create table public.shortcut_ads (
   shortcut_ad_data jsonb,
   shortcut_ad_updated_at timestamp with time zone default CURRENT_TIMESTAMP,
   shortcut_building_id uuid constraint shortcut_ads_shortcut_ads_building_id_fkey references shortcut_buildings(shortcut_building_id) ON DELETE SET NULL,
-  shortcut_ad_address text generated always as ((shortcut_ad_data #>> '{address,formattedAddress}'::text[])) stored,
-  shortcut_ad_area numeric generated always as (((shortcut_ad_data #>> '{adData,size}'::text[]))::numeric) stored,
-  shortcut_ad_room_layout text generated always as ((shortcut_ad_data #>> '{adData,roomConfiguration}'::text[])) stored,
-  shortcut_ad_asking_price numeric generated always as (COALESCE(((shortcut_ad_data #>> '{priceData,priceSell}'::text[]))::numeric, ((shortcut_ad_data #>> '{priceData,price}'::text[]))::numeric)) stored,
-  shortcut_ad_street_address text,
-  shortcut_ad_city text,
-  shortcut_ad_postal text,
-  shortcut_ad_price bigint,
-  shortcut_ad_area_value double precision,
-  shortcut_ad_address_key text,
-  shortcut_ad_search_text text,
-  shortcut_ad_description_text text,
-  shortcut_ad_availability_text text,
-  shortcut_ad_renovations_done_text text,
-  shortcut_ad_renovations_planned_text text,
-  shortcut_ad_additional_info_text text,
-  shortcut_ad_charges_text text,
-  shortcut_ad_maintenance_charge_monthly double precision,
-  shortcut_ad_total_charge_monthly double precision,
-  shortcut_ad_water_charge double precision,
-  shortcut_ad_debt_free_price bigint,
-  shortcut_ad_debt_share_amount bigint,
-  shortcut_ad_price_per_m2 double precision,
-  shortcut_ad_floor_level integer,
-  shortcut_ad_total_floors integer,
-  shortcut_ad_build_year integer,
-  shortcut_ad_condition text,
-  shortcut_ad_energy_class text,
-  shortcut_ad_plot_type text,
-  shortcut_ad_elevator boolean,
-  shortcut_ad_sauna boolean,
-  shortcut_ad_rooms_count integer,
-  shortcut_ad_data_schema_version smallint default 1 not null
+  shortcut_ad_data_schema_version smallint default 1 not null,
+  shortcut_ad_data_hash text,
+  shortcut_ad_data_hash_algorithm text default 'sha256'::text not null,
+  shortcut_ad_data_changed_at timestamp with time zone,
+  shortcut_ad_data_normalized_at timestamp with time zone
 );
 
-CREATE INDEX idx_shortcut_ad_zipcode_name ON public.shortcut_ads USING btree (((((shortcut_ad_data -> 'address'::text) -> 'zipCode'::text) ->> 'name'::text)));
-CREATE INDEX idx_shortcut_ads_address_key ON public.shortcut_ads USING btree (shortcut_ad_address_key);
-CREATE INDEX idx_shortcut_ads_area_value ON public.shortcut_ads USING btree (shortcut_ad_area_value);
-CREATE INDEX idx_shortcut_ads_build_year ON public.shortcut_ads USING btree (shortcut_ad_build_year);
-CREATE INDEX idx_shortcut_ads_floor_level ON public.shortcut_ads USING btree (shortcut_ad_floor_level);
-CREATE INDEX idx_shortcut_ads_maintenance_charge ON public.shortcut_ads USING btree (shortcut_ad_maintenance_charge_monthly);
-CREATE INDEX idx_shortcut_ads_postal ON public.shortcut_ads USING btree (shortcut_ad_postal);
-CREATE INDEX idx_shortcut_ads_price ON public.shortcut_ads USING btree (shortcut_ad_price);
-CREATE INDEX idx_shortcut_ads_search_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_search_text) gin_trgm_ops);
-CREATE INDEX idx_shortcut_ads_street_trgm ON public.shortcut_ads USING gin (lower(shortcut_ad_street_address) gin_trgm_ops);
+CREATE INDEX idx_shortcut_ads_data_hash ON public.shortcut_ads USING btree (shortcut_ad_data_hash);
+CREATE INDEX idx_shortcut_ads_data_normalized ON public.shortcut_ads USING btree (shortcut_ad_data_normalized_at) WHERE (shortcut_ad_data_hash IS NOT NULL);
 
 create table public.shortcut_building_listings (
   shortcut_building_listing_id uuid default gen_random_uuid() not null constraint shortcut_building_listings_pkey primary key,

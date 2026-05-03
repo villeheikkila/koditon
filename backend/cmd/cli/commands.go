@@ -387,12 +387,14 @@ func validateSyncJobTarget(provider, kind string) error {
 			"frontdoor_sitemap_sync":           {},
 			"frontdoor_buildings_sitemap_sync": {},
 			"frontdoor_sync":                   {},
+			"frontdoor_ad_data_hash_backfill":  {},
 		},
 		"shortcut": {
 			"shortcut_sitemap_sync":           {},
 			"shortcut_buildings_sitemap_sync": {},
 			"shortcut_scraper_sync":           {},
 			"shortcut_api_sync":               {},
+			"shortcut_ad_data_hash_backfill":  {},
 		},
 		"prices": {
 			"prices_cities_init":                   {},

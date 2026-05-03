@@ -150,10 +150,12 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			"frontdoor_sitemap_sync":                        1,
 			"frontdoor_buildings_sitemap_sync":              1,
 			"frontdoor_sync":                                2,
+			"frontdoor_ad_data_hash_backfill":               1,
 			"shortcut_sitemap_sync":                         1,
 			"shortcut_buildings_sitemap_sync":               1,
 			"shortcut_scraper_sync":                         1,
 			"shortcut_api_sync":                             2,
+			"shortcut_ad_data_hash_backfill":                1,
 			"prices_cities_init":                            1,
 			"prices_sync":                                   1,
 			"prices_postal_code_sync":                       1,
@@ -193,8 +195,14 @@ func QueueNameForProvider(provider string) string {
 func CapacityClassForJob(provider, kind string) string {
 	switch strings.TrimSpace(provider) {
 	case "frontdoor":
+		if kind == "frontdoor_ad_data_hash_backfill" {
+			return CapacityClassInternalDB
+		}
 		return CapacityClassFrontdoor
 	case "shortcut":
+		if kind == "shortcut_ad_data_hash_backfill" {
+			return CapacityClassInternalDB
+		}
 		if kind == "shortcut_scraper_sync" {
 			return CapacityClassShortcutScraper
 		}

@@ -12,6 +12,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
 	shortcutpayload "koditon/internal/providers/shortcut"
+	"koditon/internal/sync/sourcejson"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -174,11 +175,46 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err != nil {
 		return fmt.Errorf("get existing ad (ad_id=%d): %w", adID, err)
 	}
-	params := mapUpsertAdParams(adID, existingAd.ShortcutAdUrl, string(payload.AdType), payload.Raw, payload.SchemaVersion, shortcutBuildingID)
+	params, err := mapUpsertAdParams(adID, existingAd.ShortcutAdUrl, string(payload.AdType), payload.Raw, payload.SchemaVersion, shortcutBuildingID)
+	if err != nil {
+		return fmt.Errorf("prepare ad data (ad_id=%d): %w", adID, err)
+	}
 	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}
+	if err := s.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdID: adID, ShortcutAdDataHash: params.ShortcutAdDataHash}); err != nil {
+		return fmt.Errorf("mark ad data normalized (ad_id=%d): %w", adID, err)
+	}
 	return nil
+}
+
+func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (sourcejson.BackfillResult, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	rows, err := s.queries.ListShortcutAdsMissingDataHash(ctx, limit)
+	if err != nil {
+		return sourcejson.BackfillResult{}, fmt.Errorf("list shortcut ads missing data hash: %w", err)
+	}
+	result := sourcejson.BackfillResult{Scanned: len(rows)}
+	if len(rows) > 0 {
+		result.Batches = 1
+	}
+	for _, row := range rows {
+		canonical, hash, err := sourcejson.CanonicalizeAndHash(row.ShortcutAdData)
+		if err != nil {
+			return result, fmt.Errorf("hash shortcut ad payload (ad_id=%d): %w", row.ShortcutAdID, err)
+		}
+		params := db.BackfillShortcutAdDataHashParams{ShortcutAdData: canonical, ShortcutAdDataHash: &hash, ShortcutAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, ShortcutAdID: row.ShortcutAdID}
+		if err := s.queries.BackfillShortcutAdDataHash(ctx, params); err != nil {
+			return result, fmt.Errorf("backfill shortcut ad data hash (ad_id=%d): %w", row.ShortcutAdID, err)
+		}
+		if err := s.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdID: row.ShortcutAdID, ShortcutAdDataHash: &hash}); err != nil {
+			return result, fmt.Errorf("mark shortcut ad data normalized (ad_id=%d): %w", row.ShortcutAdID, err)
+		}
+		result.Updated++
+	}
+	return result, nil
 }
 
 func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error {

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AuthSignupEmailToken struct {
@@ -91,49 +90,19 @@ type FeatureFlag struct {
 }
 
 type FrontdoorAd struct {
-	FrontdoorAdID                       uuid.UUID       `json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID               string          `json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl                      string          `json:"frontdoor_ad_url"`
-	FrontdoorAdFirstSeenAt              time.Time       `json:"frontdoor_ad_first_seen_at"`
-	FrontdoorAdLastSeenAt               time.Time       `json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdUpdatedAt                time.Time       `json:"frontdoor_ad_updated_at"`
-	FrontdoorAdData                     json.RawMessage `json:"frontdoor_ad_data"`
-	FrontdoorAdProcessedAt              *time.Time      `json:"frontdoor_ad_processed_at"`
-	FrontdoorAdPageNotFound             bool            `json:"frontdoor_ad_page_not_found"`
-	FrontdoorAdPublishingTime           *time.Time      `json:"frontdoor_ad_publishing_time"`
-	PostalPostalCodeID                  *uuid.UUID      `json:"postal_postal_code_id"`
-	FrontdoorAdAddress                  *string         `json:"frontdoor_ad_address"`
-	FrontdoorAdArea                     pgtype.Numeric  `json:"frontdoor_ad_area"`
-	FrontdoorAdRoomLayout               *string         `json:"frontdoor_ad_room_layout"`
-	FrontdoorAdAskingPrice              pgtype.Numeric  `json:"frontdoor_ad_asking_price"`
-	FrontdoorAdStreetAddress            *string         `json:"frontdoor_ad_street_address"`
-	FrontdoorAdCity                     *string         `json:"frontdoor_ad_city"`
-	FrontdoorAdPostal                   *string         `json:"frontdoor_ad_postal"`
-	FrontdoorAdPrice                    *int64          `json:"frontdoor_ad_price"`
-	FrontdoorAdAreaValue                *float64        `json:"frontdoor_ad_area_value"`
-	FrontdoorAdAddressKey               *string         `json:"frontdoor_ad_address_key"`
-	FrontdoorAdSearchText               *string         `json:"frontdoor_ad_search_text"`
-	FrontdoorAdDescriptionText          *string         `json:"frontdoor_ad_description_text"`
-	FrontdoorAdAvailabilityText         *string         `json:"frontdoor_ad_availability_text"`
-	FrontdoorAdRenovationsDoneText      *string         `json:"frontdoor_ad_renovations_done_text"`
-	FrontdoorAdRenovationsPlannedText   *string         `json:"frontdoor_ad_renovations_planned_text"`
-	FrontdoorAdAdditionalInfoText       *string         `json:"frontdoor_ad_additional_info_text"`
-	FrontdoorAdChargesText              *string         `json:"frontdoor_ad_charges_text"`
-	FrontdoorAdMaintenanceChargeMonthly *float64        `json:"frontdoor_ad_maintenance_charge_monthly"`
-	FrontdoorAdTotalChargeMonthly       *float64        `json:"frontdoor_ad_total_charge_monthly"`
-	FrontdoorAdWaterCharge              *float64        `json:"frontdoor_ad_water_charge"`
-	FrontdoorAdDebtFreePrice            *int64          `json:"frontdoor_ad_debt_free_price"`
-	FrontdoorAdDebtShareAmount          *int64          `json:"frontdoor_ad_debt_share_amount"`
-	FrontdoorAdPricePerM2               *float64        `json:"frontdoor_ad_price_per_m2"`
-	FrontdoorAdFloorLevel               *int32          `json:"frontdoor_ad_floor_level"`
-	FrontdoorAdTotalFloors              *int32          `json:"frontdoor_ad_total_floors"`
-	FrontdoorAdBuildYear                *int32          `json:"frontdoor_ad_build_year"`
-	FrontdoorAdCondition                *string         `json:"frontdoor_ad_condition"`
-	FrontdoorAdEnergyClass              *string         `json:"frontdoor_ad_energy_class"`
-	FrontdoorAdPlotType                 *string         `json:"frontdoor_ad_plot_type"`
-	FrontdoorAdElevator                 *bool           `json:"frontdoor_ad_elevator"`
-	FrontdoorAdSauna                    *bool           `json:"frontdoor_ad_sauna"`
-	FrontdoorAdRoomsCount               *int32          `json:"frontdoor_ad_rooms_count"`
+	FrontdoorAdID                uuid.UUID       `json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID        string          `json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl               string          `json:"frontdoor_ad_url"`
+	FrontdoorAdFirstSeenAt       time.Time       `json:"frontdoor_ad_first_seen_at"`
+	FrontdoorAdLastSeenAt        time.Time       `json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdUpdatedAt         time.Time       `json:"frontdoor_ad_updated_at"`
+	FrontdoorAdData              json.RawMessage `json:"frontdoor_ad_data"`
+	FrontdoorAdProcessedAt       *time.Time      `json:"frontdoor_ad_processed_at"`
+	FrontdoorAdPageNotFound      bool            `json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdDataHash          *string         `json:"frontdoor_ad_data_hash"`
+	FrontdoorAdDataHashAlgorithm string          `json:"frontdoor_ad_data_hash_algorithm"`
+	FrontdoorAdDataChangedAt     *time.Time      `json:"frontdoor_ad_data_changed_at"`
+	FrontdoorAdDataNormalizedAt  *time.Time      `json:"frontdoor_ad_data_normalized_at"`
 }
 
 type FrontdoorBuilding struct {
@@ -662,6 +631,14 @@ type SaleListing struct {
 	SaleListingSourceMatchLastAttemptedAt   *time.Time      `json:"sale_listing_source_match_last_attempted_at"`
 	SaleListingSourceMatchAttemptCount      int32           `json:"sale_listing_source_match_attempt_count"`
 	SaleListingSourceMatchRunID             *uuid.UUID      `json:"sale_listing_source_match_run_id"`
+	SaleListingAvailabilityText             *string         `json:"sale_listing_availability_text"`
+	SaleListingRenovationsDoneText          *string         `json:"sale_listing_renovations_done_text"`
+	SaleListingRenovationsPlannedText       *string         `json:"sale_listing_renovations_planned_text"`
+	SaleListingAdditionalInfoText           *string         `json:"sale_listing_additional_info_text"`
+	SaleListingChargesText                  *string         `json:"sale_listing_charges_text"`
+	SaleListingMaintenanceChargeMonthly     *float64        `json:"sale_listing_maintenance_charge_monthly"`
+	SaleListingTotalChargeMonthly           *float64        `json:"sale_listing_total_charge_monthly"`
+	SaleListingWaterCharge                  *float64        `json:"sale_listing_water_charge"`
 }
 
 type SaleListingPlotTypeAlias struct {
@@ -712,47 +689,19 @@ type SchemaMigration struct {
 }
 
 type ShortcutAd struct {
-	ShortcutAdID                       int64           `json:"shortcut_ad_id"`
-	ShortcutAdUrl                      string          `json:"shortcut_ad_url"`
-	ShortcutAdType                     string          `json:"shortcut_ad_type"`
-	ShortcutAdFirstSeenAt              time.Time       `json:"shortcut_ad_first_seen_at"`
-	ShortcutAdLastSeenAt               time.Time       `json:"shortcut_ad_last_seen_at"`
-	ShortcutAdData                     json.RawMessage `json:"shortcut_ad_data"`
-	ShortcutAdUpdatedAt                *time.Time      `json:"shortcut_ad_updated_at"`
-	ShortcutBuildingID                 *uuid.UUID      `json:"shortcut_building_id"`
-	ShortcutAdAddress                  *string         `json:"shortcut_ad_address"`
-	ShortcutAdArea                     pgtype.Numeric  `json:"shortcut_ad_area"`
-	ShortcutAdRoomLayout               *string         `json:"shortcut_ad_room_layout"`
-	ShortcutAdAskingPrice              pgtype.Numeric  `json:"shortcut_ad_asking_price"`
-	ShortcutAdStreetAddress            *string         `json:"shortcut_ad_street_address"`
-	ShortcutAdCity                     *string         `json:"shortcut_ad_city"`
-	ShortcutAdPostal                   *string         `json:"shortcut_ad_postal"`
-	ShortcutAdPrice                    *int64          `json:"shortcut_ad_price"`
-	ShortcutAdAreaValue                *float64        `json:"shortcut_ad_area_value"`
-	ShortcutAdAddressKey               *string         `json:"shortcut_ad_address_key"`
-	ShortcutAdSearchText               *string         `json:"shortcut_ad_search_text"`
-	ShortcutAdDescriptionText          *string         `json:"shortcut_ad_description_text"`
-	ShortcutAdAvailabilityText         *string         `json:"shortcut_ad_availability_text"`
-	ShortcutAdRenovationsDoneText      *string         `json:"shortcut_ad_renovations_done_text"`
-	ShortcutAdRenovationsPlannedText   *string         `json:"shortcut_ad_renovations_planned_text"`
-	ShortcutAdAdditionalInfoText       *string         `json:"shortcut_ad_additional_info_text"`
-	ShortcutAdChargesText              *string         `json:"shortcut_ad_charges_text"`
-	ShortcutAdMaintenanceChargeMonthly *float64        `json:"shortcut_ad_maintenance_charge_monthly"`
-	ShortcutAdTotalChargeMonthly       *float64        `json:"shortcut_ad_total_charge_monthly"`
-	ShortcutAdWaterCharge              *float64        `json:"shortcut_ad_water_charge"`
-	ShortcutAdDebtFreePrice            *int64          `json:"shortcut_ad_debt_free_price"`
-	ShortcutAdDebtShareAmount          *int64          `json:"shortcut_ad_debt_share_amount"`
-	ShortcutAdPricePerM2               *float64        `json:"shortcut_ad_price_per_m2"`
-	ShortcutAdFloorLevel               *int32          `json:"shortcut_ad_floor_level"`
-	ShortcutAdTotalFloors              *int32          `json:"shortcut_ad_total_floors"`
-	ShortcutAdBuildYear                *int32          `json:"shortcut_ad_build_year"`
-	ShortcutAdCondition                *string         `json:"shortcut_ad_condition"`
-	ShortcutAdEnergyClass              *string         `json:"shortcut_ad_energy_class"`
-	ShortcutAdPlotType                 *string         `json:"shortcut_ad_plot_type"`
-	ShortcutAdElevator                 *bool           `json:"shortcut_ad_elevator"`
-	ShortcutAdSauna                    *bool           `json:"shortcut_ad_sauna"`
-	ShortcutAdRoomsCount               *int32          `json:"shortcut_ad_rooms_count"`
-	ShortcutAdDataSchemaVersion        int16           `json:"shortcut_ad_data_schema_version"`
+	ShortcutAdID                int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl               string          `json:"shortcut_ad_url"`
+	ShortcutAdType              string          `json:"shortcut_ad_type"`
+	ShortcutAdFirstSeenAt       time.Time       `json:"shortcut_ad_first_seen_at"`
+	ShortcutAdLastSeenAt        time.Time       `json:"shortcut_ad_last_seen_at"`
+	ShortcutAdData              json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutAdUpdatedAt         *time.Time      `json:"shortcut_ad_updated_at"`
+	ShortcutBuildingID          *uuid.UUID      `json:"shortcut_building_id"`
+	ShortcutAdDataSchemaVersion int16           `json:"shortcut_ad_data_schema_version"`
+	ShortcutAdDataHash          *string         `json:"shortcut_ad_data_hash"`
+	ShortcutAdDataHashAlgorithm string          `json:"shortcut_ad_data_hash_algorithm"`
+	ShortcutAdDataChangedAt     *time.Time      `json:"shortcut_ad_data_changed_at"`
+	ShortcutAdDataNormalizedAt  *time.Time      `json:"shortcut_ad_data_normalized_at"`
 }
 
 type ShortcutBuilding struct {

@@ -76,6 +76,14 @@ func (r *Runner) FrontdoorSyncEntity(ctx context.Context, entityID string) error
 	}
 }
 
+func (r *Runner) FrontdoorBackfillAdDataHashes(ctx context.Context, limit int32) (int, int, int, error) {
+	result, err := r.frontdoorService.BackfillAdDataHashes(ctx, limit)
+	if err != nil {
+		return result.Scanned, result.Updated, result.Batches, fmt.Errorf("backfill frontdoor ad data hashes: %w", err)
+	}
+	return result.Scanned, result.Updated, result.Batches, nil
+}
+
 func (r *Runner) ShortcutSyncEntity(ctx context.Context, entityID string) error {
 	entityType, externalID, err := parseEntityID(entityID)
 	if err != nil {
@@ -103,6 +111,14 @@ func (r *Runner) ShortcutSyncEntity(ctx context.Context, entityID string) error 
 	default:
 		return &EntityParseError{EntityID: entityID, Reason: fmt.Sprintf("expected ad/building entity type for shortcut sync, got: %s", entityType)}
 	}
+}
+
+func (r *Runner) ShortcutBackfillAdDataHashes(ctx context.Context, limit int32) (int, int, int, error) {
+	result, err := r.shortcutService.BackfillAdDataHashes(ctx, limit)
+	if err != nil {
+		return result.Scanned, result.Updated, result.Batches, fmt.Errorf("backfill shortcut ad data hashes: %w", err)
+	}
+	return result.Scanned, result.Updated, result.Batches, nil
 }
 
 func (r *Runner) PricesSyncCityEntity(ctx context.Context, entityID string) error {

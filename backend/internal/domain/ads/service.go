@@ -196,12 +196,12 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 			Source:      row.Source,
 			Kind:        row.Kind,
 			NativeID:    row.NativeID,
-			Headline:    valueOrEmpty(row.Headline),
-			Address:     valueOrEmpty(row.Address),
-			City:        valueOrEmpty(row.City),
-			Postal:      valueOrEmpty(row.Postal),
-			Price:       row.Price,
-			Area:        row.Area,
+			Headline:    strings.TrimSpace(row.Headline),
+			Address:     strings.TrimSpace(row.Address),
+			City:        strings.TrimSpace(row.City),
+			Postal:      strings.TrimSpace(row.Postal),
+			Price:       int64Ptr(row.Price),
+			Area:        float64Ptr(row.Area),
 			RoomLayout:  strings.TrimSpace(row.RoomLayout),
 			URL:         strings.TrimSpace(row.Url),
 			LastSeenAt:  row.LastSeenAt,
@@ -787,6 +787,14 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*value)
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
+}
+
+func float64Ptr(value float64) *float64 {
+	return &value
 }
 
 func formatBool(value bool) string {

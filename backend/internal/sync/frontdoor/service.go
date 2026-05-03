@@ -11,6 +11,7 @@ import (
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
+	"koditon/internal/sync/sourcejson"
 )
 
 type Service struct {
@@ -92,10 +93,46 @@ func (s *Service) SyncAd(ctx context.Context, friendlyID string) error {
 		}
 		return fmt.Errorf("fetch ad data (friendly_id=%s): %w", friendlyID, err)
 	}
-	if err := s.queries.UpdateFrontdoorAdData(ctx, mapAdParams(friendlyID, ad)); err != nil {
+	params, err := mapAdParams(friendlyID, ad)
+	if err != nil {
+		return fmt.Errorf("prepare ad data (friendly_id=%s): %w", friendlyID, err)
+	}
+	if err := s.queries.UpdateFrontdoorAdData(ctx, params); err != nil {
 		return fmt.Errorf("update ad data (friendly_id=%s): %w", friendlyID, err)
 	}
+	if err := s.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdExternalID: friendlyID, FrontdoorAdDataHash: params.FrontdoorAdDataHash}); err != nil {
+		return fmt.Errorf("mark ad data normalized (friendly_id=%s): %w", friendlyID, err)
+	}
 	return nil
+}
+
+func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (sourcejson.BackfillResult, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	rows, err := s.queries.ListFrontdoorAdsMissingDataHash(ctx, limit)
+	if err != nil {
+		return sourcejson.BackfillResult{}, fmt.Errorf("list frontdoor ads missing data hash: %w", err)
+	}
+	result := sourcejson.BackfillResult{Scanned: len(rows)}
+	if len(rows) > 0 {
+		result.Batches = 1
+	}
+	for _, row := range rows {
+		canonical, hash, err := sourcejson.CanonicalizeAndHash(row.FrontdoorAdData)
+		if err != nil {
+			return result, fmt.Errorf("hash frontdoor ad payload (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
+		}
+		params := db.BackfillFrontdoorAdDataHashParams{FrontdoorAdData: canonical, FrontdoorAdDataHash: &hash, FrontdoorAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, FrontdoorAdExternalID: row.FrontdoorAdExternalID}
+		if err := s.queries.BackfillFrontdoorAdDataHash(ctx, params); err != nil {
+			return result, fmt.Errorf("backfill frontdoor ad data hash (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
+		}
+		if err := s.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdExternalID: row.FrontdoorAdExternalID, FrontdoorAdDataHash: &hash}); err != nil {
+			return result, fmt.Errorf("mark frontdoor ad data normalized (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
+		}
+		result.Updated++
+	}
+	return result, nil
 }
 
 func (s *Service) SyncBuilding(ctx context.Context, externalID string) error {

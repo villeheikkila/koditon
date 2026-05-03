@@ -1,10 +1,13 @@
 package shortcut
 
 import (
+	"fmt"
+
 	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 	shortcutpayload "koditon/internal/providers/shortcut"
+	"koditon/internal/sync/sourcejson"
 
 	"github.com/google/uuid"
 )
@@ -38,15 +41,21 @@ func mapBatchUpsertAdsFromSitemapParams(entries []client.ShortcutSitemapEntry, a
 	}
 }
 
-func mapUpsertAdParams(adID int64, url string, adType string, data []byte, schemaVersion int16, shortcutBuildingID *uuid.UUID) db.UpsertShortcutAdParams {
+func mapUpsertAdParams(adID int64, url string, adType string, data []byte, schemaVersion int16, shortcutBuildingID *uuid.UUID) (db.UpsertShortcutAdParams, error) {
+	canonical, hash, err := sourcejson.CanonicalizeAndHash(data)
+	if err != nil {
+		return db.UpsertShortcutAdParams{}, fmt.Errorf("hash shortcut ad payload: %w", err)
+	}
 	return db.UpsertShortcutAdParams{
 		ShortcutAdID:                adID,
 		ShortcutAdUrl:               url,
 		ShortcutAdType:              adType,
-		ShortcutAdData:              data,
+		ShortcutAdData:              canonical,
+		ShortcutAdDataHash:          &hash,
+		ShortcutAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256,
 		ShortcutAdDataSchemaVersion: schemaVersion,
 		ShortcutBuildingID:          shortcutBuildingID,
-	}
+	}, nil
 }
 
 func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *client.ScrapedBuilding) db.UpsertShortcutBuildingParams {

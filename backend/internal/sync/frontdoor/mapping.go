@@ -2,11 +2,13 @@ package frontdoor
 
 import (
 	"encoding/json"
+	"fmt"
 
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
+	"koditon/internal/sync/sourcejson"
 
 	"github.com/google/uuid"
 )
@@ -32,14 +34,22 @@ func mapBatchUpsertBuildingsFromSitemapParams(entries []client.SitemapEntry) []s
 	return urls
 }
 
-func mapAdParams(friendlyID string, ad *frontdoorpayload.AdResponse) db.UpdateFrontdoorAdDataParams {
+func mapAdParams(friendlyID string, ad *frontdoorpayload.AdResponse) (db.UpdateFrontdoorAdDataParams, error) {
 	params := db.UpdateFrontdoorAdDataParams{
 		FrontdoorAdExternalID: friendlyID,
 	}
-	if jsonData, err := json.Marshal(ad); err == nil {
-		params.Column2 = jsonData
+	jsonData, err := json.Marshal(ad)
+	if err != nil {
+		return db.UpdateFrontdoorAdDataParams{}, fmt.Errorf("marshal frontdoor ad payload: %w", err)
 	}
-	return params
+	canonical, hash, err := sourcejson.CanonicalizeAndHash(jsonData)
+	if err != nil {
+		return db.UpdateFrontdoorAdDataParams{}, fmt.Errorf("hash frontdoor ad payload: %w", err)
+	}
+	params.FrontdoorAdData = canonical
+	params.FrontdoorAdDataHash = &hash
+	params.FrontdoorAdDataHashAlgorithm = sourcejson.HashAlgorithmSHA256
+	return params, nil
 }
 
 func mapBuildingParams(housingCompanyID int64, data *frontdoorpayload.HousingCompanyResponse) db.UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams {

@@ -49,11 +49,37 @@ RETURNING *;
 
 -- name: UpdateFrontdoorAdData :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ad_data = $2::jsonb,
+SET frontdoor_ad_data = sqlc.arg(frontdoor_ad_data)::jsonb,
+    frontdoor_ad_data_hash = sqlc.arg(frontdoor_ad_data_hash),
+    frontdoor_ad_data_hash_algorithm = sqlc.arg(frontdoor_ad_data_hash_algorithm),
+    frontdoor_ad_data_changed_at = CASE WHEN frontdoor_ad_data_hash IS DISTINCT FROM sqlc.arg(frontdoor_ad_data_hash) THEN now() ELSE frontdoor_ad_data_changed_at END,
+    frontdoor_ad_data_normalized_at = CASE WHEN frontdoor_ad_data_hash IS DISTINCT FROM sqlc.arg(frontdoor_ad_data_hash) THEN NULL ELSE frontdoor_ad_data_normalized_at END,
     frontdoor_ad_processed_at = NOW(),
     frontdoor_ad_updated_at = NOW(),
     frontdoor_ad_page_not_found = false
-WHERE frontdoor_ad_external_id = $1;
+WHERE frontdoor_ad_external_id = sqlc.arg(frontdoor_ad_external_id);
+
+-- name: ListFrontdoorAdsMissingDataHash :many
+SELECT frontdoor_ad_external_id, frontdoor_ad_data
+FROM public.frontdoor_ads
+WHERE frontdoor_ad_data IS NOT NULL
+  AND frontdoor_ad_data_hash IS NULL
+ORDER BY frontdoor_ad_updated_at ASC NULLS FIRST, frontdoor_ad_first_seen_at ASC
+LIMIT $1;
+
+-- name: BackfillFrontdoorAdDataHash :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_data = sqlc.arg(frontdoor_ad_data)::jsonb,
+    frontdoor_ad_data_hash = sqlc.arg(frontdoor_ad_data_hash),
+    frontdoor_ad_data_hash_algorithm = sqlc.arg(frontdoor_ad_data_hash_algorithm),
+    frontdoor_ad_data_changed_at = COALESCE(frontdoor_ad_data_changed_at, frontdoor_ad_updated_at, frontdoor_ad_processed_at, now())
+WHERE frontdoor_ad_external_id = sqlc.arg(frontdoor_ad_external_id);
+
+-- name: MarkFrontdoorAdDataNormalized :exec
+UPDATE public.frontdoor_ads
+SET frontdoor_ad_data_normalized_at = now()
+WHERE frontdoor_ad_external_id = sqlc.arg(frontdoor_ad_external_id)
+  AND frontdoor_ad_data_hash = sqlc.arg(frontdoor_ad_data_hash);
 
 -- name: MarkFrontdoorAdProcessed :exec
 UPDATE public.frontdoor_ads
