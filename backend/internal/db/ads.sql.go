@@ -463,7 +463,7 @@ UPDATE public.frontdoor_ads
 SET frontdoor_ad_data_normalized_at = now(),
     frontdoor_ad_data_normalized_version = $1
 WHERE frontdoor_ad_external_id = $2
-  AND frontdoor_ad_data_hash = $3
+  AND frontdoor_ad_data_hash IS NOT DISTINCT FROM $3
 `
 
 type MarkFrontdoorAdDataNormalizedParams struct {
@@ -517,7 +517,7 @@ UPDATE public.shortcut_ads
 SET shortcut_ad_data_normalized_at = now(),
     shortcut_ad_data_normalized_version = $1
 WHERE shortcut_ad_id = $2
-  AND shortcut_ad_data_hash = $3
+  AND shortcut_ad_data_hash IS NOT DISTINCT FROM $3
 `
 
 type MarkShortcutAdDataNormalizedParams struct {

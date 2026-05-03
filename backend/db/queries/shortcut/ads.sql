@@ -87,4 +87,4 @@ UPDATE public.shortcut_ads
 SET shortcut_ad_data_normalized_at = now(),
     shortcut_ad_data_normalized_version = sqlc.arg(shortcut_ad_data_normalized_version)
 WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id)
-  AND shortcut_ad_data_hash = sqlc.arg(shortcut_ad_data_hash);
+  AND shortcut_ad_data_hash IS NOT DISTINCT FROM sqlc.arg(shortcut_ad_data_hash);

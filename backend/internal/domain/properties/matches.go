@@ -234,9 +234,13 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 		item.Listing.TotalFloors = totalFloors
 		item.Listing.Elevator = listingElevator
 		item.Listing.PlotOwned = listingPlotOwned
+		item.Listing.Condition = displayCondition(item.Listing.Condition)
+		item.Listing.EnergyLabel = displayEnergyClass(item.Listing.EnergyLabel, item.Listing.EnergyMatchCode)
 		item.Transaction.Price = int64(transactionPrice)
 		item.Transaction.PricePerSquareMeter = int64(transactionPricePerM2)
 		item.Transaction.PlotOwned = transactionPlotOwned
+		item.Transaction.Condition = displayCondition(item.Transaction.Condition)
+		item.Transaction.EnergyClass = displayEnergyClass(item.Transaction.EnergyClass, item.Transaction.EnergyMatchCode)
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {

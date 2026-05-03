@@ -96,7 +96,7 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	var listing SaleListing
 	var plotOwned *bool
 	var saleListingIDText string
-	var provider, kind, url, headline, streetAddress, city, postal, roomLayout, propertyType, condition, energyClass, energyLabel, plotType, plotCode, description, availability, renovationsDone, renovationsPlanned, additionalInfo, chargesText, housingCompanyName, housingCompanyBusinessID, buildingMaterial, heatingSystem, roofType, roofMaterial, carStorage, buildingDescription, buildingOtherInfo string
+	var provider, kind, url, headline, streetAddress, city, postal, roomLayout, propertyType, condition, energyClass, energyLabel, plotType, plotCode, description, availability, renovationsDone, renovationsPlanned, additionalInfo, chargesText, housingCompanyName, housingCompanyBusinessID, buildingMaterial, heatingSystem, roofType, roofMaterial, carStorage, buildingDescription, buildingOtherInfo, parkingText, kitchenDescription, bathroomDescription, storageDescription, floorMaterialsDescription, wallMaterialsDescription, balconyDescription, saunaDescription, viewsDescription, servicesText, transportText string
 	err := s.db.QueryRow(ctx, `
 SELECT
     sl.sale_listing_id::text,
@@ -131,6 +131,29 @@ SELECT
     sl.sale_listing_build_year,
     sl.sale_listing_total_floors,
     sl.sale_listing_apartment_count,
+    sl.sale_listing_living_area_value,
+    sl.sale_listing_total_area_value,
+    sl.sale_listing_other_area_value,
+    sl.sale_listing_bedrooms_count,
+    sl.sale_listing_sauna,
+    sl.sale_listing_balcony,
+    COALESCE(sl.sale_listing_parking_text, ''),
+    COALESCE(sl.sale_listing_kitchen_description_text, ''),
+    COALESCE(sl.sale_listing_bathroom_description_text, ''),
+    COALESCE(sl.sale_listing_storage_description_text, ''),
+    COALESCE(sl.sale_listing_floor_materials_description_text, ''),
+    COALESCE(sl.sale_listing_wall_materials_description_text, ''),
+    COALESCE(sl.sale_listing_balcony_description_text, ''),
+    COALESCE(sl.sale_listing_sauna_description_text, ''),
+    COALESCE(sl.sale_listing_views_description_text, ''),
+    COALESCE(sl.sale_listing_appliances, ARRAY[]::text[]),
+    COALESCE(sl.sale_listing_features, ARRAY[]::text[]),
+    sl.sale_listing_plot_area_value,
+    COALESCE(sl.sale_listing_services_text, ''),
+    COALESCE(sl.sale_listing_transport_text, ''),
+    sl.sale_listing_previous_asking_price,
+    sl.sale_listing_previous_debt_free_price,
+    sl.sale_listing_new_development,
     COALESCE(sl.sale_listing_description_text, ''),
     COALESCE(sl.sale_listing_availability_text, ''),
     COALESCE(sl.sale_listing_renovations_done_text, ''),
@@ -152,7 +175,7 @@ SELECT
 FROM public.property_source_offerings sl
 WHERE sl.sale_listing_id = $1
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
-LIMIT 1`, saleListingID).Scan(&saleListingIDText, &provider, &kind, &url, &headline, &streetAddress, &city, &postal, &listing.Unit.Location.Latitude, &listing.Unit.Location.Longitude, &roomLayout, &listing.Unit.RoomsCount, &listing.Unit.AreaM2, &listing.Unit.FloorLevel, &propertyType, &condition, &listing.Building.Elevator, &energyClass, &energyLabel, &plotType, &plotCode, &plotOwned, &listing.Commercial.AskingPrice, &listing.Commercial.DebtFreePrice, &listing.Commercial.DebtShareAmount, &listing.Commercial.PricePerSquareMeter, &listing.Commercial.FirstSeenAt, &listing.Commercial.LastSeenAt, &listing.Commercial.PublishedAt, &listing.Building.BuildYear, &listing.Building.FloorCount, &listing.Building.ApartmentCount, &description, &availability, &renovationsDone, &renovationsPlanned, &additionalInfo, &chargesText, &listing.Commercial.Charges.MaintenanceMonthly, &listing.Commercial.Charges.TotalMonthly, &listing.Commercial.Charges.Water, &housingCompanyName, &housingCompanyBusinessID, &buildingMaterial, &heatingSystem, &roofType, &roofMaterial, &carStorage, &buildingDescription, &buildingOtherInfo)
+LIMIT 1`, saleListingID).Scan(&saleListingIDText, &provider, &kind, &url, &headline, &streetAddress, &city, &postal, &listing.Unit.Location.Latitude, &listing.Unit.Location.Longitude, &roomLayout, &listing.Unit.RoomsCount, &listing.Unit.AreaM2, &listing.Unit.FloorLevel, &propertyType, &condition, &listing.Building.Elevator, &energyClass, &energyLabel, &plotType, &plotCode, &plotOwned, &listing.Commercial.AskingPrice, &listing.Commercial.DebtFreePrice, &listing.Commercial.DebtShareAmount, &listing.Commercial.PricePerSquareMeter, &listing.Commercial.FirstSeenAt, &listing.Commercial.LastSeenAt, &listing.Commercial.PublishedAt, &listing.Building.BuildYear, &listing.Building.FloorCount, &listing.Building.ApartmentCount, &listing.Unit.LivingAreaM2, &listing.Unit.TotalAreaM2, &listing.Unit.OtherAreaM2, &listing.Unit.BedroomsCount, &listing.Unit.Sauna, &listing.Unit.Balcony, &parkingText, &kitchenDescription, &bathroomDescription, &storageDescription, &floorMaterialsDescription, &wallMaterialsDescription, &balconyDescription, &saunaDescription, &viewsDescription, &listing.Unit.Appliances, &listing.Unit.Features, &listing.Site.PlotAreaM2, &servicesText, &transportText, &listing.Commercial.PreviousAskingPrice, &listing.Commercial.PreviousDebtFreePrice, &listing.Commercial.NewDevelopment, &description, &availability, &renovationsDone, &renovationsPlanned, &additionalInfo, &chargesText, &listing.Commercial.Charges.MaintenanceMonthly, &listing.Commercial.Charges.TotalMonthly, &listing.Commercial.Charges.Water, &housingCompanyName, &housingCompanyBusinessID, &buildingMaterial, &heatingSystem, &roofType, &roofMaterial, &carStorage, &buildingDescription, &buildingOtherInfo)
 	if err != nil {
 		return SaleListing{}, mapNotFound(err)
 	}
@@ -162,14 +185,23 @@ LIMIT 1`, saleListingID).Scan(&saleListingIDText, &provider, &kind, &url, &headl
 	listing.Unit.Location.StreetAddress = streetAddress
 	listing.Unit.Location.City = city
 	listing.Unit.Location.Postal = postal
-	listing.Unit.PropertyType = propertyType
+	listing.Unit.PropertyType = displayPropertyType(propertyType)
 	listing.Unit.RoomLayout = roomLayout
-	listing.Unit.Condition = condition
+	listing.Unit.Condition = displayCondition(condition)
+	listing.Unit.Parking = parkingText
+	listing.Unit.KitchenDescription = kitchenDescription
+	listing.Unit.BathroomDescription = bathroomDescription
+	listing.Unit.StorageDescription = storageDescription
+	listing.Unit.FloorMaterialsDescription = floorMaterialsDescription
+	listing.Unit.WallMaterialsDescription = wallMaterialsDescription
+	listing.Unit.BalconyDescription = balconyDescription
+	listing.Unit.SaunaDescription = saunaDescription
+	listing.Unit.ViewsDescription = viewsDescription
 	listing.Building.Location = listing.Unit.Location
 	listing.Building.HousingCompany = housingCompanyName
 	listing.Building.BusinessID = housingCompanyBusinessID
-	listing.Building.EnergyClass = firstNonEmpty(energyClass, energyLabel)
-	listing.Building.EnergyEfficiencyLabel = firstNonEmpty(energyLabel, energyClass)
+	listing.Building.EnergyClass = displayEnergyClass(energyLabel, energyClass)
+	listing.Building.EnergyEfficiencyLabel = listing.Building.EnergyClass
 	listing.Building.BuildingMaterial = buildingMaterial
 	listing.Building.Heating = heatingSystem
 	listing.Building.RoofType = roofType
@@ -177,6 +209,8 @@ LIMIT 1`, saleListingID).Scan(&saleListingIDText, &provider, &kind, &url, &headl
 	listing.Building.CarStorage = carStorage
 	listing.Building.OtherInfo = buildingOtherInfo
 	listing.Site.PlotType = firstNonEmpty(plotType, plotCode)
+	listing.Site.Services = servicesText
+	listing.Site.Transport = transportText
 	if plotOwned != nil {
 		if *plotOwned {
 			listing.Site.PlotOwnershipType = "owned"
@@ -349,7 +383,8 @@ LIMIT 1`, housingCompanyID).Scan(&building.ID, &building.Details.Identity.Key, &
 	building.Details.Identity.Confidence = 1
 	building.Details.Location.Latitude = latitude
 	building.Details.Location.Longitude = longitude
-	building.Details.EnergyClass = building.Details.EnergyEfficiencyLabel
+	building.Details.EnergyClass = displayEnergyClass(building.Details.EnergyEfficiencyLabel)
+	building.Details.EnergyEfficiencyLabel = building.Details.EnergyClass
 	if mergeDecisionCount > 0 {
 		building.Metadata = map[string]any{
 			"merge_decision_count": mergeDecisionCount,
@@ -406,8 +441,9 @@ ORDER BY housing_company_fact_updated_at DESC`, buildingID)
 		case "elevator":
 			building.Details.Elevator = firstBool(building.Details.Elevator, valueBool)
 		case "energy_label":
-			building.Details.EnergyEfficiencyLabel = firstNonEmpty(building.Details.EnergyEfficiencyLabel, valueOrEmpty(text))
-			building.Details.EnergyClass = firstNonEmpty(building.Details.EnergyClass, valueOrEmpty(text))
+			energy := displayEnergyClass(valueOrEmpty(text))
+			building.Details.EnergyEfficiencyLabel = firstNonEmpty(building.Details.EnergyEfficiencyLabel, energy)
+			building.Details.EnergyClass = firstNonEmpty(building.Details.EnergyClass, energy)
 		case "building_material":
 			building.Details.BuildingMaterial = firstNonEmpty(building.Details.BuildingMaterial, valueOrEmpty(text))
 		case "heating_system":
@@ -458,6 +494,7 @@ LIMIT 200`, buildingID)
 	}
 	defer rows.Close()
 	seen := map[string]struct{}{}
+	var renovationCandidate *buildingRenovationSourceCandidate
 	for rows.Next() {
 		var saleListingID uuid.UUID
 		if err := rows.Scan(&saleListingID); err != nil {
@@ -478,12 +515,79 @@ LIMIT 200`, buildingID)
 		mergeBuildingDetails(&building.Details, listing.Building)
 		mergeSiteDetails(&building.Site, listing.Site)
 		mergeTextSections(&building.Texts, listing.Texts)
+		renovationCandidate = selectBuildingRenovationCandidate(renovationCandidate, listing)
 		building.SourceRecords = appendUniqueListingSources(building.SourceRecords, []ListingSource{listing.Source})
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
+	if renovationCandidate != nil {
+		building.Details.Renovations = renovationCandidate.renovations
+		building.Texts.RenovationsDone = renovationCandidate.doneText
+		building.Texts.RenovationsPlanned = renovationCandidate.plannedText
+	}
 	return nil
+}
+
+type buildingRenovationSourceCandidate struct {
+	renovations []BuildingRenovation
+	doneText    string
+	plannedText string
+	recency     *time.Time
+	score       int
+}
+
+func selectBuildingRenovationCandidate(current *buildingRenovationSourceCandidate, listing SaleListing) *buildingRenovationSourceCandidate {
+	candidate := buildingRenovationCandidateFromListing(listing)
+	if candidate == nil {
+		return current
+	}
+	if current == nil {
+		return candidate
+	}
+	if current.recency == nil && candidate.recency != nil {
+		return candidate
+	}
+	if current.recency != nil && candidate.recency != nil {
+		if candidate.recency.After(*current.recency) {
+			return candidate
+		}
+		if candidate.recency.Equal(*current.recency) && candidate.score > current.score {
+			return candidate
+		}
+		return current
+	}
+	if candidate.score > current.score {
+		return candidate
+	}
+	return current
+}
+
+func buildingRenovationCandidateFromListing(listing SaleListing) *buildingRenovationSourceCandidate {
+	renovations := compactRenovations(listing.Building.Renovations)
+	doneText := cleanDisplayString(listing.Texts.RenovationsDone)
+	plannedText := cleanDisplayString(listing.Texts.RenovationsPlanned)
+	if len(renovations) == 0 && doneText == "" && plannedText == "" {
+		return nil
+	}
+	return &buildingRenovationSourceCandidate{
+		renovations: renovations,
+		doneText:    doneText,
+		plannedText: plannedText,
+		recency:     sourceRenovationRecency(listing),
+		score:       len(renovations)*10 + boolScore(doneText != "") + boolScore(plannedText != ""),
+	}
+}
+
+func sourceRenovationRecency(listing SaleListing) *time.Time {
+	return latestTime(listing.Source.LastSeenAt, listing.Commercial.LastSeenAt, listing.Source.PublishedAt, listing.Commercial.PublishedAt, listing.Source.FirstSeenAt, listing.Commercial.FirstSeenAt)
+}
+
+func boolScore(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (s *Service) relatedListingsForBuilding(ctx context.Context, buildingID uuid.UUID) ([]RelatedListing, error) {
@@ -497,6 +601,8 @@ SELECT
     pu.property_unit_area_value,
     COALESCE(po.property_offering_asking_price, source_summary.asking_price),
     COALESCE(po.property_offering_price_per_m2, source_summary.price_per_m2),
+    transaction_summary.sold_price,
+    transaction_summary.sold_at,
     pb.housing_company_build_year,
     COALESCE(po.property_offering_last_seen_at, source_summary.last_seen_at),
     COALESCE(source_summary.providers, ARRAY[]::text[]),
@@ -517,6 +623,17 @@ LEFT JOIN LATERAL (
     WHERE pos.property_offering_id = po.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
 ) source_summary ON true
+LEFT JOIN LATERAL (
+    SELECT
+        pt.prices_transaction_price::bigint AS sold_price,
+        pt.prices_transaction_created_at AS sold_at
+    FROM public.property_offering_transactions pot
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = pot.prices_transaction_id
+    WHERE pot.property_offering_id = po.property_offering_id
+        AND pot.property_offering_transaction_link_status <> 'rejected'
+    ORDER BY pot.property_offering_transaction_link_score DESC, pt.prices_transaction_created_at DESC
+    LIMIT 1
+) transaction_summary ON true
 WHERE pu.housing_company_id = $1
 ORDER BY po.property_offering_last_seen_at DESC NULLS LAST, po.property_offering_asking_price ASC NULLS LAST
 LIMIT 60`, buildingID)
@@ -527,7 +644,7 @@ LIMIT 60`, buildingID)
 	out := []RelatedListing{}
 	for rows.Next() {
 		var item RelatedListing
-		if err := rows.Scan(&item.ID, &item.Kind, &item.FriendlyID, &item.Address, &item.RoomLayout, &item.AreaM2, &item.Price, &item.PricePerM2, &item.BuildYear, &item.LastSeenAt, &item.Providers, &item.Kinds); err != nil {
+		if err := rows.Scan(&item.ID, &item.Kind, &item.FriendlyID, &item.Address, &item.RoomLayout, &item.AreaM2, &item.Price, &item.PricePerM2, &item.SoldPrice, &item.SoldAt, &item.BuildYear, &item.LastSeenAt, &item.Providers, &item.Kinds); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -672,15 +789,34 @@ func (s *Service) enrichSaleListingFromOfferingSources(ctx context.Context, list
 
 func mergeSaleListingDetails(dst *SaleListing, src SaleListing) {
 	dst.Headline = firstNonEmpty(dst.Headline, src.Headline)
-	mergeUnitDetails(&dst.Unit, src.Unit)
+	unitCompatible := compatibleUnitFacts(dst, src)
+	if unitCompatible {
+		mergeUnitDetails(&dst.Unit, src.Unit)
+		mergeCommercialDetails(&dst.Commercial, src.Commercial)
+		mergeTextSections(&dst.Texts, src.Texts)
+		mergeMedia(&dst.Media, src.Media)
+		dst.Contacts = appendUniqueContacts(dst.Contacts, src.Contacts)
+		dst.Showings = append(dst.Showings, src.Showings...)
+		dst.Links = appendUniqueLinks(dst.Links, src.Links)
+	}
 	mergeBuildingDetails(&dst.Building, src.Building)
 	mergeSiteDetails(&dst.Site, src.Site)
-	mergeCommercialDetails(&dst.Commercial, src.Commercial)
-	mergeTextSections(&dst.Texts, src.Texts)
-	mergeMedia(&dst.Media, src.Media)
-	dst.Contacts = appendUniqueContacts(dst.Contacts, src.Contacts)
-	dst.Showings = append(dst.Showings, src.Showings...)
-	dst.Links = appendUniqueLinks(dst.Links, src.Links)
+}
+
+func compatibleUnitFacts(dst *SaleListing, src SaleListing) bool {
+	if !sameFloat(dst.Unit.AreaM2, src.Unit.AreaM2) {
+		return false
+	}
+	if !sameInt32(dst.Unit.FloorLevel, src.Unit.FloorLevel) {
+		return false
+	}
+	if !sameInt32(dst.Unit.RoomsCount, src.Unit.RoomsCount) {
+		return false
+	}
+	if !sameInt32(dst.Building.BuildYear, src.Building.BuildYear) {
+		return false
+	}
+	return true
 }
 
 func mergeUnitDetails(dst *UnitDetails, src UnitDetails) {
@@ -695,19 +831,19 @@ func mergeUnitDetails(dst *UnitDetails, src UnitDetails) {
 	dst.TotalAreaM2 = firstFloat64(dst.TotalAreaM2, src.TotalAreaM2)
 	dst.OtherAreaM2 = firstFloat64(dst.OtherAreaM2, src.OtherAreaM2)
 	dst.FloorLevel = firstInt32(dst.FloorLevel, src.FloorLevel)
-	dst.Condition = firstNonEmpty(dst.Condition, src.Condition)
-	dst.Sauna = firstBool(dst.Sauna, src.Sauna)
-	dst.Balcony = firstBool(dst.Balcony, src.Balcony)
-	dst.Parking = firstNonEmpty(dst.Parking, src.Parking)
+	dst.Condition = firstNonEmpty(dst.Condition, displayCondition(src.Condition))
+	dst.Sauna = trueWinsBool(dst.Sauna, src.Sauna)
+	dst.Balcony = trueWinsBool(dst.Balcony, src.Balcony)
+	dst.Parking = richerText(dst.Parking, src.Parking)
 	dst.Availability = firstNonEmpty(dst.Availability, src.Availability)
-	dst.KitchenDescription = firstNonEmpty(dst.KitchenDescription, src.KitchenDescription)
-	dst.BathroomDescription = firstNonEmpty(dst.BathroomDescription, src.BathroomDescription)
-	dst.StorageDescription = firstNonEmpty(dst.StorageDescription, src.StorageDescription)
-	dst.FloorMaterialsDescription = firstNonEmpty(dst.FloorMaterialsDescription, src.FloorMaterialsDescription)
-	dst.WallMaterialsDescription = firstNonEmpty(dst.WallMaterialsDescription, src.WallMaterialsDescription)
-	dst.BalconyDescription = firstNonEmpty(dst.BalconyDescription, src.BalconyDescription)
-	dst.SaunaDescription = firstNonEmpty(dst.SaunaDescription, src.SaunaDescription)
-	dst.ViewsDescription = firstNonEmpty(dst.ViewsDescription, src.ViewsDescription)
+	dst.KitchenDescription = richerText(dst.KitchenDescription, src.KitchenDescription)
+	dst.BathroomDescription = richerText(dst.BathroomDescription, src.BathroomDescription)
+	dst.StorageDescription = richerText(dst.StorageDescription, src.StorageDescription)
+	dst.FloorMaterialsDescription = richerText(dst.FloorMaterialsDescription, src.FloorMaterialsDescription)
+	dst.WallMaterialsDescription = richerText(dst.WallMaterialsDescription, src.WallMaterialsDescription)
+	dst.BalconyDescription = richerText(dst.BalconyDescription, src.BalconyDescription)
+	dst.SaunaDescription = richerText(dst.SaunaDescription, src.SaunaDescription)
+	dst.ViewsDescription = richerText(dst.ViewsDescription, src.ViewsDescription)
 	dst.Appliances = compactStrings(append(dst.Appliances, src.Appliances...))
 	dst.Features = compactStrings(append(dst.Features, src.Features...))
 }
@@ -723,8 +859,8 @@ func mergeBuildingDetails(dst *BuildingDetails, src BuildingDetails) {
 	dst.FloorCount = firstInt32(dst.FloorCount, src.FloorCount)
 	dst.ApartmentCount = firstInt32(dst.ApartmentCount, src.ApartmentCount)
 	dst.BusinessPremiseCount = firstInt32(dst.BusinessPremiseCount, src.BusinessPremiseCount)
-	dst.EnergyClass = firstNonEmpty(dst.EnergyClass, src.EnergyClass)
-	dst.EnergyEfficiencyLabel = firstNonEmpty(dst.EnergyEfficiencyLabel, src.EnergyEfficiencyLabel)
+	dst.EnergyClass = firstNonEmpty(dst.EnergyClass, displayEnergyClass(src.EnergyEfficiencyLabel, src.EnergyClass))
+	dst.EnergyEfficiencyLabel = firstNonEmpty(dst.EnergyEfficiencyLabel, displayEnergyClass(src.EnergyEfficiencyLabel, src.EnergyClass))
 	dst.Heating = firstNonEmpty(dst.Heating, src.Heating)
 	dst.HeatingDescription = firstNonEmpty(dst.HeatingDescription, src.HeatingDescription)
 	dst.HeatingFuel = firstNonEmpty(dst.HeatingFuel, src.HeatingFuel)
@@ -738,7 +874,7 @@ func mergeBuildingDetails(dst *BuildingDetails, src BuildingDetails) {
 	dst.Connectivity = firstNonEmpty(dst.Connectivity, src.Connectivity)
 	dst.OtherInfo = firstNonEmpty(dst.OtherInfo, src.OtherInfo)
 	dst.Elevator = firstBool(dst.Elevator, src.Elevator)
-	dst.Sauna = firstBool(dst.Sauna, src.Sauna)
+	dst.Sauna = trueWinsBool(dst.Sauna, src.Sauna)
 	dst.Renovations = compactRenovations(append(dst.Renovations, src.Renovations...))
 	dst.ManagementMethod = firstNonEmpty(dst.ManagementMethod, src.ManagementMethod)
 	dst.PropertyManager = firstNonEmpty(dst.PropertyManager, src.PropertyManager)
@@ -758,8 +894,8 @@ func mergeSiteDetails(dst *SiteDetails, src SiteDetails) {
 	dst.RoadAccess = firstNonEmpty(dst.RoadAccess, src.RoadAccess)
 	dst.Zoning = firstNonEmpty(dst.Zoning, src.Zoning)
 	dst.DrivingDirections = firstNonEmpty(dst.DrivingDirections, src.DrivingDirections)
-	dst.Services = firstNonEmpty(dst.Services, src.Services)
-	dst.Transport = firstNonEmpty(dst.Transport, src.Transport)
+	dst.Services = richerText(dst.Services, src.Services)
+	dst.Transport = richerText(dst.Transport, src.Transport)
 	dst.WaterSupplyTypes = compactStrings(append(dst.WaterSupplyTypes, src.WaterSupplyTypes...))
 }
 
@@ -767,10 +903,10 @@ func mergeCommercialDetails(dst *CommercialDetails, src CommercialDetails) {
 	matchedTransaction := dst.MatchedTransaction
 	dst.Status = firstNonEmpty(dst.Status, src.Status)
 	dst.BookingStatus = firstNonEmpty(dst.BookingStatus, src.BookingStatus)
-	dst.PublishedAt = firstTime(dst.PublishedAt, src.PublishedAt)
-	dst.UnpublishedAt = firstTime(dst.UnpublishedAt, src.UnpublishedAt)
-	dst.FirstSeenAt = firstTime(dst.FirstSeenAt, src.FirstSeenAt)
-	dst.LastSeenAt = firstTime(dst.LastSeenAt, src.LastSeenAt)
+	dst.PublishedAt = earliestTime(dst.PublishedAt, src.PublishedAt)
+	dst.UnpublishedAt = latestTime(dst.UnpublishedAt, src.UnpublishedAt)
+	dst.FirstSeenAt = earliestTime(dst.FirstSeenAt, src.FirstSeenAt)
+	dst.LastSeenAt = latestTime(dst.LastSeenAt, src.LastSeenAt)
 	dst.DaysOnMarket = firstInt32(dst.DaysOnMarket, src.DaysOnMarket)
 	dst.MapVisible = firstBool(dst.MapVisible, src.MapVisible)
 	dst.CanReceiveLeads = firstBool(dst.CanReceiveLeads, src.CanReceiveLeads)
@@ -792,7 +928,7 @@ func mergeCommercialDetails(dst *CommercialDetails, src CommercialDetails) {
 	dst.OpenBiddingLatestOffer = firstInt64(dst.OpenBiddingLatestOffer, src.OpenBiddingLatestOffer)
 	dst.OpenBiddingTargetURL = firstNonEmpty(dst.OpenBiddingTargetURL, src.OpenBiddingTargetURL)
 	dst.DevelopmentPhase = firstNonEmpty(dst.DevelopmentPhase, src.DevelopmentPhase)
-	dst.NewDevelopment = firstBool(dst.NewDevelopment, src.NewDevelopment)
+	dst.NewDevelopment = trueWinsBool(dst.NewDevelopment, src.NewDevelopment)
 	dst.NotifyPriceChanged = firstBool(dst.NotifyPriceChanged, src.NotifyPriceChanged)
 	dst.MainImageHidden = firstBool(dst.MainImageHidden, src.MainImageHidden)
 	dst.IsCompanyAnnouncement = firstBool(dst.IsCompanyAnnouncement, src.IsCompanyAnnouncement)
@@ -809,24 +945,24 @@ func mergeCharges(dst *Charges, src Charges) {
 	dst.Sauna = firstFloat64(dst.Sauna, src.Sauna)
 	dst.Electricity = firstNonEmpty(dst.Electricity, src.Electricity)
 	dst.Heating = firstNonEmpty(dst.Heating, src.Heating)
-	dst.Notes = firstNonEmpty(dst.Notes, src.Notes)
+	dst.Notes = richerText(dst.Notes, src.Notes)
 }
 
 func mergeTextSections(dst *TextSections, src TextSections) {
-	dst.Description = firstNonEmpty(dst.Description, src.Description)
+	dst.Description = richerText(dst.Description, src.Description)
 	dst.Availability = firstNonEmpty(dst.Availability, src.Availability)
-	dst.RenovationsDone = firstNonEmpty(dst.RenovationsDone, src.RenovationsDone)
-	dst.RenovationsPlanned = firstNonEmpty(dst.RenovationsPlanned, src.RenovationsPlanned)
-	dst.AdditionalInfo = firstNonEmpty(dst.AdditionalInfo, src.AdditionalInfo)
-	dst.Area = firstNonEmpty(dst.Area, src.Area)
-	dst.Building = firstNonEmpty(dst.Building, src.Building)
-	dst.Transport = firstNonEmpty(dst.Transport, src.Transport)
-	dst.Amenities = firstNonEmpty(dst.Amenities, src.Amenities)
-	dst.Charges = firstNonEmpty(dst.Charges, src.Charges)
-	dst.Kitchen = firstNonEmpty(dst.Kitchen, src.Kitchen)
-	dst.Bathroom = firstNonEmpty(dst.Bathroom, src.Bathroom)
-	dst.Storage = firstNonEmpty(dst.Storage, src.Storage)
-	dst.Materials = firstNonEmpty(dst.Materials, src.Materials)
+	dst.RenovationsDone = combineText(dst.RenovationsDone, src.RenovationsDone)
+	dst.RenovationsPlanned = combineText(dst.RenovationsPlanned, src.RenovationsPlanned)
+	dst.AdditionalInfo = richerText(dst.AdditionalInfo, src.AdditionalInfo)
+	dst.Area = richerText(dst.Area, src.Area)
+	dst.Building = richerText(dst.Building, src.Building)
+	dst.Transport = richerText(dst.Transport, src.Transport)
+	dst.Amenities = richerText(dst.Amenities, src.Amenities)
+	dst.Charges = richerText(dst.Charges, src.Charges)
+	dst.Kitchen = richerText(dst.Kitchen, src.Kitchen)
+	dst.Bathroom = richerText(dst.Bathroom, src.Bathroom)
+	dst.Storage = richerText(dst.Storage, src.Storage)
+	dst.Materials = richerText(dst.Materials, src.Materials)
 }
 
 func mergeMedia(dst *Media, src Media) {
@@ -845,13 +981,88 @@ func mergeLocation(dst *Location, src Location) {
 	dst.Longitude = firstFloat64(dst.Longitude, src.Longitude)
 }
 
-func firstTime(values ...*time.Time) *time.Time {
+func earliestTime(values ...*time.Time) *time.Time {
+	var out *time.Time
 	for _, value := range values {
-		if value != nil {
-			return value
+		if value != nil && (out == nil || value.Before(*out)) {
+			out = value
 		}
 	}
-	return nil
+	return out
+}
+
+func latestTime(values ...*time.Time) *time.Time {
+	var out *time.Time
+	for _, value := range values {
+		if value != nil && (out == nil || value.After(*out)) {
+			out = value
+		}
+	}
+	return out
+}
+
+func trueWinsBool(dst *bool, src *bool) *bool {
+	if dst != nil && *dst {
+		return dst
+	}
+	if src != nil && *src {
+		return src
+	}
+	return firstBool(dst, src)
+}
+
+func richerText(dst string, src string) string {
+	dst = cleanDisplayString(dst)
+	src = cleanDisplayString(src)
+	if dst == "" {
+		return src
+	}
+	if src == "" {
+		return dst
+	}
+	if strings.Contains(strings.ToLower(dst), strings.ToLower(src)) {
+		return dst
+	}
+	if strings.Contains(strings.ToLower(src), strings.ToLower(dst)) {
+		return src
+	}
+	if len([]rune(src)) > len([]rune(dst))*3/2 {
+		return src
+	}
+	return dst
+}
+
+func combineText(dst string, src string) string {
+	dst = cleanDisplayString(dst)
+	src = cleanDisplayString(src)
+	if dst == "" {
+		return src
+	}
+	if src == "" || strings.Contains(strings.ToLower(dst), strings.ToLower(src)) {
+		return dst
+	}
+	if strings.Contains(strings.ToLower(src), strings.ToLower(dst)) {
+		return src
+	}
+	return dst + "\n\n" + src
+}
+
+func sameInt32(a *int32, b *int32) bool {
+	if a == nil || b == nil {
+		return true
+	}
+	return *a == *b
+}
+
+func sameFloat(a *float64, b *float64) bool {
+	if a == nil || b == nil {
+		return true
+	}
+	delta := *a - *b
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta < 0.01
 }
 
 func appendUniqueImages(dst []Image, src []Image) []Image {
@@ -1016,8 +1227,9 @@ LIMIT 1`, offeringID).Scan(&housingCompany, &businessID, &address, &postal, &cit
 	listing.Building.FloorCount = firstInt32(listing.Building.FloorCount, floorCount)
 	listing.Building.ApartmentCount = firstInt32(listing.Building.ApartmentCount, apartmentCount)
 	listing.Building.Elevator = firstBool(listing.Building.Elevator, elevator)
-	listing.Building.EnergyClass = firstNonEmpty(listing.Building.EnergyClass, valueOrEmpty(energyLabel))
-	listing.Building.EnergyEfficiencyLabel = firstNonEmpty(listing.Building.EnergyEfficiencyLabel, valueOrEmpty(energyLabel))
+	energy := displayEnergyClass(valueOrEmpty(energyLabel))
+	listing.Building.EnergyClass = firstNonEmpty(listing.Building.EnergyClass, energy)
+	listing.Building.EnergyEfficiencyLabel = firstNonEmpty(listing.Building.EnergyEfficiencyLabel, energy)
 	listing.Building.BuildingMaterial = firstNonEmpty(listing.Building.BuildingMaterial, valueOrEmpty(buildingMaterial))
 	listing.Building.Heating = firstNonEmpty(listing.Building.Heating, valueOrEmpty(heating))
 	listing.Building.RoofMaterial = firstNonEmpty(listing.Building.RoofMaterial, valueOrEmpty(roofMaterial))
@@ -1133,7 +1345,7 @@ LIMIT 1`, offeringID).Scan(&transactionID, &transactionFirstSeenAt, &transaction
 	priceValue := int64(price)
 	pricePerM2Value := int64(pricePerM2)
 	buildYearValue := buildYear
-	listing.Commercial.MatchedTransaction = &PriceTransactionMatch{ID: transactionID.String(), FirstSeenAt: transactionFirstSeenAt, UpdatedAt: transactionUpdatedAt, Description: description, Type: transactionType, Category: category, AreaM2: &areaPtr, Price: &priceValue, PricePerSquareMeter: &pricePerM2Value, BuildYear: &buildYearValue, Floor: valueOrEmpty(floor), Elevator: &elevator, Condition: valueOrEmpty(condition), Plot: valueOrEmpty(plot), PlotOwned: plotOwned, EnergyClass: valueOrEmpty(energyClass), PeriodIdentifier: period, City: valueOrEmpty(city), Neighborhood: valueOrEmpty(neighborhood), PostalCode: valueOrEmpty(postalCode), MatchStatus: valueOrEmpty(matchStatus), MatchScore: matchScore, MatchConfidence: valueOrEmpty(matchConfidence)}
+	listing.Commercial.MatchedTransaction = &PriceTransactionMatch{ID: transactionID.String(), FirstSeenAt: transactionFirstSeenAt, UpdatedAt: transactionUpdatedAt, Description: description, Type: transactionType, Category: category, AreaM2: &areaPtr, Price: &priceValue, PricePerSquareMeter: &pricePerM2Value, BuildYear: &buildYearValue, Floor: valueOrEmpty(floor), Elevator: &elevator, Condition: displayCondition(valueOrEmpty(condition)), Plot: valueOrEmpty(plot), PlotOwned: plotOwned, EnergyClass: displayEnergyClass(valueOrEmpty(energyClass)), PeriodIdentifier: period, City: valueOrEmpty(city), Neighborhood: valueOrEmpty(neighborhood), PostalCode: valueOrEmpty(postalCode), MatchStatus: valueOrEmpty(matchStatus), MatchScore: matchScore, MatchConfidence: valueOrEmpty(matchConfidence)}
 	return nil
 }
 
@@ -1205,7 +1417,7 @@ LIMIT 1`, saleListingID).Scan(&transactionID, &transactionFirstSeenAt, &transact
 	priceValue := int64(price)
 	pricePerM2Value := int64(pricePerM2)
 	buildYearValue := buildYear
-	listing.Commercial.MatchedTransaction = &PriceTransactionMatch{ID: transactionID.String(), FirstSeenAt: transactionFirstSeenAt, UpdatedAt: transactionUpdatedAt, Description: description, Type: transactionType, Category: category, AreaM2: &areaPtr, Price: &priceValue, PricePerSquareMeter: &pricePerM2Value, BuildYear: &buildYearValue, Floor: valueOrEmpty(floor), Elevator: &elevator, Condition: valueOrEmpty(condition), Plot: valueOrEmpty(plot), PlotOwned: plotOwned, EnergyClass: valueOrEmpty(energyClass), PeriodIdentifier: period, City: valueOrEmpty(city), Neighborhood: valueOrEmpty(neighborhood), PostalCode: valueOrEmpty(postalCode), MatchStatus: valueOrEmpty(matchStatus), MatchScore: matchScore, MatchConfidence: valueOrEmpty(matchConfidence)}
+	listing.Commercial.MatchedTransaction = &PriceTransactionMatch{ID: transactionID.String(), FirstSeenAt: transactionFirstSeenAt, UpdatedAt: transactionUpdatedAt, Description: description, Type: transactionType, Category: category, AreaM2: &areaPtr, Price: &priceValue, PricePerSquareMeter: &pricePerM2Value, BuildYear: &buildYearValue, Floor: valueOrEmpty(floor), Elevator: &elevator, Condition: displayCondition(valueOrEmpty(condition)), Plot: valueOrEmpty(plot), PlotOwned: plotOwned, EnergyClass: displayEnergyClass(valueOrEmpty(energyClass)), PeriodIdentifier: period, City: valueOrEmpty(city), Neighborhood: valueOrEmpty(neighborhood), PostalCode: valueOrEmpty(postalCode), MatchStatus: valueOrEmpty(matchStatus), MatchScore: matchScore, MatchConfidence: valueOrEmpty(matchConfidence)}
 	return nil
 }
 
@@ -1250,7 +1462,8 @@ func (r listingSearchRow) toSaleSummary() SaleListingSummary {
 	source := ListingSource{Provider: r.Source, Kind: r.Kind, CanonicalID: r.CanonicalID, NativeID: r.NativeID, URL: r.URL, OriginalURL: r.URL}
 	location := Location{StreetAddress: r.Address, City: r.City, Postal: r.Postal}
 	identity := computedBuildingIdentity(r.Source, r.Kind, r.NativeID, location, "", "", "")
-	return SaleListingSummary{ID: r.PublicID, Source: source, SourceProviders: r.SourceProviders, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, RoomsCount: r.RoomsCount, AreaM2: r.Area, FloorLevel: r.FloorLevel, Condition: valueOrEmpty(r.Condition)}, Building: BuildingDetails{Identity: identity, Location: location, BuildYear: r.BuildYear, FloorCount: r.TotalFloors, EnergyClass: valueOrEmpty(r.EnergyClass), EnergyEfficiencyLabel: valueOrEmpty(r.EnergyEfficiencyLabel)}, Commercial: CommercialDetails{AskingPrice: r.Price, DebtFreePrice: r.DebtFreePrice, DebtShareAmount: r.DebtShareAmount, PricePerSquareMeter: r.PricePerM2, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
+	energy := displayEnergyClass(valueOrEmpty(r.EnergyEfficiencyLabel), valueOrEmpty(r.EnergyClass))
+	return SaleListingSummary{ID: r.PublicID, Source: source, SourceProviders: r.SourceProviders, Headline: r.Headline, Unit: UnitDetails{Location: location, RoomLayout: r.RoomLayout, RoomsCount: r.RoomsCount, AreaM2: r.Area, FloorLevel: r.FloorLevel, Condition: displayCondition(valueOrEmpty(r.Condition))}, Building: BuildingDetails{Identity: identity, Location: location, BuildYear: r.BuildYear, FloorCount: r.TotalFloors, EnergyClass: energy, EnergyEfficiencyLabel: energy}, Commercial: CommercialDetails{AskingPrice: r.Price, DebtFreePrice: r.DebtFreePrice, DebtShareAmount: r.DebtShareAmount, PricePerSquareMeter: r.PricePerM2, LastSeenAt: parseTimeString(r.LastSeenAt), PublishedAt: parseTimeString(r.PublishedAt)}}
 }
 
 func (r listingSearchRow) toRentalSummary() RentalSummary {

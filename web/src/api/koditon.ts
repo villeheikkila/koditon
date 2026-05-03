@@ -228,6 +228,8 @@ export interface RelatedListing {
   main_image?: Image;
   price?: number;
   price_per_m2?: number;
+  sold_at?: string;
+  sold_price?: number;
   /** @nullable */
   providers?: string[] | null;
   published?: boolean;

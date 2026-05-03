@@ -74,13 +74,34 @@ type saleListingsSearchOutput struct {
 }
 
 type saleListingsMapInput struct {
-	MinLat float64 `query:"min_lat" doc:"Minimum latitude"`
-	MinLng float64 `query:"min_lng" doc:"Minimum longitude"`
-	MaxLat float64 `query:"max_lat" doc:"Maximum latitude"`
-	MaxLng float64 `query:"max_lng" doc:"Maximum longitude"`
-	Source string  `query:"source"  doc:"Source filter: shortcut, frontdoor, or all"`
-	Kind   string  `query:"kind"    doc:"Listing kind filter: ad, announcement, or all"`
-	Limit  int32   `query:"limit"   doc:"Maximum markers to return"`
+	MinLat         float64 `query:"min_lat" doc:"Minimum latitude"`
+	MinLng         float64 `query:"min_lng" doc:"Minimum longitude"`
+	MaxLat         float64 `query:"max_lat" doc:"Maximum latitude"`
+	MaxLng         float64 `query:"max_lng" doc:"Maximum longitude"`
+	Query          string  `query:"q" doc:"Text search"`
+	City           string  `query:"city" doc:"City filter"`
+	Postal         string  `query:"postal" doc:"Postal code filter"`
+	Source         string  `query:"source"  doc:"Source filter: shortcut, frontdoor, or all"`
+	Kind           string  `query:"kind"    doc:"Listing kind filter: ad, announcement, or all"`
+	MinPrice       int64   `query:"min_price" doc:"Minimum asking price"`
+	MaxPrice       int64   `query:"max_price" doc:"Maximum asking price"`
+	MinArea        float64 `query:"min_area" doc:"Minimum area"`
+	MaxArea        float64 `query:"max_area" doc:"Maximum area"`
+	MinPricePerM2  float64 `query:"min_price_m2" doc:"Minimum price per square meter"`
+	MaxPricePerM2  float64 `query:"max_price_m2" doc:"Maximum price per square meter"`
+	Rooms          int32   `query:"rooms" doc:"Exact room count"`
+	MinBuildYear   int32   `query:"min_build_year" doc:"Minimum build year"`
+	MaxBuildYear   int32   `query:"max_build_year" doc:"Maximum build year"`
+	PropertyType   string  `query:"property_type" doc:"Property type code"`
+	Condition      string  `query:"condition" doc:"Condition code"`
+	EnergyClass    string  `query:"energy_class" doc:"Energy class text or match code"`
+	Elevator       string  `query:"elevator" doc:"true or false"`
+	Sauna          string  `query:"sauna" doc:"true or false"`
+	Balcony        string  `query:"balcony" doc:"true or false"`
+	PlotOwned      string  `query:"plot_owned" doc:"true or false"`
+	NewDevelopment string  `query:"new_development" doc:"true or false"`
+	HasTransaction string  `query:"has_transaction" doc:"true or false"`
+	Limit          int32   `query:"limit"   doc:"Maximum markers to return"`
 }
 
 type saleListingsMapOutput struct {
@@ -254,7 +275,20 @@ func propertyMapBounds(input *saleListingsMapInput) properties.MapBounds {
 		maxLat = &input.MaxLat
 		maxLng = &input.MaxLng
 	}
-	return properties.MapBounds{MinLat: minLat, MinLng: minLng, MaxLat: maxLat, MaxLng: maxLng, Source: input.Source, Kind: input.Kind, Limit: input.Limit}
+	return properties.MapBounds{MinLat: minLat, MinLng: minLng, MaxLat: maxLat, MaxLng: maxLng, Query: input.Query, City: input.City, Postal: input.Postal, Source: input.Source, Kind: input.Kind, MinPrice: positiveInt64Ptr(input.MinPrice), MaxPrice: positiveInt64Ptr(input.MaxPrice), MinArea: positiveFloat64Ptr(input.MinArea), MaxArea: positiveFloat64Ptr(input.MaxArea), MinPricePerM2: positiveFloat64Ptr(input.MinPricePerM2), MaxPricePerM2: positiveFloat64Ptr(input.MaxPricePerM2), Rooms: positiveInt32Ptr(input.Rooms), MinBuildYear: positiveInt32Ptr(input.MinBuildYear), MaxBuildYear: positiveInt32Ptr(input.MaxBuildYear), PropertyType: input.PropertyType, Condition: input.Condition, EnergyClass: input.EnergyClass, Elevator: boolQueryPtr(input.Elevator), Sauna: boolQueryPtr(input.Sauna), Balcony: boolQueryPtr(input.Balcony), PlotOwned: boolQueryPtr(input.PlotOwned), NewDevelopment: boolQueryPtr(input.NewDevelopment), HasTransaction: boolQueryPtr(input.HasTransaction), Limit: input.Limit}
+}
+
+func boolQueryPtr(value string) *bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes":
+		out := true
+		return &out
+	case "false", "0", "no":
+		out := false
+		return &out
+	default:
+		return nil
+	}
 }
 
 func positiveInt64Ptr(value int64) *int64 {

@@ -85,7 +85,7 @@ UPDATE public.frontdoor_ads
 SET frontdoor_ad_data_normalized_at = now(),
     frontdoor_ad_data_normalized_version = sqlc.arg(frontdoor_ad_data_normalized_version)
 WHERE frontdoor_ad_external_id = sqlc.arg(frontdoor_ad_external_id)
-  AND frontdoor_ad_data_hash = sqlc.arg(frontdoor_ad_data_hash);
+  AND frontdoor_ad_data_hash IS NOT DISTINCT FROM sqlc.arg(frontdoor_ad_data_hash);
 
 -- name: MarkFrontdoorAdProcessed :exec
 UPDATE public.frontdoor_ads

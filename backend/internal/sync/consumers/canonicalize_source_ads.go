@@ -22,7 +22,7 @@ import (
 const (
 	TaskTypeCanonicalizeSourceAdsFanout    = "canonicalize_source_ads_fanout"
 	TaskTypeCanonicalizeSourceAd           = "canonicalize_source_ad"
-	currentSourceAdCanonicalizationVersion = int32(1)
+	currentSourceAdCanonicalizationVersion = int32(2)
 )
 
 type canonicalizeSourceAdsFanoutPayload struct {
@@ -48,8 +48,9 @@ func (c *Consumer) handleCanonicalizeSourceAdsFanout(ctx context.Context, logger
 	rows, err := c.pool.Query(ctx, `
 (SELECT 'frontdoor_ad'::text AS source_table, frontdoor_ad_id::text AS source_id
  FROM public.frontdoor_ads
- WHERE frontdoor_ad_data_hash IS NOT NULL
-     AND (frontdoor_ad_data_normalized_at IS NULL
+ WHERE frontdoor_ad_data IS NOT NULL
+     AND (frontdoor_ad_data_hash IS NULL
+         OR frontdoor_ad_data_normalized_at IS NULL
          OR frontdoor_ad_data_changed_at > frontdoor_ad_data_normalized_at
          OR frontdoor_ad_data_normalized_version < $2)
  ORDER BY frontdoor_ad_updated_at ASC
@@ -57,8 +58,9 @@ func (c *Consumer) handleCanonicalizeSourceAdsFanout(ctx context.Context, logger
 UNION ALL
 (SELECT 'shortcut_ad'::text AS source_table, shortcut_ad_id::text AS source_id
  FROM public.shortcut_ads
- WHERE shortcut_ad_data_hash IS NOT NULL
-     AND (shortcut_ad_data_normalized_at IS NULL
+ WHERE shortcut_ad_data IS NOT NULL
+     AND (shortcut_ad_data_hash IS NULL
+         OR shortcut_ad_data_normalized_at IS NULL
          OR shortcut_ad_data_changed_at > shortcut_ad_data_normalized_at
          OR shortcut_ad_data_normalized_version < $2)
  ORDER BY shortcut_ad_updated_at ASC NULLS FIRST
@@ -77,12 +79,14 @@ UNION ALL
 	}
 	defer rows.Close()
 	enqueued := 0
+	scanned := 0
 	for rows.Next() {
 		var sourceTable string
 		var sourceID string
 		if err := rows.Scan(&sourceTable, &sourceID); err != nil {
 			return fmt.Errorf("scan canonicalize source ad fanout row: %w", err)
 		}
+		scanned++
 		if err := c.enqueueCanonicalizeSourceAd(ctx, sourceTable, sourceID, int32(taskqueue.PriorityLow)); err != nil {
 			return err
 		}
@@ -91,7 +95,12 @@ UNION ALL
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate canonicalize source ad fanout rows: %w", err)
 	}
-	logger.InfoContext(ctx, "canonicalize source ad jobs enqueued", "count", enqueued, "outcome", logging.OutcomeSuccess)
+	if scanned > 0 {
+		if err := c.enqueueCanonicalizeSourceAdsFanout(ctx, payload.Limit, time.Now().Add(30*time.Second)); err != nil {
+			return err
+		}
+	}
+	logger.InfoContext(ctx, "canonicalize source ad jobs enqueued", "count", enqueued, "next_fanout_scheduled", scanned > 0, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
@@ -186,7 +195,7 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 		}
 		return fmt.Errorf("load frontdoor ad for canonicalization: %w", err)
 	}
-	if ad.FrontdoorAdDataHash == nil {
+	if len(ad.FrontdoorAdData) == 0 {
 		return nil
 	}
 	saleListingID, err := c.queries.CanonicalizeFrontdoorAdSaleListing(ctx, frontdoorAdID)
@@ -221,7 +230,7 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 		}
 		return fmt.Errorf("load shortcut ad for canonicalization: %w", err)
 	}
-	if ad.ShortcutAdDataHash == nil {
+	if len(ad.ShortcutAdData) == 0 {
 		return nil
 	}
 	if ad.ShortcutAdType != "listing" {
@@ -261,6 +270,23 @@ func (c *Consumer) enqueueCanonicalizeSourceAd(ctx context.Context, sourceTable,
 		EntityID:    fmt.Sprintf("%s:%s", sourceTable, sourceID),
 		Priority:    priority,
 		MaxAttempts: 3,
+		Payload:     payload,
+	})
+	return err
+}
+
+func (c *Consumer) enqueueCanonicalizeSourceAdsFanout(ctx context.Context, limit int32, runAfter time.Time) error {
+	payload, err := json.Marshal(canonicalizeSourceAdsFanoutPayload{Limit: limit})
+	if err != nil {
+		return fmt.Errorf("marshal canonicalize source ads fanout payload: %w", err)
+	}
+	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "canonical",
+		Kind:        TaskTypeCanonicalizeSourceAdsFanout,
+		EntityID:    fmt.Sprintf("canonical:source_ads:%d", runAfter.UnixNano()),
+		Priority:    int32(taskqueue.PriorityLow),
+		MaxAttempts: 3,
+		RunAfter:    runAfter,
 		Payload:     payload,
 	})
 	return err

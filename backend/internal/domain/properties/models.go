@@ -41,13 +41,34 @@ type Page[T any] struct {
 }
 
 type MapBounds struct {
-	MinLat *float64
-	MinLng *float64
-	MaxLat *float64
-	MaxLng *float64
-	Source string
-	Kind   string
-	Limit  int32
+	MinLat         *float64
+	MinLng         *float64
+	MaxLat         *float64
+	MaxLng         *float64
+	Query          string
+	City           string
+	Postal         string
+	Source         string
+	Kind           string
+	MinPrice       *int64
+	MaxPrice       *int64
+	MinArea        *float64
+	MaxArea        *float64
+	MinPricePerM2  *float64
+	MaxPricePerM2  *float64
+	Rooms          *int32
+	MinBuildYear   *int32
+	MaxBuildYear   *int32
+	PropertyType   string
+	Condition      string
+	EnergyClass    string
+	Elevator       *bool
+	Sauna          *bool
+	Balcony        *bool
+	PlotOwned      *bool
+	NewDevelopment *bool
+	HasTransaction *bool
+	Limit          int32
 }
 
 type SaleListingMapMarker struct {
@@ -552,6 +573,8 @@ type RelatedListing struct {
 	AreaM2     *float64   `json:"area_m2,omitempty"`
 	Price      *int64     `json:"price,omitempty"`
 	PricePerM2 *float64   `json:"price_per_m2,omitempty"`
+	SoldPrice  *int64     `json:"sold_price,omitempty"`
+	SoldAt     *time.Time `json:"sold_at,omitempty"`
 	BuildYear  *int32     `json:"build_year,omitempty"`
 	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
 	Providers  []string   `json:"providers,omitempty"`

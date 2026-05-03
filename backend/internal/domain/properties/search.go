@@ -326,6 +326,35 @@ WITH visible_base AS (
     WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
+        AND ($8::text IS NULL OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text, sl.sale_listing_street_address, pb.housing_company_address_norm, pb.housing_company_name)) LIKE ('%' || lower(trim($8::text)) || '%'))
+        AND ($9::text IS NULL OR lower(COALESCE(sl.sale_listing_city, pb.housing_company_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%'))
+        AND ($10::text IS NULL OR public.fnc__normalize_postal(COALESCE(sl.sale_listing_postal, pb.housing_company_postal_norm, '')) = public.fnc__normalize_postal($10::text))
+        AND ($11::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) >= $11::bigint)
+        AND ($12::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) <= $12::bigint)
+        AND ($13::double precision IS NULL OR COALESCE(pu.property_unit_area_value, sl.sale_listing_area_value) >= $13::double precision)
+        AND ($14::double precision IS NULL OR COALESCE(pu.property_unit_area_value, sl.sale_listing_area_value) <= $14::double precision)
+        AND ($15::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) >= $15::double precision)
+        AND ($16::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) <= $16::double precision)
+        AND ($17::integer IS NULL OR COALESCE(pu.property_unit_rooms_count, sl.sale_listing_rooms_count) = $17::integer)
+        AND ($18::integer IS NULL OR COALESCE(pb.housing_company_build_year, sl.sale_listing_build_year) >= $18::integer)
+        AND ($19::integer IS NULL OR COALESCE(pb.housing_company_build_year, sl.sale_listing_build_year) <= $19::integer)
+        AND ($20::text IS NULL OR sl.sale_listing_property_type_code = public.fnc__sale_listing_property_type_code($20::text) OR lower(COALESCE(sl.sale_listing_property_type_raw, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
+        AND ($21::text IS NULL OR public.fnc__condition_match_code(sl.sale_listing_condition) = public.fnc__condition_match_code($21::text) OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
+        AND ($22::text IS NULL OR sl.sale_listing_energy_efficiency_match_code = public.fnc__energy_efficiency_match_code($22::text) OR lower(concat_ws(' ', sl.sale_listing_energy_class, sl.sale_listing_energy_efficiency_label)) LIKE ('%' || lower(trim($22::text)) || '%'))
+        AND ($23::boolean IS NULL OR sl.sale_listing_elevator IS NOT DISTINCT FROM $23::boolean)
+        AND ($24::boolean IS NULL OR sl.sale_listing_sauna IS NOT DISTINCT FROM $24::boolean)
+        AND ($25::boolean IS NULL OR sl.sale_listing_balcony IS NOT DISTINCT FROM $25::boolean)
+        AND ($26::boolean IS NULL OR sl.sale_listing_plot_owned IS NOT DISTINCT FROM $26::boolean)
+        AND ($27::boolean IS NULL OR sl.sale_listing_new_development IS NOT DISTINCT FROM $27::boolean)
+        AND (
+            $28::boolean IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM public.property_offering_transactions pot
+                WHERE pot.property_offering_id = po.property_offering_id
+                    AND pot.property_offering_transaction_link_status <> 'rejected'
+            ) IS NOT DISTINCT FROM $28::boolean
+        )
         AND (
             $3::double precision IS NULL
             OR postgis.ST_Intersects(
@@ -423,7 +452,7 @@ SELECT
 FROM grouped
 LEFT JOIN listing_cards USING (marker_key)
 ORDER BY last_seen_at DESC NULLS LAST, offering_count DESC
-LIMIT $7::int`, source, kind, bounds.MinLat, bounds.MinLng, bounds.MaxLat, bounds.MaxLng, limit)
+LIMIT $7::int`, source, kind, bounds.MinLat, bounds.MinLng, bounds.MaxLat, bounds.MaxLng, limit, emptyToNil(bounds.Query), emptyToNil(bounds.City), emptyToNil(bounds.Postal), bounds.MinPrice, bounds.MaxPrice, bounds.MinArea, bounds.MaxArea, bounds.MinPricePerM2, bounds.MaxPricePerM2, bounds.Rooms, bounds.MinBuildYear, bounds.MaxBuildYear, emptyToNil(bounds.PropertyType), emptyToNil(bounds.Condition), emptyToNil(bounds.EnergyClass), bounds.Elevator, bounds.Sauna, bounds.Balcony, bounds.PlotOwned, bounds.NewDevelopment, bounds.HasTransaction)
 	if err != nil {
 		return SaleListingMap{}, fmt.Errorf("query sale listing map: %w", err)
 	}

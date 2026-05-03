@@ -166,16 +166,14 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           <ListingLocationMap latitude={mapLatitude} longitude={mapLongitude} label={mapLabel || 'Listing location'} />
         )}
         <div className="listing-body">
-          <Section title="Source & Timing">
+          <Section title="Provenance & Timing">
             <div className="listing-table">
               {saleDetail?.canonical.offering_id && <Row label="Offering ID" value={saleDetail.canonical.offering_id} />}
-              {saleDetail?.canonical.primary_source_listing_id && <Row label="Primary source row" value={saleDetail.canonical.primary_source_listing_id} />}
-              {saleDetail?.canonical.source_count != null && <Row label="Linked source rows" value={String(saleDetail.canonical.source_count)} />}
+              {saleDetail?.canonical.source_count != null && <Row label="Combined sources" value={`${saleDetail.canonical.source_count} linked source row${saleDetail.canonical.source_count === 1 ? '' : 's'}`} highlight={saleDetail.canonical.source_count > 1} />}
               {saleDetail?.canonical.merge_decision_count ? <Row label="Merged duplicate offerings" value={String(saleDetail.canonical.merge_decision_count)} highlight /> : null}
               {saleDetail?.canonical.merged_from?.length ? <Row label="Merged from" value={saleDetail.canonical.merged_from.join(', ')} /> : null}
               <Row label="Provider" value={providerLabel(d.source.provider)} />
               <Row label="Source kind" value={d.source.kind} />
-              <Row label="Native ID" value={d.source.native_id} />
               {d.source.external_id && <Row label="External ID" value={d.source.external_id} />}
               {d.source.friendly_id && <Row label="Friendly ID" value={d.source.friendly_id} />}
               {commercial.status && <Row label="Status" value={commercial.status} />}
@@ -191,7 +189,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
             </div>
           </Section>
           {saleDetail?.source_records?.length ? (
-            <Section title="Linked Source Rows">
+            <Section title="Linked Sources">
               <div className="listing-table">
                 {saleDetail.source_records.map(record => (
                   <Row
@@ -201,11 +199,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
                       <div className="source-row-value">
                         <span>
                           {[
-                            record.id,
-                            record.native_id,
                             record.headline,
                             record.last_seen_at && `last seen ${fmtDateTime(record.last_seen_at)}`,
-                            `${record.link_status} ${record.link_score}`,
+                            record.link_score > 0 && `${record.link_status} ${record.link_score}`,
                           ].filter(Boolean).join(' · ')}
                         </span>
                         <a
@@ -228,9 +224,18 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               <TextBlock text={texts.description} />
             </Section>
           )}
-          {(commercial.debt_share_amount != null || charges?.maintenance_monthly != null ||
-            charges?.total_monthly != null || charges?.water != null || commercial.security_deposit ||
-            commercial.minimum_term_months != null || commercial.pets_allowed != null || texts?.charges) && (
+          {(commercial.rent != null || commercial.asking_price != null || commercial.debt_free_price != null ||
+            commercial.previous_asking_price != null || commercial.previous_debt_free_price != null ||
+            commercial.debt_share_amount != null || matchedTransaction?.price != null || commercial.security_deposit ||
+            charges?.maintenance_monthly != null || charges?.total_monthly != null || charges?.water != null ||
+            charges?.parking != null || charges?.sauna != null || charges?.electricity || charges?.heating ||
+            charges?.notes || commercial.fees_info || commercial.financing_fee_interest_only_period ||
+            commercial.financing_fee_interest_only_start_date || commercial.financing_fee_interest_only_end_date ||
+            commercial.open_bidding_in_use != null || commercial.open_bidding_starting_selling_price != null ||
+            commercial.open_bidding_starting_debt_free_price != null || commercial.open_bidding_latest_offer != null ||
+            commercial.minimum_term_months != null || commercial.pets_allowed != null || commercial.furnished != null ||
+            commercial.fixed_term != null || commercial.ownership_type || commercial.development_phase ||
+            commercial.new_development != null || commercial.other_terms || texts?.charges) && (
             <Section title="Pricing & Charges">
               <div className="listing-table">
                 {commercial.rent != null && <Row label="Rent" value={`${fmtPrice(commercial.rent)}${commercial.rent_period ? ` / ${commercial.rent_period}` : ''}`} highlight />}
@@ -597,17 +602,6 @@ function BuildingView({ building }: { building: Building }) {
             </div>
           </Section>
         )}
-        {(texts?.description || texts?.building || texts?.additional_info || texts?.area || texts?.amenities || texts?.transport || texts?.charges) && (
-          <Section title="Source Texts">
-            {texts.description && <TextBlock text={texts.description} />}
-            {texts.building && <TextBlock text={texts.building} />}
-            {texts.additional_info && <TextBlock text={texts.additional_info} />}
-            {texts.area && <TextBlock text={texts.area} />}
-            {texts.amenities && <TextBlock text={texts.amenities} />}
-            {texts.transport && <TextBlock text={texts.transport} />}
-            {texts.charges && <TextBlock text={texts.charges} />}
-          </Section>
-        )}
         {sourceRecords.length > 0 && (
           <Section title="Sources">
             <div className="listing-table">
@@ -635,6 +629,7 @@ function BuildingView({ building }: { building: Building }) {
                   </div>
                   <div className="building-related-footer">
                     {item.price != null && <span>{fmtPrice(item.price)}</span>}
+                    {item.sold_price != null && <span className="building-related-sale">Sold {fmtPrice(item.sold_price)}{item.sold_at ? ` · ${fmtDate(item.sold_at)}` : ''}</span>}
                     <span>{[...(item.providers ?? []), ...(item.kinds ?? [])].join(' · ')}</span>
                   </div>
                 </Link>

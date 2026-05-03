@@ -50,6 +50,30 @@ type MapBounds = {
   max_lng: number
 }
 
+type MapFilters = {
+  q: string
+  city: string
+  postal: string
+  min_price: string
+  max_price: string
+  min_area: string
+  max_area: string
+  min_price_m2: string
+  max_price_m2: string
+  rooms: string
+  min_build_year: string
+  max_build_year: string
+  property_type: string
+  condition: string
+  energy_class: string
+  elevator: string
+  sauna: string
+  balcony: string
+  plot_owned: string
+  new_development: string
+  has_transaction: string
+}
+
 const KIND_OPTIONS = [
   { value: 'ad', label: 'Full ads' },
   { value: '', label: 'All kinds' },
@@ -60,6 +84,50 @@ const SOURCE_OPTIONS = [
   { value: '', label: 'All sources' },
   { value: 'frontdoor', label: 'Frontdoor' },
   { value: 'shortcut', label: 'Shortcut' },
+]
+
+const EMPTY_FILTERS: MapFilters = {
+  q: '',
+  city: '',
+  postal: '',
+  min_price: '',
+  max_price: '',
+  min_area: '',
+  max_area: '',
+  min_price_m2: '',
+  max_price_m2: '',
+  rooms: '',
+  min_build_year: '',
+  max_build_year: '',
+  property_type: '',
+  condition: '',
+  energy_class: '',
+  elevator: '',
+  sauna: '',
+  balcony: '',
+  plot_owned: '',
+  new_development: '',
+  has_transaction: '',
+}
+
+const PROPERTY_TYPE_OPTIONS = [
+  { value: '', label: 'Any type' },
+  { value: 'apartment_house', label: 'Apartment house' },
+  { value: 'row_house', label: 'Row house' },
+  { value: 'detached_house', label: 'Detached house' },
+]
+
+const CONDITION_OPTIONS = [
+  { value: '', label: 'Any condition' },
+  { value: 'good', label: 'Good' },
+  { value: 'satisfactory', label: 'Satisfactory' },
+  { value: 'poor', label: 'Poor' },
+]
+
+const BOOLEAN_OPTIONS = [
+  { value: '', label: 'Any' },
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' },
 ]
 
 const INITIAL_BOUNDS = {
@@ -230,6 +298,30 @@ function addMarkerLayers(map: maplibregl.Map) {
   })
 }
 
+function RangeFields({ label, min, max, minPlaceholder, maxPlaceholder, onMin, onMax }: { label: string; min: string; max: string; minPlaceholder: string; maxPlaceholder: string; onMin: (value: string) => void; onMax: (value: string) => void }) {
+  return (
+    <div className="map-filter-range">
+      <div className="map-filter-label">{label}</div>
+      <div className="map-filter-range-inputs">
+        <input value={min} onChange={event => onMin(event.target.value)} placeholder={minPlaceholder} inputMode="numeric" />
+        <span>-</span>
+        <input value={max} onChange={event => onMax(event.target.value)} placeholder={maxPlaceholder} inputMode="numeric" />
+      </div>
+    </div>
+  )
+}
+
+function BooleanField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="map-filter-field">
+      <span>{label}</span>
+      <select value={value} onChange={event => onChange(event.target.value)}>
+        {BOOLEAN_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  )
+}
+
 export default function MapPage() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
@@ -237,9 +329,12 @@ export default function MapPage() {
   const [bounds, setBounds] = useState<MapBounds>(INITIAL_BOUNDS)
   const [source, setSource] = useState('')
   const [kind, setKind] = useState('ad')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<MapFilters>(EMPTY_FILTERS)
   const [selected, setSelected] = useState<MapMarker | null>(null)
+  const activeFilterCount = Object.values(filters).filter(Boolean).length
   const query = useQuery({
-    queryKey: ['sale-listing-map', bounds, source, kind],
+    queryKey: ['sale-listing-map', bounds, source, kind, filters],
     queryFn: () => {
       const params = new URLSearchParams({
         min_lat: String(bounds.min_lat),
@@ -250,6 +345,9 @@ export default function MapPage() {
       })
       if (source) params.set('source', source)
       if (kind) params.set('kind', kind)
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value)
+      })
       return customInstance<MapResponse>(`/api/v1/sale-listings/map?${params.toString()}`)
     },
     staleTime: 30_000,
@@ -348,6 +446,14 @@ export default function MapPage() {
       setSelected(null)
     })
   }
+  function setFilter<K extends keyof MapFilters>(key: K, value: MapFilters[K]) {
+    setFilters(current => ({ ...current, [key]: value }))
+    setSelected(null)
+  }
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS)
+    setSelected(null)
+  }
   return (
     <div className="map-layout">
       <Nav actions={<span className="search-total">{markers.length.toLocaleString('fi-FI')} locations</span>} />
@@ -358,8 +464,69 @@ export default function MapPage() {
         <select className="search-select" value={source} onChange={event => { setSource(event.target.value); setSelected(null) }}>
           {SOURCE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
+        <button className="search-clear-btn" type="button" onClick={() => setFiltersOpen(value => !value)}>
+          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
         <button className="search-clear-btn" type="button" onClick={useCurrentLocation}>Current location</button>
       </div>
+      {filtersOpen && (
+        <div className="map-filter-panel">
+          <div className="map-filter-head">
+            <div>
+              <div className="map-filter-title">Map filters</div>
+              <div className="map-filter-subtitle">Uses normalized canonical listing facts.</div>
+            </div>
+            <button className="search-clear-btn" type="button" onClick={clearFilters}>Clear</button>
+          </div>
+          <div className="map-filter-grid">
+            <label className="map-filter-field map-filter-field--wide">
+              <span>Search</span>
+              <input value={filters.q} onChange={event => setFilter('q', event.target.value)} placeholder="Address, postal, description" />
+            </label>
+            <label className="map-filter-field">
+              <span>City</span>
+              <input value={filters.city} onChange={event => setFilter('city', event.target.value)} placeholder="Helsinki" />
+            </label>
+            <label className="map-filter-field">
+              <span>Postal</span>
+              <input value={filters.postal} onChange={event => setFilter('postal', event.target.value)} placeholder="00100" />
+            </label>
+            <RangeFields label="Price" min={filters.min_price} max={filters.max_price} minPlaceholder="Min €" maxPlaceholder="Max €" onMin={value => setFilter('min_price', value)} onMax={value => setFilter('max_price', value)} />
+            <RangeFields label="Area" min={filters.min_area} max={filters.max_area} minPlaceholder="Min m²" maxPlaceholder="Max m²" onMin={value => setFilter('min_area', value)} onMax={value => setFilter('max_area', value)} />
+            <RangeFields label="€/m²" min={filters.min_price_m2} max={filters.max_price_m2} minPlaceholder="Min" maxPlaceholder="Max" onMin={value => setFilter('min_price_m2', value)} onMax={value => setFilter('max_price_m2', value)} />
+            <RangeFields label="Build year" min={filters.min_build_year} max={filters.max_build_year} minPlaceholder="From" maxPlaceholder="To" onMin={value => setFilter('min_build_year', value)} onMax={value => setFilter('max_build_year', value)} />
+            <label className="map-filter-field">
+              <span>Rooms</span>
+              <select value={filters.rooms} onChange={event => setFilter('rooms', event.target.value)}>
+                <option value="">Any rooms</option>
+                {[1, 2, 3, 4, 5, 6, 7].map(value => <option key={value} value={String(value)}>{value === 7 ? '7+' : value} rooms</option>)}
+              </select>
+            </label>
+            <label className="map-filter-field">
+              <span>Property type</span>
+              <select value={filters.property_type} onChange={event => setFilter('property_type', event.target.value)}>
+                {PROPERTY_TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="map-filter-field">
+              <span>Condition</span>
+              <select value={filters.condition} onChange={event => setFilter('condition', event.target.value)}>
+                {CONDITION_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="map-filter-field">
+              <span>Energy</span>
+              <input value={filters.energy_class} onChange={event => setFilter('energy_class', event.target.value)} placeholder="A2018, B, E13_G" />
+            </label>
+            <BooleanField label="Elevator" value={filters.elevator} onChange={value => setFilter('elevator', value)} />
+            <BooleanField label="Sauna" value={filters.sauna} onChange={value => setFilter('sauna', value)} />
+            <BooleanField label="Balcony" value={filters.balcony} onChange={value => setFilter('balcony', value)} />
+            <BooleanField label="Owned plot" value={filters.plot_owned} onChange={value => setFilter('plot_owned', value)} />
+            <BooleanField label="New development" value={filters.new_development} onChange={value => setFilter('new_development', value)} />
+            <BooleanField label="Linked transaction" value={filters.has_transaction} onChange={value => setFilter('has_transaction', value)} />
+          </div>
+        </div>
+      )}
       <div className="map-shell">
         <div ref={mapRef} className="map-canvas">
           {query.isPending && <div className="map-loading">Loading locations…</div>}
