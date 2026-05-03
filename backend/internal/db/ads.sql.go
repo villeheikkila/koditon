@@ -76,7 +76,7 @@ SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version
 `
 
 type BatchUpsertFrontdoorAdsFromSitemapParams struct {
@@ -107,6 +107,7 @@ func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg Ba
 			&i.FrontdoorAdDataHashAlgorithm,
 			&i.FrontdoorAdDataChangedAt,
 			&i.FrontdoorAdDataNormalizedAt,
+			&i.FrontdoorAdDataNormalizedVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -130,7 +131,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version
 `
 
 type BatchUpsertShortcutAdsFromSitemapParams struct {
@@ -162,6 +163,7 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 			&i.ShortcutAdDataHashAlgorithm,
 			&i.ShortcutAdDataChangedAt,
 			&i.ShortcutAdDataNormalizedAt,
+			&i.ShortcutAdDataNormalizedVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -174,7 +176,7 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 }
 
 const getFrontdoorAdByExternalID = `-- name: GetFrontdoorAdByExternalID :one
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 WHERE frontdoor_ad_external_id = $1
 `
 
@@ -195,12 +197,40 @@ func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, frontdoorAdExt
 		&i.FrontdoorAdDataHashAlgorithm,
 		&i.FrontdoorAdDataChangedAt,
 		&i.FrontdoorAdDataNormalizedAt,
+		&i.FrontdoorAdDataNormalizedVersion,
+	)
+	return i, err
+}
+
+const getFrontdoorAdByID = `-- name: GetFrontdoorAdByID :one
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
+WHERE frontdoor_ad_id = $1
+`
+
+func (q *Queries) GetFrontdoorAdByID(ctx context.Context, frontdoorAdID uuid.UUID) (FrontdoorAd, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorAdByID, frontdoorAdID)
+	var i FrontdoorAd
+	err := row.Scan(
+		&i.FrontdoorAdID,
+		&i.FrontdoorAdExternalID,
+		&i.FrontdoorAdUrl,
+		&i.FrontdoorAdFirstSeenAt,
+		&i.FrontdoorAdLastSeenAt,
+		&i.FrontdoorAdUpdatedAt,
+		&i.FrontdoorAdData,
+		&i.FrontdoorAdProcessedAt,
+		&i.FrontdoorAdPageNotFound,
+		&i.FrontdoorAdDataHash,
+		&i.FrontdoorAdDataHashAlgorithm,
+		&i.FrontdoorAdDataChangedAt,
+		&i.FrontdoorAdDataNormalizedAt,
+		&i.FrontdoorAdDataNormalizedVersion,
 	)
 	return i, err
 }
 
 const getShortcutAdByID = `-- name: GetShortcutAdByID :one
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
 WHERE shortcut_ad_id = $1
 `
 
@@ -221,12 +251,13 @@ func (q *Queries) GetShortcutAdByID(ctx context.Context, shortcutAdID int64) (Sh
 		&i.ShortcutAdDataHashAlgorithm,
 		&i.ShortcutAdDataChangedAt,
 		&i.ShortcutAdDataNormalizedAt,
+		&i.ShortcutAdDataNormalizedVersion,
 	)
 	return i, err
 }
 
 const listFrontdoorAds = `-- name: ListFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 ORDER BY frontdoor_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -259,6 +290,7 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsPara
 			&i.FrontdoorAdDataHashAlgorithm,
 			&i.FrontdoorAdDataChangedAt,
 			&i.FrontdoorAdDataNormalizedAt,
+			&i.FrontdoorAdDataNormalizedVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -305,7 +337,7 @@ func (q *Queries) ListFrontdoorAdsMissingDataHash(ctx context.Context, limit int
 }
 
 const listShortcutAds = `-- name: ListShortcutAds :many
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -338,6 +370,7 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams
 			&i.ShortcutAdDataHashAlgorithm,
 			&i.ShortcutAdDataChangedAt,
 			&i.ShortcutAdDataNormalizedAt,
+			&i.ShortcutAdDataNormalizedVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -384,7 +417,7 @@ func (q *Queries) ListShortcutAdsMissingDataHash(ctx context.Context, limit int3
 }
 
 const listUnprocessedFrontdoorAds = `-- name: ListUnprocessedFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
 ORDER BY frontdoor_ad_first_seen_at ASC
 LIMIT $1
@@ -413,6 +446,7 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, limit int32) 
 			&i.FrontdoorAdDataHashAlgorithm,
 			&i.FrontdoorAdDataChangedAt,
 			&i.FrontdoorAdDataNormalizedAt,
+			&i.FrontdoorAdDataNormalizedVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -426,18 +460,20 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, limit int32) 
 
 const markFrontdoorAdDataNormalized = `-- name: MarkFrontdoorAdDataNormalized :exec
 UPDATE public.frontdoor_ads
-SET frontdoor_ad_data_normalized_at = now()
-WHERE frontdoor_ad_external_id = $1
-  AND frontdoor_ad_data_hash = $2
+SET frontdoor_ad_data_normalized_at = now(),
+    frontdoor_ad_data_normalized_version = $1
+WHERE frontdoor_ad_external_id = $2
+  AND frontdoor_ad_data_hash = $3
 `
 
 type MarkFrontdoorAdDataNormalizedParams struct {
-	FrontdoorAdExternalID string  `json:"frontdoor_ad_external_id"`
-	FrontdoorAdDataHash   *string `json:"frontdoor_ad_data_hash"`
+	FrontdoorAdDataNormalizedVersion int32   `json:"frontdoor_ad_data_normalized_version"`
+	FrontdoorAdExternalID            string  `json:"frontdoor_ad_external_id"`
+	FrontdoorAdDataHash              *string `json:"frontdoor_ad_data_hash"`
 }
 
 func (q *Queries) MarkFrontdoorAdDataNormalized(ctx context.Context, arg MarkFrontdoorAdDataNormalizedParams) error {
-	_, err := q.db.Exec(ctx, markFrontdoorAdDataNormalized, arg.FrontdoorAdExternalID, arg.FrontdoorAdDataHash)
+	_, err := q.db.Exec(ctx, markFrontdoorAdDataNormalized, arg.FrontdoorAdDataNormalizedVersion, arg.FrontdoorAdExternalID, arg.FrontdoorAdDataHash)
 	return err
 }
 
@@ -478,18 +514,20 @@ func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, frontdoorAdID uu
 
 const markShortcutAdDataNormalized = `-- name: MarkShortcutAdDataNormalized :exec
 UPDATE public.shortcut_ads
-SET shortcut_ad_data_normalized_at = now()
-WHERE shortcut_ad_id = $1
-  AND shortcut_ad_data_hash = $2
+SET shortcut_ad_data_normalized_at = now(),
+    shortcut_ad_data_normalized_version = $1
+WHERE shortcut_ad_id = $2
+  AND shortcut_ad_data_hash = $3
 `
 
 type MarkShortcutAdDataNormalizedParams struct {
-	ShortcutAdID       int64   `json:"shortcut_ad_id"`
-	ShortcutAdDataHash *string `json:"shortcut_ad_data_hash"`
+	ShortcutAdDataNormalizedVersion int32   `json:"shortcut_ad_data_normalized_version"`
+	ShortcutAdID                    int64   `json:"shortcut_ad_id"`
+	ShortcutAdDataHash              *string `json:"shortcut_ad_data_hash"`
 }
 
 func (q *Queries) MarkShortcutAdDataNormalized(ctx context.Context, arg MarkShortcutAdDataNormalizedParams) error {
-	_, err := q.db.Exec(ctx, markShortcutAdDataNormalized, arg.ShortcutAdID, arg.ShortcutAdDataHash)
+	_, err := q.db.Exec(ctx, markShortcutAdDataNormalized, arg.ShortcutAdDataNormalizedVersion, arg.ShortcutAdID, arg.ShortcutAdDataHash)
 	return err
 }
 
@@ -500,6 +538,7 @@ SET frontdoor_ad_data = $1::jsonb,
     frontdoor_ad_data_hash_algorithm = $3,
     frontdoor_ad_data_changed_at = CASE WHEN frontdoor_ad_data_hash IS DISTINCT FROM $2 THEN now() ELSE frontdoor_ad_data_changed_at END,
     frontdoor_ad_data_normalized_at = CASE WHEN frontdoor_ad_data_hash IS DISTINCT FROM $2 THEN NULL ELSE frontdoor_ad_data_normalized_at END,
+    frontdoor_ad_data_normalized_version = CASE WHEN frontdoor_ad_data_hash IS DISTINCT FROM $2 THEN 0 ELSE frontdoor_ad_data_normalized_version END,
     frontdoor_ad_processed_at = NOW(),
     frontdoor_ad_updated_at = NOW(),
     frontdoor_ad_page_not_found = false
@@ -534,7 +573,7 @@ INSERT INTO public.frontdoor_ads (
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version
 `
 
 type UpsertFrontdoorAdFromSitemapParams struct {
@@ -559,6 +598,7 @@ func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg UpsertFr
 		&i.FrontdoorAdDataHashAlgorithm,
 		&i.FrontdoorAdDataChangedAt,
 		&i.FrontdoorAdDataNormalizedAt,
+		&i.FrontdoorAdDataNormalizedVersion,
 	)
 	return i, err
 }
@@ -599,11 +639,12 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_data_hash_algorithm = EXCLUDED.shortcut_ad_data_hash_algorithm,
     shortcut_ad_data_changed_at = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN now() ELSE shortcut_ads.shortcut_ad_data_changed_at END,
     shortcut_ad_data_normalized_at = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN NULL ELSE shortcut_ads.shortcut_ad_data_normalized_at END,
+    shortcut_ad_data_normalized_version = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN 0 ELSE shortcut_ads.shortcut_ad_data_normalized_version END,
     shortcut_ad_data_schema_version = EXCLUDED.shortcut_ad_data_schema_version,
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
     shortcut_ad_updated_at = CURRENT_TIMESTAMP
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version
 `
 
 type UpsertShortcutAdParams struct {
@@ -643,6 +684,7 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdPara
 		&i.ShortcutAdDataHashAlgorithm,
 		&i.ShortcutAdDataChangedAt,
 		&i.ShortcutAdDataNormalizedAt,
+		&i.ShortcutAdDataNormalizedVersion,
 	)
 	return i, err
 }
@@ -660,7 +702,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version
 `
 
 type UpsertShortcutAdFromSitemapParams struct {
@@ -686,6 +728,7 @@ func (q *Queries) UpsertShortcutAdFromSitemap(ctx context.Context, arg UpsertSho
 		&i.ShortcutAdDataHashAlgorithm,
 		&i.ShortcutAdDataChangedAt,
 		&i.ShortcutAdDataNormalizedAt,
+		&i.ShortcutAdDataNormalizedVersion,
 	)
 	return i, err
 }

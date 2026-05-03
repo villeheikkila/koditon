@@ -104,7 +104,7 @@ func (c *Consumer) handleCanonicalMatchSaleListingSourcesFanout(ctx context.Cont
 	}
 	rows, err := c.pool.Query(ctx, `
 SELECT sl.sale_listing_id::text, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
-FROM public.sale_listings sl
+FROM public.property_source_offerings sl
 JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
 WHERE sl.sale_listing_source_kind = 'ad'
     AND pos.property_offering_source_link_status <> 'rejected'
@@ -203,7 +203,7 @@ SELECT
     pos.property_offering_source_link_status,
     sl.sale_listing_source_match_status,
     sl.sale_listing_source_match_attempt_count
-FROM public.sale_listings sl
+FROM public.property_source_offerings sl
 LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
 WHERE sl.sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LinkMethod, &row.LinkStatus, &row.Status, &row.AttemptCount)
@@ -244,7 +244,7 @@ WHERE property_offering_source_match_run_id = $1::uuid`, runID).Scan(&summary.Ru
 
 func (c *Consumer) updateCanonicalSourceMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string) error {
 	_, err := c.pool.Exec(ctx, `
-UPDATE public.sale_listings
+UPDATE public.property_source_offerings
 SET
     sale_listing_source_match_status = $2,
     sale_listing_source_match_next_attempt_at = $3,

@@ -36,13 +36,13 @@ SELECT
     COALESCE(sl.sale_listing_street_address, ''),
     source_badges.source_providers
 FROM public.property_offerings po
-JOIN public.sale_listings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
 JOIN LATERAL (
     SELECT array_agg(provider ORDER BY provider)::text[] AS source_providers
     FROM (
         SELECT DISTINCT source_sl.sale_listing_source_provider AS provider
         FROM public.property_offering_sources source_pos
-        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
         WHERE source_pos.property_offering_id = po.property_offering_id
             AND source_pos.property_offering_source_link_status <> 'rejected'
     ) providers
@@ -58,7 +58,7 @@ WHERE EXISTS (
     OR EXISTS (
         SELECT 1
         FROM public.property_offering_sources source_pos
-        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
         WHERE source_pos.property_offering_id = po.property_offering_id
             AND source_pos.property_offering_source_link_status <> 'rejected'
             AND source_sl.sale_listing_source_provider = $4
@@ -138,7 +138,7 @@ LIMIT $3::int OFFSET $2::int`
 const countSaleListingsSQL = `
 SELECT count(*)::bigint
 FROM public.property_offerings po
-JOIN public.sale_listings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
 WHERE EXISTS (
     SELECT 1
     FROM public.property_offering_sources active_pos
@@ -150,7 +150,7 @@ WHERE EXISTS (
     OR EXISTS (
         SELECT 1
         FROM public.property_offering_sources source_pos
-        JOIN public.sale_listings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
         WHERE source_pos.property_offering_id = po.property_offering_id
             AND source_pos.property_offering_source_link_status <> 'rejected'
             AND source_sl.sale_listing_source_provider = $1
@@ -322,7 +322,7 @@ WITH visible_base AS (
     JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
     JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
-    JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
     WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)

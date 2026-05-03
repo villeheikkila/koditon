@@ -114,6 +114,9 @@ func TestValidateSyncJobTarget(t *testing.T) {
 	if err := validateSyncJobTarget("shortcut", "shortcut_ad_data_hash_backfill"); err != nil {
 		t.Fatalf("validateSyncJobTarget returned error: %v", err)
 	}
+	if err := validateSyncJobTarget("canonical", "canonicalize_source_ads_fanout"); err != nil {
+		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	}
 	err := validateSyncJobTarget("prices", "frontdoor_sync")
 	if err == nil {
 		t.Fatal("expected error")

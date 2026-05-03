@@ -177,6 +177,10 @@ func (c *Consumer) runPricesSyncJob(ctx context.Context, logger *slog.Logger, jo
 		return c.handlePricesMatchSaleListingsFanout(ctx, logger, job)
 	case TaskTypePricesMatchSaleListing:
 		return c.handlePricesMatchSaleListing(ctx, logger, job)
+	case TaskTypeCanonicalizeSourceAdsFanout:
+		return c.handleCanonicalizeSourceAdsFanout(ctx, logger, job)
+	case TaskTypeCanonicalizeSourceAd:
+		return c.handleCanonicalizeSourceAd(ctx, logger, job)
 	case TaskTypeCanonicalMatchSaleListingSourcesBackfill:
 		return c.handleCanonicalMatchSaleListingSourcesBackfill(ctx, logger, job)
 	case TaskTypeCanonicalMatchSaleListingSourcesFanout:
@@ -344,7 +348,7 @@ func (c *Consumer) handlePricesMatchSaleListingsFanout(ctx context.Context, logg
 	}
 	rows, err := c.pool.Query(ctx, `
 SELECT sale_listing_id::text, COALESCE(sale_listing_prices_match_attempt_count, 0)
-FROM public.sale_listings
+FROM public.property_source_offerings
 WHERE sale_listing_source_kind = 'ad'
     AND prices_transaction_id IS NULL
     AND sale_listing_last_seen_at IS NOT NULL
@@ -470,7 +474,7 @@ SELECT
     sale_listing_prices_match_status,
     sale_listing_prices_match_attempt_count,
     sale_listing_prices_match_expires_at
-FROM public.sale_listings
+FROM public.property_source_offerings
 WHERE sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LastSeenAt, &transactionID, &row.Status, &row.AttemptCount, &row.ExpiresAt)
 	row.TransactionID = transactionID
 	return row, err
@@ -518,7 +522,7 @@ WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&sum
 
 func (c *Consumer) updatePricesMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {
 	_, err := c.pool.Exec(ctx, `
-UPDATE public.sale_listings
+UPDATE public.property_source_offerings
 SET
     sale_listing_prices_match_status = $2,
     sale_listing_prices_match_next_attempt_at = $3,

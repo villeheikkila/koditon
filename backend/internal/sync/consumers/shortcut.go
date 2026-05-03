@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
@@ -75,6 +76,9 @@ func (c *Consumer) handleShortcutScraperSync(ctx context.Context, logger *slog.L
 		logger.ErrorContext(ctx, "shortcut scraper sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
+	if err := c.enqueueShortcutCanonicalizationForSyncedEntity(ctx, msg.Data.EntityID); err != nil {
+		return err
+	}
 	logger.InfoContext(ctx, "shortcut scraper entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
 }
@@ -85,8 +89,30 @@ func (c *Consumer) handleShortcutAPISync(ctx context.Context, logger *slog.Logge
 		logger.ErrorContext(ctx, "shortcut api sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
+	if err := c.enqueueShortcutCanonicalizationForSyncedEntity(ctx, msg.Data.EntityID); err != nil {
+		return err
+	}
 	logger.InfoContext(ctx, "shortcut api entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
+}
+
+func (c *Consumer) enqueueShortcutCanonicalizationForSyncedEntity(ctx context.Context, entityID string) error {
+	entityType, sourceID, err := parseJobEntity(entityID)
+	if err != nil || entityType != "ad" {
+		return nil
+	}
+	adID, err := strconv.ParseInt(sourceID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse synced shortcut ad id: %w", err)
+	}
+	ad, err := c.queries.GetShortcutAdByID(ctx, adID)
+	if err != nil {
+		return fmt.Errorf("load synced shortcut ad for canonicalization enqueue: %w", err)
+	}
+	if ad.ShortcutAdDataHash == nil {
+		return nil
+	}
+	return c.enqueueCanonicalizeSourceAd(ctx, "shortcut_ad", sourceID, int32(taskqueue.PriorityNormal))
 }
 
 func (c *Consumer) handleShortcutAdDataHashBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {

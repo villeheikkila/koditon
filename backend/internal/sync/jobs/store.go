@@ -165,6 +165,8 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			"prices_match_sale_listings_backfill":           1,
 			"prices_match_sale_listings_fanout":             1,
 			"prices_match_sale_listing":                     8,
+			"canonicalize_source_ads_fanout":                1,
+			"canonicalize_source_ad":                        8,
 			"canonical_match_sale_listing_sources_backfill": 1,
 			"canonical_match_sale_listing_sources_fanout":   1,
 			"canonical_match_sale_listing_source":           8,

@@ -182,9 +182,6 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}
-	if err := s.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdID: adID, ShortcutAdDataHash: params.ShortcutAdDataHash}); err != nil {
-		return fmt.Errorf("mark ad data normalized (ad_id=%d): %w", adID, err)
-	}
 	return nil
 }
 
@@ -208,9 +205,6 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 		params := db.BackfillShortcutAdDataHashParams{ShortcutAdData: canonical, ShortcutAdDataHash: &hash, ShortcutAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, ShortcutAdID: row.ShortcutAdID}
 		if err := s.queries.BackfillShortcutAdDataHash(ctx, params); err != nil {
 			return result, fmt.Errorf("backfill shortcut ad data hash (ad_id=%d): %w", row.ShortcutAdID, err)
-		}
-		if err := s.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdID: row.ShortcutAdID, ShortcutAdDataHash: &hash}); err != nil {
-			return result, fmt.Errorf("mark shortcut ad data normalized (ad_id=%d): %w", row.ShortcutAdID, err)
 		}
 		result.Updated++
 	}

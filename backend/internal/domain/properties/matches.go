@@ -18,13 +18,13 @@ potential AS (
         latest.*,
         sl.sale_listing_postal_norm AS postal
     FROM latest
-    JOIN public.sale_listings sl ON sl.sale_listing_id = latest.sale_listing_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
     WHERE latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate'::text, 'ambiguous'::text])
         AND sl.prices_transaction_id IS NULL
         AND sl.sale_listing_postal_norm IS NOT NULL
         AND NOT EXISTS (
             SELECT 1
-            FROM public.sale_listings linked
+            FROM public.property_source_offerings linked
             WHERE linked.prices_transaction_id = latest.prices_transaction_id
         )
 )
@@ -105,7 +105,7 @@ SELECT
     COALESCE(pt.prices_transaction_period_identifier, ''),
     COALESCE(pt.prices_transaction_created_at::text, '')
 FROM latest
-JOIN public.sale_listings sl ON sl.sale_listing_id = latest.sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
 JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
@@ -116,7 +116,7 @@ WHERE latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate
     AND ($3::uuid IS NULL OR pt.prices_transaction_id = $3::uuid)
     AND NOT EXISTS (
         SELECT 1
-        FROM public.sale_listings linked
+        FROM public.property_source_offerings linked
         WHERE linked.prices_transaction_id = latest.prices_transaction_id
     )
 ORDER BY

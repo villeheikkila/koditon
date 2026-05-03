@@ -59,6 +59,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_data_hash_algorithm = EXCLUDED.shortcut_ad_data_hash_algorithm,
     shortcut_ad_data_changed_at = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN now() ELSE shortcut_ads.shortcut_ad_data_changed_at END,
     shortcut_ad_data_normalized_at = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN NULL ELSE shortcut_ads.shortcut_ad_data_normalized_at END,
+    shortcut_ad_data_normalized_version = CASE WHEN shortcut_ads.shortcut_ad_data_hash IS DISTINCT FROM EXCLUDED.shortcut_ad_data_hash THEN 0 ELSE shortcut_ads.shortcut_ad_data_normalized_version END,
     shortcut_ad_data_schema_version = EXCLUDED.shortcut_ad_data_schema_version,
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
@@ -83,6 +84,7 @@ WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id);
 
 -- name: MarkShortcutAdDataNormalized :exec
 UPDATE public.shortcut_ads
-SET shortcut_ad_data_normalized_at = now()
+SET shortcut_ad_data_normalized_at = now(),
+    shortcut_ad_data_normalized_version = sqlc.arg(shortcut_ad_data_normalized_version)
 WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id)
   AND shortcut_ad_data_hash = sqlc.arg(shortcut_ad_data_hash);

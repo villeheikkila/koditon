@@ -301,7 +301,7 @@ func linkPricesMatchCandidateCmd(pool *pgxpool.Pool, group pricesMatchCandidateG
 		if _, err := tx.Exec(ctx, `UPDATE public.sale_listing_prices_transaction_match_candidates SET sale_listing_prices_transaction_match_status = CASE WHEN sale_listing_prices_transaction_match_candidate_id = $3::uuid THEN 'auto_linked' ELSE 'rejected' END WHERE sale_listing_prices_transaction_match_run_id = $1::uuid AND sale_listing_id = $2::uuid`, group.RunID, group.Listing.ID, candidate.CandidateID); err != nil {
 			return pricesMatchReviewLinkMsg{err: fmt.Errorf("mark candidates: %w", err)}
 		}
-		if _, err := tx.Exec(ctx, `UPDATE public.sale_listings SET sale_listing_prices_match_status = 'manual_linked', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE public.property_source_offerings SET sale_listing_prices_match_status = 'manual_linked', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
 			return pricesMatchReviewLinkMsg{err: fmt.Errorf("mark listing: %w", err)}
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -327,7 +327,7 @@ func rejectPricesMatchListingCmd(pool *pgxpool.Pool, group pricesMatchCandidateG
 		if _, err := tx.Exec(ctx, `UPDATE public.sale_listing_prices_transaction_match_candidates SET sale_listing_prices_transaction_match_status = 'rejected' WHERE sale_listing_prices_transaction_match_run_id = $1::uuid AND sale_listing_id = $2::uuid AND sale_listing_prices_transaction_match_status = 'ambiguous'`, group.RunID, group.Listing.ID); err != nil {
 			return pricesMatchReviewRejectMsg{err: fmt.Errorf("reject candidates: %w", err)}
 		}
-		if _, err := tx.Exec(ctx, `UPDATE public.sale_listings SET sale_listing_prices_match_status = 'rejected', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE public.property_source_offerings SET sale_listing_prices_match_status = 'rejected', sale_listing_prices_match_run_id = $2::uuid, sale_listing_updated_at = now() WHERE sale_listing_id = $1::uuid`, group.Listing.ID, group.RunID); err != nil {
 			return pricesMatchReviewRejectMsg{err: fmt.Errorf("mark listing rejected: %w", err)}
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -374,7 +374,7 @@ SELECT
     COALESCE(sl.sale_listing_room_layout, ''),
     COALESCE(sl.sale_listing_last_seen_at::date::text, '')
 FROM groups g
-JOIN public.sale_listings sl ON sl.sale_listing_id = g.sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = g.sale_listing_id
 LIMIT 1 OFFSET $2`
 	if offset < 0 {
 		offset = 0

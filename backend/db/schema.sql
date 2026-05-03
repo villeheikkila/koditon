@@ -111,13 +111,15 @@ create table public.frontdoor_ads (
   frontdoor_ad_data_hash text,
   frontdoor_ad_data_hash_algorithm text default 'sha256'::text not null,
   frontdoor_ad_data_changed_at timestamp with time zone,
-  frontdoor_ad_data_normalized_at timestamp with time zone
+  frontdoor_ad_data_normalized_at timestamp with time zone,
+  frontdoor_ad_data_normalized_version integer default 0 not null
 );
 
 CREATE INDEX idx_frontdoor_ad_page_not_found ON public.frontdoor_ads USING btree (frontdoor_ad_page_not_found);
 CREATE INDEX idx_frontdoor_ad_processed_at ON public.frontdoor_ads USING btree (frontdoor_ad_processed_at);
 CREATE INDEX idx_frontdoor_ads_data_hash ON public.frontdoor_ads USING btree (frontdoor_ad_data_hash);
 CREATE INDEX idx_frontdoor_ads_data_normalized ON public.frontdoor_ads USING btree (frontdoor_ad_data_normalized_at) WHERE (frontdoor_ad_data_hash IS NOT NULL);
+CREATE INDEX idx_frontdoor_ads_data_normalized_version ON public.frontdoor_ads USING btree (frontdoor_ad_data_normalized_version) WHERE (frontdoor_ad_data_hash IS NOT NULL);
 
 create table public.frontdoor_building_announcements (
   frontdoor_building_announcement_id uuid default gen_random_uuid() not null constraint frontdoor_building_announcements_pkey primary key,
@@ -544,10 +546,10 @@ CREATE INDEX idx_property_offering_merge_decisions_target ON public.property_off
 create table public.property_offering_source_match_candidates (
   property_offering_source_match_candidate_id uuid default gen_random_uuid() not null constraint property_offering_source_match_candidates_pkey primary key,
   property_offering_source_match_run_id uuid not null constraint property_offering_source_matc_property_offering_source_mat_fkey references property_offering_source_match_runs(property_offering_source_match_run_id) ON DELETE CASCADE,
-  source_sale_listing_id uuid not null constraint property_offering_source_match_cand_source_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE CASCADE,
+  source_sale_listing_id uuid not null constraint property_offering_source_match_cand_source_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
   source_property_offering_id uuid not null constraint property_offering_source_match_source_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
   target_property_offering_id uuid not null constraint property_offering_source_match_target_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  target_sale_listing_id uuid not null constraint property_offering_source_match_cand_target_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE CASCADE,
+  target_sale_listing_id uuid not null constraint property_offering_source_match_cand_target_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
   property_offering_source_match_score integer not null,
   property_offering_source_match_confidence text not null,
   property_offering_source_match_status text default 'candidate'::text not null,
@@ -581,7 +583,7 @@ create table public.property_offering_source_match_runs (
 create table public.property_offering_sources (
   property_offering_source_id uuid default gen_random_uuid() not null constraint property_offering_sources_pkey primary key,
   property_offering_id uuid not null constraint property_offering_sources_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  sale_listing_id uuid not null constraint property_offering_sources_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE CASCADE,
+  sale_listing_id uuid not null constraint property_offering_sources_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
   property_offering_source_link_status text not null,
   property_offering_source_link_method text not null,
   property_offering_source_link_score integer not null,
@@ -620,7 +622,7 @@ create table public.property_offerings (
   property_offering_first_seen_at timestamp with time zone,
   property_offering_last_seen_at timestamp with time zone,
   property_offering_status text,
-  primary_sale_listing_id uuid constraint property_offerings_primary_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE SET NULL,
+  primary_sale_listing_id uuid constraint property_offerings_primary_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE SET NULL,
   property_offering_match_reasons jsonb default '{}'::jsonb not null,
   property_offering_created_at timestamp with time zone default now() not null,
   property_offering_updated_at timestamp with time zone default now() not null,
@@ -630,94 +632,7 @@ create table public.property_offerings (
 CREATE INDEX idx_property_offerings_primary_sale_listing ON public.property_offerings USING btree (primary_sale_listing_id);
 CREATE INDEX idx_property_offerings_unit ON public.property_offerings USING btree (property_unit_id);
 
-create table public.property_units (
-  property_unit_id uuid default gen_random_uuid() not null constraint property_units_pkey primary key,
-  housing_company_id uuid not null constraint property_units_property_building_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
-  property_unit_identity_key text not null constraint property_units_property_unit_identity_key_key unique,
-  property_unit_address_norm text,
-  property_unit_floor_level integer,
-  property_unit_area_value double precision,
-  property_unit_rooms_count integer,
-  property_unit_room_layout text,
-  property_unit_layout_match_key text,
-  property_unit_match_reasons jsonb default '{}'::jsonb not null,
-  property_unit_created_at timestamp with time zone default now() not null,
-  property_unit_updated_at timestamp with time zone default now() not null
-);
-
-CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
-
-create table public.role_feature_flags (
-  flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
-  role_id bigint not null constraint role_feature_flags_role_id_fkey references roles(role_id) ON DELETE CASCADE,
-  constraint role_feature_flags_pkey PRIMARY KEY (role_id, flag_id)
-);
-
-CREATE INDEX idx_role_feature_flags_flag_id ON public.role_feature_flags USING btree (flag_id);
-CREATE INDEX idx_role_feature_flags_role_id ON public.role_feature_flags USING btree (role_id);
-
-create table public.roles (
-  role_uuid uuid default gen_random_uuid() not null constraint roles_uuid_key unique,
-  role_name text not null constraint roles_role_name_key unique,
-  role_description text,
-  role_created_at timestamp with time zone default now() not null,
-  role_id bigint generated always as identity not null constraint roles_pkey primary key
-);
-
-create table public.sale_listing_plot_type_aliases (
-  sale_listing_plot_type_alias text not null constraint sale_listing_plot_type_aliases_pkey primary key,
-  sale_listing_plot_type_code text not null,
-  sale_listing_plot_type_label text not null
-);
-
-create table public.sale_listing_prices_transaction_match_candidates (
-  sale_listing_prices_transaction_match_candidate_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_candidates_pkey primary key,
-  sale_listing_prices_transaction_match_run_id uuid not null constraint sale_listing_prices_transacti_sale_listing_prices_transact_fkey references sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE CASCADE,
-  sale_listing_id uuid not null constraint sale_listing_prices_transaction_match_cand_sale_listing_id_fkey references sale_listings(sale_listing_id) ON DELETE CASCADE,
-  prices_transaction_id uuid not null constraint sale_listing_prices_transaction_matc_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE CASCADE,
-  sale_listing_prices_transaction_match_score integer not null,
-  sale_listing_prices_transaction_match_confidence text not null,
-  sale_listing_prices_transaction_match_status text default 'candidate'::text not null,
-  sale_listing_prices_transaction_match_reasons jsonb default '{}'::jsonb not null,
-  sale_listing_prices_transaction_match_price_delta_percent double precision,
-  sale_listing_prices_transaction_match_created_at timestamp with time zone default now() not null,
-  constraint sale_listing_prices_transaction_match_candidate_unique UNIQUE (sale_listing_prices_transaction_match_run_id, sale_listing_id, prices_transaction_id),
-  constraint sale_listing_prices_transaction_match_confidence_check CHECK ((sale_listing_prices_transaction_match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))),
-  constraint sale_listing_prices_transaction_match_status_check CHECK ((sale_listing_prices_transaction_match_status = ANY (ARRAY['candidate'::text, 'auto_linked'::text, 'ambiguous'::text, 'rejected'::text])))
-);
-
-CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_listing_sc ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_id, sale_listing_prices_transaction_match_score DESC);
-CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_run_status ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_prices_transaction_match_run_id, sale_listing_prices_transaction_match_status);
-CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_transactio ON public.sale_listing_prices_transaction_match_candidates USING btree (prices_transaction_id, sale_listing_prices_transaction_match_score DESC);
-
-create table public.sale_listing_prices_transaction_match_runs (
-  sale_listing_prices_transaction_match_run_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_runs_pkey primary key,
-  sale_listing_prices_transaction_match_run_mode text not null,
-  sale_listing_prices_transaction_match_score_threshold integer default 90 not null,
-  sale_listing_prices_transaction_match_competitor_margin integer default 15 not null,
-  sale_listing_prices_transaction_match_candidates_count integer default 0 not null,
-  sale_listing_prices_transaction_match_auto_linked_count integer default 0 not null,
-  sale_listing_prices_transaction_match_ambiguous_count integer default 0 not null,
-  sale_listing_prices_transaction_match_started_at timestamp with time zone default now() not null,
-  sale_listing_prices_transaction_match_finished_at timestamp with time zone,
-  constraint sale_listing_prices_transaction_match_margin_check CHECK ((sale_listing_prices_transaction_match_competitor_margin >= 0)),
-  constraint sale_listing_prices_transaction_match_run_mode_check CHECK ((sale_listing_prices_transaction_match_run_mode = ANY (ARRAY['dry_run'::text, 'auto_link_safe'::text]))),
-  constraint sale_listing_prices_transaction_match_threshold_check CHECK ((sale_listing_prices_transaction_match_score_threshold >= 0))
-);
-
-create table public.sale_listing_property_type_aliases (
-  sale_listing_property_type_alias text not null constraint sale_listing_property_type_aliases_pkey primary key,
-  sale_listing_property_type_code text not null,
-  sale_listing_property_type_label text not null
-);
-
-create table public.sale_listing_room_category_aliases (
-  sale_listing_room_category_alias text not null constraint sale_listing_room_category_aliases_pkey primary key,
-  sale_listing_room_category_code text not null,
-  sale_listing_room_category_label text not null
-);
-
-create table public.sale_listings (
+create table public.property_source_offerings (
   sale_listing_id uuid default gen_random_uuid() not null constraint sale_listings_pkey primary key,
   shortcut_ad_id bigint constraint sale_listings_shortcut_ad_id_fkey references shortcut_ads(shortcut_ad_id) ON DELETE SET NULL,
   frontdoor_ad_id uuid constraint sale_listings_frontdoor_ad_id_fkey references frontdoor_ads(frontdoor_ad_id) ON DELETE SET NULL,
@@ -804,36 +719,123 @@ create table public.sale_listings (
   constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
 );
 
-CREATE INDEX idx_sale_listings_area ON public.sale_listings USING btree (sale_listing_area_value);
-CREATE INDEX idx_sale_listings_build_year ON public.sale_listings USING btree (sale_listing_build_year);
-CREATE INDEX idx_sale_listings_building_match_key ON public.sale_listings USING btree (sale_listing_building_match_key);
-CREATE INDEX idx_sale_listings_city ON public.sale_listings USING btree (sale_listing_city);
-CREATE INDEX idx_sale_listings_elevator ON public.sale_listings USING btree (sale_listing_elevator);
-CREATE INDEX idx_sale_listings_energy_efficiency_class_year ON public.sale_listings USING btree (sale_listing_energy_efficiency_class_code, sale_listing_energy_efficiency_standard_year);
-CREATE INDEX idx_sale_listings_energy_efficiency_match_code ON public.sale_listings USING btree (sale_listing_energy_efficiency_match_code);
-CREATE INDEX idx_sale_listings_energy_efficiency_status ON public.sale_listings USING btree (sale_listing_energy_efficiency_status);
-CREATE INDEX idx_sale_listings_first_seen ON public.sale_listings USING btree (sale_listing_first_seen_at);
-CREATE INDEX idx_sale_listings_floor_level ON public.sale_listings USING btree (sale_listing_floor_level);
-CREATE INDEX idx_sale_listings_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at DESC);
-CREATE INDEX idx_sale_listings_plot_owned ON public.sale_listings USING btree (sale_listing_plot_owned);
-CREATE INDEX idx_sale_listings_plot_type_code ON public.sale_listings USING btree (sale_listing_plot_type_code);
-CREATE INDEX idx_sale_listings_postal ON public.sale_listings USING btree (sale_listing_postal);
-CREATE INDEX idx_sale_listings_price ON public.sale_listings USING btree (sale_listing_asking_price);
-CREATE INDEX idx_sale_listings_price_per_m2 ON public.sale_listings USING btree (sale_listing_price_per_m2);
-CREATE INDEX idx_sale_listings_prices_match_last_seen ON public.sale_listings USING btree (sale_listing_last_seen_at) WHERE ((prices_transaction_id IS NULL) AND (sale_listing_source_kind = 'ad'::text));
-CREATE INDEX idx_sale_listings_prices_match_queue ON public.sale_listings USING btree (sale_listing_prices_match_status, sale_listing_prices_match_next_attempt_at) WHERE (prices_transaction_id IS NULL);
-CREATE INDEX idx_sale_listings_property_type_code ON public.sale_listings USING btree (sale_listing_property_type_code);
-CREATE INDEX idx_sale_listings_room_category_code ON public.sale_listings USING btree (sale_listing_room_category_code);
-CREATE INDEX idx_sale_listings_rooms_count ON public.sale_listings USING btree (sale_listing_rooms_count);
-CREATE INDEX idx_sale_listings_search_trgm ON public.sale_listings USING gin (lower(sale_listing_search_text) gin_trgm_ops);
-CREATE INDEX idx_sale_listings_source ON public.sale_listings USING btree (sale_listing_source_provider, sale_listing_source_kind);
-CREATE INDEX idx_sale_listings_source_match_queue ON public.sale_listings USING btree (sale_listing_source_match_status, sale_listing_source_match_next_attempt_at) WHERE (sale_listing_source_kind = 'ad'::text);
-CREATE INDEX idx_sale_listings_street_match_key ON public.sale_listings USING btree (sale_listing_street_match_key);
-CREATE INDEX idx_sale_listings_unit_match_key ON public.sale_listings USING btree (sale_listing_unit_match_key);
-CREATE UNIQUE INDEX sale_listings_frontdoor_ad_id_key ON public.sale_listings USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
-CREATE UNIQUE INDEX sale_listings_frontdoor_building_announcement_id_key ON public.sale_listings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
-CREATE UNIQUE INDEX sale_listings_prices_transaction_id_key ON public.sale_listings USING btree (prices_transaction_id) WHERE (prices_transaction_id IS NOT NULL);
-CREATE UNIQUE INDEX sale_listings_shortcut_ad_id_key ON public.sale_listings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
+CREATE INDEX idx_sale_listings_area ON public.property_source_offerings USING btree (sale_listing_area_value);
+CREATE INDEX idx_sale_listings_build_year ON public.property_source_offerings USING btree (sale_listing_build_year);
+CREATE INDEX idx_sale_listings_building_match_key ON public.property_source_offerings USING btree (sale_listing_building_match_key);
+CREATE INDEX idx_sale_listings_city ON public.property_source_offerings USING btree (sale_listing_city);
+CREATE INDEX idx_sale_listings_elevator ON public.property_source_offerings USING btree (sale_listing_elevator);
+CREATE INDEX idx_sale_listings_energy_efficiency_class_year ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_class_code, sale_listing_energy_efficiency_standard_year);
+CREATE INDEX idx_sale_listings_energy_efficiency_match_code ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_match_code);
+CREATE INDEX idx_sale_listings_energy_efficiency_status ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_status);
+CREATE INDEX idx_sale_listings_first_seen ON public.property_source_offerings USING btree (sale_listing_first_seen_at);
+CREATE INDEX idx_sale_listings_floor_level ON public.property_source_offerings USING btree (sale_listing_floor_level);
+CREATE INDEX idx_sale_listings_last_seen ON public.property_source_offerings USING btree (sale_listing_last_seen_at DESC);
+CREATE INDEX idx_sale_listings_plot_owned ON public.property_source_offerings USING btree (sale_listing_plot_owned);
+CREATE INDEX idx_sale_listings_plot_type_code ON public.property_source_offerings USING btree (sale_listing_plot_type_code);
+CREATE INDEX idx_sale_listings_postal ON public.property_source_offerings USING btree (sale_listing_postal);
+CREATE INDEX idx_sale_listings_price ON public.property_source_offerings USING btree (sale_listing_asking_price);
+CREATE INDEX idx_sale_listings_price_per_m2 ON public.property_source_offerings USING btree (sale_listing_price_per_m2);
+CREATE INDEX idx_sale_listings_prices_match_last_seen ON public.property_source_offerings USING btree (sale_listing_last_seen_at) WHERE ((prices_transaction_id IS NULL) AND (sale_listing_source_kind = 'ad'::text));
+CREATE INDEX idx_sale_listings_prices_match_queue ON public.property_source_offerings USING btree (sale_listing_prices_match_status, sale_listing_prices_match_next_attempt_at) WHERE (prices_transaction_id IS NULL);
+CREATE INDEX idx_sale_listings_property_type_code ON public.property_source_offerings USING btree (sale_listing_property_type_code);
+CREATE INDEX idx_sale_listings_room_category_code ON public.property_source_offerings USING btree (sale_listing_room_category_code);
+CREATE INDEX idx_sale_listings_rooms_count ON public.property_source_offerings USING btree (sale_listing_rooms_count);
+CREATE INDEX idx_sale_listings_search_trgm ON public.property_source_offerings USING gin (lower(sale_listing_search_text) gin_trgm_ops);
+CREATE INDEX idx_sale_listings_source ON public.property_source_offerings USING btree (sale_listing_source_provider, sale_listing_source_kind);
+CREATE INDEX idx_sale_listings_source_match_queue ON public.property_source_offerings USING btree (sale_listing_source_match_status, sale_listing_source_match_next_attempt_at) WHERE (sale_listing_source_kind = 'ad'::text);
+CREATE INDEX idx_sale_listings_street_match_key ON public.property_source_offerings USING btree (sale_listing_street_match_key);
+CREATE INDEX idx_sale_listings_unit_match_key ON public.property_source_offerings USING btree (sale_listing_unit_match_key);
+CREATE UNIQUE INDEX sale_listings_frontdoor_ad_id_key ON public.property_source_offerings USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_frontdoor_building_announcement_id_key ON public.property_source_offerings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_prices_transaction_id_key ON public.property_source_offerings USING btree (prices_transaction_id) WHERE (prices_transaction_id IS NOT NULL);
+CREATE UNIQUE INDEX sale_listings_shortcut_ad_id_key ON public.property_source_offerings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
+
+create table public.property_units (
+  property_unit_id uuid default gen_random_uuid() not null constraint property_units_pkey primary key,
+  housing_company_id uuid not null constraint property_units_property_building_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  property_unit_identity_key text not null constraint property_units_property_unit_identity_key_key unique,
+  property_unit_address_norm text,
+  property_unit_floor_level integer,
+  property_unit_area_value double precision,
+  property_unit_rooms_count integer,
+  property_unit_room_layout text,
+  property_unit_layout_match_key text,
+  property_unit_match_reasons jsonb default '{}'::jsonb not null,
+  property_unit_created_at timestamp with time zone default now() not null,
+  property_unit_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
+
+create table public.role_feature_flags (
+  flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
+  role_id bigint not null constraint role_feature_flags_role_id_fkey references roles(role_id) ON DELETE CASCADE,
+  constraint role_feature_flags_pkey PRIMARY KEY (role_id, flag_id)
+);
+
+CREATE INDEX idx_role_feature_flags_flag_id ON public.role_feature_flags USING btree (flag_id);
+CREATE INDEX idx_role_feature_flags_role_id ON public.role_feature_flags USING btree (role_id);
+
+create table public.roles (
+  role_uuid uuid default gen_random_uuid() not null constraint roles_uuid_key unique,
+  role_name text not null constraint roles_role_name_key unique,
+  role_description text,
+  role_created_at timestamp with time zone default now() not null,
+  role_id bigint generated always as identity not null constraint roles_pkey primary key
+);
+
+create table public.sale_listing_plot_type_aliases (
+  sale_listing_plot_type_alias text not null constraint sale_listing_plot_type_aliases_pkey primary key,
+  sale_listing_plot_type_code text not null,
+  sale_listing_plot_type_label text not null
+);
+
+create table public.sale_listing_prices_transaction_match_candidates (
+  sale_listing_prices_transaction_match_candidate_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_candidates_pkey primary key,
+  sale_listing_prices_transaction_match_run_id uuid not null constraint sale_listing_prices_transacti_sale_listing_prices_transact_fkey references sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE CASCADE,
+  sale_listing_id uuid not null constraint sale_listing_prices_transaction_match_cand_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
+  prices_transaction_id uuid not null constraint sale_listing_prices_transaction_matc_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE CASCADE,
+  sale_listing_prices_transaction_match_score integer not null,
+  sale_listing_prices_transaction_match_confidence text not null,
+  sale_listing_prices_transaction_match_status text default 'candidate'::text not null,
+  sale_listing_prices_transaction_match_reasons jsonb default '{}'::jsonb not null,
+  sale_listing_prices_transaction_match_price_delta_percent double precision,
+  sale_listing_prices_transaction_match_created_at timestamp with time zone default now() not null,
+  constraint sale_listing_prices_transaction_match_candidate_unique UNIQUE (sale_listing_prices_transaction_match_run_id, sale_listing_id, prices_transaction_id),
+  constraint sale_listing_prices_transaction_match_confidence_check CHECK ((sale_listing_prices_transaction_match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))),
+  constraint sale_listing_prices_transaction_match_status_check CHECK ((sale_listing_prices_transaction_match_status = ANY (ARRAY['candidate'::text, 'auto_linked'::text, 'ambiguous'::text, 'rejected'::text])))
+);
+
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_listing_sc ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_id, sale_listing_prices_transaction_match_score DESC);
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_run_status ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_prices_transaction_match_run_id, sale_listing_prices_transaction_match_status);
+CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_transactio ON public.sale_listing_prices_transaction_match_candidates USING btree (prices_transaction_id, sale_listing_prices_transaction_match_score DESC);
+
+create table public.sale_listing_prices_transaction_match_runs (
+  sale_listing_prices_transaction_match_run_id uuid default gen_random_uuid() not null constraint sale_listing_prices_transaction_match_runs_pkey primary key,
+  sale_listing_prices_transaction_match_run_mode text not null,
+  sale_listing_prices_transaction_match_score_threshold integer default 90 not null,
+  sale_listing_prices_transaction_match_competitor_margin integer default 15 not null,
+  sale_listing_prices_transaction_match_candidates_count integer default 0 not null,
+  sale_listing_prices_transaction_match_auto_linked_count integer default 0 not null,
+  sale_listing_prices_transaction_match_ambiguous_count integer default 0 not null,
+  sale_listing_prices_transaction_match_started_at timestamp with time zone default now() not null,
+  sale_listing_prices_transaction_match_finished_at timestamp with time zone,
+  constraint sale_listing_prices_transaction_match_margin_check CHECK ((sale_listing_prices_transaction_match_competitor_margin >= 0)),
+  constraint sale_listing_prices_transaction_match_run_mode_check CHECK ((sale_listing_prices_transaction_match_run_mode = ANY (ARRAY['dry_run'::text, 'auto_link_safe'::text]))),
+  constraint sale_listing_prices_transaction_match_threshold_check CHECK ((sale_listing_prices_transaction_match_score_threshold >= 0))
+);
+
+create table public.sale_listing_property_type_aliases (
+  sale_listing_property_type_alias text not null constraint sale_listing_property_type_aliases_pkey primary key,
+  sale_listing_property_type_code text not null,
+  sale_listing_property_type_label text not null
+);
+
+create table public.sale_listing_room_category_aliases (
+  sale_listing_room_category_alias text not null constraint sale_listing_room_category_aliases_pkey primary key,
+  sale_listing_room_category_code text not null,
+  sale_listing_room_category_label text not null
+);
 
 create table public.schema_migrations (
   version integer not null constraint schema_migrations_pkey primary key
@@ -852,11 +854,13 @@ create table public.shortcut_ads (
   shortcut_ad_data_hash text,
   shortcut_ad_data_hash_algorithm text default 'sha256'::text not null,
   shortcut_ad_data_changed_at timestamp with time zone,
-  shortcut_ad_data_normalized_at timestamp with time zone
+  shortcut_ad_data_normalized_at timestamp with time zone,
+  shortcut_ad_data_normalized_version integer default 0 not null
 );
 
 CREATE INDEX idx_shortcut_ads_data_hash ON public.shortcut_ads USING btree (shortcut_ad_data_hash);
 CREATE INDEX idx_shortcut_ads_data_normalized ON public.shortcut_ads USING btree (shortcut_ad_data_normalized_at) WHERE (shortcut_ad_data_hash IS NOT NULL);
+CREATE INDEX idx_shortcut_ads_data_normalized_version ON public.shortcut_ads USING btree (shortcut_ad_data_normalized_version) WHERE (shortcut_ad_data_hash IS NOT NULL);
 
 create table public.shortcut_building_listings (
   shortcut_building_listing_id uuid default gen_random_uuid() not null constraint shortcut_building_listings_pkey primary key,

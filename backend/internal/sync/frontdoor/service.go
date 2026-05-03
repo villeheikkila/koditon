@@ -100,9 +100,6 @@ func (s *Service) SyncAd(ctx context.Context, friendlyID string) error {
 	if err := s.queries.UpdateFrontdoorAdData(ctx, params); err != nil {
 		return fmt.Errorf("update ad data (friendly_id=%s): %w", friendlyID, err)
 	}
-	if err := s.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdExternalID: friendlyID, FrontdoorAdDataHash: params.FrontdoorAdDataHash}); err != nil {
-		return fmt.Errorf("mark ad data normalized (friendly_id=%s): %w", friendlyID, err)
-	}
 	return nil
 }
 
@@ -126,9 +123,6 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 		params := db.BackfillFrontdoorAdDataHashParams{FrontdoorAdData: canonical, FrontdoorAdDataHash: &hash, FrontdoorAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, FrontdoorAdExternalID: row.FrontdoorAdExternalID}
 		if err := s.queries.BackfillFrontdoorAdDataHash(ctx, params); err != nil {
 			return result, fmt.Errorf("backfill frontdoor ad data hash (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
-		}
-		if err := s.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdExternalID: row.FrontdoorAdExternalID, FrontdoorAdDataHash: &hash}); err != nil {
-			return result, fmt.Errorf("mark frontdoor ad data normalized (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
 		}
 		result.Updated++
 	}

@@ -150,7 +150,7 @@ SELECT
     shortcut_ad_id,
     frontdoor_ad_id,
     frontdoor_building_announcement_id
-FROM public.sale_listings
+FROM public.property_source_offerings
 WHERE sale_listing_id = $1
 LIMIT 1`, saleListingID).Scan(&source.SaleListingID, &source.Provider, &source.Kind, &source.NativeID, &source.CanonicalID, &source.ShortcutAdID, &source.FrontdoorAdID, &source.FrontdoorBuildingAnnouncementID)
 	if err != nil {
@@ -305,7 +305,7 @@ SELECT
 FROM public.property_units pu
 JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
 JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
-JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
 WHERE pu.housing_company_id = $1
     AND pos.property_offering_source_link_status <> 'rejected'
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
@@ -375,7 +375,7 @@ LEFT JOIN LATERAL (
         array_agg(DISTINCT sl.sale_listing_source_provider ORDER BY sl.sale_listing_source_provider) AS providers,
         array_agg(DISTINCT sl.sale_listing_source_kind ORDER BY sl.sale_listing_source_kind) AS kinds
     FROM public.property_offering_sources pos
-    JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
     WHERE pos.property_offering_id = po.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
 ) source_summary ON true
@@ -444,7 +444,7 @@ JOIN LATERAL (
     SELECT
         sl.sale_listing_id
     FROM public.property_offering_sources linked
-    JOIN public.sale_listings sl ON sl.sale_listing_id = linked.sale_listing_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = linked.sale_listing_id
     WHERE linked.property_offering_id = po.property_offering_id
         AND linked.property_offering_source_link_status <> 'rejected'
     ORDER BY
@@ -490,7 +490,7 @@ SELECT
     pos.property_offering_source_link_method,
     pos.property_offering_source_link_score::int4
 FROM public.property_offering_sources pos
-JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
 WHERE pos.property_offering_id = $1
     AND pos.property_offering_source_link_status <> 'rejected'
 ORDER BY sl.sale_listing_last_seen_at DESC NULLS LAST, sl.sale_listing_created_at DESC`, offeringID)
@@ -813,7 +813,7 @@ SELECT
         '{}'::jsonb
     ) AS payload
 FROM public.property_offering_sources pos
-JOIN public.sale_listings sl ON sl.sale_listing_id = pos.sale_listing_id
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
 LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
@@ -872,7 +872,7 @@ SELECT
 FROM public.property_offerings po
 JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 JOIN public.housing_companies pb ON pb.housing_company_id = pu.housing_company_id
-LEFT JOIN public.sale_listings sl ON sl.sale_listing_id = $2
+LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = $2
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 WHERE po.property_offering_id = $1
@@ -1032,7 +1032,7 @@ SELECT
     sl.sale_listing_prices_match_status,
     c.sale_listing_prices_transaction_match_score,
     c.sale_listing_prices_transaction_match_confidence
-FROM public.sale_listings sl
+FROM public.property_source_offerings sl
 LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = sl.prices_transaction_id
 LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id

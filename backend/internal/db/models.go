@@ -90,19 +90,20 @@ type FeatureFlag struct {
 }
 
 type FrontdoorAd struct {
-	FrontdoorAdID                uuid.UUID       `json:"frontdoor_ad_id"`
-	FrontdoorAdExternalID        string          `json:"frontdoor_ad_external_id"`
-	FrontdoorAdUrl               string          `json:"frontdoor_ad_url"`
-	FrontdoorAdFirstSeenAt       time.Time       `json:"frontdoor_ad_first_seen_at"`
-	FrontdoorAdLastSeenAt        time.Time       `json:"frontdoor_ad_last_seen_at"`
-	FrontdoorAdUpdatedAt         time.Time       `json:"frontdoor_ad_updated_at"`
-	FrontdoorAdData              json.RawMessage `json:"frontdoor_ad_data"`
-	FrontdoorAdProcessedAt       *time.Time      `json:"frontdoor_ad_processed_at"`
-	FrontdoorAdPageNotFound      bool            `json:"frontdoor_ad_page_not_found"`
-	FrontdoorAdDataHash          *string         `json:"frontdoor_ad_data_hash"`
-	FrontdoorAdDataHashAlgorithm string          `json:"frontdoor_ad_data_hash_algorithm"`
-	FrontdoorAdDataChangedAt     *time.Time      `json:"frontdoor_ad_data_changed_at"`
-	FrontdoorAdDataNormalizedAt  *time.Time      `json:"frontdoor_ad_data_normalized_at"`
+	FrontdoorAdID                    uuid.UUID       `json:"frontdoor_ad_id"`
+	FrontdoorAdExternalID            string          `json:"frontdoor_ad_external_id"`
+	FrontdoorAdUrl                   string          `json:"frontdoor_ad_url"`
+	FrontdoorAdFirstSeenAt           time.Time       `json:"frontdoor_ad_first_seen_at"`
+	FrontdoorAdLastSeenAt            time.Time       `json:"frontdoor_ad_last_seen_at"`
+	FrontdoorAdUpdatedAt             time.Time       `json:"frontdoor_ad_updated_at"`
+	FrontdoorAdData                  json.RawMessage `json:"frontdoor_ad_data"`
+	FrontdoorAdProcessedAt           *time.Time      `json:"frontdoor_ad_processed_at"`
+	FrontdoorAdPageNotFound          bool            `json:"frontdoor_ad_page_not_found"`
+	FrontdoorAdDataHash              *string         `json:"frontdoor_ad_data_hash"`
+	FrontdoorAdDataHashAlgorithm     string          `json:"frontdoor_ad_data_hash_algorithm"`
+	FrontdoorAdDataChangedAt         *time.Time      `json:"frontdoor_ad_data_changed_at"`
+	FrontdoorAdDataNormalizedAt      *time.Time      `json:"frontdoor_ad_data_normalized_at"`
+	FrontdoorAdDataNormalizedVersion int32           `json:"frontdoor_ad_data_normalized_version"`
 }
 
 type FrontdoorBuilding struct {
@@ -523,43 +524,7 @@ type PropertyOfferingTransaction struct {
 	PropertyOfferingTransactionUpdatedAt   time.Time       `json:"property_offering_transaction_updated_at"`
 }
 
-type PropertyUnit struct {
-	PropertyUnitID             uuid.UUID       `json:"property_unit_id"`
-	HousingCompanyID           uuid.UUID       `json:"housing_company_id"`
-	PropertyUnitIdentityKey    string          `json:"property_unit_identity_key"`
-	PropertyUnitAddressNorm    *string         `json:"property_unit_address_norm"`
-	PropertyUnitFloorLevel     *int32          `json:"property_unit_floor_level"`
-	PropertyUnitAreaValue      *float64        `json:"property_unit_area_value"`
-	PropertyUnitRoomsCount     *int32          `json:"property_unit_rooms_count"`
-	PropertyUnitRoomLayout     *string         `json:"property_unit_room_layout"`
-	PropertyUnitLayoutMatchKey *string         `json:"property_unit_layout_match_key"`
-	PropertyUnitMatchReasons   json.RawMessage `json:"property_unit_match_reasons"`
-	PropertyUnitCreatedAt      time.Time       `json:"property_unit_created_at"`
-	PropertyUnitUpdatedAt      time.Time       `json:"property_unit_updated_at"`
-}
-
-type Role struct {
-	RoleUuid        uuid.UUID `json:"role_uuid"`
-	RoleName        string    `json:"role_name"`
-	RoleDescription *string   `json:"role_description"`
-	RoleCreatedAt   time.Time `json:"role_created_at"`
-	RoleID          int64     `json:"role_id"`
-}
-
-type RoleFeatureFlag struct {
-	FlagID int64 `json:"flag_id"`
-	RoleID int64 `json:"role_id"`
-}
-
-type RuntimeKvStore struct {
-	KvKey     string    `json:"kv_key"`
-	KvValue   []byte    `json:"kv_value"`
-	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type SaleListing struct {
+type PropertySourceOffering struct {
 	SaleListingID                           uuid.UUID       `json:"sale_listing_id"`
 	ShortcutAdID                            *int64          `json:"shortcut_ad_id"`
 	FrontdoorAdID                           *uuid.UUID      `json:"frontdoor_ad_id"`
@@ -641,6 +606,42 @@ type SaleListing struct {
 	SaleListingWaterCharge                  *float64        `json:"sale_listing_water_charge"`
 }
 
+type PropertyUnit struct {
+	PropertyUnitID             uuid.UUID       `json:"property_unit_id"`
+	HousingCompanyID           uuid.UUID       `json:"housing_company_id"`
+	PropertyUnitIdentityKey    string          `json:"property_unit_identity_key"`
+	PropertyUnitAddressNorm    *string         `json:"property_unit_address_norm"`
+	PropertyUnitFloorLevel     *int32          `json:"property_unit_floor_level"`
+	PropertyUnitAreaValue      *float64        `json:"property_unit_area_value"`
+	PropertyUnitRoomsCount     *int32          `json:"property_unit_rooms_count"`
+	PropertyUnitRoomLayout     *string         `json:"property_unit_room_layout"`
+	PropertyUnitLayoutMatchKey *string         `json:"property_unit_layout_match_key"`
+	PropertyUnitMatchReasons   json.RawMessage `json:"property_unit_match_reasons"`
+	PropertyUnitCreatedAt      time.Time       `json:"property_unit_created_at"`
+	PropertyUnitUpdatedAt      time.Time       `json:"property_unit_updated_at"`
+}
+
+type Role struct {
+	RoleUuid        uuid.UUID `json:"role_uuid"`
+	RoleName        string    `json:"role_name"`
+	RoleDescription *string   `json:"role_description"`
+	RoleCreatedAt   time.Time `json:"role_created_at"`
+	RoleID          int64     `json:"role_id"`
+}
+
+type RoleFeatureFlag struct {
+	FlagID int64 `json:"flag_id"`
+	RoleID int64 `json:"role_id"`
+}
+
+type RuntimeKvStore struct {
+	KvKey     string    `json:"kv_key"`
+	KvValue   []byte    `json:"kv_value"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type SaleListingPlotTypeAlias struct {
 	SaleListingPlotTypeAlias string `json:"sale_listing_plot_type_alias"`
 	SaleListingPlotTypeCode  string `json:"sale_listing_plot_type_code"`
@@ -689,19 +690,20 @@ type SchemaMigration struct {
 }
 
 type ShortcutAd struct {
-	ShortcutAdID                int64           `json:"shortcut_ad_id"`
-	ShortcutAdUrl               string          `json:"shortcut_ad_url"`
-	ShortcutAdType              string          `json:"shortcut_ad_type"`
-	ShortcutAdFirstSeenAt       time.Time       `json:"shortcut_ad_first_seen_at"`
-	ShortcutAdLastSeenAt        time.Time       `json:"shortcut_ad_last_seen_at"`
-	ShortcutAdData              json.RawMessage `json:"shortcut_ad_data"`
-	ShortcutAdUpdatedAt         *time.Time      `json:"shortcut_ad_updated_at"`
-	ShortcutBuildingID          *uuid.UUID      `json:"shortcut_building_id"`
-	ShortcutAdDataSchemaVersion int16           `json:"shortcut_ad_data_schema_version"`
-	ShortcutAdDataHash          *string         `json:"shortcut_ad_data_hash"`
-	ShortcutAdDataHashAlgorithm string          `json:"shortcut_ad_data_hash_algorithm"`
-	ShortcutAdDataChangedAt     *time.Time      `json:"shortcut_ad_data_changed_at"`
-	ShortcutAdDataNormalizedAt  *time.Time      `json:"shortcut_ad_data_normalized_at"`
+	ShortcutAdID                    int64           `json:"shortcut_ad_id"`
+	ShortcutAdUrl                   string          `json:"shortcut_ad_url"`
+	ShortcutAdType                  string          `json:"shortcut_ad_type"`
+	ShortcutAdFirstSeenAt           time.Time       `json:"shortcut_ad_first_seen_at"`
+	ShortcutAdLastSeenAt            time.Time       `json:"shortcut_ad_last_seen_at"`
+	ShortcutAdData                  json.RawMessage `json:"shortcut_ad_data"`
+	ShortcutAdUpdatedAt             *time.Time      `json:"shortcut_ad_updated_at"`
+	ShortcutBuildingID              *uuid.UUID      `json:"shortcut_building_id"`
+	ShortcutAdDataSchemaVersion     int16           `json:"shortcut_ad_data_schema_version"`
+	ShortcutAdDataHash              *string         `json:"shortcut_ad_data_hash"`
+	ShortcutAdDataHashAlgorithm     string          `json:"shortcut_ad_data_hash_algorithm"`
+	ShortcutAdDataChangedAt         *time.Time      `json:"shortcut_ad_data_changed_at"`
+	ShortcutAdDataNormalizedAt      *time.Time      `json:"shortcut_ad_data_normalized_at"`
+	ShortcutAdDataNormalizedVersion int32           `json:"shortcut_ad_data_normalized_version"`
 }
 
 type ShortcutBuilding struct {

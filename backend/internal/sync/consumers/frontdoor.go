@@ -78,6 +78,18 @@ func (c *Consumer) handleFrontdoorEntitySync(ctx context.Context, logger *slog.L
 		logger.ErrorContext(ctx, "frontdoor sync failed", "error", err, "outcome", logging.OutcomeError)
 		return err
 	}
+	entityType, externalID, err := parseJobEntity(msg.Data.EntityID)
+	if err == nil && entityType == "ad" {
+		ad, loadErr := c.queries.GetFrontdoorAdByExternalID(ctx, externalID)
+		if loadErr != nil {
+			return fmt.Errorf("load synced frontdoor ad for canonicalization enqueue: %w", loadErr)
+		}
+		if ad.FrontdoorAdDataHash != nil {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_ad", ad.FrontdoorAdID.String(), int32(taskqueue.PriorityNormal)); err != nil {
+				return err
+			}
+		}
+	}
 	logger.InfoContext(ctx, "frontdoor entity synced", "outcome", logging.OutcomeSuccess)
 	return nil
 }

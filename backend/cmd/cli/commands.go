@@ -407,6 +407,13 @@ func validateSyncJobTarget(provider, kind string) error {
 			"prices_match_sale_listings_fanout":    {},
 			"prices_match_sale_listing":            {},
 		},
+		"canonical": {
+			"canonicalize_source_ads_fanout":                {},
+			"canonicalize_source_ad":                        {},
+			"canonical_match_sale_listing_sources_backfill": {},
+			"canonical_match_sale_listing_sources_fanout":   {},
+			"canonical_match_sale_listing_source":           {},
+		},
 		"postal": {
 			"postal_sync": {},
 		},
