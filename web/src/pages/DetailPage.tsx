@@ -156,7 +156,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           {unit.floor_level != null && <Fact label="Floor" value={building.floor_count != null ? `${unit.floor_level} / ${building.floor_count}` : String(unit.floor_level)} />}
           {building.build_year != null && <Fact label="Built" value={String(building.build_year)} />}
           {unit.condition && <Fact label="Condition" value={unit.condition} />}
-          {(building.energy_efficiency_label || building.energy_class) && <Fact label="Energy" value={building.energy_efficiency_label || building.energy_class || ''} />}
+          {building.energy_class && <Fact label="Energy" value={building.energy_class} />}
           {building.elevator != null && <Fact label="Elevator" value={building.elevator ? 'Yes' : 'No'} />}
           {unit.balcony != null && <Fact label="Balcony" value={unit.balcony ? 'Yes' : 'No'} />}
           {unit.sauna != null && <Fact label="Sauna" value={unit.sauna ? 'Yes' : 'No'} />}
@@ -323,7 +323,7 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               {building.construction_year != null && <Row label="Construction year" value={String(building.construction_year)} />}
               {building.building_type && <Row label="Building type" value={building.building_type} />}
               {building.building_subtype && <Row label="Building subtype" value={building.building_subtype} />}
-              {(building.energy_efficiency_label || building.energy_class) && <Row label="Energy class" value={building.energy_efficiency_label || building.energy_class || ''} />}
+              {building.energy_class && <Row label="Energy class" value={building.energy_class} />}
               {building.heating && <Row label="Heating" value={building.heating} />}
               {building.heating_description && <Row label="Heating details" value={building.heating_description} />}
               {building.heating_fuel && <Row label="Heating fuel" value={building.heating_fuel} />}
@@ -551,7 +551,6 @@ function BuildingView({ building }: { building: Building }) {
             {details.heating_description && <Row label="Heating details" value={details.heating_description} />}
             {details.heating_fuel && <Row label="Heating fuel" value={details.heating_fuel} />}
             {details.energy_class && <Row label="Energy class" value={details.energy_class} />}
-            {details.energy_efficiency_label && details.energy_efficiency_label !== details.energy_class && <Row label="Energy label" value={details.energy_efficiency_label} />}
             {details.building_material && <Row label="Material" value={details.building_material} />}
             {details.wall_structure && <Row label="Wall structure" value={details.wall_structure} />}
             {details.frame_construction_method && <Row label="Frame" value={details.frame_construction_method} />}

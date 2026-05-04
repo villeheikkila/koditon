@@ -1431,6 +1431,244 @@ func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildin
 	return i, err
 }
 
+const getPropertySourceOfferingDetail = `-- name: GetPropertySourceOfferingDetail :one
+SELECT
+    sl.sale_listing_id,
+    sl.sale_listing_source_provider,
+    sl.sale_listing_source_kind,
+    COALESCE(sl.sale_listing_url, '') AS url,
+    COALESCE(sl.sale_listing_headline, '') AS headline,
+    COALESCE(sl.sale_listing_street_address, '') AS street_address,
+    COALESCE(sl.sale_listing_city, '') AS city,
+    COALESCE(sl.sale_listing_postal, '') AS postal,
+    sl.sale_listing_latitude,
+    sl.sale_listing_longitude,
+    COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
+    sl.sale_listing_rooms_count,
+    sl.sale_listing_area_value,
+    sl.sale_listing_floor_level,
+    COALESCE(sl.sale_listing_property_type_raw, '') AS property_type_raw,
+    COALESCE(sl.sale_listing_condition, '') AS condition,
+    sl.sale_listing_elevator,
+    COALESCE(sl.sale_listing_energy_class, '') AS energy_class,
+    COALESCE(sl.sale_listing_energy_efficiency_label, '') AS energy_efficiency_label,
+    COALESCE(sl.sale_listing_plot_type_raw, '') AS plot_type_raw,
+    COALESCE(sl.sale_listing_plot_type_code, '') AS plot_type_code,
+    sl.sale_listing_plot_owned,
+    sl.sale_listing_asking_price,
+    sl.sale_listing_debt_free_price,
+    sl.sale_listing_debt_share_amount,
+    sl.sale_listing_price_per_m2,
+    sl.sale_listing_first_seen_at,
+    sl.sale_listing_last_seen_at,
+    sl.sale_listing_published_at,
+    sl.sale_listing_build_year,
+    sl.sale_listing_total_floors,
+    sl.sale_listing_apartment_count,
+    sl.sale_listing_living_area_value,
+    sl.sale_listing_total_area_value,
+    sl.sale_listing_other_area_value,
+    sl.sale_listing_bedrooms_count,
+    sl.sale_listing_sauna,
+    sl.sale_listing_balcony,
+    COALESCE(sl.sale_listing_parking_text, '') AS parking_text,
+    COALESCE(sl.sale_listing_kitchen_description_text, '') AS kitchen_description_text,
+    COALESCE(sl.sale_listing_bathroom_description_text, '') AS bathroom_description_text,
+    COALESCE(sl.sale_listing_storage_description_text, '') AS storage_description_text,
+    COALESCE(sl.sale_listing_floor_materials_description_text, '') AS floor_materials_description_text,
+    COALESCE(sl.sale_listing_wall_materials_description_text, '') AS wall_materials_description_text,
+    COALESCE(sl.sale_listing_balcony_description_text, '') AS balcony_description_text,
+    COALESCE(sl.sale_listing_sauna_description_text, '') AS sauna_description_text,
+    COALESCE(sl.sale_listing_views_description_text, '') AS views_description_text,
+    COALESCE(sl.sale_listing_appliances, ARRAY[]::text[]) AS appliances,
+    COALESCE(sl.sale_listing_features, ARRAY[]::text[]) AS features,
+    sl.sale_listing_plot_area_value,
+    COALESCE(sl.sale_listing_services_text, '') AS services_text,
+    COALESCE(sl.sale_listing_transport_text, '') AS transport_text,
+    sl.sale_listing_previous_asking_price,
+    sl.sale_listing_previous_debt_free_price,
+    sl.sale_listing_new_development,
+    COALESCE(sl.sale_listing_description_text, '') AS description_text,
+    COALESCE(sl.sale_listing_availability_text, '') AS availability_text,
+    COALESCE(sl.sale_listing_renovations_done_text, '') AS renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
+    COALESCE(sl.sale_listing_additional_info_text, '') AS additional_info_text,
+    COALESCE(sl.sale_listing_charges_text, '') AS charges_text,
+    sl.sale_listing_maintenance_charge_monthly,
+    sl.sale_listing_total_charge_monthly,
+    sl.sale_listing_water_charge,
+    COALESCE(sl.sale_listing_housing_company_name, '') AS housing_company_name,
+    COALESCE(sl.sale_listing_housing_company_business_id, '') AS housing_company_business_id,
+    COALESCE(sl.sale_listing_building_material, '') AS building_material,
+    COALESCE(sl.sale_listing_heating_system, '') AS heating_system,
+    COALESCE(sl.sale_listing_roof_type, '') AS roof_type,
+    COALESCE(sl.sale_listing_roof_material, '') AS roof_material,
+    COALESCE(sl.sale_listing_car_storage_text, '') AS car_storage_text,
+    COALESCE(sl.sale_listing_building_description_text, '') AS building_description_text,
+    COALESCE(sl.sale_listing_building_other_info_text, '') AS building_other_info_text
+FROM public.property_source_offerings sl
+WHERE sl.sale_listing_id = $1
+    AND sl.sale_listing_source_kind IN ('ad', 'announcement')
+LIMIT 1
+`
+
+type GetPropertySourceOfferingDetailRow struct {
+	SaleListingID                       uuid.UUID  `json:"sale_listing_id"`
+	SaleListingSourceProvider           string     `json:"sale_listing_source_provider"`
+	SaleListingSourceKind               string     `json:"sale_listing_source_kind"`
+	Url                                 string     `json:"url"`
+	Headline                            string     `json:"headline"`
+	StreetAddress                       string     `json:"street_address"`
+	City                                string     `json:"city"`
+	Postal                              string     `json:"postal"`
+	SaleListingLatitude                 *float64   `json:"sale_listing_latitude"`
+	SaleListingLongitude                *float64   `json:"sale_listing_longitude"`
+	RoomLayout                          string     `json:"room_layout"`
+	SaleListingRoomsCount               *int32     `json:"sale_listing_rooms_count"`
+	SaleListingAreaValue                *float64   `json:"sale_listing_area_value"`
+	SaleListingFloorLevel               *int32     `json:"sale_listing_floor_level"`
+	PropertyTypeRaw                     string     `json:"property_type_raw"`
+	Condition                           string     `json:"condition"`
+	SaleListingElevator                 *bool      `json:"sale_listing_elevator"`
+	EnergyClass                         string     `json:"energy_class"`
+	EnergyEfficiencyLabel               string     `json:"energy_efficiency_label"`
+	PlotTypeRaw                         string     `json:"plot_type_raw"`
+	PlotTypeCode                        string     `json:"plot_type_code"`
+	SaleListingPlotOwned                *bool      `json:"sale_listing_plot_owned"`
+	SaleListingAskingPrice              *int64     `json:"sale_listing_asking_price"`
+	SaleListingDebtFreePrice            *int64     `json:"sale_listing_debt_free_price"`
+	SaleListingDebtShareAmount          *int64     `json:"sale_listing_debt_share_amount"`
+	SaleListingPricePerM2               *float64   `json:"sale_listing_price_per_m2"`
+	SaleListingFirstSeenAt              *time.Time `json:"sale_listing_first_seen_at"`
+	SaleListingLastSeenAt               *time.Time `json:"sale_listing_last_seen_at"`
+	SaleListingPublishedAt              *time.Time `json:"sale_listing_published_at"`
+	SaleListingBuildYear                *int32     `json:"sale_listing_build_year"`
+	SaleListingTotalFloors              *int32     `json:"sale_listing_total_floors"`
+	SaleListingApartmentCount           *int32     `json:"sale_listing_apartment_count"`
+	SaleListingLivingAreaValue          *float64   `json:"sale_listing_living_area_value"`
+	SaleListingTotalAreaValue           *float64   `json:"sale_listing_total_area_value"`
+	SaleListingOtherAreaValue           *float64   `json:"sale_listing_other_area_value"`
+	SaleListingBedroomsCount            *int32     `json:"sale_listing_bedrooms_count"`
+	SaleListingSauna                    *bool      `json:"sale_listing_sauna"`
+	SaleListingBalcony                  *bool      `json:"sale_listing_balcony"`
+	ParkingText                         string     `json:"parking_text"`
+	KitchenDescriptionText              string     `json:"kitchen_description_text"`
+	BathroomDescriptionText             string     `json:"bathroom_description_text"`
+	StorageDescriptionText              string     `json:"storage_description_text"`
+	FloorMaterialsDescriptionText       string     `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText        string     `json:"wall_materials_description_text"`
+	BalconyDescriptionText              string     `json:"balcony_description_text"`
+	SaunaDescriptionText                string     `json:"sauna_description_text"`
+	ViewsDescriptionText                string     `json:"views_description_text"`
+	Appliances                          []string   `json:"appliances"`
+	Features                            []string   `json:"features"`
+	SaleListingPlotAreaValue            *float64   `json:"sale_listing_plot_area_value"`
+	ServicesText                        string     `json:"services_text"`
+	TransportText                       string     `json:"transport_text"`
+	SaleListingPreviousAskingPrice      *int64     `json:"sale_listing_previous_asking_price"`
+	SaleListingPreviousDebtFreePrice    *int64     `json:"sale_listing_previous_debt_free_price"`
+	SaleListingNewDevelopment           *bool      `json:"sale_listing_new_development"`
+	DescriptionText                     string     `json:"description_text"`
+	AvailabilityText                    string     `json:"availability_text"`
+	RenovationsDoneText                 string     `json:"renovations_done_text"`
+	RenovationsPlannedText              string     `json:"renovations_planned_text"`
+	AdditionalInfoText                  string     `json:"additional_info_text"`
+	ChargesText                         string     `json:"charges_text"`
+	SaleListingMaintenanceChargeMonthly *float64   `json:"sale_listing_maintenance_charge_monthly"`
+	SaleListingTotalChargeMonthly       *float64   `json:"sale_listing_total_charge_monthly"`
+	SaleListingWaterCharge              *float64   `json:"sale_listing_water_charge"`
+	HousingCompanyName                  string     `json:"housing_company_name"`
+	HousingCompanyBusinessID            string     `json:"housing_company_business_id"`
+	BuildingMaterial                    string     `json:"building_material"`
+	HeatingSystem                       string     `json:"heating_system"`
+	RoofType                            string     `json:"roof_type"`
+	RoofMaterial                        string     `json:"roof_material"`
+	CarStorageText                      string     `json:"car_storage_text"`
+	BuildingDescriptionText             string     `json:"building_description_text"`
+	BuildingOtherInfoText               string     `json:"building_other_info_text"`
+}
+
+func (q *Queries) GetPropertySourceOfferingDetail(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingDetailRow, error) {
+	row := q.db.QueryRow(ctx, getPropertySourceOfferingDetail, saleListingID)
+	var i GetPropertySourceOfferingDetailRow
+	err := row.Scan(
+		&i.SaleListingID,
+		&i.SaleListingSourceProvider,
+		&i.SaleListingSourceKind,
+		&i.Url,
+		&i.Headline,
+		&i.StreetAddress,
+		&i.City,
+		&i.Postal,
+		&i.SaleListingLatitude,
+		&i.SaleListingLongitude,
+		&i.RoomLayout,
+		&i.SaleListingRoomsCount,
+		&i.SaleListingAreaValue,
+		&i.SaleListingFloorLevel,
+		&i.PropertyTypeRaw,
+		&i.Condition,
+		&i.SaleListingElevator,
+		&i.EnergyClass,
+		&i.EnergyEfficiencyLabel,
+		&i.PlotTypeRaw,
+		&i.PlotTypeCode,
+		&i.SaleListingPlotOwned,
+		&i.SaleListingAskingPrice,
+		&i.SaleListingDebtFreePrice,
+		&i.SaleListingDebtShareAmount,
+		&i.SaleListingPricePerM2,
+		&i.SaleListingFirstSeenAt,
+		&i.SaleListingLastSeenAt,
+		&i.SaleListingPublishedAt,
+		&i.SaleListingBuildYear,
+		&i.SaleListingTotalFloors,
+		&i.SaleListingApartmentCount,
+		&i.SaleListingLivingAreaValue,
+		&i.SaleListingTotalAreaValue,
+		&i.SaleListingOtherAreaValue,
+		&i.SaleListingBedroomsCount,
+		&i.SaleListingSauna,
+		&i.SaleListingBalcony,
+		&i.ParkingText,
+		&i.KitchenDescriptionText,
+		&i.BathroomDescriptionText,
+		&i.StorageDescriptionText,
+		&i.FloorMaterialsDescriptionText,
+		&i.WallMaterialsDescriptionText,
+		&i.BalconyDescriptionText,
+		&i.SaunaDescriptionText,
+		&i.ViewsDescriptionText,
+		&i.Appliances,
+		&i.Features,
+		&i.SaleListingPlotAreaValue,
+		&i.ServicesText,
+		&i.TransportText,
+		&i.SaleListingPreviousAskingPrice,
+		&i.SaleListingPreviousDebtFreePrice,
+		&i.SaleListingNewDevelopment,
+		&i.DescriptionText,
+		&i.AvailabilityText,
+		&i.RenovationsDoneText,
+		&i.RenovationsPlannedText,
+		&i.AdditionalInfoText,
+		&i.ChargesText,
+		&i.SaleListingMaintenanceChargeMonthly,
+		&i.SaleListingTotalChargeMonthly,
+		&i.SaleListingWaterCharge,
+		&i.HousingCompanyName,
+		&i.HousingCompanyBusinessID,
+		&i.BuildingMaterial,
+		&i.HeatingSystem,
+		&i.RoofType,
+		&i.RoofMaterial,
+		&i.CarStorageText,
+		&i.BuildingDescriptionText,
+		&i.BuildingOtherInfoText,
+	)
+	return i, err
+}
+
 const getQueueMetrics = `-- name: GetQueueMetrics :one
 
 SELECT

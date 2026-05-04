@@ -164,7 +164,7 @@ func millisToTime(value *int64) *time.Time {
 func valueAtPath(value any, path ...string) string {
 	current := value
 	for _, part := range path {
-		m, ok := current.(map[string]any)
+		m, ok := mapAtPathValue(current)
 		if !ok {
 			return ""
 		}
@@ -186,6 +186,17 @@ func valueAtPath(value any, path ...string) string {
 		return "false"
 	default:
 		return ""
+	}
+}
+
+func mapAtPathValue(value any) (map[string]any, bool) {
+	switch v := value.(type) {
+	case map[string]any:
+		return v, true
+	case rawMap:
+		return map[string]any(v), true
+	default:
+		return nil, false
 	}
 }
 
@@ -240,7 +251,7 @@ func boolPath(value any, path ...string) *bool {
 func stringSlicePath(value any, path ...string) []string {
 	current := value
 	for _, part := range path {
-		m, ok := current.(map[string]any)
+		m, ok := mapAtPathValue(current)
 		if !ok {
 			return nil
 		}
