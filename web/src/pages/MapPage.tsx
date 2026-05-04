@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import maplibregl, { type GeoJSONSource, type MapLayerMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Nav from '../components/Nav'
@@ -43,6 +43,13 @@ type MapResponse = {
   data: { markers: MapMarker[] }
 }
 
+type MapFilterOptionsResponse = {
+  data: {
+    cities: SearchOption[]
+    postals: SearchOption[]
+  }
+}
+
 type MapBounds = {
   min_lat: number
   min_lng: number
@@ -74,9 +81,17 @@ type MapFilters = {
   has_transaction: string
 }
 
+type SearchOption = {
+  value: string
+  label: string
+  meta?: string
+  lat?: number
+  lng?: number
+}
+
 const KIND_OPTIONS = [
-  { value: 'ad', label: 'Full ads' },
   { value: '', label: 'All kinds' },
+  { value: 'ad', label: 'Full ads' },
   { value: 'announcement', label: 'Announcements' },
 ]
 
@@ -109,6 +124,8 @@ const EMPTY_FILTERS: MapFilters = {
   new_development: '',
   has_transaction: '',
 }
+
+const FILTER_PARAM_KEYS = Object.keys(EMPTY_FILTERS) as (keyof MapFilters)[]
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: '', label: 'Any type' },
@@ -201,6 +218,97 @@ function markerFeatureCollection(markers: MapMarker[]) {
       },
     })),
   }
+}
+
+function optionLabel(option: SearchOption) {
+  return option.meta ? `${option.label} ${option.meta}` : option.label
+}
+
+function filtersFromSearchParams(params: URLSearchParams): MapFilters {
+  return FILTER_PARAM_KEYS.reduce((out, key) => {
+    const fallback = key === 'min_price_m2' ? params.get('min_price_per_m2') : key === 'max_price_m2' ? params.get('max_price_per_m2') : null
+    return { ...out, [key]: params.get(key) ?? fallback ?? '' }
+  }, { ...EMPTY_FILTERS })
+}
+
+function kindFromSearchParams(params: URLSearchParams) {
+  const value = params.get('kind')
+  if (value === 'all') return ''
+  return value ?? ''
+}
+
+function SearchableFilterField({ label, value, options, placeholder, onChange, onSelect }: { label: string; value: string; options: SearchOption[]; placeholder: string; onChange: (value: string) => void; onSelect?: (option: SearchOption) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const [highlighted, setHighlighted] = useState(0)
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase('fi')
+    const rows = normalized ? options.filter(option => optionLabel(option).toLocaleLowerCase('fi').includes(normalized)) : options
+    return rows.slice(0, 40)
+  }, [options, query])
+  useEffect(() => {
+    setQuery(value)
+  }, [value])
+  function commit(option: SearchOption) {
+    onChange(option.value)
+    onSelect?.(option)
+    setQuery(option.value)
+    setOpen(false)
+  }
+  function update(value: string) {
+    setQuery(value)
+    setHighlighted(0)
+    setOpen(true)
+    onChange(value)
+  }
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setOpen(true)
+      setHighlighted(index => Math.min(index + 1, Math.max(filtered.length - 1, 0)))
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setHighlighted(index => Math.max(index - 1, 0))
+    } else if (event.key === 'Enter' && open && filtered[highlighted]) {
+      event.preventDefault()
+      commit(filtered[highlighted])
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+  return (
+    <label className="map-filter-field map-combobox-field">
+      <span>{label}</span>
+      <div className="map-combobox">
+        <input
+          value={query}
+          onChange={event => update(event.target.value)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onKeyDown={onKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        {query && <button className="map-combobox-clear" type="button" onMouseDown={event => { event.preventDefault(); update('') }}>x</button>}
+        {open && filtered.length > 0 && (
+          <div className="map-combobox-menu">
+            {filtered.map((option, index) => (
+              <button
+                key={option.value}
+                className={`map-combobox-option${index === highlighted ? ' map-combobox-option--active' : ''}`}
+                type="button"
+                onMouseEnter={() => setHighlighted(index)}
+                onMouseDown={event => { event.preventDefault(); commit(option) }}
+              >
+                <span>{option.label}</span>
+                {option.meta && <small>{option.meta}</small>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </label>
+  )
 }
 
 function addMarkerLayers(map: maplibregl.Map) {
@@ -323,14 +431,15 @@ function BooleanField({ label, value, onChange }: { label: string; value: string
 }
 
 export default function MapPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<MapMarker[]>([])
   const [bounds, setBounds] = useState<MapBounds>(INITIAL_BOUNDS)
-  const [source, setSource] = useState('')
-  const [kind, setKind] = useState('ad')
+  const [source, setSource] = useState(() => searchParams.get('source') ?? '')
+  const [kind, setKind] = useState(() => kindFromSearchParams(searchParams))
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [filters, setFilters] = useState<MapFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<MapFilters>(() => filtersFromSearchParams(searchParams))
   const [selected, setSelected] = useState<MapMarker | null>(null)
   const activeFilterCount = Object.values(filters).filter(Boolean).length
   const query = useQuery({
@@ -352,11 +461,37 @@ export default function MapPage() {
     },
     staleTime: 30_000,
   })
+  const filterOptionsQuery = useQuery({
+    queryKey: ['sale-listing-map-filter-options', source, kind],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (source) params.set('source', source)
+      if (kind) params.set('kind', kind)
+      const queryString = params.toString()
+      return customInstance<MapFilterOptionsResponse>(`/api/v1/sale-listings/map-filter-options${queryString ? `?${queryString}` : ''}`)
+    },
+    staleTime: 300_000,
+  })
   const markers = query.data?.data.markers ?? []
   const markerGeoJSON = useMemo(() => markerFeatureCollection(markers), [markers])
+  const filterOptions = filterOptionsQuery.data?.data ?? { cities: [], postals: [] }
   useEffect(() => {
     markersRef.current = markers
   }, [markers])
+  useEffect(() => {
+    setSearchParams(current => {
+      const next = new URLSearchParams(current)
+      next.delete('source')
+      next.delete('kind')
+      FILTER_PARAM_KEYS.forEach(key => next.delete(key))
+      if (source) next.set('source', source)
+      if (kind) next.set('kind', kind)
+      FILTER_PARAM_KEYS.forEach(key => {
+        if (filters[key]) next.set(key, filters[key])
+      })
+      return next.toString() === current.toString() ? current : next
+    }, { replace: true })
+  }, [source, kind, filters, setSearchParams])
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
     const map = new maplibregl.Map({
@@ -450,14 +585,26 @@ export default function MapPage() {
     setFilters(current => ({ ...current, [key]: value }))
     setSelected(null)
   }
-  function clearFilters() {
-    setFilters(EMPTY_FILTERS)
+  function focusOption(option: SearchOption, zoom: number) {
+    if (option.lat == null || option.lng == null) return
+    mapInstanceRef.current?.flyTo({ center: [option.lng, option.lat], zoom, duration: 560 })
     setSelected(null)
   }
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS)
+    setSource('')
+    setKind('')
+    setSelected(null)
+  }
+  const searchPath = `/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
   return (
     <div className="map-layout">
       <Nav actions={<span className="search-total">{markers.length.toLocaleString('fi-FI')} locations</span>} />
       <div className="map-toolbar">
+        <div className="search-view-switch">
+          <Link className="search-view-tab" to={searchPath}>List</Link>
+          <span className="search-view-tab search-view-tab--active">Map</span>
+        </div>
         <select className="search-select" value={kind} onChange={event => { setKind(event.target.value); setSelected(null) }}>
           {KIND_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
@@ -483,14 +630,8 @@ export default function MapPage() {
               <span>Search</span>
               <input value={filters.q} onChange={event => setFilter('q', event.target.value)} placeholder="Address, postal, description" />
             </label>
-            <label className="map-filter-field">
-              <span>City</span>
-              <input value={filters.city} onChange={event => setFilter('city', event.target.value)} placeholder="Helsinki" />
-            </label>
-            <label className="map-filter-field">
-              <span>Postal</span>
-              <input value={filters.postal} onChange={event => setFilter('postal', event.target.value)} placeholder="00100" />
-            </label>
+            <SearchableFilterField label="City" value={filters.city} options={filterOptions.cities} placeholder="Search city" onChange={value => setFilter('city', value)} onSelect={option => focusOption(option, 12)} />
+            <SearchableFilterField label="Postal" value={filters.postal} options={filterOptions.postals} placeholder="Search postal" onChange={value => setFilter('postal', value)} onSelect={option => focusOption(option, 14)} />
             <RangeFields label="Price" min={filters.min_price} max={filters.max_price} minPlaceholder="Min €" maxPlaceholder="Max €" onMin={value => setFilter('min_price', value)} onMax={value => setFilter('max_price', value)} />
             <RangeFields label="Area" min={filters.min_area} max={filters.max_area} minPlaceholder="Min m²" maxPlaceholder="Max m²" onMin={value => setFilter('min_area', value)} onMax={value => setFilter('max_area', value)} />
             <RangeFields label="€/m²" min={filters.min_price_m2} max={filters.max_price_m2} minPlaceholder="Min" maxPlaceholder="Max" onMin={value => setFilter('min_price_m2', value)} onMax={value => setFilter('max_price_m2', value)} />

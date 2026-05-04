@@ -52,6 +52,27 @@ SELECT
     ht.prices_transaction_created_at,
     ht.prices_transaction_updated_at,
     ht.prices_transaction_category,
+    EXISTS (
+        SELECT 1
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS is_matched,
+    (
+        SELECT count(*)::integer
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) AS matched_listing_count,
+    (
+        SELECT count(*)::integer
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
     ppc.postal_postal_code_id,
@@ -137,6 +158,27 @@ SELECT
     ht.prices_transaction_created_at,
     ht.prices_transaction_updated_at,
     ht.prices_transaction_category,
+    EXISTS (
+        SELECT 1
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS is_matched,
+    (
+        SELECT count(*)::integer
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) AS matched_listing_count,
+    (
+        SELECT count(*)::integer
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
     ppc.postal_postal_code_id,
@@ -159,7 +201,7 @@ WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
   AND (sqlc.narg('min_area')::double precision IS NULL OR ht.prices_transaction_area >= sqlc.narg('min_area')::double precision)
   AND (sqlc.narg('max_area')::double precision IS NULL OR ht.prices_transaction_area <= sqlc.narg('max_area')::double precision)
 ORDER BY ht.prices_transaction_created_at DESC
-LIMIT COALESCE(sqlc.narg('limit_count')::int, 100);
+LIMIT COALESCE(sqlc.narg('limit_count')::int, 2147483647);
 
 -- name: SearchTransactionsAdvanced :many
 SELECT

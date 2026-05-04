@@ -109,16 +109,16 @@ JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_lis
 JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
-WHERE latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate'::text, 'ambiguous'::text])
-    AND sl.prices_transaction_id IS NULL
+WHERE ($3::uuid IS NOT NULL OR latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate'::text, 'ambiguous'::text]))
+    AND ($3::uuid IS NOT NULL OR sl.prices_transaction_id IS NULL)
     AND ($1::text IS NULL OR sl.sale_listing_postal_norm = public.fnc__normalize_postal($1::text))
     AND ($2::text IS NULL OR latest.sale_listing_prices_transaction_match_status = $2::text)
     AND ($3::uuid IS NULL OR pt.prices_transaction_id = $3::uuid)
-    AND NOT EXISTS (
+    AND ($3::uuid IS NOT NULL OR NOT EXISTS (
         SELECT 1
         FROM public.property_source_offerings linked
         WHERE linked.prices_transaction_id = latest.prices_transaction_id
-    )
+    ))
 ORDER BY
     latest.sale_listing_prices_transaction_match_score DESC,
     latest.sale_listing_prices_transaction_match_price_delta_percent ASC NULLS LAST,

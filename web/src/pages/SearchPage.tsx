@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { keepPreviousData } from '@tanstack/react-query'
 import Nav from '../components/Nav'
 import {
@@ -34,6 +34,48 @@ const SORT_OPTIONS = [
   { value: 'build_year_desc', label: 'Year built ↓' },
 ]
 
+type SearchFilterValues = {
+  query: string
+  city: string
+  postal: string
+  source: string
+  listingKind: string
+  minPrice: string
+  maxPrice: string
+  minArea: string
+  maxArea: string
+  minPriceM2: string
+  maxPriceM2: string
+  rooms: string
+  floor: string
+  minBuildYear: string
+  maxBuildYear: string
+  condition: string
+  energyClass: string
+  sort: string
+}
+
+const EMPTY_SEARCH_FILTERS: SearchFilterValues = {
+  query: '',
+  city: '',
+  postal: '',
+  source: '',
+  listingKind: '',
+  minPrice: '',
+  maxPrice: '',
+  minArea: '',
+  maxArea: '',
+  minPriceM2: '',
+  maxPriceM2: '',
+  rooms: '',
+  floor: '',
+  minBuildYear: '',
+  maxBuildYear: '',
+  condition: '',
+  energyClass: '',
+  sort: 'seen_desc',
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
@@ -53,8 +95,6 @@ function fmtPricePerM2(n: number) {
 
 export default function SearchPage() {
   const [urlParams, setUrlParams] = useSearchParams()
-
-  // Read initial state from URL
   const [query, setQuery]     = useState(() => urlParams.get('q') ?? '')
   const [city, setCity]       = useState(() => urlParams.get('city') ?? '')
   const [postal, setPostal]   = useState(() => urlParams.get('postal') ?? '')
@@ -64,8 +104,8 @@ export default function SearchPage() {
   const [maxPrice, setMaxPrice] = useState(() => urlParams.get('max_price') ?? '')
   const [minArea, setMinArea]   = useState(() => urlParams.get('min_area') ?? '')
   const [maxArea, setMaxArea]   = useState(() => urlParams.get('max_area') ?? '')
-  const [minPriceM2, setMinPriceM2] = useState(() => urlParams.get('min_price_per_m2') ?? '')
-  const [maxPriceM2, setMaxPriceM2] = useState(() => urlParams.get('max_price_per_m2') ?? '')
+  const [minPriceM2, setMinPriceM2] = useState(() => urlParams.get('min_price_m2') ?? urlParams.get('min_price_per_m2') ?? '')
+  const [maxPriceM2, setMaxPriceM2] = useState(() => urlParams.get('max_price_m2') ?? urlParams.get('max_price_per_m2') ?? '')
   const [rooms, setRooms] = useState(() => urlParams.get('rooms') ?? '')
   const [floor, setFloor] = useState(() => urlParams.get('floor') ?? '')
   const [minBuildYear, setMinBuildYear] = useState(() => urlParams.get('min_build_year') ?? '')
@@ -74,12 +114,12 @@ export default function SearchPage() {
   const [energyClass, setEnergyClass] = useState(() => urlParams.get('energy_class') ?? '')
   const [sort, setSort]       = useState(() => urlParams.get('sort') ?? 'seen_desc')
   const [page, setPage]       = useState(() => Number(urlParams.get('page') ?? '1'))
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const dQuery  = useDebounce(query, 300)
   const dCity   = useDebounce(city, 300)
   const dPostal = useDebounce(postal, 300)
 
-  // Sync URL
   useEffect(() => {
     const p: Record<string, string> = {}
     if (dQuery)   p.q       = dQuery
@@ -91,8 +131,8 @@ export default function SearchPage() {
     if (maxPrice) p.max_price = maxPrice
     if (minArea)  p.min_area  = minArea
     if (maxArea)  p.max_area  = maxArea
-    if (minPriceM2) p.min_price_per_m2 = minPriceM2
-    if (maxPriceM2) p.max_price_per_m2 = maxPriceM2
+    if (minPriceM2) p.min_price_m2 = minPriceM2
+    if (maxPriceM2) p.max_price_m2 = maxPriceM2
     if (rooms) p.rooms = rooms
     if (floor) p.floor = floor
     if (minBuildYear) p.min_build_year = minBuildYear
@@ -103,8 +143,27 @@ export default function SearchPage() {
     if (page > 1) p.page = String(page)
     setUrlParams(p, { replace: true })
   }, [dQuery, dCity, dPostal, source, listingKind, minPrice, maxPrice, minArea, maxArea, minPriceM2, maxPriceM2, rooms, floor, minBuildYear, maxBuildYear, condition, energyClass, sort, page, setUrlParams])
+  useEffect(() => {
+    if (!filtersOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFiltersOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [filtersOpen])
 
   const hasFilters = !!(dQuery || dCity || dPostal || source || listingKind || minPrice || maxPrice || minArea || maxArea || minPriceM2 || maxPriceM2 || rooms || floor || minBuildYear || maxBuildYear || condition || energyClass)
+  const activeFilterCount = [dQuery, dCity, dPostal, source, listingKind, minPrice, maxPrice, minArea, maxArea, minPriceM2, maxPriceM2, rooms, floor, minBuildYear, maxBuildYear, condition, energyClass].filter(Boolean).length
+  const activeFilterSummary = [
+    dQuery && `Search "${dQuery}"`,
+    dCity && `City ${dCity}`,
+    dPostal && `Postal ${dPostal}`,
+    source && SOURCE_OPTIONS.find(option => option.value === source)?.label,
+    listingKind && KIND_OPTIONS.find(option => option.value === listingKind)?.label,
+    minPrice || maxPrice ? `Price ${minPrice || '0'}-${maxPrice || 'any'}` : null,
+    minArea || maxArea ? `Area ${minArea || '0'}-${maxArea || 'any'}` : null,
+    rooms && `${rooms} rooms`,
+  ].filter(Boolean).join(' · ')
 
   const params: SaleListingsSearchParams = {
     q:         dQuery   || undefined,
@@ -142,6 +201,27 @@ export default function SearchPage() {
   const totalPages = pageData ? Math.ceil(pageData.total / PAGE_SIZE) : 0
   const isPending = saleSearch.isPending
   const isPlaceholderData = saleSearch.isPlaceholderData
+  const mapPath = `/map${urlParams.toString() ? `?${urlParams.toString()}` : ''}`
+  const currentFilters: SearchFilterValues = {
+    query,
+    city,
+    postal,
+    source,
+    listingKind,
+    minPrice,
+    maxPrice,
+    minArea,
+    maxArea,
+    minPriceM2,
+    maxPriceM2,
+    rooms,
+    floor,
+    minBuildYear,
+    maxBuildYear,
+    condition,
+    energyClass,
+    sort,
+  }
 
   function clearAll() {
     setQuery(''); setCity(''); setPostal('')
@@ -152,9 +232,27 @@ export default function SearchPage() {
     setSort('seen_desc'); setPage(1)
   }
 
-  function updateFilter(setter: (value: string) => void, value: string) {
-    setter(value)
+  function applyFilters(next: SearchFilterValues) {
+    setQuery(next.query)
+    setCity(next.city)
+    setPostal(next.postal)
+    setSource(next.source)
+    setListingKind(next.listingKind)
+    setMinPrice(next.minPrice)
+    setMaxPrice(next.maxPrice)
+    setMinArea(next.minArea)
+    setMaxArea(next.maxArea)
+    setMinPriceM2(next.minPriceM2)
+    setMaxPriceM2(next.maxPriceM2)
+    setRooms(next.rooms)
+    setFloor(next.floor)
+    setMinBuildYear(next.minBuildYear)
+    setMaxBuildYear(next.maxBuildYear)
+    setCondition(next.condition)
+    setEnergyClass(next.energyClass)
+    setSort(next.sort || 'seen_desc')
     setPage(1)
+    setFiltersOpen(false)
   }
 
   return (
@@ -164,222 +262,33 @@ export default function SearchPage() {
           ? <span className="search-total">{pageData.total.toLocaleString('fi-FI')} results</span>
           : undefined
       } />
-
+      {filtersOpen && (
+        <SearchFiltersModal
+          initialFilters={currentFilters}
+          hasFilters={hasFilters}
+          onClose={() => setFiltersOpen(false)}
+          onApply={applyFilters}
+        />
+      )}
       <div className="search-body">
-        {/* Sidebar filters */}
-        <aside className="search-sidebar">
-          <div className="search-filter-group">
-            <label className="search-filter-label">Search</label>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Address, area, description…"
-              value={query}
-              onChange={e => updateFilter(setQuery, e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <div className="search-filter-row">
-            <div className="search-filter-group">
-              <label className="search-filter-label">City</label>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="Helsinki"
-                value={city}
-                onChange={e => updateFilter(setCity, e.target.value)}
-              />
-            </div>
-            <div className="search-filter-group">
-              <label className="search-filter-label">Postal</label>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="001…"
-                value={postal}
-                onChange={e => updateFilter(setPostal, e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-divider" />
-
-          <div className="search-filter-row">
-            <div className="search-filter-group">
-              <label className="search-filter-label">Source</label>
-              <select className="search-select" value={source} onChange={e => updateFilter(setSource, e.target.value)}>
-                {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="search-filter-group">
-              <label className="search-filter-label">Kind</label>
-              <select className="search-select" value={listingKind} onChange={e => updateFilter(setListingKind, e.target.value)}>
-                {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="search-filter-divider" />
-
-          <div className="search-filter-group">
-            <label className="search-filter-label">Price (€)</label>
-            <div className="search-range-row">
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Min"
-                value={minPrice}
-                onChange={e => updateFilter(setMinPrice, e.target.value)}
-                min={0}
-              />
-              <span className="search-range-sep">–</span>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Max"
-                value={maxPrice}
-                onChange={e => updateFilter(setMaxPrice, e.target.value)}
-                min={0}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-group">
-            <label className="search-filter-label">Area (m²)</label>
-            <div className="search-range-row">
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Min"
-                value={minArea}
-                onChange={e => updateFilter(setMinArea, e.target.value)}
-                min={0}
-              />
-              <span className="search-range-sep">–</span>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Max"
-                value={maxArea}
-                onChange={e => updateFilter(setMaxArea, e.target.value)}
-                min={0}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-group">
-            <label className="search-filter-label">Price / m²</label>
-            <div className="search-range-row">
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Min"
-                value={minPriceM2}
-                onChange={e => updateFilter(setMinPriceM2, e.target.value)}
-                min={0}
-              />
-              <span className="search-range-sep">–</span>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Max"
-                value={maxPriceM2}
-                onChange={e => updateFilter(setMaxPriceM2, e.target.value)}
-                min={0}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-row">
-            <div className="search-filter-group">
-              <label className="search-filter-label">Rooms</label>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Any"
-                value={rooms}
-                onChange={e => updateFilter(setRooms, e.target.value)}
-                min={0}
-              />
-            </div>
-            <div className="search-filter-group">
-              <label className="search-filter-label">Floor</label>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Any"
-                value={floor}
-                onChange={e => updateFilter(setFloor, e.target.value)}
-                min={0}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-group">
-            <label className="search-filter-label">Year built</label>
-            <div className="search-range-row">
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Min"
-                value={minBuildYear}
-                onChange={e => updateFilter(setMinBuildYear, e.target.value)}
-                min={0}
-              />
-              <span className="search-range-sep">–</span>
-              <input
-                className="search-input"
-                type="number"
-                placeholder="Max"
-                value={maxBuildYear}
-                onChange={e => updateFilter(setMaxBuildYear, e.target.value)}
-                min={0}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-row">
-            <div className="search-filter-group">
-              <label className="search-filter-label">Condition</label>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="Good"
-                value={condition}
-                onChange={e => updateFilter(setCondition, e.target.value)}
-              />
-            </div>
-            <div className="search-filter-group">
-              <label className="search-filter-label">Energy</label>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="C"
-                value={energyClass}
-                onChange={e => updateFilter(setEnergyClass, e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="search-filter-divider" />
-
-          <div className="search-filter-group">
-            <label className="search-filter-label">Sort by</label>
-            <select className="search-select" value={sort} onChange={e => updateFilter(setSort, e.target.value)}>
-              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-
-          {hasFilters && (
-            <button className="search-clear-btn" onClick={clearAll}>
-              Clear all filters
-            </button>
-          )}
-        </aside>
-
-        {/* Results */}
         <main className="search-results">
+          <div className="search-filter-toolbar">
+            <div className="search-view-switch">
+              <span className="search-view-tab search-view-tab--active">List</span>
+              <Link className="search-view-tab" to={mapPath}>Map</Link>
+            </div>
+            <button className="search-filter-trigger" type="button" onClick={() => setFiltersOpen(true)}>
+              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
+            <div className="search-filter-summary">
+              {activeFilterSummary || 'No filters selected'}
+            </div>
+            {hasFilters && (
+              <button className="search-clear-btn search-clear-btn--inline" type="button" onClick={clearAll}>
+                Clear
+              </button>
+            )}
+          </div>
           {!hasFilters ? (
             <div className="search-empty-hint">
               <SearchIllustration />
@@ -424,6 +333,112 @@ export default function SearchPage() {
             </>
           )}
         </main>
+      </div>
+    </div>
+  )
+}
+
+type SearchFiltersModalProps = {
+  initialFilters: SearchFilterValues
+  hasFilters: boolean
+  onClose: () => void
+  onApply: (filters: SearchFilterValues) => void
+}
+
+function SearchFiltersModal(props: SearchFiltersModalProps) {
+  const [draft, setDraft] = useState<SearchFilterValues>(props.initialFilters)
+  const field = (key: keyof SearchFilterValues) => (event: { target: { value: string } }) => setDraft(current => ({ ...current, [key]: event.target.value }))
+  const hasDraftFilters = Object.entries(draft).some(([key, value]) => key !== 'sort' && Boolean(value))
+  function clearDraft() {
+    setDraft(EMPTY_SEARCH_FILTERS)
+  }
+  return (
+    <div className="modal-overlay" onClick={event => { if (event.target === event.currentTarget) props.onClose() }}>
+      <div className="search-filter-modal" role="dialog" aria-modal="true" aria-labelledby="search-filter-title">
+        <div className="search-filter-modal-head">
+          <div>
+            <h2 id="search-filter-title" className="search-filter-modal-title">Search filters</h2>
+            <div className="search-filter-modal-subtitle">Shared by list and map views.</div>
+          </div>
+          <button className="transaction-modal-close" type="button" onClick={props.onClose} aria-label="Close">×</button>
+        </div>
+        <div className="search-filter-modal-body">
+          <div className="search-filter-group search-filter-group--wide">
+            <label className="search-filter-label">Search</label>
+            <input className="search-input" type="text" placeholder="Address, area, description…" value={draft.query} onChange={field('query')} autoFocus />
+          </div>
+          <div className="search-filter-row">
+            <div className="search-filter-group">
+              <label className="search-filter-label">City</label>
+              <input className="search-input" type="text" placeholder="Helsinki" value={draft.city} onChange={field('city')} />
+            </div>
+            <div className="search-filter-group">
+              <label className="search-filter-label">Postal</label>
+              <input className="search-input" type="text" placeholder="00100" value={draft.postal} onChange={field('postal')} />
+            </div>
+          </div>
+          <div className="search-filter-row">
+            <div className="search-filter-group">
+              <label className="search-filter-label">Source</label>
+              <select className="search-select" value={draft.source} onChange={field('source')}>
+                {SOURCE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
+            <div className="search-filter-group">
+              <label className="search-filter-label">Kind</label>
+              <select className="search-select" value={draft.listingKind} onChange={field('listingKind')}>
+                {KIND_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <SearchRange label="Price (€)" min={draft.minPrice} max={draft.maxPrice} onMin={field('minPrice')} onMax={field('maxPrice')} />
+          <SearchRange label="Area (m²)" min={draft.minArea} max={draft.maxArea} onMin={field('minArea')} onMax={field('maxArea')} />
+          <SearchRange label="Price / m²" min={draft.minPriceM2} max={draft.maxPriceM2} onMin={field('minPriceM2')} onMax={field('maxPriceM2')} />
+          <div className="search-filter-row">
+            <div className="search-filter-group">
+              <label className="search-filter-label">Rooms</label>
+              <input className="search-input" type="number" placeholder="Any" value={draft.rooms} onChange={field('rooms')} min={0} />
+            </div>
+            <div className="search-filter-group">
+              <label className="search-filter-label">Floor</label>
+              <input className="search-input" type="number" placeholder="Any" value={draft.floor} onChange={field('floor')} min={0} />
+            </div>
+          </div>
+          <SearchRange label="Year built" min={draft.minBuildYear} max={draft.maxBuildYear} onMin={field('minBuildYear')} onMax={field('maxBuildYear')} />
+          <div className="search-filter-row">
+            <div className="search-filter-group">
+              <label className="search-filter-label">Condition</label>
+              <input className="search-input" type="text" placeholder="Good" value={draft.condition} onChange={field('condition')} />
+            </div>
+            <div className="search-filter-group">
+              <label className="search-filter-label">Energy</label>
+              <input className="search-input" type="text" placeholder="C" value={draft.energyClass} onChange={field('energyClass')} />
+            </div>
+          </div>
+          <div className="search-filter-group search-filter-group--wide">
+            <label className="search-filter-label">Sort by</label>
+            <select className="search-select" value={draft.sort} onChange={field('sort')}>
+              {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="search-filter-modal-actions">
+          <button className="search-clear-btn search-clear-btn--inline" type="button" onClick={clearDraft} disabled={!props.hasFilters && !hasDraftFilters}>Clear all</button>
+          <button className="search-filter-trigger" type="button" onClick={() => props.onApply(draft)}>Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SearchRange({ label, min, max, onMin, onMax }: { label: string; min: string; max: string; onMin: (event: { target: { value: string } }) => void; onMax: (event: { target: { value: string } }) => void }) {
+  return (
+    <div className="search-filter-group search-filter-group--wide">
+      <label className="search-filter-label">{label}</label>
+      <div className="search-range-row">
+        <input className="search-input" type="number" placeholder="Min" value={min} onChange={onMin} min={0} />
+        <span className="search-range-sep">–</span>
+        <input className="search-input" type="number" placeholder="Max" value={max} onChange={onMax} min={0} />
       </div>
     </div>
   )

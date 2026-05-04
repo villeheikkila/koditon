@@ -27,29 +27,32 @@ type pricesTransactionsInput struct {
 }
 
 type pricesTransaction struct {
-	ID                  string      `json:"id"`
-	Description         string      `json:"description"`
-	Type                string      `json:"type"`
-	Area                float64     `json:"area"`
-	Price               int32       `json:"price"`
-	PricePerSquareMeter int32       `json:"price_per_square_meter"`
-	BuildYear           int32       `json:"build_year"`
-	Floor               *string     `json:"floor,omitempty"`
-	Elevator            bool        `json:"elevator"`
-	Condition           *string     `json:"condition,omitempty"`
-	Plot                *string     `json:"plot,omitempty"`
-	EnergyClass         *string     `json:"energy_class,omitempty"`
-	PeriodIdentifier    string      `json:"period_identifier"`
-	CreatedAt           RFC3339Time `json:"created_at"`
-	UpdatedAt           RFC3339Time `json:"updated_at"`
-	Category            string      `json:"category"`
-	NeighborhoodID      string      `json:"neighborhood_id"`
-	NeighborhoodName    *string     `json:"neighborhood_name,omitempty"`
-	PostalCodeID        string      `json:"postal_code_id"`
-	PostalCodeCode      string      `json:"postal_code_code"`
-	PostalCodeNameFi    string      `json:"postal_code_name_fi"`
-	MunicipalityID      string      `json:"municipality_id"`
-	MunicipalityNameFi  string      `json:"municipality_name_fi"`
+	ID                   string      `json:"id"`
+	Description          string      `json:"description"`
+	Type                 string      `json:"type"`
+	Area                 float64     `json:"area"`
+	Price                int32       `json:"price"`
+	PricePerSquareMeter  int32       `json:"price_per_square_meter"`
+	BuildYear            int32       `json:"build_year"`
+	Floor                *string     `json:"floor,omitempty"`
+	Elevator             bool        `json:"elevator"`
+	Condition            *string     `json:"condition,omitempty"`
+	Plot                 *string     `json:"plot,omitempty"`
+	EnergyClass          *string     `json:"energy_class,omitempty"`
+	PeriodIdentifier     string      `json:"period_identifier"`
+	CreatedAt            RFC3339Time `json:"created_at"`
+	UpdatedAt            RFC3339Time `json:"updated_at"`
+	Category             string      `json:"category"`
+	IsMatched            bool        `json:"is_matched"`
+	MatchedListingCount  int32       `json:"matched_listing_count"`
+	MatchedOfferingCount int32       `json:"matched_offering_count"`
+	NeighborhoodID       string      `json:"neighborhood_id"`
+	NeighborhoodName     *string     `json:"neighborhood_name,omitempty"`
+	PostalCodeID         string      `json:"postal_code_id"`
+	PostalCodeCode       string      `json:"postal_code_code"`
+	PostalCodeNameFi     string      `json:"postal_code_name_fi"`
+	MunicipalityID       string      `json:"municipality_id"`
+	MunicipalityNameFi   string      `json:"municipality_name_fi"`
 }
 
 type pricesTransactionsOutput struct {
@@ -78,29 +81,32 @@ func (a *API) pricesTransactionsHandler(ctx context.Context, input *pricesTransa
 	for _, row := range rows {
 		neighborhoodName := row.PricesNeighborhoodName
 		transactions = append(transactions, pricesTransaction{
-			ID:                  row.PricesTransactionID.String(),
-			Description:         row.PricesTransactionDescription,
-			Type:                row.PricesTransactionType,
-			Area:                row.PricesTransactionArea,
-			Price:               row.PricesTransactionPrice,
-			PricePerSquareMeter: row.PricesTransactionPricePerSquareMeter,
-			BuildYear:           row.PricesTransactionBuildYear,
-			Floor:               row.PricesTransactionFloor,
-			Elevator:            row.PricesTransactionElevator,
-			Condition:           row.PricesTransactionCondition,
-			Plot:                row.PricesTransactionPlot,
-			EnergyClass:         row.PricesTransactionEnergyClass,
-			PeriodIdentifier:    row.PricesTransactionPeriodIdentifier,
-			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
-			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
-			Category:            row.PricesTransactionCategory,
-			NeighborhoodID:      row.PricesNeighborhoodID.String(),
-			NeighborhoodName:    &neighborhoodName,
-			PostalCodeID:        row.PostalPostalCodeID.String(),
-			PostalCodeCode:      row.PostalPostalCodeCode,
-			PostalCodeNameFi:    row.PostalPostalCodeNameFi,
-			MunicipalityID:      row.PostalMunicipalityID.String(),
-			MunicipalityNameFi:  row.PostalMunicipalityNameFi,
+			ID:                   row.PricesTransactionID.String(),
+			Description:          row.PricesTransactionDescription,
+			Type:                 row.PricesTransactionType,
+			Area:                 row.PricesTransactionArea,
+			Price:                row.PricesTransactionPrice,
+			PricePerSquareMeter:  row.PricesTransactionPricePerSquareMeter,
+			BuildYear:            row.PricesTransactionBuildYear,
+			Floor:                row.PricesTransactionFloor,
+			Elevator:             row.PricesTransactionElevator,
+			Condition:            row.PricesTransactionCondition,
+			Plot:                 row.PricesTransactionPlot,
+			EnergyClass:          row.PricesTransactionEnergyClass,
+			PeriodIdentifier:     row.PricesTransactionPeriodIdentifier,
+			CreatedAt:            RFC3339Time{row.PricesTransactionCreatedAt},
+			UpdatedAt:            RFC3339Time{row.PricesTransactionUpdatedAt},
+			Category:             row.PricesTransactionCategory,
+			IsMatched:            row.IsMatched != nil && *row.IsMatched,
+			MatchedListingCount:  row.MatchedListingCount,
+			MatchedOfferingCount: row.MatchedOfferingCount,
+			NeighborhoodID:       row.PricesNeighborhoodID.String(),
+			NeighborhoodName:     &neighborhoodName,
+			PostalCodeID:         row.PostalPostalCodeID.String(),
+			PostalCodeCode:       row.PostalPostalCodeCode,
+			PostalCodeNameFi:     row.PostalPostalCodeNameFi,
+			MunicipalityID:       row.PostalMunicipalityID.String(),
+			MunicipalityNameFi:   row.PostalMunicipalityNameFi,
 		})
 	}
 	output := &pricesTransactionsOutput{}
@@ -181,29 +187,32 @@ func (a *API) pricesTransactionsFilteredHandler(ctx context.Context, input *pric
 	for _, row := range rows {
 		neighborhoodName := row.PricesNeighborhoodName
 		transactions = append(transactions, pricesTransaction{
-			ID:                  row.PricesTransactionID.String(),
-			Description:         row.PricesTransactionDescription,
-			Type:                row.PricesTransactionType,
-			Area:                row.PricesTransactionArea,
-			Price:               row.PricesTransactionPrice,
-			PricePerSquareMeter: row.PricesTransactionPricePerSquareMeter,
-			BuildYear:           row.PricesTransactionBuildYear,
-			Floor:               row.PricesTransactionFloor,
-			Elevator:            row.PricesTransactionElevator,
-			Condition:           row.PricesTransactionCondition,
-			Plot:                row.PricesTransactionPlot,
-			EnergyClass:         row.PricesTransactionEnergyClass,
-			PeriodIdentifier:    row.PricesTransactionPeriodIdentifier,
-			CreatedAt:           RFC3339Time{row.PricesTransactionCreatedAt},
-			UpdatedAt:           RFC3339Time{row.PricesTransactionUpdatedAt},
-			Category:            row.PricesTransactionCategory,
-			NeighborhoodID:      row.PricesNeighborhoodID.String(),
-			NeighborhoodName:    &neighborhoodName,
-			PostalCodeID:        row.PostalPostalCodeID.String(),
-			PostalCodeCode:      row.PostalPostalCodeCode,
-			PostalCodeNameFi:    row.PostalPostalCodeNameFi,
-			MunicipalityID:      row.PostalMunicipalityID.String(),
-			MunicipalityNameFi:  row.PostalMunicipalityNameFi,
+			ID:                   row.PricesTransactionID.String(),
+			Description:          row.PricesTransactionDescription,
+			Type:                 row.PricesTransactionType,
+			Area:                 row.PricesTransactionArea,
+			Price:                row.PricesTransactionPrice,
+			PricePerSquareMeter:  row.PricesTransactionPricePerSquareMeter,
+			BuildYear:            row.PricesTransactionBuildYear,
+			Floor:                row.PricesTransactionFloor,
+			Elevator:             row.PricesTransactionElevator,
+			Condition:            row.PricesTransactionCondition,
+			Plot:                 row.PricesTransactionPlot,
+			EnergyClass:          row.PricesTransactionEnergyClass,
+			PeriodIdentifier:     row.PricesTransactionPeriodIdentifier,
+			CreatedAt:            RFC3339Time{row.PricesTransactionCreatedAt},
+			UpdatedAt:            RFC3339Time{row.PricesTransactionUpdatedAt},
+			Category:             row.PricesTransactionCategory,
+			IsMatched:            row.IsMatched != nil && *row.IsMatched,
+			MatchedListingCount:  row.MatchedListingCount,
+			MatchedOfferingCount: row.MatchedOfferingCount,
+			NeighborhoodID:       row.PricesNeighborhoodID.String(),
+			NeighborhoodName:     &neighborhoodName,
+			PostalCodeID:         row.PostalPostalCodeID.String(),
+			PostalCodeCode:       row.PostalPostalCodeCode,
+			PostalCodeNameFi:     row.PostalPostalCodeNameFi,
+			MunicipalityID:       row.PostalMunicipalityID.String(),
+			MunicipalityNameFi:   row.PostalMunicipalityNameFi,
 		})
 	}
 	output := &pricesTransactionsOutput{}

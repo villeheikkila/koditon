@@ -231,6 +231,27 @@ SELECT
     ht.prices_transaction_created_at,
     ht.prices_transaction_updated_at,
     ht.prices_transaction_category,
+    EXISTS (
+        SELECT 1
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS is_matched,
+    (
+        SELECT count(*)::integer
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) AS matched_listing_count,
+    (
+        SELECT count(*)::integer
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
     ppc.postal_postal_code_id,
@@ -273,6 +294,9 @@ type ListTransactionsByPostalSelectionRow struct {
 	PricesTransactionCreatedAt           time.Time `json:"prices_transaction_created_at"`
 	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
 	PricesTransactionCategory            string    `json:"prices_transaction_category"`
+	IsMatched                            *bool     `json:"is_matched"`
+	MatchedListingCount                  int32     `json:"matched_listing_count"`
+	MatchedOfferingCount                 int32     `json:"matched_offering_count"`
 	PricesNeighborhoodID                 uuid.UUID `json:"prices_neighborhood_id"`
 	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
 	PostalPostalCodeID                   uuid.UUID `json:"postal_postal_code_id"`
@@ -308,6 +332,9 @@ func (q *Queries) ListTransactionsByPostalSelection(ctx context.Context, arg Lis
 			&i.PricesTransactionCreatedAt,
 			&i.PricesTransactionUpdatedAt,
 			&i.PricesTransactionCategory,
+			&i.IsMatched,
+			&i.MatchedListingCount,
+			&i.MatchedOfferingCount,
 			&i.PricesNeighborhoodID,
 			&i.PricesNeighborhoodName,
 			&i.PostalPostalCodeID,
@@ -344,6 +371,27 @@ SELECT
     ht.prices_transaction_created_at,
     ht.prices_transaction_updated_at,
     ht.prices_transaction_category,
+    EXISTS (
+        SELECT 1
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) OR EXISTS (
+        SELECT 1
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS is_matched,
+    (
+        SELECT count(*)::integer
+        FROM public.property_source_offerings AS sl
+        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+    ) AS matched_listing_count,
+    (
+        SELECT count(*)::integer
+        FROM public.property_offering_transactions AS pot
+        WHERE pot.prices_transaction_id = ht.prices_transaction_id
+          AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
     ppc.postal_postal_code_id,
@@ -366,7 +414,7 @@ WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
   AND ($5::double precision IS NULL OR ht.prices_transaction_area >= $5::double precision)
   AND ($6::double precision IS NULL OR ht.prices_transaction_area <= $6::double precision)
 ORDER BY ht.prices_transaction_created_at DESC
-LIMIT COALESCE($7::int, 100)
+LIMIT COALESCE($7::int, 2147483647)
 `
 
 type ListTransactionsFilteredParams struct {
@@ -396,6 +444,9 @@ type ListTransactionsFilteredRow struct {
 	PricesTransactionCreatedAt           time.Time `json:"prices_transaction_created_at"`
 	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
 	PricesTransactionCategory            string    `json:"prices_transaction_category"`
+	IsMatched                            *bool     `json:"is_matched"`
+	MatchedListingCount                  int32     `json:"matched_listing_count"`
+	MatchedOfferingCount                 int32     `json:"matched_offering_count"`
 	PricesNeighborhoodID                 uuid.UUID `json:"prices_neighborhood_id"`
 	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
 	PostalPostalCodeID                   uuid.UUID `json:"postal_postal_code_id"`
@@ -439,6 +490,9 @@ func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransact
 			&i.PricesTransactionCreatedAt,
 			&i.PricesTransactionUpdatedAt,
 			&i.PricesTransactionCategory,
+			&i.IsMatched,
+			&i.MatchedListingCount,
+			&i.MatchedOfferingCount,
 			&i.PricesNeighborhoodID,
 			&i.PricesNeighborhoodName,
 			&i.PostalPostalCodeID,

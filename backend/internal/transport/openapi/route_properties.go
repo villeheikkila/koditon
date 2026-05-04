@@ -104,8 +104,17 @@ type saleListingsMapInput struct {
 	Limit          int32   `query:"limit"   doc:"Maximum markers to return"`
 }
 
+type saleListingsMapFilterOptionsInput struct {
+	Source string `query:"source" doc:"Source filter: shortcut, frontdoor, or all"`
+	Kind   string `query:"kind"   doc:"Listing kind filter: ad, announcement, or all"`
+}
+
 type saleListingsMapOutput struct {
 	Body properties.SaleListingMap
+}
+
+type saleListingsMapFilterOptionsOutput struct {
+	Body properties.SaleListingMapFilterOptions
 }
 
 type rentalsSearchOutput struct {
@@ -158,6 +167,16 @@ func (a *API) saleListingsMapHandler(ctx context.Context, input *saleListingsMap
 		return nil, huma.Error500InternalServerError("sale listing map failed")
 	}
 	return &saleListingsMapOutput{Body: markers}, nil
+}
+
+func (a *API) saleListingsMapFilterOptionsHandler(ctx context.Context, input *saleListingsMapFilterOptionsInput) (*saleListingsMapFilterOptionsOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.sale_listings_map_filter_options"))
+	options, err := a.propertiesService.SaleListingMapFilterOptions(ctx, input.Source, input.Kind)
+	if err != nil {
+		logger.ErrorContext(ctx, "sale listing map filter options failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("sale listing map filter options failed")
+	}
+	return &saleListingsMapFilterOptionsOutput{Body: options}, nil
 }
 
 func (a *API) rentalsSearchHandler(ctx context.Context, input *propertySearchInput) (*rentalsSearchOutput, error) {

@@ -327,7 +327,11 @@ WITH visible_base AS (
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
         AND ($8::text IS NULL OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text, sl.sale_listing_street_address, pb.housing_company_address_norm, pb.housing_company_name)) LIKE ('%' || lower(trim($8::text)) || '%'))
-        AND ($9::text IS NULL OR lower(COALESCE(sl.sale_listing_city, pb.housing_company_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%'))
+        AND (
+            $9::text IS NULL
+            OR lower(COALESCE(pb.housing_company_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%')
+            OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($9::text)) || '%')
+        )
         AND ($10::text IS NULL OR public.fnc__normalize_postal(COALESCE(sl.sale_listing_postal, pb.housing_company_postal_norm, '')) = public.fnc__normalize_postal($10::text))
         AND ($11::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) >= $11::bigint)
         AND ($12::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) <= $12::bigint)
@@ -471,6 +475,80 @@ LIMIT $7::int`, source, kind, bounds.MinLat, bounds.MinLng, bounds.MaxLat, bound
 	}
 	if err := rows.Err(); err != nil {
 		return SaleListingMap{}, fmt.Errorf("iterate sale listing map markers: %w", err)
+	}
+	return out, nil
+}
+
+func (s *Service) SaleListingMapFilterOptions(ctx context.Context, sourceValue string, kindValue string) (SaleListingMapFilterOptions, error) {
+	source := normalizeSource(sourceValue)
+	kind := normalizeListingKind(kindValue)
+	rows, err := s.db.Query(ctx, `
+WITH source_rows AS (
+    SELECT
+        NULLIF(trim(pb.housing_company_city_norm), '') AS city_norm,
+        NULLIF(public.fnc__normalize_postal(pb.housing_company_postal_norm), '') AS postal,
+        pb.housing_company_geom AS geom
+    FROM public.housing_companies pb
+    JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
+    JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+    JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    WHERE pb.housing_company_geom IS NOT NULL
+        AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
+        AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
+),
+city_rows AS (
+    SELECT
+        'city'::text AS option_kind,
+        initcap(city_norm) AS value,
+        initcap(city_norm) AS label,
+        ''::text AS meta,
+        avg(postgis.ST_Y(geom))::double precision AS lat,
+        avg(postgis.ST_X(geom))::double precision AS lng
+    FROM source_rows
+    WHERE city_norm IS NOT NULL
+    GROUP BY city_norm
+),
+postal_rows AS (
+    SELECT
+        'postal'::text AS option_kind,
+        postal AS value,
+        postal AS label,
+        concat_ws(' ', NULLIF(ppc.postal_postal_code_name_fi, ''), NULLIF(pm.postal_municipality_name_fi, '')) AS meta,
+        avg(postgis.ST_Y(source_rows.geom))::double precision AS lat,
+        avg(postgis.ST_X(source_rows.geom))::double precision AS lng
+    FROM source_rows
+    LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_code = source_rows.postal
+    LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+    WHERE postal IS NOT NULL
+    GROUP BY postal, ppc.postal_postal_code_name_fi, pm.postal_municipality_name_fi
+)
+SELECT option_kind, value, label, COALESCE(meta, '') AS meta, lat, lng
+FROM city_rows
+UNION ALL
+SELECT option_kind, value, label, COALESCE(meta, '') AS meta, lat, lng
+FROM postal_rows
+ORDER BY option_kind, value`, source, kind)
+	if err != nil {
+		return SaleListingMapFilterOptions{}, fmt.Errorf("query sale listing map filter options: %w", err)
+	}
+	defer rows.Close()
+	out := SaleListingMapFilterOptions{Cities: []SaleListingMapFilterOption{}, Postals: []SaleListingMapFilterOption{}}
+	for rows.Next() {
+		var optionKind string
+		var option SaleListingMapFilterOption
+		if err := rows.Scan(&optionKind, &option.Value, &option.Label, &option.Meta, &option.Lat, &option.Lng); err != nil {
+			return SaleListingMapFilterOptions{}, fmt.Errorf("scan sale listing map filter option: %w", err)
+		}
+		if optionKind == "city" {
+			out.Cities = append(out.Cities, option)
+		} else {
+			out.Postals = append(out.Postals, option)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return SaleListingMapFilterOptions{}, fmt.Errorf("iterate sale listing map filter options: %w", err)
 	}
 	return out, nil
 }

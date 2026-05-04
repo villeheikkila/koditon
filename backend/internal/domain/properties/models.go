@@ -111,6 +111,19 @@ type SaleListingMap struct {
 	Markers []SaleListingMapMarker `json:"markers"`
 }
 
+type SaleListingMapFilterOption struct {
+	Value string   `json:"value"`
+	Label string   `json:"label"`
+	Meta  string   `json:"meta,omitempty"`
+	Lat   *float64 `json:"lat,omitempty"`
+	Lng   *float64 `json:"lng,omitempty"`
+}
+
+type SaleListingMapFilterOptions struct {
+	Cities  []SaleListingMapFilterOption `json:"cities"`
+	Postals []SaleListingMapFilterOption `json:"postals"`
+}
+
 type ListingSource struct {
 	Provider    string          `json:"provider"`
 	Kind        string          `json:"kind"`

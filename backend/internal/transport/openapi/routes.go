@@ -80,6 +80,12 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Return grouped map markers for canonical sale offerings by exact housing company location"
 		op.Tags = []string{"Sale Listings"}
 	})
+	huma.Get(api, "/api/v1/sale-listings/map-filter-options", a.saleListingsMapFilterOptionsHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-map-filter-options"
+		op.Summary = "List map filter options"
+		op.Description = "Return distinct city and postal values available in sale listing map filters"
+		op.Tags = []string{"Sale Listings"}
+	})
 	huma.Get(api, "/api/v1/sale-listings/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-transaction-match-postals"
 		op.Summary = "List postal codes with potential transaction matches"
