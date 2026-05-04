@@ -681,6 +681,8 @@ func (t *toolImpl) getTransactionByID(ctx context.Context, transactionID uuid.UU
 }
 
 func mapSearchTransactionsAdvancedRow(row db.SearchTransactionsAdvancedRow) transactionsAdvancedRow {
+	postalCodeID := row.PostalCodeID
+	municipalityID := row.MunicipalityID
 	out := transactionsAdvancedRow{
 		TransactionID:       row.TransactionID,
 		Description:         row.Description,
@@ -700,10 +702,10 @@ func mapSearchTransactionsAdvancedRow(row db.SearchTransactionsAdvancedRow) tran
 		UpdatedAt:           row.UpdatedAt,
 		NeighborhoodID:      row.NeighborhoodID,
 		Neighborhood:        row.Neighborhood,
-		PostalCodeID:        row.PostalCodeID,
+		PostalCodeID:        &postalCodeID,
 		PostalCode:          row.PostalCode,
 		PostalArea:          row.PostalArea,
-		MunicipalityID:      row.MunicipalityID,
+		MunicipalityID:      &municipalityID,
 		Municipality:        row.Municipality,
 		City:                row.City,
 	}

@@ -2,6 +2,7 @@ package properties
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -193,10 +194,44 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	if row.SaleListingSourceKind == "announcement" {
 		listing.Commercial.IsCompanyAnnouncement = ptrBool(true)
 	}
+	if err := s.enrichSaleListingMediaFromSource(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
 	if err := s.enrichSaleListingRenovations(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
 	return listing, nil
+}
+
+func (s *Service) enrichSaleListingMediaFromSource(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	var provider, kind, announcementMainImageURI string
+	var shortcutData, frontdoorData []byte
+	err := s.db.QueryRow(ctx, `
+SELECT
+    sl.sale_listing_source_provider,
+    sl.sale_listing_source_kind,
+    COALESCE(sa.shortcut_ad_data, '{}'::jsonb),
+    COALESCE(fa.frontdoor_ad_data, '{}'::jsonb),
+    COALESCE(fba.frontdoor_building_announcement_main_image_uri, '')
+FROM public.property_source_offerings sl
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+WHERE sl.sale_listing_id = $1`, saleListingID).Scan(&provider, &kind, &shortcutData, &frontdoorData, &announcementMainImageURI)
+	if err != nil {
+		return err
+	}
+	var media Media
+	switch {
+	case provider == "shortcut" && len(shortcutData) > 2:
+		media = shortcutMedia(parseShortcutRaw(json.RawMessage(shortcutData)))
+	case provider == "frontdoor" && kind == "ad" && len(frontdoorData) > 2:
+		media = frontdoorMedia(parseFrontdoorRaw(json.RawMessage(frontdoorData)))
+	case provider == "frontdoor" && kind == "announcement":
+		media = frontdoorAnnouncementMedia(announcementMainImageURI)
+	}
+	mergeMedia(&listing.Media, media)
+	return nil
 }
 
 func (s *Service) enrichSaleListingRenovations(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {

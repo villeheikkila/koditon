@@ -254,21 +254,26 @@ SELECT
     ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
-    ppc.postal_postal_code_id,
-    ppc.postal_postal_code_code,
-    ppc.postal_postal_code_name_fi,
-    pm.postal_municipality_id,
-    pm.postal_municipality_name_fi
+    COALESCE(ppc_scraped.postal_postal_code_id, ppc.postal_postal_code_id) AS postal_postal_code_id,
+    COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_postal_code_code,
+    COALESCE(ppc_scraped.postal_postal_code_name_fi, ppc.postal_postal_code_name_fi, '') AS postal_postal_code_name_fi,
+    COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS postal_municipality_id,
+    COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS postal_municipality_name_fi
 FROM public.prices_transactions AS ht
 JOIN public.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-JOIN public.postal_postal_codes AS ppc
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc_scraped
+    ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
+LEFT JOIN public.postal_municipalities AS pm_scraped
+    ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
+LEFT JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-JOIN public.postal_municipalities AS pm
+LEFT JOIN public.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
-WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
-  AND pm.postal_municipality_id = $1
-  AND ppc.postal_postal_code_id = $2
+WHERE COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = $1
+  AND (ppc_scraped.postal_postal_code_id = $2 OR ppc.postal_postal_code_id = $2)
 ORDER BY ht.prices_transaction_created_at DESC
 `
 
@@ -394,21 +399,26 @@ SELECT
     ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
-    ppc.postal_postal_code_id,
-    ppc.postal_postal_code_code,
-    ppc.postal_postal_code_name_fi,
-    pm.postal_municipality_id,
-    pm.postal_municipality_name_fi
+    COALESCE(ppc_scraped.postal_postal_code_id, ppc.postal_postal_code_id) AS postal_postal_code_id,
+    COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_postal_code_code,
+    COALESCE(ppc_scraped.postal_postal_code_name_fi, ppc.postal_postal_code_name_fi, '') AS postal_postal_code_name_fi,
+    COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS postal_municipality_id,
+    COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS postal_municipality_name_fi
 FROM public.prices_transactions AS ht
 JOIN public.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-JOIN public.postal_postal_codes AS ppc
+LEFT JOIN public.prices_postal_codes AS ppc_prices
+    ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc_scraped
+    ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
+LEFT JOIN public.postal_municipalities AS pm_scraped
+    ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
+LEFT JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-JOIN public.postal_municipalities AS pm
+LEFT JOIN public.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
-WHERE pn.prices_neighborhood_postal_postal_code_id IS NOT NULL
-  AND ($1::uuid[] IS NULL OR pm.postal_municipality_id = ANY($1::uuid[]))
-  AND ($2::uuid[] IS NULL OR ppc.postal_postal_code_id = ANY($2::uuid[]))
+WHERE ($1::uuid[] IS NULL OR COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = ANY($1::uuid[]))
+  AND ($2::uuid[] IS NULL OR ppc_scraped.postal_postal_code_id = ANY($2::uuid[]) OR ppc.postal_postal_code_id = ANY($2::uuid[]))
   AND ($3::text[] IS NULL OR ht.prices_transaction_category = ANY($3::text[]))
   AND ($4::text[] IS NULL OR ht.prices_transaction_type = ANY($4::text[]))
   AND ($5::double precision IS NULL OR ht.prices_transaction_area >= $5::double precision)
@@ -531,11 +541,11 @@ SELECT
     ht.prices_transaction_updated_at AS updated_at,
     pn.prices_neighborhood_id AS neighborhood_id,
     pn.prices_neighborhood_name AS neighborhood,
-    ppc.postal_postal_code_id AS postal_code_id,
-    COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area,
-    pm.postal_municipality_id AS municipality_id,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
+    COALESCE(ppc_scraped.postal_postal_code_id, ppc.postal_postal_code_id) AS postal_code_id,
+    COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
+    COALESCE(ppc_scraped.postal_postal_code_name_fi, ppc.postal_postal_code_name_fi, '') AS postal_area,
+    COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS municipality_id,
+    COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS municipality,
     pc.prices_city_name AS city
 FROM public.prices_transactions AS ht
 JOIN public.prices_neighborhoods AS pn
@@ -544,14 +554,18 @@ JOIN public.prices_cities AS pc
     ON pc.prices_city_id = pn.prices_city_id
 LEFT JOIN public.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN public.postal_postal_codes AS ppc_scraped
+    ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
+LEFT JOIN public.postal_municipalities AS pm_scraped
+    ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
 LEFT JOIN public.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 LEFT JOIN public.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim($1::text)) || '%'))
-  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR pm.postal_municipality_id = ANY($2::uuid[]))
-  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR ppc.postal_postal_code_id = ANY($3::uuid[]))
-  AND (COALESCE(cardinality($4::text[]), 0) = 0 OR COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) = ANY($4::text[]))
+  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = ANY($2::uuid[]))
+  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR ppc_scraped.postal_postal_code_id = ANY($3::uuid[]) OR ppc.postal_postal_code_id = ANY($3::uuid[]))
+  AND (COALESCE(cardinality($4::text[]), 0) = 0 OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) = ANY($4::text[]))
   AND (COALESCE(cardinality($5::text[]), 0) = 0 OR ht.prices_transaction_category = ANY($5::text[]))
   AND (COALESCE(cardinality($6::text[]), 0) = 0 OR ht.prices_transaction_type = ANY($6::text[]))
   AND ($7::int IS NULL OR ht.prices_transaction_price >= $7::int)
@@ -600,30 +614,30 @@ type SearchTransactionsAdvancedParams struct {
 }
 
 type SearchTransactionsAdvancedRow struct {
-	TransactionID       uuid.UUID  `json:"transaction_id"`
-	Description         string     `json:"description"`
-	Type                string     `json:"type"`
-	Category            string     `json:"category"`
-	Area                float64    `json:"area"`
-	Price               int32      `json:"price"`
-	PricePerSquareMeter int32      `json:"price_per_square_meter"`
-	BuildYear           int32      `json:"build_year"`
-	Floor               *string    `json:"floor"`
-	Elevator            bool       `json:"elevator"`
-	Condition           *string    `json:"condition"`
-	Plot                *string    `json:"plot"`
-	EnergyClass         *string    `json:"energy_class"`
-	PeriodIdentifier    string     `json:"period_identifier"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	NeighborhoodID      uuid.UUID  `json:"neighborhood_id"`
-	Neighborhood        string     `json:"neighborhood"`
-	PostalCodeID        *uuid.UUID `json:"postal_code_id"`
-	PostalCode          string     `json:"postal_code"`
-	PostalArea          string     `json:"postal_area"`
-	MunicipalityID      *uuid.UUID `json:"municipality_id"`
-	Municipality        string     `json:"municipality"`
-	City                string     `json:"city"`
+	TransactionID       uuid.UUID `json:"transaction_id"`
+	Description         string    `json:"description"`
+	Type                string    `json:"type"`
+	Category            string    `json:"category"`
+	Area                float64   `json:"area"`
+	Price               int32     `json:"price"`
+	PricePerSquareMeter int32     `json:"price_per_square_meter"`
+	BuildYear           int32     `json:"build_year"`
+	Floor               *string   `json:"floor"`
+	Elevator            bool      `json:"elevator"`
+	Condition           *string   `json:"condition"`
+	Plot                *string   `json:"plot"`
+	EnergyClass         *string   `json:"energy_class"`
+	PeriodIdentifier    string    `json:"period_identifier"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	NeighborhoodID      uuid.UUID `json:"neighborhood_id"`
+	Neighborhood        string    `json:"neighborhood"`
+	PostalCodeID        uuid.UUID `json:"postal_code_id"`
+	PostalCode          string    `json:"postal_code"`
+	PostalArea          string    `json:"postal_area"`
+	MunicipalityID      uuid.UUID `json:"municipality_id"`
+	Municipality        string    `json:"municipality"`
+	City                string    `json:"city"`
 }
 
 func (q *Queries) SearchTransactionsAdvanced(ctx context.Context, arg SearchTransactionsAdvancedParams) ([]SearchTransactionsAdvancedRow, error) {

@@ -96,8 +96,9 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const hasSiteDetails = siteRows.some(value => value != null && value !== '')
   const title = [unit.room_layout, unit.area_m2 != null && `${unit.area_m2.toFixed(1)} m²`]
     .filter(Boolean).join(', ')
-  const mainImage = d.media?.main_image?.variants?.gallery || d.media?.main_image?.variants?.large || d.media?.main_image?.url
-  const images = d.media?.images?.filter(image => image.url !== mainImage) ?? []
+  const mainImage = d.media?.main_image?.variants?.large || d.media?.main_image?.variants?.gallery || d.media?.main_image?.url
+  const mainImageURLs = new Set([d.media?.main_image?.url, d.media?.main_image?.variants?.large, d.media?.main_image?.variants?.gallery].filter(Boolean))
+  const images = d.media?.images?.filter(image => !mainImageURLs.has(image.url)) ?? []
   const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
   const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
   const mapLatitude = location.latitude ?? building.location.latitude
@@ -444,8 +445,8 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
             <Section title="Images">
               <div className="listing-image-grid">
                 {images.slice(0, 24).map(image => (
-                  <a key={image.id || image.url} href={image.url} target="_blank" rel="noopener noreferrer">
-                    <img src={image.variants?.thumbnail || image.variants?.gallery || image.url} alt={image.description || ''} />
+                  <a key={image.id || image.url} href={image.variants?.gallery || image.variants?.large || image.url} target="_blank" rel="noopener noreferrer">
+                    <img src={image.variants?.thumb || image.variants?.card || image.variants?.large || image.url} alt={image.description || ''} />
                   </a>
                 ))}
               </div>
