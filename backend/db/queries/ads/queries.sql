@@ -659,6 +659,44 @@ FROM public.property_source_offerings
 WHERE sale_listing_id = sqlc.arg(sale_listing_id)
 LIMIT 1;
 
+-- name: GetPropertySourceOfferingValuationExtractionTexts :one
+SELECT
+    COALESCE(sale_listing_room_layout, '') AS room_layout,
+    sale_listing_rooms_count,
+    sale_listing_bedrooms_count,
+    sale_listing_area_value,
+    sale_listing_living_area_value,
+    sale_listing_total_area_value,
+    sale_listing_other_area_value,
+    sale_listing_floor_level,
+    sale_listing_total_floors,
+    COALESCE(sale_listing_floor_text, '') AS floor_text,
+    COALESCE(sale_listing_condition, '') AS condition,
+    sale_listing_sauna,
+    sale_listing_balcony,
+    COALESCE(sale_listing_parking_text, '') AS parking_text,
+    COALESCE(sale_listing_description_text, '') AS description_text,
+    COALESCE(sale_listing_additional_info_text, '') AS additional_info_text,
+    COALESCE(sale_listing_kitchen_description_text, '') AS kitchen_description_text,
+    COALESCE(sale_listing_bathroom_description_text, '') AS bathroom_description_text,
+    COALESCE(sale_listing_storage_description_text, '') AS storage_description_text,
+    COALESCE(sale_listing_floor_materials_description_text, '') AS floor_materials_description_text,
+    COALESCE(sale_listing_wall_materials_description_text, '') AS wall_materials_description_text,
+    COALESCE(sale_listing_balcony_description_text, '') AS balcony_description_text,
+    COALESCE(sale_listing_sauna_description_text, '') AS sauna_description_text,
+    COALESCE(sale_listing_views_description_text, '') AS views_description_text,
+    COALESCE(sale_listing_building_material, '') AS building_material,
+    COALESCE(sale_listing_heating_system, '') AS heating_system,
+    COALESCE(sale_listing_roof_type, '') AS roof_type,
+    COALESCE(sale_listing_roof_material, '') AS roof_material,
+    COALESCE(sale_listing_car_storage_text, '') AS car_storage_text,
+    COALESCE(sale_listing_building_description_text, '') AS building_description_text,
+    COALESCE(sale_listing_building_other_info_text, '') AS building_other_info_text,
+    COALESCE(sale_listing_charges_text, '') AS charges_text
+FROM public.property_source_offerings
+WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+LIMIT 1;
+
 -- name: ListPropertySourceOfferingInsights :many
 SELECT
     property_source_offering_insight_key,
@@ -672,10 +710,34 @@ FROM public.property_source_offering_insights
 WHERE sale_listing_id = sqlc.arg(sale_listing_id)
 ORDER BY property_source_offering_insight_severity DESC, property_source_offering_insight_key;
 
+-- name: ListPropertyValuationFactsForEntity :many
+SELECT
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key,
+    property_valuation_fact_value_kind,
+    COALESCE(property_valuation_fact_value_text, '') AS property_valuation_fact_value_text,
+    property_valuation_fact_value_number,
+    property_valuation_fact_value_bool,
+    property_valuation_fact_confidence,
+    COALESCE(property_valuation_fact_evidence_text, '') AS property_valuation_fact_evidence_text,
+    COALESCE(property_valuation_fact_model, '') AS property_valuation_fact_model,
+    COALESCE(property_valuation_fact_prompt_version, '') AS property_valuation_fact_prompt_version
+FROM public.property_valuation_facts
+WHERE property_valuation_fact_entity_type = sqlc.arg(entity_type)
+    AND property_valuation_fact_entity_id = sqlc.arg(entity_id)
+ORDER BY property_valuation_fact_section, property_valuation_fact_key;
+
 -- name: DeleteLLMPropertySourceOfferingInsights :exec
 DELETE FROM public.property_source_offering_insights
 WHERE sale_listing_id = sqlc.arg(sale_listing_id)
     AND property_source_offering_insight_source_field LIKE 'llm_%';
+
+-- name: DeleteLLMPropertyValuationFactsForEntity :exec
+DELETE FROM public.property_valuation_facts
+WHERE property_valuation_fact_entity_type = sqlc.arg(entity_type)
+    AND property_valuation_fact_entity_id = sqlc.arg(entity_id)
+    AND property_valuation_fact_source_field LIKE 'llm_%';
 
 -- name: InsertPropertySourceOfferingInsight :exec
 INSERT INTO public.property_source_offering_insights (
@@ -697,6 +759,52 @@ INSERT INTO public.property_source_offering_insights (
     sqlc.arg(confidence),
     NULLIF(sqlc.arg(text), '')
 );
+
+-- name: InsertPropertyValuationFact :exec
+INSERT INTO public.property_valuation_facts (
+    property_valuation_fact_entity_type,
+    property_valuation_fact_entity_id,
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key,
+    property_valuation_fact_value_kind,
+    property_valuation_fact_value_text,
+    property_valuation_fact_value_number,
+    property_valuation_fact_value_bool,
+    property_valuation_fact_confidence,
+    property_valuation_fact_evidence_text,
+    property_valuation_fact_model,
+    property_valuation_fact_prompt_version
+) VALUES (
+    sqlc.arg(entity_type),
+    sqlc.arg(entity_id),
+    sqlc.arg(source_field),
+    sqlc.arg(section),
+    sqlc.arg(key),
+    sqlc.arg(value_kind),
+    NULLIF(sqlc.arg(value_text), ''),
+    sqlc.narg(value_number),
+    sqlc.narg(value_bool),
+    sqlc.arg(confidence),
+    NULLIF(sqlc.arg(evidence_text), ''),
+    NULLIF(sqlc.arg(model), ''),
+    NULLIF(sqlc.arg(prompt_version), '')
+) ON CONFLICT (
+    property_valuation_fact_entity_type,
+    property_valuation_fact_entity_id,
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key
+) DO UPDATE SET
+    property_valuation_fact_value_kind = EXCLUDED.property_valuation_fact_value_kind,
+    property_valuation_fact_value_text = EXCLUDED.property_valuation_fact_value_text,
+    property_valuation_fact_value_number = EXCLUDED.property_valuation_fact_value_number,
+    property_valuation_fact_value_bool = EXCLUDED.property_valuation_fact_value_bool,
+    property_valuation_fact_confidence = EXCLUDED.property_valuation_fact_confidence,
+    property_valuation_fact_evidence_text = EXCLUDED.property_valuation_fact_evidence_text,
+    property_valuation_fact_model = EXCLUDED.property_valuation_fact_model,
+    property_valuation_fact_prompt_version = EXCLUDED.property_valuation_fact_prompt_version,
+    property_valuation_fact_updated_at = now();
 
 -- name: SearchUnifiedEntities :many
 WITH unified AS (

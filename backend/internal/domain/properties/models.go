@@ -532,22 +532,23 @@ type RentalSummary struct {
 }
 
 type SaleListing struct {
-	ID            string                        `json:"id"`
-	Canonical     CanonicalOffering             `json:"canonical"`
-	Source        ListingSource                 `json:"source"`
-	SourceRecords []OfferingSourceRecord        `json:"source_records,omitempty"`
-	Headline      string                        `json:"headline"`
-	Unit          UnitDetails                   `json:"unit"`
-	Building      BuildingDetails               `json:"building"`
-	Site          SiteDetails                   `json:"site,omitempty"`
-	Commercial    CommercialDetails             `json:"commercial"`
-	Texts         TextSections                  `json:"texts,omitempty"`
-	Media         Media                         `json:"media,omitempty"`
-	Contacts      []Contact                     `json:"contacts,omitempty"`
-	Showings      []Showing                     `json:"showings,omitempty"`
-	Links         []Link                        `json:"links,omitempty"`
-	Insights      ListingInsights               `json:"insights,omitempty"`
-	Valuation     *valuation.ApartmentValuation `json:"valuation,omitempty"`
+	ID              string                        `json:"id"`
+	Canonical       CanonicalOffering             `json:"canonical"`
+	Source          ListingSource                 `json:"source"`
+	SourceRecords   []OfferingSourceRecord        `json:"source_records,omitempty"`
+	Headline        string                        `json:"headline"`
+	Unit            UnitDetails                   `json:"unit"`
+	Building        BuildingDetails               `json:"building"`
+	Site            SiteDetails                   `json:"site,omitempty"`
+	Commercial      CommercialDetails             `json:"commercial"`
+	Texts           TextSections                  `json:"texts,omitempty"`
+	Media           Media                         `json:"media,omitempty"`
+	Contacts        []Contact                     `json:"contacts,omitempty"`
+	Showings        []Showing                     `json:"showings,omitempty"`
+	Links           []Link                        `json:"links,omitempty"`
+	Insights        ListingInsights               `json:"insights,omitempty"`
+	ValuationInputs valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
+	Valuation       *valuation.ApartmentValuation `json:"valuation,omitempty"`
 }
 
 type Rental struct {

@@ -21,11 +21,15 @@ func RenovationSeverity(category string) string {
 }
 
 func apartmentValuation(listing SaleListing) *ApartmentValuation {
+	input := BuildInput(listing)
+	listing.Inputs = input
 	valuation := &ApartmentValuation{Subject: apartmentValuationSubject(listing), Price: apartmentValuationPrice(listing), Renovations: apartmentValuationRenovations(listing)}
+	valuation.Input = attachRenovationForecast(input, valuation.Renovations.Next40Years)
 	valuation.Signals = apartmentValuationSignals(listing, valuation)
 	valuation.Missing = apartmentValuationMissingInputs(listing)
 	valuation.Confidence = apartmentValuationConfidence(listing, valuation)
 	valuation.OfferAssessment = apartmentOfferAssessment(listing, valuation)
+	valuation.Brief = BuildBrief(valuation)
 	valuation.Explanation = apartmentValuationExplanation(listing, valuation)
 	return valuation
 }
@@ -451,6 +455,25 @@ func apartmentOfferReasons(listing SaleListing, valuation *ApartmentValuation, a
 			continue
 		}
 		reasons = append(reasons, ApartmentOfferReason{Key: "description_" + insight.Key, Direction: insight.Direction, Severity: firstNonEmpty(insight.Severity, "low"), Explanation: fmt.Sprintf("%s: %s", insight.Value, firstNonEmpty(insight.Explanation, "extracted from listing description"))})
+	}
+	input := BuildInput(listing)
+	if input.Unit.BalconyGlazing != nil && *input.Unit.BalconyGlazing {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_balcony_glazing", Direction: "positive", Severity: "low", Explanation: "Canonical inputs indicate a glazed balcony, which supports usability and buyer demand."})
+	}
+	if input.Layout.AwkwardLayout != nil && *input.Layout.AwkwardLayout {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_awkward_layout", Direction: "negative", Severity: "medium", Explanation: "Canonical inputs flag an awkward layout that can narrow demand."})
+	}
+	if (input.Unit.SurfaceRenovationNeed != nil && *input.Unit.SurfaceRenovationNeed) || (input.Unit.ModernizationNeed != nil && *input.Unit.ModernizationNeed) {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_unit_renovation_need", Direction: "negative", Severity: "medium", Explanation: "Canonical inputs indicate apartment-level renovation or modernization need."})
+	}
+	if input.Unit.NoiseRisk != nil && *input.Unit.NoiseRisk {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_noise_risk", Direction: "negative", Severity: "medium", Explanation: "Canonical inputs indicate noise risk from listing evidence."})
+	}
+	if input.Unit.KitchenRenovated != nil && *input.Unit.KitchenRenovated {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_kitchen_renovated", Direction: "positive", Severity: "low", Explanation: "Canonical inputs indicate a renovated kitchen."})
+	}
+	if input.Unit.BathroomRenovated != nil && *input.Unit.BathroomRenovated {
+		reasons = append(reasons, ApartmentOfferReason{Key: "input_bathroom_renovated", Direction: "positive", Severity: "low", Explanation: "Canonical inputs indicate a renovated bathroom."})
 	}
 	return reasons
 }

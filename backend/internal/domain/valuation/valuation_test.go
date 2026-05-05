@@ -1,6 +1,9 @@
 package valuation
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestAssessExplainsTransactionAndUpcomingRenovations(t *testing.T) {
 	area := 50.0
@@ -48,6 +51,118 @@ func TestAssessFlagsOverpricedRiskAdjustedOffer(t *testing.T) {
 	}
 	if assessment.RenovationRiskReserve.High == nil || *assessment.RenovationRiskReserve.High == 0 {
 		t.Fatalf("expected renovation reserve, got %#v", assessment.RenovationRiskReserve)
+	}
+}
+
+func TestBuildInputPromotesProviderAndExtractedFacts(t *testing.T) {
+	area := 51.5
+	rooms := int32(2)
+	bedrooms := int32(1)
+	floor := int32(5)
+	totalFloors := int32(6)
+	elevator := true
+	balcony := true
+	glazed := true
+	renovated := true
+	listing := SaleListing{
+		Unit:     UnitDetails{RoomLayout: "2h+avok", RoomsCount: &rooms, BedroomsCount: &bedrooms, AreaM2: &area, FloorLevel: &floor, Balcony: &balcony},
+		Building: BuildingDetails{FloorCount: &totalFloors, Elevator: &elevator},
+		Inputs: ValuationInputs{Facts: []ValuationFact{
+			{Section: "balcony", Key: "glazing", ValueKind: "bool", ValueBool: &glazed, Confidence: 0.82, Source: "llm_balcony_description_text"},
+			{Section: "kitchen", Key: "renovated", ValueKind: "bool", ValueBool: &renovated, Confidence: 0.78, Source: "llm_kitchen_description_text"},
+		}},
+	}
+	input := BuildInput(listing)
+	if input.Unit.AreaM2 == nil || *input.Unit.AreaM2 != area {
+		t.Fatalf("expected provider area, got %#v", input.Unit.AreaM2)
+	}
+	if input.Layout.RoomCount == nil || *input.Layout.RoomCount != rooms || input.Layout.KitchenType != "open" {
+		t.Fatalf("expected parsed layout input, got %#v", input.Layout)
+	}
+	if input.Floor.HighFloor == nil || !*input.Floor.HighFloor || input.Floor.ElevatorRelevance != "elevator_present" {
+		t.Fatalf("expected high-floor elevator input, got %#v", input.Floor)
+	}
+	if input.Unit.BalconyGlazing == nil || !*input.Unit.BalconyGlazing || input.Unit.KitchenRenovated == nil || !*input.Unit.KitchenRenovated {
+		t.Fatalf("expected promoted extracted facts, got %#v", input.Unit)
+	}
+}
+
+func TestBuildInputRetainsProviderValueAndReportsConflict(t *testing.T) {
+	balcony := true
+	noBalcony := false
+	listing := SaleListing{Unit: UnitDetails{Balcony: &balcony}, Inputs: ValuationInputs{Facts: []ValuationFact{{Section: "balcony", Key: "glazing", ValueKind: "bool", ValueBool: &noBalcony, Confidence: 0.7, Source: "llm_balcony_description_text"}}}}
+	input := BuildInput(listing)
+	if input.Unit.BalconyGlazing == nil || *input.Unit.BalconyGlazing {
+		t.Fatalf("expected extracted glazing fact to be false, got %#v", input.Unit.BalconyGlazing)
+	}
+	listing = SaleListing{Unit: UnitDetails{Balcony: &balcony}, Inputs: ValuationInputs{Facts: []ValuationFact{{Section: "unit", Key: "balcony", ValueKind: "bool", ValueBool: &noBalcony, Confidence: 0.7, Source: "llm_description_text"}}}}
+	input = BuildInput(listing)
+	if input.Unit.Balcony == nil || !*input.Unit.Balcony {
+		t.Fatalf("expected provider balcony to remain true, got %#v", input.Unit.Balcony)
+	}
+	if len(input.Conflicts) != 1 || input.Conflicts[0].Path != "unit.balcony" {
+		t.Fatalf("expected balcony conflict, got %#v", input.Conflicts)
+	}
+}
+
+func TestAssessExposesCanonicalInput(t *testing.T) {
+	area := 42.0
+	listing := SaleListing{Unit: UnitDetails{RoomLayout: "1h+kk", AreaM2: &area}}
+	result := Assess(listing)
+	if result.Input.Unit.AreaM2 == nil || *result.Input.Unit.AreaM2 != area {
+		t.Fatalf("expected canonical input in valuation result, got %#v", result.Input)
+	}
+	if result.Input.Layout.KitchenType != "kitchenette" {
+		t.Fatalf("expected kitchenette layout input, got %#v", result.Input.Layout)
+	}
+}
+
+func TestAssessIncludesBrief(t *testing.T) {
+	area := 42.0
+	listing := SaleListing{Unit: UnitDetails{AreaM2: &area}, Commercial: CommercialDetails{AskingPrice: ptrInt64(200000)}}
+	result := Assess(listing)
+	if result.Brief.Verdict == "" || result.Brief.Confidence == "" {
+		t.Fatalf("expected valuation brief, got %#v", result.Brief)
+	}
+}
+
+func TestBuildBriefFlagsExpensiveRenovationWindow(t *testing.T) {
+	area := 60.0
+	planned := false
+	pipeYear := int32(time.Now().Year() + 1)
+	roofYear := int32(time.Now().Year() + 2)
+	listing := SaleListing{Unit: UnitDetails{AreaM2: &area}, Building: BuildingDetails{Renovations: []BuildingRenovation{{Kind: "pipe", Done: &planned, Year: &pipeYear, Scope: "full"}, {Kind: "roof", Done: &planned, Year: &roofYear, Scope: "full"}}}, Commercial: CommercialDetails{AskingPrice: ptrInt64(200000)}}
+	result := Assess(listing)
+	if result.Brief.BuildingRisk != "high" {
+		t.Fatalf("expected high building risk, got %#v", result.Brief)
+	}
+	if len(result.Brief.ExpensiveWindows) == 0 || result.Brief.ExpensiveWindows[0].Severity != "high" {
+		t.Fatalf("expected high expensive window, got %#v", result.Brief.ExpensiveWindows)
+	}
+}
+
+func TestBuildBriefShowsMissingEvidence(t *testing.T) {
+	result := Assess(SaleListing{})
+	missing := map[string]bool{}
+	for _, item := range result.Brief.MissingEvidence {
+		missing[item] = true
+	}
+	if !missing["manager certificate"] || !missing["housing company financials"] || !missing["matched transaction"] {
+		t.Fatalf("expected human missing evidence, got %#v", result.Brief.MissingEvidence)
+	}
+}
+
+func TestBuildBriefPromotesPositiveInputs(t *testing.T) {
+	glazed := true
+	renovated := true
+	listing := SaleListing{Inputs: ValuationInputs{Facts: []ValuationFact{{Section: "balcony", Key: "glazing", ValueKind: "bool", ValueBool: &glazed, Confidence: 0.8}, {Section: "kitchen", Key: "renovated", ValueKind: "bool", ValueBool: &renovated, Confidence: 0.8}}}}
+	result := Assess(listing)
+	positives := map[string]bool{}
+	for _, item := range result.Brief.TopPositives {
+		positives[item.Key] = true
+	}
+	if !positives["balcony_glazing"] || !positives["kitchen_renovated"] {
+		t.Fatalf("expected canonical input positives, got %#v", result.Brief.TopPositives)
 	}
 }
 
@@ -129,4 +244,8 @@ func findRenovationNeed(t *testing.T, needs []ApartmentRenovationNeed, category 
 	}
 	t.Fatalf("missing forecast row for %s %s %d in %#v", category, status, year, needs)
 	return ApartmentRenovationNeed{}
+}
+
+func ptrInt64(value int64) *int64 {
+	return &value
 }

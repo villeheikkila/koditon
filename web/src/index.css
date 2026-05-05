@@ -1500,6 +1500,156 @@ td.dim { color: var(--text-3); font-size: 12px; }
   padding-top: 4px;
 }
 
+.valuation-brief {
+  display: flex;
+  flex-direction: column;
+}
+
+.brief-verdict {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brief-verdict-label {
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.brief-verdict-text {
+  margin-top: 5px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.brief-meta {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.brief-meta span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+}
+
+.brief-panel {
+  min-width: 0;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.brief-panel:last-child {
+  border-right: none;
+}
+
+.brief-panel-title {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brief-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.brief-window strong,
+.brief-signal strong {
+  display: block;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.brief-window span,
+.brief-signal span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brief-window p,
+.brief-signal p {
+  margin: 5px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.brief-empty {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.brief-renovations {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brief-renovation {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.brief-renovation span {
+  display: block;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brief-renovation strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.brief-missing {
+  padding: 10px 16px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
 .offer-assessment {
   display: flex;
   flex-direction: column;
@@ -1604,6 +1754,68 @@ td.dim { color: var(--text-3); font-size: 12px; }
   padding: 10px 16px;
   color: var(--text-3);
   font-size: 12px;
+}
+
+.valuation-inputs {
+  display: flex;
+  flex-direction: column;
+}
+
+.valuation-input-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.valuation-input-group:last-child {
+  border-bottom: none;
+}
+
+.valuation-input-section {
+  padding: 10px 16px 0;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.valuation-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 16px 14px;
+}
+
+.valuation-input-fact {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.valuation-input-fact span {
+  display: block;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.valuation-input-fact strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.valuation-input-fact p {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 
 .renovation-list {
@@ -2994,6 +3206,13 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .match-card-head { flex-direction: column; }
   .match-card-prices { justify-content: flex-start; }
   .match-fact-grid { grid-template-columns: minmax(0, 1fr); }
+  .brief-verdict { flex-direction: column; }
+  .brief-meta { justify-content: flex-start; }
+  .brief-grid { grid-template-columns: 1fr; }
+  .brief-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  .brief-panel:last-child { border-bottom: none; }
+  .brief-renovations { grid-template-columns: 1fr; }
+  .valuation-input-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {

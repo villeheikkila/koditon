@@ -48,6 +48,44 @@ type DescriptionExtractionResponse = {
   status: number
   headers: Headers
 }
+type ValuationFact = {
+  section: string
+  key: string
+  value_kind: string
+  value_text?: string
+  value_number?: number
+  value_bool?: boolean
+  confidence?: number
+  source?: string
+  evidence?: string
+  model?: string
+  prompt?: string
+}
+type ValuationInputExtractionResult = {
+  sale_listing_id: string
+  model: string
+  facts?: ValuationFact[] | null
+}
+type ValuationInputExtractionResponse = {
+  data: ValuationInputExtractionResult
+  status: number
+  headers: Headers
+}
+type ValuationInput = {
+  unit?: Record<string, unknown>
+  layout?: Record<string, unknown>
+  floor?: Record<string, unknown>
+  building?: Record<string, unknown>
+  site?: Record<string, unknown>
+  charges?: Record<string, unknown>
+  market?: Record<string, unknown>
+  renovations?: Record<string, unknown>
+  documents?: Record<string, unknown>
+  facts?: ValuationFact[] | null
+  extra_facts?: ValuationFact[] | null
+  conflicts?: Array<{ path: string; reason: string }> | null
+  missing?: string[] | null
+}
 type RenovationForecastItem = {
   category: string
   component?: string
@@ -88,8 +126,51 @@ type OfferAssessment = {
   missing?: string[] | null
   explanation: string
 }
+type OwnershipCostWindow = {
+  start_year?: number
+  end_year?: number
+  severity: string
+  label: string
+  reasons?: string[] | null
+}
+type KeyRenovationStatus = {
+  category: string
+  status: string
+  year?: number
+  window_start_year?: number
+  window_end_year?: number
+  severity?: string
+  confidence?: string
+  explanation?: string
+}
+type BriefSignal = {
+  key: string
+  label: string
+  severity: string
+  direction: string
+  explanation?: string
+}
+type ValuationBrief = {
+  verdict: string
+  label?: string
+  building_risk?: string
+  expensive_windows?: OwnershipCostWindow[] | null
+  key_renovations?: KeyRenovationStatus[] | null
+  top_risks?: BriefSignal[] | null
+  top_positives?: BriefSignal[] | null
+  missing_evidence?: string[] | null
+  confidence: string
+  explanation?: string
+}
 type SaleListingWithValuation = SaleListing & {
+  valuation_inputs?: {
+    facts?: ValuationFact[] | null
+  }
   valuation?: {
+    input?: {
+      facts?: ValuationFact[] | null
+    } & ValuationInput
+    brief?: ValuationBrief
     renovations?: {
       next_40_years?: RenovationForecastItem[] | null
       forecast_start_year?: number
@@ -148,6 +229,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const [transactionOpen, setTransactionOpen] = useState(false)
   const [renovationExtractionResult, setRenovationExtractionResult] = useState<RenovationExtractionResult | null>(null)
   const [descriptionExtractionResult, setDescriptionExtractionResult] = useState<DescriptionExtractionResult | null>(null)
+  const [valuationInputExtractionResult, setValuationInputExtractionResult] = useState<ValuationInputExtractionResult | null>(null)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -184,7 +266,11 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const images = d.media?.images?.filter(image => !mainImageURLs.has(image.url)) ?? []
   const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
   const valuationRenovations = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.renovations
+  const valuationBrief = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.brief
   const offerAssessment = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.offer_assessment
+  const valuationInput = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.input
+  const valuationFacts = valuationInput?.facts ?? (saleDetail as SaleListingWithValuation | undefined)?.valuation_inputs?.facts ?? []
+  const valuationDisplayFacts = valuationInputDisplayFacts(valuationInput, valuationFacts)
   const renovationForecastRows = valuationRenovations?.next_40_years ?? []
   const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
   const mapLatitude = location.latitude ?? building.location.latitude
@@ -232,13 +318,31 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
     : descriptionExtractionResult
       ? `${descriptionExtractionResult.items?.length ?? 0} extracted · ${descriptionExtractionResult.model}`
       : undefined
+  const extractValuationInputs = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Valuation input extraction is only available for sale listings')
+      return extractSaleListingValuationInputs(saleDetail.id)
+    },
+    onSuccess: async response => {
+      setValuationInputExtractionResult(response.data)
+      await onRefresh?.()
+    },
+  })
+  const valuationInputExtractionMessage = extractValuationInputs.isError
+    ? (extractValuationInputs.error as Error)?.message ?? 'Valuation input extraction failed'
+    : valuationInputExtractionResult
+      ? `${valuationInputExtractionResult.facts?.length ?? 0} facts · ${valuationInputExtractionResult.model}`
+      : undefined
   const offerActions = saleDetail ? (
     <div className="listing-section-actions">
-      {descriptionExtractionMessage && (
-        <span className={`listing-section-status${extractDescription.isError ? ' listing-section-status--error' : ''}`}>
-          {descriptionExtractionMessage}
+      {(descriptionExtractionMessage || valuationInputExtractionMessage) && (
+        <span className={`listing-section-status${extractDescription.isError || extractValuationInputs.isError ? ' listing-section-status--error' : ''}`}>
+          {[descriptionExtractionMessage, valuationInputExtractionMessage].filter(Boolean).join(' · ')}
         </span>
       )}
+      <button type="button" className="listing-action-button" onClick={() => extractValuationInputs.mutate()} disabled={extractValuationInputs.isPending}>
+        {extractValuationInputs.isPending ? 'Running…' : 'Extract inputs'}
+      </button>
       <button type="button" className="listing-action-button" onClick={() => extractDescription.mutate()} disabled={extractDescription.isPending}>
         {extractDescription.isPending ? 'Running…' : 'Extract description'}
       </button>
@@ -365,8 +469,56 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
               <TextBlock text={texts.description} />
             </Section>
           )}
+          {valuationBrief && (
+            <Section title="At a Glance" actions={offerActions}>
+              <div className="valuation-brief">
+                <div className={`brief-verdict brief-verdict--${valuationBrief.verdict}`}>
+                  <div>
+                    <div className="brief-verdict-label">{valuationBrief.label || renovationStatusLabel(valuationBrief.verdict)}</div>
+                    {valuationBrief.explanation && <div className="brief-verdict-text">{valuationBrief.explanation}</div>}
+                  </div>
+                  <div className="brief-meta">
+                    {valuationBrief.building_risk && <span>{valuationBrief.building_risk} building risk</span>}
+                    <span>{valuationBrief.confidence} confidence</span>
+                  </div>
+                </div>
+                <div className="brief-grid">
+                  <BriefPanel title="Cost window">
+                    {valuationBrief.expensive_windows?.length ? (
+                      <div className={`brief-window brief-window--${valuationBrief.expensive_windows[0].severity}`}>
+                        <strong>{valuationBrief.expensive_windows[0].label}</strong>
+                        <span>{valuationBrief.expensive_windows[0].severity} impact</span>
+                        {valuationBrief.expensive_windows[0].reasons?.length ? <p>{valuationBrief.expensive_windows[0].reasons.map(renovationStatusLabel).join(', ')}</p> : null}
+                      </div>
+                    ) : (
+                      <span className="brief-empty">No near expensive window</span>
+                    )}
+                  </BriefPanel>
+                  <BriefPanel title="Top risks">
+                    {valuationBrief.top_risks?.length ? valuationBrief.top_risks.slice(0, 3).map(signal => <BriefSignalRow signal={signal} key={signal.key} />) : <span className="brief-empty">No major risk signal</span>}
+                  </BriefPanel>
+                  <BriefPanel title="Supports">
+                    {valuationBrief.top_positives?.length ? valuationBrief.top_positives.slice(0, 3).map(signal => <BriefSignalRow signal={signal} key={signal.key} />) : <span className="brief-empty">No strong positive signal</span>}
+                  </BriefPanel>
+                </div>
+                {valuationBrief.key_renovations?.length ? (
+                  <div className="brief-renovations">
+                    {valuationBrief.key_renovations.slice(0, 9).map(item => (
+                      <div className={`brief-renovation brief-renovation--${item.status}`} key={item.category}>
+                        <span>{renovationStatusLabel(item.category)}</span>
+                        <strong>{briefRenovationWhen(item)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {valuationBrief.missing_evidence?.length ? (
+                  <div className="brief-missing">Missing: {valuationBrief.missing_evidence.slice(0, 6).map(renovationStatusLabel).join(', ')}</div>
+                ) : null}
+              </div>
+            </Section>
+          )}
           {offerAssessment && (
-            <Section title="Offer Assessment" actions={offerActions}>
+            <Section title="Offer Assessment" actions={!valuationBrief ? offerActions : undefined}>
               <div className="offer-assessment">
                 <div className={`offer-verdict offer-verdict--${offerAssessment.verdict}`}>
                   <div>
@@ -395,6 +547,32 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
                   <div className="offer-missing">Missing: {offerAssessment.missing.map(renovationStatusLabel).join(', ')}</div>
                 ) : null}
               </div>
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Valuation Inputs" actions={!offerAssessment ? offerActions : undefined}>
+              {valuationDisplayFacts.length ? (
+                <div className="valuation-inputs">
+                  {groupValuationFacts(valuationDisplayFacts).map(group => (
+                    <div className="valuation-input-group" key={group.section}>
+                      <div className="valuation-input-section">{renovationStatusLabel(group.section)}</div>
+                      <div className="valuation-input-grid">
+                        {group.facts.map(fact => (
+                          <div className="valuation-input-fact" key={`${fact.source || 'source'}-${fact.section}-${fact.key}`}>
+                            <span>{renovationStatusLabel(fact.key)}</span>
+                            <strong>{formatValuationFactValue(fact)}</strong>
+                            {(fact.evidence || fact.confidence != null) && (
+                              <p>{[fact.evidence, fact.confidence != null ? `${Math.round(fact.confidence * 100)}%` : undefined].filter(Boolean).join(' · ')}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">Run extraction to parse canonical valuation inputs</div>
+              )}
             </Section>
           )}
           {(commercial.rent != null || commercial.asking_price != null || commercial.debt_free_price != null ||
@@ -879,6 +1057,49 @@ function extractSaleListingDescription(id: string): Promise<DescriptionExtractio
   )
 }
 
+function extractSaleListingValuationInputs(id: string): Promise<ValuationInputExtractionResponse> {
+  return customInstance<ValuationInputExtractionResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/valuation-inputs/extract?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+    { method: 'POST' },
+  )
+}
+
+function groupValuationFacts(facts: ValuationFact[]): Array<{ section: string; facts: ValuationFact[] }> {
+  const grouped = new Map<string, ValuationFact[]>()
+  for (const fact of facts) {
+    if (!grouped.has(fact.section)) grouped.set(fact.section, [])
+    grouped.get(fact.section)!.push(fact)
+  }
+  return Array.from(grouped.entries()).map(([section, values]) => ({ section, facts: values }))
+}
+
+function valuationInputDisplayFacts(input: ValuationInput | undefined, evidenceFacts: ValuationFact[]): ValuationFact[] {
+  if (!input) return evidenceFacts
+  const sections: Array<keyof ValuationInput> = ['unit', 'layout', 'floor', 'building', 'site', 'charges', 'market', 'documents']
+  const facts: ValuationFact[] = []
+  for (const section of sections) {
+    const values = input[section]
+    if (!values || Array.isArray(values) || typeof values !== 'object') continue
+    for (const [key, value] of Object.entries(values)) {
+      if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) continue
+      if (typeof value === 'boolean') {
+        facts.push({ section, key, value_kind: 'bool', value_bool: value })
+      } else if (typeof value === 'number') {
+        facts.push({ section, key, value_kind: 'number', value_number: value })
+      } else if (typeof value === 'string') {
+        facts.push({ section, key, value_kind: 'text', value_text: value })
+      }
+    }
+  }
+  return facts.length ? facts : evidenceFacts
+}
+
+function formatValuationFactValue(fact: ValuationFact): string {
+  if (fact.value_kind === 'bool' && fact.value_bool != null) return fact.value_bool ? 'yes' : 'no'
+  if (fact.value_kind === 'number' && fact.value_number != null) return String(fact.value_number)
+  return fact.value_text || '—'
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="listing-fact">
@@ -904,6 +1125,25 @@ function OfferRange({ label, range }: { label: string; range?: ValueRange }) {
     <div className="offer-range">
       <span>{label}</span>
       <strong>{fmtRange(range)}</strong>
+    </div>
+  )
+}
+
+function BriefPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="brief-panel">
+      <div className="brief-panel-title">{title}</div>
+      <div className="brief-panel-body">{children}</div>
+    </div>
+  )
+}
+
+function BriefSignalRow({ signal }: { signal: BriefSignal }) {
+  return (
+    <div className={`brief-signal brief-signal--${signal.direction}`}>
+      <span>{signal.severity}</span>
+      <strong>{signal.label}</strong>
+      {signal.explanation && <p>{signal.explanation}</p>}
     </div>
   )
 }
@@ -1023,6 +1263,12 @@ function renovationTextItems(text: string | undefined, status: RenovationStatus)
 function fmtRenovationNeedYear(item: RenovationForecastItem): string {
   if (item.year_range) return item.year_range
   return item.year != null ? String(item.year) : 'TBD'
+}
+
+function briefRenovationWhen(item: KeyRenovationStatus): string {
+  if (item.year != null) return `${renovationStatusLabel(item.status)} ${item.year}`
+  if (item.window_start_year != null && item.window_end_year != null) return `${item.window_start_year}-${item.window_end_year}`
+  return renovationStatusLabel(item.status)
 }
 
 function renovationStatusLabel(status: string): string {

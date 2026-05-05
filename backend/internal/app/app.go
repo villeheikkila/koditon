@@ -35,9 +35,9 @@ import (
 	server "koditon/internal/transport/httpserver"
 	mcpserver "koditon/internal/transport/mcp"
 	oauthapi "koditon/internal/transport/oauth"
+	openapi "koditon/internal/transport/openapi"
 	"koditon/internal/transport/telegram"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
@@ -229,7 +229,7 @@ func run(
 		mux.Handle("/mcp", mcpSrv)
 		mux.Handle("/mcp/", mcpSrv)
 		mux.Handle("/.well-known/openai-apps-challenge", mcpSrv)
-		apiConfig := huma.DefaultConfig("Koditon API", "0.1.0")
+		apiConfig := openapi.NewConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)
 		if oauthHandler != nil {

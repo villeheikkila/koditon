@@ -690,6 +690,25 @@ type PropertyUnit struct {
 	PropertyUnitUpdatedAt      time.Time       `json:"property_unit_updated_at"`
 }
 
+type PropertyValuationFact struct {
+	PropertyValuationFactID            uuid.UUID `json:"property_valuation_fact_id"`
+	PropertyValuationFactEntityType    string    `json:"property_valuation_fact_entity_type"`
+	PropertyValuationFactEntityID      uuid.UUID `json:"property_valuation_fact_entity_id"`
+	PropertyValuationFactSourceField   string    `json:"property_valuation_fact_source_field"`
+	PropertyValuationFactSection       string    `json:"property_valuation_fact_section"`
+	PropertyValuationFactKey           string    `json:"property_valuation_fact_key"`
+	PropertyValuationFactValueKind     string    `json:"property_valuation_fact_value_kind"`
+	PropertyValuationFactValueText     *string   `json:"property_valuation_fact_value_text"`
+	PropertyValuationFactValueNumber   *float64  `json:"property_valuation_fact_value_number"`
+	PropertyValuationFactValueBool     *bool     `json:"property_valuation_fact_value_bool"`
+	PropertyValuationFactConfidence    int32     `json:"property_valuation_fact_confidence"`
+	PropertyValuationFactEvidenceText  *string   `json:"property_valuation_fact_evidence_text"`
+	PropertyValuationFactModel         *string   `json:"property_valuation_fact_model"`
+	PropertyValuationFactPromptVersion *string   `json:"property_valuation_fact_prompt_version"`
+	PropertyValuationFactCreatedAt     time.Time `json:"property_valuation_fact_created_at"`
+	PropertyValuationFactUpdatedAt     time.Time `json:"property_valuation_fact_updated_at"`
+}
+
 type Role struct {
 	RoleUuid        uuid.UUID `json:"role_uuid"`
 	RoleName        string    `json:"role_name"`

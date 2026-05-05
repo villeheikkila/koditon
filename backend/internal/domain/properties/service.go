@@ -221,6 +221,9 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	if err := s.enrichSaleListingInsights(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
+	if err := s.enrichSaleListingValuationFacts(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
 	return listing, nil
 }
 
@@ -231,6 +234,26 @@ func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleLi
 	}
 	for _, row := range rows {
 		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.PropertySourceOfferingInsightKey, Value: row.PropertySourceOfferingInsightValue, Direction: row.PropertySourceOfferingInsightDirection, Severity: row.PropertySourceOfferingInsightSeverity, Confidence: float64(row.PropertySourceOfferingInsightConfidence) / 100, Source: row.PropertySourceOfferingInsightSourceField, Explanation: row.PropertySourceOfferingInsightText})
+	}
+	return nil
+}
+
+func (s *Service) enrichSaleListingValuationFacts(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	rows, err := s.queries.ListPropertyValuationFactsForEntity(ctx, db.ListPropertyValuationFactsForEntityParams{EntityType: valuationFactEntitySaleListing, EntityID: saleListingID})
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		fact := valuation.ValuationFact{Section: row.PropertyValuationFactSection, Key: row.PropertyValuationFactKey, ValueKind: row.PropertyValuationFactValueKind, ValueText: row.PropertyValuationFactValueText, Confidence: float64(row.PropertyValuationFactConfidence) / 100, Source: row.PropertyValuationFactSourceField, Evidence: row.PropertyValuationFactEvidenceText, Model: row.PropertyValuationFactModel, Prompt: row.PropertyValuationFactPromptVersion}
+		if row.PropertyValuationFactValueNumber != nil {
+			value := *row.PropertyValuationFactValueNumber
+			fact.ValueNumber = &value
+		}
+		if row.PropertyValuationFactValueBool != nil {
+			value := *row.PropertyValuationFactValueBool
+			fact.ValueBool = &value
+		}
+		listing.ValuationInputs.Facts = append(listing.ValuationInputs.Facts, fact)
 	}
 	return nil
 }

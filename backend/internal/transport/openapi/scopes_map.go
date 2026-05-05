@@ -20,6 +20,7 @@ var operationIDScopes = map[string][]string{
 	"sale-listings-transaction-match-candidates": {auth.ScopeCoreRead},
 	"sale-listings-renovations-extract":          {auth.ScopeCoreRead},
 	"sale-listings-description-extract":          {auth.ScopeCoreRead},
+	"sale-listings-valuation-inputs-extract":     {auth.ScopeCoreRead},
 	"entity-detail":                              {},
 	"search":                                     {},
 	"auth-apple-web":                             {},

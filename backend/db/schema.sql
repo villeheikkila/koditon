@@ -844,6 +844,31 @@ create table public.property_units (
 
 CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
 
+create table public.property_valuation_facts (
+  property_valuation_fact_id uuid default gen_random_uuid() not null constraint property_valuation_facts_pkey primary key,
+  property_valuation_fact_entity_type text not null,
+  property_valuation_fact_entity_id uuid not null,
+  property_valuation_fact_source_field text not null,
+  property_valuation_fact_section text not null,
+  property_valuation_fact_key text not null,
+  property_valuation_fact_value_kind text not null,
+  property_valuation_fact_value_text text,
+  property_valuation_fact_value_number double precision,
+  property_valuation_fact_value_bool boolean,
+  property_valuation_fact_confidence integer default 50 not null,
+  property_valuation_fact_evidence_text text,
+  property_valuation_fact_model text,
+  property_valuation_fact_prompt_version text,
+  property_valuation_fact_created_at timestamp with time zone default now() not null,
+  property_valuation_fact_updated_at timestamp with time zone default now() not null,
+  constraint property_valuation_facts_property_valuation_fact_entity_t_check CHECK ((property_valuation_fact_entity_type = ANY (ARRAY['sale_listing'::text, 'building'::text, 'transaction'::text, 'document'::text]))),
+  constraint property_valuation_facts_property_valuation_fact_value_ki_check CHECK ((property_valuation_fact_value_kind = ANY (ARRAY['text'::text, 'number'::text, 'bool'::text])))
+);
+
+CREATE INDEX idx_property_valuation_facts_entity ON public.property_valuation_facts USING btree (property_valuation_fact_entity_type, property_valuation_fact_entity_id);
+CREATE INDEX idx_property_valuation_facts_section_key ON public.property_valuation_facts USING btree (property_valuation_fact_section, property_valuation_fact_key);
+CREATE UNIQUE INDEX idx_property_valuation_facts_unique ON public.property_valuation_facts USING btree (property_valuation_fact_entity_type, property_valuation_fact_entity_id, property_valuation_fact_source_field, property_valuation_fact_section, property_valuation_fact_key);
+
 create table public.role_feature_flags (
   flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
   role_id bigint not null constraint role_feature_flags_role_id_fkey references roles(role_id) ON DELETE CASCADE,

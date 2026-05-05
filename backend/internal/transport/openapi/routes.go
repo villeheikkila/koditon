@@ -126,6 +126,13 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Sale Listings"}
 		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-description-extract"))
 	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/valuation-inputs/extract", a.saleListingValuationInputsExtractHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-valuation-inputs-extract"
+		op.Summary = "Extract canonical sale listing valuation inputs"
+		op.Description = "Uses the configured Fantasy/OpenRouter model to parse layout and listing text into structured valuation facts"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-valuation-inputs-extract"))
+	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-search"
 		op.Summary = "Search rentals"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"reflect"
 	"time"
 
 	frontdoorclient "koditon/internal/clients/frontdoor"
@@ -19,6 +20,16 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const valuationPackagePath = "koditon/internal/domain/valuation"
+
+var valuationSchemaNameOverrides = map[string]string{
+	"BuildingRenovation":    "ValuationBuildingRenovation",
+	"Charges":               "ValuationCharges",
+	"Location":              "ValuationLocation",
+	"PriceTransactionMatch": "ValuationPriceTransactionMatch",
+	"SaleListing":           "ValuationSaleListing",
+}
 
 type API struct {
 	logger            *slog.Logger
@@ -92,4 +103,24 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 
 func (a *API) AddRoutes(humaAPI huma.API) {
 	addRoutes(a, humaAPI)
+}
+
+// NewConfig creates the Huma config used by the HTTP API.
+func NewConfig(title string, version string) huma.Config {
+	cfg := huma.DefaultConfig(title, version)
+	cfg.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", schemaName)
+	return cfg
+}
+
+func schemaName(t reflect.Type, hint string) string {
+	named := t
+	for named.Kind() == reflect.Pointer {
+		named = named.Elem()
+	}
+	if named.PkgPath() == valuationPackagePath {
+		if name, ok := valuationSchemaNameOverrides[named.Name()]; ok {
+			return name
+		}
+	}
+	return huma.DefaultSchemaNamer(t, hint)
 }

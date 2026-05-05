@@ -55,6 +55,11 @@ type saleListingDescriptionExtractInput struct {
 	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
 }
 
+type saleListingValuationInputsExtractInput struct {
+	ID    string `path:"id"     required:"true" doc:"Canonical offering UUID"`
+	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
+}
+
 type transactionMatchPostalsInput struct {
 	Limit int32 `query:"limit" doc:"Maximum postal codes to return"`
 }
@@ -145,6 +150,10 @@ type saleListingRenovationExtractOutput struct {
 
 type saleListingDescriptionExtractOutput struct {
 	Body properties.DescriptionExtractionResult
+}
+
+type saleListingValuationInputsExtractOutput struct {
+	Body properties.ValuationInputExtractionResult
 }
 
 type rentalDetailOutput struct {
@@ -259,6 +268,21 @@ func (a *API) saleListingDescriptionExtractHandler(ctx context.Context, input *s
 		return nil, huma.Error400BadRequest("description extraction failed")
 	}
 	return &saleListingDescriptionExtractOutput{Body: result}, nil
+}
+
+func (a *API) saleListingValuationInputsExtractHandler(ctx context.Context, input *saleListingValuationInputsExtractInput) (*saleListingValuationInputsExtractOutput, error) {
+	result, err := a.propertiesService.ExtractSaleListingValuationInputs(ctx, input.ID, input.Model)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
+			return nil, huma.Error503ServiceUnavailable("valuation input extractor not configured")
+		}
+		a.logger.ErrorContext(ctx, "sale listing valuation input extraction failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("valuation input extraction failed")
+	}
+	return &saleListingValuationInputsExtractOutput{Body: result}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {

@@ -912,6 +912,23 @@ func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, s
 	return err
 }
 
+const deleteLLMPropertyValuationFactsForEntity = `-- name: DeleteLLMPropertyValuationFactsForEntity :exec
+DELETE FROM public.property_valuation_facts
+WHERE property_valuation_fact_entity_type = $1
+    AND property_valuation_fact_entity_id = $2
+    AND property_valuation_fact_source_field LIKE 'llm_%'
+`
+
+type DeleteLLMPropertyValuationFactsForEntityParams struct {
+	EntityType string    `json:"entity_type"`
+	EntityID   uuid.UUID `json:"entity_id"`
+}
+
+func (q *Queries) DeleteLLMPropertyValuationFactsForEntity(ctx context.Context, arg DeleteLLMPropertyValuationFactsForEntityParams) error {
+	_, err := q.db.Exec(ctx, deleteLLMPropertyValuationFactsForEntity, arg.EntityType, arg.EntityID)
+	return err
+}
+
 const deletePropertySourceOfferingForFrontdoorBuildingAnnouncement = `-- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
 DELETE FROM public.property_source_offerings
 WHERE frontdoor_building_announcement_id = $1
@@ -1705,6 +1722,120 @@ func (q *Queries) GetPropertySourceOfferingDetail(ctx context.Context, saleListi
 	return i, err
 }
 
+const getPropertySourceOfferingValuationExtractionTexts = `-- name: GetPropertySourceOfferingValuationExtractionTexts :one
+SELECT
+    COALESCE(sale_listing_room_layout, '') AS room_layout,
+    sale_listing_rooms_count,
+    sale_listing_bedrooms_count,
+    sale_listing_area_value,
+    sale_listing_living_area_value,
+    sale_listing_total_area_value,
+    sale_listing_other_area_value,
+    sale_listing_floor_level,
+    sale_listing_total_floors,
+    COALESCE(sale_listing_floor_text, '') AS floor_text,
+    COALESCE(sale_listing_condition, '') AS condition,
+    sale_listing_sauna,
+    sale_listing_balcony,
+    COALESCE(sale_listing_parking_text, '') AS parking_text,
+    COALESCE(sale_listing_description_text, '') AS description_text,
+    COALESCE(sale_listing_additional_info_text, '') AS additional_info_text,
+    COALESCE(sale_listing_kitchen_description_text, '') AS kitchen_description_text,
+    COALESCE(sale_listing_bathroom_description_text, '') AS bathroom_description_text,
+    COALESCE(sale_listing_storage_description_text, '') AS storage_description_text,
+    COALESCE(sale_listing_floor_materials_description_text, '') AS floor_materials_description_text,
+    COALESCE(sale_listing_wall_materials_description_text, '') AS wall_materials_description_text,
+    COALESCE(sale_listing_balcony_description_text, '') AS balcony_description_text,
+    COALESCE(sale_listing_sauna_description_text, '') AS sauna_description_text,
+    COALESCE(sale_listing_views_description_text, '') AS views_description_text,
+    COALESCE(sale_listing_building_material, '') AS building_material,
+    COALESCE(sale_listing_heating_system, '') AS heating_system,
+    COALESCE(sale_listing_roof_type, '') AS roof_type,
+    COALESCE(sale_listing_roof_material, '') AS roof_material,
+    COALESCE(sale_listing_car_storage_text, '') AS car_storage_text,
+    COALESCE(sale_listing_building_description_text, '') AS building_description_text,
+    COALESCE(sale_listing_building_other_info_text, '') AS building_other_info_text,
+    COALESCE(sale_listing_charges_text, '') AS charges_text
+FROM public.property_source_offerings
+WHERE sale_listing_id = $1
+LIMIT 1
+`
+
+type GetPropertySourceOfferingValuationExtractionTextsRow struct {
+	RoomLayout                    string   `json:"room_layout"`
+	SaleListingRoomsCount         *int32   `json:"sale_listing_rooms_count"`
+	SaleListingBedroomsCount      *int32   `json:"sale_listing_bedrooms_count"`
+	SaleListingAreaValue          *float64 `json:"sale_listing_area_value"`
+	SaleListingLivingAreaValue    *float64 `json:"sale_listing_living_area_value"`
+	SaleListingTotalAreaValue     *float64 `json:"sale_listing_total_area_value"`
+	SaleListingOtherAreaValue     *float64 `json:"sale_listing_other_area_value"`
+	SaleListingFloorLevel         *int32   `json:"sale_listing_floor_level"`
+	SaleListingTotalFloors        *int32   `json:"sale_listing_total_floors"`
+	FloorText                     string   `json:"floor_text"`
+	Condition                     string   `json:"condition"`
+	SaleListingSauna              *bool    `json:"sale_listing_sauna"`
+	SaleListingBalcony            *bool    `json:"sale_listing_balcony"`
+	ParkingText                   string   `json:"parking_text"`
+	DescriptionText               string   `json:"description_text"`
+	AdditionalInfoText            string   `json:"additional_info_text"`
+	KitchenDescriptionText        string   `json:"kitchen_description_text"`
+	BathroomDescriptionText       string   `json:"bathroom_description_text"`
+	StorageDescriptionText        string   `json:"storage_description_text"`
+	FloorMaterialsDescriptionText string   `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText  string   `json:"wall_materials_description_text"`
+	BalconyDescriptionText        string   `json:"balcony_description_text"`
+	SaunaDescriptionText          string   `json:"sauna_description_text"`
+	ViewsDescriptionText          string   `json:"views_description_text"`
+	BuildingMaterial              string   `json:"building_material"`
+	HeatingSystem                 string   `json:"heating_system"`
+	RoofType                      string   `json:"roof_type"`
+	RoofMaterial                  string   `json:"roof_material"`
+	CarStorageText                string   `json:"car_storage_text"`
+	BuildingDescriptionText       string   `json:"building_description_text"`
+	BuildingOtherInfoText         string   `json:"building_other_info_text"`
+	ChargesText                   string   `json:"charges_text"`
+}
+
+func (q *Queries) GetPropertySourceOfferingValuationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingValuationExtractionTextsRow, error) {
+	row := q.db.QueryRow(ctx, getPropertySourceOfferingValuationExtractionTexts, saleListingID)
+	var i GetPropertySourceOfferingValuationExtractionTextsRow
+	err := row.Scan(
+		&i.RoomLayout,
+		&i.SaleListingRoomsCount,
+		&i.SaleListingBedroomsCount,
+		&i.SaleListingAreaValue,
+		&i.SaleListingLivingAreaValue,
+		&i.SaleListingTotalAreaValue,
+		&i.SaleListingOtherAreaValue,
+		&i.SaleListingFloorLevel,
+		&i.SaleListingTotalFloors,
+		&i.FloorText,
+		&i.Condition,
+		&i.SaleListingSauna,
+		&i.SaleListingBalcony,
+		&i.ParkingText,
+		&i.DescriptionText,
+		&i.AdditionalInfoText,
+		&i.KitchenDescriptionText,
+		&i.BathroomDescriptionText,
+		&i.StorageDescriptionText,
+		&i.FloorMaterialsDescriptionText,
+		&i.WallMaterialsDescriptionText,
+		&i.BalconyDescriptionText,
+		&i.SaunaDescriptionText,
+		&i.ViewsDescriptionText,
+		&i.BuildingMaterial,
+		&i.HeatingSystem,
+		&i.RoofType,
+		&i.RoofMaterial,
+		&i.CarStorageText,
+		&i.BuildingDescriptionText,
+		&i.BuildingOtherInfoText,
+		&i.ChargesText,
+	)
+	return i, err
+}
+
 const getQueueMetrics = `-- name: GetQueueMetrics :one
 
 SELECT
@@ -2073,6 +2204,88 @@ func (q *Queries) InsertPropertySourceOfferingInsight(ctx context.Context, arg I
 	return err
 }
 
+const insertPropertyValuationFact = `-- name: InsertPropertyValuationFact :exec
+INSERT INTO public.property_valuation_facts (
+    property_valuation_fact_entity_type,
+    property_valuation_fact_entity_id,
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key,
+    property_valuation_fact_value_kind,
+    property_valuation_fact_value_text,
+    property_valuation_fact_value_number,
+    property_valuation_fact_value_bool,
+    property_valuation_fact_confidence,
+    property_valuation_fact_evidence_text,
+    property_valuation_fact_model,
+    property_valuation_fact_prompt_version
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    NULLIF($7, ''),
+    $8,
+    $9,
+    $10,
+    NULLIF($11, ''),
+    NULLIF($12, ''),
+    NULLIF($13, '')
+) ON CONFLICT (
+    property_valuation_fact_entity_type,
+    property_valuation_fact_entity_id,
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key
+) DO UPDATE SET
+    property_valuation_fact_value_kind = EXCLUDED.property_valuation_fact_value_kind,
+    property_valuation_fact_value_text = EXCLUDED.property_valuation_fact_value_text,
+    property_valuation_fact_value_number = EXCLUDED.property_valuation_fact_value_number,
+    property_valuation_fact_value_bool = EXCLUDED.property_valuation_fact_value_bool,
+    property_valuation_fact_confidence = EXCLUDED.property_valuation_fact_confidence,
+    property_valuation_fact_evidence_text = EXCLUDED.property_valuation_fact_evidence_text,
+    property_valuation_fact_model = EXCLUDED.property_valuation_fact_model,
+    property_valuation_fact_prompt_version = EXCLUDED.property_valuation_fact_prompt_version,
+    property_valuation_fact_updated_at = now()
+`
+
+type InsertPropertyValuationFactParams struct {
+	EntityType    string      `json:"entity_type"`
+	EntityID      uuid.UUID   `json:"entity_id"`
+	SourceField   string      `json:"source_field"`
+	Section       string      `json:"section"`
+	Key           string      `json:"key"`
+	ValueKind     string      `json:"value_kind"`
+	ValueText     interface{} `json:"value_text"`
+	ValueNumber   *float64    `json:"value_number"`
+	ValueBool     *bool       `json:"value_bool"`
+	Confidence    int32       `json:"confidence"`
+	EvidenceText  interface{} `json:"evidence_text"`
+	Model         interface{} `json:"model"`
+	PromptVersion interface{} `json:"prompt_version"`
+}
+
+func (q *Queries) InsertPropertyValuationFact(ctx context.Context, arg InsertPropertyValuationFactParams) error {
+	_, err := q.db.Exec(ctx, insertPropertyValuationFact,
+		arg.EntityType,
+		arg.EntityID,
+		arg.SourceField,
+		arg.Section,
+		arg.Key,
+		arg.ValueKind,
+		arg.ValueText,
+		arg.ValueNumber,
+		arg.ValueBool,
+		arg.Confidence,
+		arg.EvidenceText,
+		arg.Model,
+		arg.PromptVersion,
+	)
+	return err
+}
+
 const listMunicipalitiesWithPostalCodes = `-- name: ListMunicipalitiesWithPostalCodes :many
 SELECT
     pm.postal_municipality_id,
@@ -2281,6 +2494,76 @@ func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleLi
 			&i.PropertySourceOfferingInsightConfidence,
 			&i.PropertySourceOfferingInsightSourceField,
 			&i.PropertySourceOfferingInsightText,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPropertyValuationFactsForEntity = `-- name: ListPropertyValuationFactsForEntity :many
+SELECT
+    property_valuation_fact_source_field,
+    property_valuation_fact_section,
+    property_valuation_fact_key,
+    property_valuation_fact_value_kind,
+    COALESCE(property_valuation_fact_value_text, '') AS property_valuation_fact_value_text,
+    property_valuation_fact_value_number,
+    property_valuation_fact_value_bool,
+    property_valuation_fact_confidence,
+    COALESCE(property_valuation_fact_evidence_text, '') AS property_valuation_fact_evidence_text,
+    COALESCE(property_valuation_fact_model, '') AS property_valuation_fact_model,
+    COALESCE(property_valuation_fact_prompt_version, '') AS property_valuation_fact_prompt_version
+FROM public.property_valuation_facts
+WHERE property_valuation_fact_entity_type = $1
+    AND property_valuation_fact_entity_id = $2
+ORDER BY property_valuation_fact_section, property_valuation_fact_key
+`
+
+type ListPropertyValuationFactsForEntityParams struct {
+	EntityType string    `json:"entity_type"`
+	EntityID   uuid.UUID `json:"entity_id"`
+}
+
+type ListPropertyValuationFactsForEntityRow struct {
+	PropertyValuationFactSourceField   string   `json:"property_valuation_fact_source_field"`
+	PropertyValuationFactSection       string   `json:"property_valuation_fact_section"`
+	PropertyValuationFactKey           string   `json:"property_valuation_fact_key"`
+	PropertyValuationFactValueKind     string   `json:"property_valuation_fact_value_kind"`
+	PropertyValuationFactValueText     string   `json:"property_valuation_fact_value_text"`
+	PropertyValuationFactValueNumber   *float64 `json:"property_valuation_fact_value_number"`
+	PropertyValuationFactValueBool     *bool    `json:"property_valuation_fact_value_bool"`
+	PropertyValuationFactConfidence    int32    `json:"property_valuation_fact_confidence"`
+	PropertyValuationFactEvidenceText  string   `json:"property_valuation_fact_evidence_text"`
+	PropertyValuationFactModel         string   `json:"property_valuation_fact_model"`
+	PropertyValuationFactPromptVersion string   `json:"property_valuation_fact_prompt_version"`
+}
+
+func (q *Queries) ListPropertyValuationFactsForEntity(ctx context.Context, arg ListPropertyValuationFactsForEntityParams) ([]ListPropertyValuationFactsForEntityRow, error) {
+	rows, err := q.db.Query(ctx, listPropertyValuationFactsForEntity, arg.EntityType, arg.EntityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPropertyValuationFactsForEntityRow{}
+	for rows.Next() {
+		var i ListPropertyValuationFactsForEntityRow
+		if err := rows.Scan(
+			&i.PropertyValuationFactSourceField,
+			&i.PropertyValuationFactSection,
+			&i.PropertyValuationFactKey,
+			&i.PropertyValuationFactValueKind,
+			&i.PropertyValuationFactValueText,
+			&i.PropertyValuationFactValueNumber,
+			&i.PropertyValuationFactValueBool,
+			&i.PropertyValuationFactConfidence,
+			&i.PropertyValuationFactEvidenceText,
+			&i.PropertyValuationFactModel,
+			&i.PropertyValuationFactPromptVersion,
 		); err != nil {
 			return nil, err
 		}
