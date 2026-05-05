@@ -112,6 +112,20 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Fetch the original provider JSON payload for a source row linked to a canonical sale offering"
 		op.Tags = []string{"Sale Listings"}
 	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/renovations/extract", a.saleListingRenovationExtractHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-renovations-extract"
+		op.Summary = "Extract structured sale listing renovations"
+		op.Description = "Uses the configured Fantasy/OpenRouter model to extract structured renovation rows from listing renovation text"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-renovations-extract"))
+	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/description/extract", a.saleListingDescriptionExtractHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-description-extract"
+		op.Summary = "Extract structured sale listing description signals"
+		op.Description = "Uses the configured Fantasy/OpenRouter model to extract offer-relevant signals from listing description text"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-description-extract"))
+	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-search"
 		op.Summary = "Search rentals"

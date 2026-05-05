@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import {
   useHousingCompaniesDetail,
@@ -9,13 +10,93 @@ import {
   type SaleListing,
 } from '../api/koditon'
 import ListingLocationMap from '../components/ListingLocationMap'
+import { customInstance } from '../lib/axios-instance'
 
 type ListingDetail = SaleListing | Rental
 type RenovationStatus = 'done' | 'planned'
+const RENOVATION_EXTRACTION_MODEL = '~google/gemini-flash-latest'
 type RenovationItem = {
   kind: string
   status: RenovationStatus
   year?: number
+}
+type RenovationExtractionResult = {
+  sale_listing_id: string
+  model: string
+  items?: RenovationExtractionResultItem[] | null
+}
+type RenovationExtractionResultItem = {
+  category: string
+  status: string
+  year?: number
+  text?: string
+  confidence: number
+  source_field: string
+}
+type RenovationExtractionResponse = {
+  data: RenovationExtractionResult
+  status: number
+  headers: Headers
+}
+type DescriptionExtractionResult = {
+  sale_listing_id: string
+  model: string
+  items?: Array<{ key: string; value: string; direction: string; severity: string; confidence: number; text?: string; source_field: string }> | null
+}
+type DescriptionExtractionResponse = {
+  data: DescriptionExtractionResult
+  status: number
+  headers: Headers
+}
+type RenovationForecastItem = {
+  category: string
+  component?: string
+  status: string
+  scope?: string
+  stage?: string
+  responsibility?: string
+  year?: number
+  year_range?: string
+  window_start_year?: number
+  window_end_year?: number
+  basis_year?: number
+  cycle_years?: number
+  severity: string
+  confidence?: string
+  cost_estimate_eur?: number
+  price_effect: string
+  source: string
+  depends_on?: string[] | null
+  price_mechanisms?: string[] | null
+  explanation: string
+}
+type ValueRange = {
+  low?: number
+  high?: number
+}
+type OfferAssessment = {
+  verdict: string
+  asking_price?: number
+  debt_free_price?: number
+  market_value_range?: ValueRange
+  risk_adjusted_value_range?: ValueRange
+  recommended_offer_range?: ValueRange
+  renovation_risk_reserve?: ValueRange
+  renovation_risk_reserve_per_m2?: ValueRange
+  confidence: string
+  main_reasons?: Array<{ key: string; direction: string; severity: string; explanation: string }> | null
+  missing?: string[] | null
+  explanation: string
+}
+type SaleListingWithValuation = SaleListing & {
+  valuation?: {
+    renovations?: {
+      next_40_years?: RenovationForecastItem[] | null
+      forecast_start_year?: number
+      forecast_horizon_years?: number
+    }
+    offer_assessment?: OfferAssessment
+  }
 }
 
 interface DetailPageProps {
@@ -42,7 +123,7 @@ export default function DetailPage({ kind }: DetailPageProps) {
   }
   if (sale.isPending) return <Loading />
   if (sale.isError || !sale.data?.data) return <ErrorMessage error={sale.error} />
-  return <ListingView detail={sale.data.data as SaleListing} kind="listing" />
+  return <ListingView detail={sale.data.data as SaleListing} kind="listing" onRefresh={() => sale.refetch().then(() => undefined)} />
 }
 
 function Loading() {
@@ -63,8 +144,10 @@ function ErrorMessage({ error }: { error: unknown }) {
   )
 }
 
-function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listing' | 'rental' }) {
+function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; kind: 'listing' | 'rental'; onRefresh?: () => Promise<void> }) {
   const [transactionOpen, setTransactionOpen] = useState(false)
+  const [renovationExtractionResult, setRenovationExtractionResult] = useState<RenovationExtractionResult | null>(null)
+  const [descriptionExtractionResult, setDescriptionExtractionResult] = useState<DescriptionExtractionResult | null>(null)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -100,10 +183,67 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
   const mainImageURLs = new Set([d.media?.main_image?.url, d.media?.main_image?.variants?.large, d.media?.main_image?.variants?.gallery].filter(Boolean))
   const images = d.media?.images?.filter(image => !mainImageURLs.has(image.url)) ?? []
   const renovationRows = renovationItems(building.renovations, texts?.renovations_done, texts?.renovations_planned)
+  const valuationRenovations = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.renovations
+  const offerAssessment = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.offer_assessment
+  const renovationForecastRows = valuationRenovations?.next_40_years ?? []
   const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
   const mapLatitude = location.latitude ?? building.location.latitude
   const mapLongitude = location.longitude ?? building.location.longitude
   const mapLabel = [location.street_address || building.location.street_address || d.headline, location.postal || building.location.postal, location.city || building.location.city].filter(Boolean).join(', ')
+  const extractRenovations = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Renovation extraction is only available for sale listings')
+      return extractSaleListingRenovations(saleDetail.id)
+    },
+    onSuccess: async response => {
+      setRenovationExtractionResult(response.data)
+      await onRefresh?.()
+    },
+  })
+  const renovationExtractionMessage = extractRenovations.isError
+    ? (extractRenovations.error as Error)?.message ?? 'Renovation extraction failed'
+    : renovationExtractionResult
+      ? `${renovationExtractionResult.items?.length ?? 0} extracted · ${renovationExtractionResult.model}`
+      : undefined
+  const renovationActions = saleDetail ? (
+    <div className="listing-section-actions">
+      {renovationExtractionMessage && (
+        <span className={`listing-section-status${extractRenovations.isError ? ' listing-section-status--error' : ''}`}>
+          {renovationExtractionMessage}
+        </span>
+      )}
+      <button type="button" className="listing-action-button" onClick={() => extractRenovations.mutate()} disabled={extractRenovations.isPending}>
+        {extractRenovations.isPending ? 'Running…' : 'Run extraction'}
+      </button>
+    </div>
+  ) : undefined
+  const extractDescription = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Description extraction is only available for sale listings')
+      return extractSaleListingDescription(saleDetail.id)
+    },
+    onSuccess: async response => {
+      setDescriptionExtractionResult(response.data)
+      await onRefresh?.()
+    },
+  })
+  const descriptionExtractionMessage = extractDescription.isError
+    ? (extractDescription.error as Error)?.message ?? 'Description extraction failed'
+    : descriptionExtractionResult
+      ? `${descriptionExtractionResult.items?.length ?? 0} extracted · ${descriptionExtractionResult.model}`
+      : undefined
+  const offerActions = saleDetail ? (
+    <div className="listing-section-actions">
+      {descriptionExtractionMessage && (
+        <span className={`listing-section-status${extractDescription.isError ? ' listing-section-status--error' : ''}`}>
+          {descriptionExtractionMessage}
+        </span>
+      )}
+      <button type="button" className="listing-action-button" onClick={() => extractDescription.mutate()} disabled={extractDescription.isPending}>
+        {extractDescription.isPending ? 'Running…' : 'Extract description'}
+      </button>
+    </div>
+  ) : undefined
 
   return (
     <div className="listing-layout">
@@ -223,6 +363,38 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
           {texts?.description && (
             <Section title="Description">
               <TextBlock text={texts.description} />
+            </Section>
+          )}
+          {offerAssessment && (
+            <Section title="Offer Assessment" actions={offerActions}>
+              <div className="offer-assessment">
+                <div className={`offer-verdict offer-verdict--${offerAssessment.verdict}`}>
+                  <div>
+                    <div className="offer-verdict-label">{renovationStatusLabel(offerAssessment.verdict)}</div>
+                    <div className="offer-verdict-text">{offerAssessment.explanation}</div>
+                  </div>
+                  <span>{offerAssessment.confidence} confidence</span>
+                </div>
+                <div className="offer-range-grid">
+                  <OfferRange label="Market value" range={offerAssessment.market_value_range} />
+                  <OfferRange label="Risk-adjusted" range={offerAssessment.risk_adjusted_value_range} />
+                  <OfferRange label="Offer range" range={offerAssessment.recommended_offer_range} />
+                  <OfferRange label="Renovation reserve" range={offerAssessment.renovation_risk_reserve} />
+                </div>
+                {offerAssessment.main_reasons?.length ? (
+                  <div className="offer-reasons">
+                    {offerAssessment.main_reasons.map(reason => (
+                      <div className={`offer-reason offer-reason--${reason.direction}`} key={reason.key}>
+                        <span>{reason.severity}</span>
+                        <p>{reason.explanation}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {offerAssessment.missing?.length ? (
+                  <div className="offer-missing">Missing: {offerAssessment.missing.map(renovationStatusLabel).join(', ')}</div>
+                ) : null}
+              </div>
             </Section>
           )}
           {(commercial.rent != null || commercial.asking_price != null || commercial.debt_free_price != null ||
@@ -347,19 +519,58 @@ function ListingView({ detail: d, kind }: { detail: ListingDetail; kind: 'listin
               {building.other_info && <Row label="Other building info" value={building.other_info} />}
             </div>
           </Section>
-          {renovationRows.length > 0 && (
-            <Section title="Housing Company Renovations">
-              <div className="renovation-list">
-                {renovationRows.map((item, index) => (
-                  <div className="renovation-row" key={`${item.kind}-${item.year || 'no-year'}-${item.status}-${index}`}>
-                    <div className="renovation-year">{item.year || '—'}</div>
-                    <div className="renovation-main">
-                      <div className="renovation-kind">{item.kind}</div>
-                      <div className={`renovation-status renovation-status--${item.status}`}>{item.status}</div>
+          {(renovationRows.length > 0 || saleDetail) && (
+            <Section title="Housing Company Renovations" actions={renovationActions}>
+              {renovationRows.length > 0 ? (
+                <div className="renovation-list">
+                  {renovationRows.map((item, index) => (
+                    <div className="renovation-row" key={`${item.kind}-${item.year || 'no-year'}-${item.status}-${index}`}>
+                      <div className="renovation-year">{item.year || '—'}</div>
+                      <div className="renovation-main">
+                        <div className="renovation-kind">{item.kind}</div>
+                        <div className={`renovation-status renovation-status--${item.status}`}>{item.status}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">No structured renovations</div>
+              )}
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Next 40 Years">
+              {renovationForecastRows.length > 0 ? (
+                <div className="renovation-list">
+                  {renovationForecastRows.map((item, index) => (
+                    <div className="renovation-row renovation-row--forecast" key={`${item.category}-${item.year || item.year_range || 'no-year'}-${item.status}-${index}`}>
+                      <div className="renovation-year">{fmtRenovationNeedYear(item)}</div>
+                      <div className="renovation-main">
+                        <div className="renovation-kind">{item.category}</div>
+                        <div className="renovation-forecast-meta">
+                          <span className={`renovation-status renovation-status--${item.status}`}>{renovationStatusLabel(item.status)}</span>
+                          <span>{item.severity} impact</span>
+                          {item.confidence && <span>{item.confidence} confidence</span>}
+                          {item.scope && item.scope !== 'unknown' && <span>{item.scope}</span>}
+                          {item.stage && item.stage !== 'unknown' && <span>{renovationStatusLabel(item.stage)}</span>}
+                          {item.component && <span>{renovationStatusLabel(item.component)}</span>}
+                          {item.cycle_years != null && <span>{item.cycle_years} year cycle</span>}
+                          {item.basis_year != null && <span>from {item.basis_year}</span>}
+                          {item.cost_estimate_eur != null && <span>{fmtPrice(item.cost_estimate_eur)}</span>}
+                        </div>
+                        {item.price_mechanisms?.length ? (
+                          <div className="renovation-forecast-tags">
+                            {item.price_mechanisms.slice(0, 4).map(value => <span key={value}>{value}</span>)}
+                          </div>
+                        ) : null}
+                        <div className="renovation-explanation">{item.explanation}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">Run extraction to project future renovation needs</div>
+              )}
             </Section>
           )}
           {site && hasSiteDetails && (
@@ -642,12 +853,29 @@ function BuildingView({ building }: { building: Building }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="listing-section">
-      <h2 className="listing-section-title">{title}</h2>
+      <div className="listing-section-header">
+        <h2 className="listing-section-title">{title}</h2>
+        {actions}
+      </div>
       {children}
     </section>
+  )
+}
+
+function extractSaleListingRenovations(id: string): Promise<RenovationExtractionResponse> {
+  return customInstance<RenovationExtractionResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/renovations/extract?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+    { method: 'POST' },
+  )
+}
+
+function extractSaleListingDescription(id: string): Promise<DescriptionExtractionResponse> {
+  return customInstance<DescriptionExtractionResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/description/extract?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+    { method: 'POST' },
   )
 }
 
@@ -667,6 +895,15 @@ function Row({ label, value, highlight }: { label: string; value: React.ReactNod
       <span className={`listing-row-value${highlight ? ' listing-row-value--highlight' : ''}`}>
         {value}
       </span>
+    </div>
+  )
+}
+
+function OfferRange({ label, range }: { label: string; range?: ValueRange }) {
+  return (
+    <div className="offer-range">
+      <span>{label}</span>
+      <strong>{fmtRange(range)}</strong>
     </div>
   )
 }
@@ -727,6 +964,13 @@ function fmtPrice(n: number): string {
   return new Intl.NumberFormat('fi-FI').format(n) + ' €'
 }
 
+function fmtRange(range?: ValueRange): string {
+  if (!range?.low && !range?.high) return '—'
+  if (range.low != null && range.high != null) return `${fmtPrice(range.low)} – ${fmtPrice(range.high)}`
+  if (range.low != null) return `from ${fmtPrice(range.low)}`
+  return `to ${fmtPrice(range.high as number)}`
+}
+
 function fmtEur(n: number): string {
   return new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 0 }).format(n) + ' €'
 }
@@ -774,6 +1018,15 @@ function renovationTextItems(text: string | undefined, status: RenovationStatus)
     const year = value.match(/\b(19|20)\d{2}\b/)?.[0]
     return { kind: year ? value.replace(year, '').trim() || value : value, status, year: year ? Number(year) : undefined }
   }).filter(item => item.kind !== '')
+}
+
+function fmtRenovationNeedYear(item: RenovationForecastItem): string {
+  if (item.year_range) return item.year_range
+  return item.year != null ? String(item.year) : 'TBD'
+}
+
+function renovationStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ')
 }
 
 function fmtPlotOwnership(value: string): string {

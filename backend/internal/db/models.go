@@ -643,17 +643,36 @@ type PropertySourceOffering struct {
 	SaleListingNewDevelopment                *bool           `json:"sale_listing_new_development"`
 }
 
+type PropertySourceOfferingInsight struct {
+	PropertySourceOfferingInsightID          uuid.UUID `json:"property_source_offering_insight_id"`
+	SaleListingID                            uuid.UUID `json:"sale_listing_id"`
+	PropertySourceOfferingInsightSourceField string    `json:"property_source_offering_insight_source_field"`
+	PropertySourceOfferingInsightKey         string    `json:"property_source_offering_insight_key"`
+	PropertySourceOfferingInsightValue       string    `json:"property_source_offering_insight_value"`
+	PropertySourceOfferingInsightDirection   string    `json:"property_source_offering_insight_direction"`
+	PropertySourceOfferingInsightSeverity    string    `json:"property_source_offering_insight_severity"`
+	PropertySourceOfferingInsightConfidence  int32     `json:"property_source_offering_insight_confidence"`
+	PropertySourceOfferingInsightText        *string   `json:"property_source_offering_insight_text"`
+	PropertySourceOfferingInsightCreatedAt   time.Time `json:"property_source_offering_insight_created_at"`
+	PropertySourceOfferingInsightUpdatedAt   time.Time `json:"property_source_offering_insight_updated_at"`
+}
+
 type PropertySourceOfferingRenovation struct {
-	PropertySourceOfferingRenovationID          uuid.UUID `json:"property_source_offering_renovation_id"`
-	SaleListingID                               uuid.UUID `json:"sale_listing_id"`
-	PropertySourceOfferingRenovationSourceField string    `json:"property_source_offering_renovation_source_field"`
-	PropertySourceOfferingRenovationCategory    string    `json:"property_source_offering_renovation_category"`
-	PropertySourceOfferingRenovationStatus      string    `json:"property_source_offering_renovation_status"`
-	PropertySourceOfferingRenovationYear        *int32    `json:"property_source_offering_renovation_year"`
-	PropertySourceOfferingRenovationText        *string   `json:"property_source_offering_renovation_text"`
-	PropertySourceOfferingRenovationConfidence  int32     `json:"property_source_offering_renovation_confidence"`
-	PropertySourceOfferingRenovationCreatedAt   time.Time `json:"property_source_offering_renovation_created_at"`
-	PropertySourceOfferingRenovationUpdatedAt   time.Time `json:"property_source_offering_renovation_updated_at"`
+	PropertySourceOfferingRenovationID              uuid.UUID `json:"property_source_offering_renovation_id"`
+	SaleListingID                                   uuid.UUID `json:"sale_listing_id"`
+	PropertySourceOfferingRenovationSourceField     string    `json:"property_source_offering_renovation_source_field"`
+	PropertySourceOfferingRenovationCategory        string    `json:"property_source_offering_renovation_category"`
+	PropertySourceOfferingRenovationStatus          string    `json:"property_source_offering_renovation_status"`
+	PropertySourceOfferingRenovationYear            *int32    `json:"property_source_offering_renovation_year"`
+	PropertySourceOfferingRenovationText            *string   `json:"property_source_offering_renovation_text"`
+	PropertySourceOfferingRenovationConfidence      int32     `json:"property_source_offering_renovation_confidence"`
+	PropertySourceOfferingRenovationCreatedAt       time.Time `json:"property_source_offering_renovation_created_at"`
+	PropertySourceOfferingRenovationUpdatedAt       time.Time `json:"property_source_offering_renovation_updated_at"`
+	PropertySourceOfferingRenovationComponent       *string   `json:"property_source_offering_renovation_component"`
+	PropertySourceOfferingRenovationScope           *string   `json:"property_source_offering_renovation_scope"`
+	PropertySourceOfferingRenovationStage           *string   `json:"property_source_offering_renovation_stage"`
+	PropertySourceOfferingRenovationResponsibility  *string   `json:"property_source_offering_renovation_responsibility"`
+	PropertySourceOfferingRenovationCostEstimateEur *int64    `json:"property_source_offering_renovation_cost_estimate_eur"`
 }
 
 type PropertyUnit struct {

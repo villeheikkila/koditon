@@ -901,6 +901,17 @@ func (q *Queries) DeleteExpiredRuntimeKV(ctx context.Context) error {
 	return err
 }
 
+const deleteLLMPropertySourceOfferingInsights = `-- name: DeleteLLMPropertySourceOfferingInsights :exec
+DELETE FROM public.property_source_offering_insights
+WHERE sale_listing_id = $1
+    AND property_source_offering_insight_source_field LIKE 'llm_%'
+`
+
+func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, saleListingID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingInsights, saleListingID)
+	return err
+}
+
 const deletePropertySourceOfferingForFrontdoorBuildingAnnouncement = `-- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
 DELETE FROM public.property_source_offerings
 WHERE frontdoor_building_announcement_id = $1
@@ -1108,8 +1119,8 @@ SELECT
     COALESCE(sl.sale_listing_condition, '')::text AS ad_condition,
     COALESCE(sl.sale_listing_description_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{basicDetails,description}'), '')) AS frontdoor_ad_description_text,
     COALESCE(sl.sale_listing_availability_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,freeingDescription}'), '')) AS frontdoor_ad_availability_text,
-    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}'), '')) AS frontdoor_ad_renovations_done_text,
-    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}'), '')) AS frontdoor_ad_renovations_planned_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}')), '')) AS frontdoor_ad_renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}')), '')) AS frontdoor_ad_renovations_planned_text,
     COALESCE(sl.sale_listing_additional_info_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,additionalInfo}'), '')) AS frontdoor_ad_additional_info_text,
     COALESCE(sl.sale_listing_charges_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', fa.frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}')), '')) AS frontdoor_ad_charges_text,
     COALESCE(sl.sale_listing_maintenance_charge_monthly, public.fnc__jsonb_periodic_charge_price(fa.frontdoor_ad_data, 'HOUSING_COMPANY_MAINTENANCE_CHARGE')) AS frontdoor_ad_maintenance_charge_monthly,
@@ -1431,6 +1442,29 @@ func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildin
 	return i, err
 }
 
+const getPropertySourceOfferingDescriptionTexts = `-- name: GetPropertySourceOfferingDescriptionTexts :one
+SELECT
+    COALESCE(sale_listing_description_text, '') AS description_text,
+    COALESCE(sale_listing_building_description_text, sale_listing_building_other_info_text, '') AS building_text,
+    COALESCE(sale_listing_additional_info_text, '') AS additional_info_text
+FROM public.property_source_offerings
+WHERE sale_listing_id = $1
+LIMIT 1
+`
+
+type GetPropertySourceOfferingDescriptionTextsRow struct {
+	DescriptionText    string `json:"description_text"`
+	BuildingText       string `json:"building_text"`
+	AdditionalInfoText string `json:"additional_info_text"`
+}
+
+func (q *Queries) GetPropertySourceOfferingDescriptionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingDescriptionTextsRow, error) {
+	row := q.db.QueryRow(ctx, getPropertySourceOfferingDescriptionTexts, saleListingID)
+	var i GetPropertySourceOfferingDescriptionTextsRow
+	err := row.Scan(&i.DescriptionText, &i.BuildingText, &i.AdditionalInfoText)
+	return i, err
+}
+
 const getPropertySourceOfferingDetail = `-- name: GetPropertySourceOfferingDetail :one
 SELECT
     sl.sale_listing_id,
@@ -1490,8 +1524,8 @@ SELECT
     sl.sale_listing_new_development,
     COALESCE(sl.sale_listing_description_text, '') AS description_text,
     COALESCE(sl.sale_listing_availability_text, '') AS availability_text,
-    COALESCE(sl.sale_listing_renovations_done_text, '') AS renovations_done_text,
-    COALESCE(sl.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '') AS renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '') AS renovations_planned_text,
     COALESCE(sl.sale_listing_additional_info_text, '') AS additional_info_text,
     COALESCE(sl.sale_listing_charges_text, '') AS charges_text,
     sl.sale_listing_maintenance_charge_monthly,
@@ -1507,6 +1541,8 @@ SELECT
     COALESCE(sl.sale_listing_building_description_text, '') AS building_description_text,
     COALESCE(sl.sale_listing_building_other_info_text, '') AS building_other_info_text
 FROM public.property_source_offerings sl
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 WHERE sl.sale_listing_id = $1
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 LIMIT 1
@@ -1990,6 +2026,53 @@ func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, building
 	return i, err
 }
 
+const insertPropertySourceOfferingInsight = `-- name: InsertPropertySourceOfferingInsight :exec
+INSERT INTO public.property_source_offering_insights (
+    sale_listing_id,
+    property_source_offering_insight_source_field,
+    property_source_offering_insight_key,
+    property_source_offering_insight_value,
+    property_source_offering_insight_direction,
+    property_source_offering_insight_severity,
+    property_source_offering_insight_confidence,
+    property_source_offering_insight_text
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    NULLIF($8, '')
+)
+`
+
+type InsertPropertySourceOfferingInsightParams struct {
+	SaleListingID uuid.UUID   `json:"sale_listing_id"`
+	SourceField   string      `json:"source_field"`
+	Key           string      `json:"key"`
+	Value         string      `json:"value"`
+	Direction     string      `json:"direction"`
+	Severity      string      `json:"severity"`
+	Confidence    int32       `json:"confidence"`
+	Text          interface{} `json:"text"`
+}
+
+func (q *Queries) InsertPropertySourceOfferingInsight(ctx context.Context, arg InsertPropertySourceOfferingInsightParams) error {
+	_, err := q.db.Exec(ctx, insertPropertySourceOfferingInsight,
+		arg.SaleListingID,
+		arg.SourceField,
+		arg.Key,
+		arg.Value,
+		arg.Direction,
+		arg.Severity,
+		arg.Confidence,
+		arg.Text,
+	)
+	return err
+}
+
 const listMunicipalitiesWithPostalCodes = `-- name: ListMunicipalitiesWithPostalCodes :many
 SELECT
     pm.postal_municipality_id,
@@ -2146,6 +2229,58 @@ func (q *Queries) ListPostalCodesWithPriceDataForMunicipality(ctx context.Contex
 			&i.PostalPostalCodeCode,
 			&i.PostalPostalCodeNameFi,
 			&i.PostalPostalCodeNameSv,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPropertySourceOfferingInsights = `-- name: ListPropertySourceOfferingInsights :many
+SELECT
+    property_source_offering_insight_key,
+    property_source_offering_insight_value,
+    property_source_offering_insight_direction,
+    property_source_offering_insight_severity,
+    property_source_offering_insight_confidence,
+    property_source_offering_insight_source_field,
+    COALESCE(property_source_offering_insight_text, '') AS property_source_offering_insight_text
+FROM public.property_source_offering_insights
+WHERE sale_listing_id = $1
+ORDER BY property_source_offering_insight_severity DESC, property_source_offering_insight_key
+`
+
+type ListPropertySourceOfferingInsightsRow struct {
+	PropertySourceOfferingInsightKey         string `json:"property_source_offering_insight_key"`
+	PropertySourceOfferingInsightValue       string `json:"property_source_offering_insight_value"`
+	PropertySourceOfferingInsightDirection   string `json:"property_source_offering_insight_direction"`
+	PropertySourceOfferingInsightSeverity    string `json:"property_source_offering_insight_severity"`
+	PropertySourceOfferingInsightConfidence  int32  `json:"property_source_offering_insight_confidence"`
+	PropertySourceOfferingInsightSourceField string `json:"property_source_offering_insight_source_field"`
+	PropertySourceOfferingInsightText        string `json:"property_source_offering_insight_text"`
+}
+
+func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleListingID uuid.UUID) ([]ListPropertySourceOfferingInsightsRow, error) {
+	rows, err := q.db.Query(ctx, listPropertySourceOfferingInsights, saleListingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPropertySourceOfferingInsightsRow{}
+	for rows.Next() {
+		var i ListPropertySourceOfferingInsightsRow
+		if err := rows.Scan(
+			&i.PropertySourceOfferingInsightKey,
+			&i.PropertySourceOfferingInsightValue,
+			&i.PropertySourceOfferingInsightDirection,
+			&i.PropertySourceOfferingInsightSeverity,
+			&i.PropertySourceOfferingInsightConfidence,
+			&i.PropertySourceOfferingInsightSourceField,
+			&i.PropertySourceOfferingInsightText,
 		); err != nil {
 			return nil, err
 		}
@@ -2344,6 +2479,11 @@ INSERT INTO public.property_source_offering_renovations (
     property_source_offering_renovation_category,
     property_source_offering_renovation_status,
     property_source_offering_renovation_year,
+    property_source_offering_renovation_component,
+    property_source_offering_renovation_scope,
+    property_source_offering_renovation_stage,
+    property_source_offering_renovation_responsibility,
+    property_source_offering_renovation_cost_estimate_eur,
     property_source_offering_renovation_text,
     property_source_offering_renovation_confidence
 )
@@ -2353,6 +2493,11 @@ SELECT
     renovation.category,
     'done',
     renovation.year,
+    NULL,
+    'unknown',
+    'completed',
+    'housing_company',
+    NULL,
     renovation.text,
     100
 FROM listing

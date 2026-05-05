@@ -45,6 +45,16 @@ type propertySourceRawInput struct {
 	SourceID string `path:"sourceID"  required:"true" doc:"Source sale listing UUID"`
 }
 
+type saleListingRenovationExtractInput struct {
+	ID    string `path:"id"     required:"true" doc:"Canonical offering UUID"`
+	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured renovation extractor model"`
+}
+
+type saleListingDescriptionExtractInput struct {
+	ID    string `path:"id"     required:"true" doc:"Canonical offering UUID"`
+	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
+}
+
 type transactionMatchPostalsInput struct {
 	Limit int32 `query:"limit" doc:"Maximum postal codes to return"`
 }
@@ -129,6 +139,14 @@ type saleListingSourceRawOutput struct {
 	Body json.RawMessage
 }
 
+type saleListingRenovationExtractOutput struct {
+	Body properties.RenovationExtractionResult
+}
+
+type saleListingDescriptionExtractOutput struct {
+	Body properties.DescriptionExtractionResult
+}
+
 type rentalDetailOutput struct {
 	Body properties.Rental
 }
@@ -211,6 +229,36 @@ func (a *API) saleListingSourceRawHandler(ctx context.Context, input *propertySo
 		return nil, huma.Error400BadRequest("invalid source payload request")
 	}
 	return &saleListingSourceRawOutput{Body: payload.Payload}, nil
+}
+
+func (a *API) saleListingRenovationExtractHandler(ctx context.Context, input *saleListingRenovationExtractInput) (*saleListingRenovationExtractOutput, error) {
+	result, err := a.propertiesService.ExtractSaleListingRenovations(ctx, input.ID, input.Model)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
+			return nil, huma.Error503ServiceUnavailable("renovation extractor not configured")
+		}
+		a.logger.ErrorContext(ctx, "sale listing renovation extraction failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("renovation extraction failed")
+	}
+	return &saleListingRenovationExtractOutput{Body: result}, nil
+}
+
+func (a *API) saleListingDescriptionExtractHandler(ctx context.Context, input *saleListingDescriptionExtractInput) (*saleListingDescriptionExtractOutput, error) {
+	result, err := a.propertiesService.ExtractSaleListingDescriptionInsights(ctx, input.ID, input.Model)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
+			return nil, huma.Error503ServiceUnavailable("description extractor not configured")
+		}
+		a.logger.ErrorContext(ctx, "sale listing description extraction failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("description extraction failed")
+	}
+	return &saleListingDescriptionExtractOutput{Body: result}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {

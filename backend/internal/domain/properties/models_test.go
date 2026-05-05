@@ -31,3 +31,11 @@ func TestSaleSummaryUsesNormalizedSections(t *testing.T) {
 		t.Fatalf("expected canonical offering UUID as id: %s", body)
 	}
 }
+
+func TestBuildingRenovationKeepsPlannedRenovationWithoutYear(t *testing.T) {
+	planned := false
+	renovation := buildingRenovation("pipe", &planned, nil)
+	if renovation.Kind != "pipe" || renovation.Done == nil || *renovation.Done {
+		t.Fatalf("expected planned pipe renovation without year, got %#v", renovation)
+	}
+}

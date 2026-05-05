@@ -635,6 +635,23 @@ create table public.property_offerings (
 CREATE INDEX idx_property_offerings_primary_sale_listing ON public.property_offerings USING btree (primary_sale_listing_id);
 CREATE INDEX idx_property_offerings_unit ON public.property_offerings USING btree (property_unit_id);
 
+create table public.property_source_offering_insights (
+  property_source_offering_insight_id uuid default gen_random_uuid() not null constraint property_source_offering_insights_pkey primary key,
+  sale_listing_id uuid not null constraint property_source_offering_insights_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
+  property_source_offering_insight_source_field text not null,
+  property_source_offering_insight_key text not null,
+  property_source_offering_insight_value text not null,
+  property_source_offering_insight_direction text not null,
+  property_source_offering_insight_severity text not null,
+  property_source_offering_insight_confidence integer default 50 not null,
+  property_source_offering_insight_text text,
+  property_source_offering_insight_created_at timestamp with time zone default now() not null,
+  property_source_offering_insight_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_property_source_offering_insights_listing ON public.property_source_offering_insights USING btree (sale_listing_id);
+CREATE UNIQUE INDEX idx_property_source_offering_insights_unique ON public.property_source_offering_insights USING btree (sale_listing_id, property_source_offering_insight_source_field, property_source_offering_insight_key);
+
 create table public.property_source_offering_renovations (
   property_source_offering_renovation_id uuid default gen_random_uuid() not null constraint property_source_offering_renovations_pkey primary key,
   sale_listing_id uuid not null constraint property_source_offering_renovations_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
@@ -646,11 +663,16 @@ create table public.property_source_offering_renovations (
   property_source_offering_renovation_confidence integer default 100 not null,
   property_source_offering_renovation_created_at timestamp with time zone default now() not null,
   property_source_offering_renovation_updated_at timestamp with time zone default now() not null,
+  property_source_offering_renovation_component text,
+  property_source_offering_renovation_scope text,
+  property_source_offering_renovation_stage text,
+  property_source_offering_renovation_responsibility text,
+  property_source_offering_renovation_cost_estimate_eur bigint,
   constraint property_source_offering_renovation_status_check CHECK ((property_source_offering_renovation_status = ANY (ARRAY['done'::text, 'planned'::text, 'unknown'::text])))
 );
 
 CREATE INDEX idx_property_source_offering_renovations_listing ON public.property_source_offering_renovations USING btree (sale_listing_id);
-CREATE UNIQUE INDEX idx_property_source_offering_renovations_unique ON public.property_source_offering_renovations USING btree (sale_listing_id, property_source_offering_renovation_source_field, property_source_offering_renovation_category, property_source_offering_renovation_status);
+CREATE UNIQUE INDEX idx_property_source_offering_renovations_unique ON public.property_source_offering_renovations USING btree (sale_listing_id, property_source_offering_renovation_source_field, property_source_offering_renovation_category, property_source_offering_renovation_status, COALESCE(property_source_offering_renovation_year, 0), COALESCE(property_source_offering_renovation_component, ''::text), COALESCE(property_source_offering_renovation_stage, ''::text));
 
 create table public.property_source_offerings (
   sale_listing_id uuid default gen_random_uuid() not null constraint sale_listings_pkey primary key,

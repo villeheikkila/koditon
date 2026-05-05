@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS public.property_source_offering_renovations (
     property_source_offering_renovation_category text NOT NULL,
     property_source_offering_renovation_status text NOT NULL,
     property_source_offering_renovation_year integer,
+    property_source_offering_renovation_component text,
+    property_source_offering_renovation_scope text,
+    property_source_offering_renovation_stage text,
+    property_source_offering_renovation_responsibility text,
+    property_source_offering_renovation_cost_estimate_eur bigint,
     property_source_offering_renovation_text text,
     property_source_offering_renovation_confidence integer DEFAULT 100 NOT NULL,
     property_source_offering_renovation_created_at timestamptz DEFAULT now() NOT NULL,
@@ -31,7 +36,10 @@ ON public.property_source_offering_renovations (
     sale_listing_id,
     property_source_offering_renovation_source_field,
     property_source_offering_renovation_category,
-    property_source_offering_renovation_status
+    property_source_offering_renovation_status,
+    COALESCE(property_source_offering_renovation_year, 0),
+    COALESCE(property_source_offering_renovation_component, ''),
+    COALESCE(property_source_offering_renovation_stage, '')
 );
 
 CREATE INDEX IF NOT EXISTS idx_property_source_offering_renovations_listing

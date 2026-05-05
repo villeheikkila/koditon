@@ -233,9 +233,6 @@ func buildingRenovation(kind string, done *bool, year *int32) BuildingRenovation
 	if year != nil && *year <= 0 {
 		year = nil
 	}
-	if done != nil && !*done && year == nil {
-		done = nil
-	}
 	if done == nil && year == nil {
 		return BuildingRenovation{}
 	}
@@ -258,7 +255,10 @@ func compactRenovations(values []BuildingRenovation) []BuildingRenovation {
 		if value.Done != nil && *value.Done {
 			done = "true"
 		}
-		key := strings.ToLower(kind + ":" + year + ":" + done)
+		if value.Done != nil && !*value.Done {
+			done = "false"
+		}
+		key := strings.ToLower(kind + ":" + value.Component + ":" + year + ":" + done + ":" + value.Stage)
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -292,6 +292,21 @@ func boolPtrValue(value *bool) bool {
 
 func ptrBool(value bool) *bool {
 	return &value
+}
+
+func ptrFloat64(value float64) *float64 {
+	return &value
+}
+
+func ptrInt64(value int64) *int64 {
+	return &value
+}
+
+func ptrInt32Value(value *int32) int32 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func ptrUUIDString(value *uuid.UUID) string {

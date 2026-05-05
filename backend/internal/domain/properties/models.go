@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"koditon/internal/domain/valuation"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
 	shortcutpayload "koditon/internal/providers/shortcut"
 )
@@ -498,10 +499,13 @@ type BuildingInsights struct {
 }
 
 type Insight struct {
-	Key        string  `json:"key"`
-	Value      string  `json:"value"`
-	Confidence float64 `json:"confidence,omitempty"`
-	Source     string  `json:"source,omitempty"`
+	Key         string  `json:"key"`
+	Value       string  `json:"value"`
+	Direction   string  `json:"direction,omitempty"`
+	Severity    string  `json:"severity,omitempty"`
+	Confidence  float64 `json:"confidence,omitempty"`
+	Source      string  `json:"source,omitempty"`
+	Explanation string  `json:"explanation,omitempty"`
 }
 
 type SaleListingSummary struct {
@@ -528,21 +532,22 @@ type RentalSummary struct {
 }
 
 type SaleListing struct {
-	ID            string                 `json:"id"`
-	Canonical     CanonicalOffering      `json:"canonical"`
-	Source        ListingSource          `json:"source"`
-	SourceRecords []OfferingSourceRecord `json:"source_records,omitempty"`
-	Headline      string                 `json:"headline"`
-	Unit          UnitDetails            `json:"unit"`
-	Building      BuildingDetails        `json:"building"`
-	Site          SiteDetails            `json:"site,omitempty"`
-	Commercial    CommercialDetails      `json:"commercial"`
-	Texts         TextSections           `json:"texts,omitempty"`
-	Media         Media                  `json:"media,omitempty"`
-	Contacts      []Contact              `json:"contacts,omitempty"`
-	Showings      []Showing              `json:"showings,omitempty"`
-	Links         []Link                 `json:"links,omitempty"`
-	Insights      ListingInsights        `json:"insights,omitempty"`
+	ID            string                        `json:"id"`
+	Canonical     CanonicalOffering             `json:"canonical"`
+	Source        ListingSource                 `json:"source"`
+	SourceRecords []OfferingSourceRecord        `json:"source_records,omitempty"`
+	Headline      string                        `json:"headline"`
+	Unit          UnitDetails                   `json:"unit"`
+	Building      BuildingDetails               `json:"building"`
+	Site          SiteDetails                   `json:"site,omitempty"`
+	Commercial    CommercialDetails             `json:"commercial"`
+	Texts         TextSections                  `json:"texts,omitempty"`
+	Media         Media                         `json:"media,omitempty"`
+	Contacts      []Contact                     `json:"contacts,omitempty"`
+	Showings      []Showing                     `json:"showings,omitempty"`
+	Links         []Link                        `json:"links,omitempty"`
+	Insights      ListingInsights               `json:"insights,omitempty"`
+	Valuation     *valuation.ApartmentValuation `json:"valuation,omitempty"`
 }
 
 type Rental struct {
@@ -597,9 +602,17 @@ type RelatedListing struct {
 }
 
 type BuildingRenovation struct {
-	Kind string `json:"kind"`
-	Done *bool  `json:"done,omitempty"`
-	Year *int32 `json:"year,omitempty"`
+	Kind            string `json:"kind"`
+	Component       string `json:"component,omitempty"`
+	Done            *bool  `json:"done,omitempty"`
+	Year            *int32 `json:"year,omitempty"`
+	Scope           string `json:"scope,omitempty"`
+	Stage           string `json:"stage,omitempty"`
+	Responsibility  string `json:"responsibility,omitempty"`
+	CostEstimateEUR *int64 `json:"cost_estimate_eur,omitempty"`
+	Text            string `json:"text,omitempty"`
+	Confidence      *int32 `json:"confidence,omitempty"`
+	Source          string `json:"source,omitempty"`
 }
 
 type rawMap map[string]any

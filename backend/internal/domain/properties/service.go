@@ -14,17 +14,34 @@ import (
 
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
+	"koditon/internal/domain/valuation"
 )
 
 var ErrNotFound = errors.New("property not found")
+var ErrRenovationExtractorNotConfigured = errors.New("renovation extractor not configured")
 
 type Service struct {
-	db      db.DBTX
-	queries *db.Queries
+	db                           db.DBTX
+	queries                      *db.Queries
+	renovationExtractorAPIKey    string
+	renovationExtractorModelName string
 }
 
-func NewService(dbtx db.DBTX) *Service {
-	return &Service{db: dbtx, queries: db.New(dbtx)}
+type ServiceOption func(*Service)
+
+func NewService(dbtx db.DBTX, opts ...ServiceOption) *Service {
+	service := &Service{db: dbtx, queries: db.New(dbtx)}
+	for _, opt := range opts {
+		opt(service)
+	}
+	return service
+}
+
+func WithOpenRouterRenovationExtractor(apiKey string, modelName string) ServiceOption {
+	return func(service *Service) {
+		service.renovationExtractorAPIKey = strings.TrimSpace(apiKey)
+		service.renovationExtractorModelName = strings.TrimSpace(modelName)
+	}
 }
 
 func (s *Service) SearchSaleListings(ctx context.Context, params SearchParams) (Page[SaleListingSummary], error) {
@@ -90,6 +107,7 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 		return SaleListing{}, err
 	}
 	listing.SourceRecords = records
+	listing.Valuation = valuation.Assess(valuationSaleListing(listing))
 	return listing, nil
 }
 
@@ -200,7 +218,21 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	if err := s.enrichSaleListingRenovations(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
+	if err := s.enrichSaleListingInsights(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
 	return listing, nil
+}
+
+func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	rows, err := s.queries.ListPropertySourceOfferingInsights(ctx, saleListingID)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.PropertySourceOfferingInsightKey, Value: row.PropertySourceOfferingInsightValue, Direction: row.PropertySourceOfferingInsightDirection, Severity: row.PropertySourceOfferingInsightSeverity, Confidence: float64(row.PropertySourceOfferingInsightConfidence) / 100, Source: row.PropertySourceOfferingInsightSourceField, Explanation: row.PropertySourceOfferingInsightText})
+	}
+	return nil
 }
 
 func (s *Service) enrichSaleListingMediaFromSource(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
@@ -239,7 +271,15 @@ func (s *Service) enrichSaleListingRenovations(ctx context.Context, listing *Sal
 SELECT
     property_source_offering_renovation_category,
     property_source_offering_renovation_status,
-    property_source_offering_renovation_year
+    property_source_offering_renovation_year,
+    COALESCE(property_source_offering_renovation_component, ''),
+    COALESCE(property_source_offering_renovation_scope, ''),
+    COALESCE(property_source_offering_renovation_stage, ''),
+    COALESCE(property_source_offering_renovation_responsibility, ''),
+    property_source_offering_renovation_cost_estimate_eur,
+    COALESCE(property_source_offering_renovation_text, ''),
+    property_source_offering_renovation_confidence,
+    property_source_offering_renovation_source_field
 FROM public.property_source_offering_renovations
 WHERE sale_listing_id = $1
 ORDER BY property_source_offering_renovation_category, property_source_offering_renovation_year NULLS LAST`, saleListingID)
@@ -248,16 +288,30 @@ ORDER BY property_source_offering_renovation_category, property_source_offering_
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var category, status string
+		var category, status, component, scope, stage, responsibility, text, source string
 		var year *int32
-		if err := rows.Scan(&category, &status, &year); err != nil {
+		var confidence *int32
+		var costEstimateEUR *int64
+		if err := rows.Scan(&category, &status, &year, &component, &scope, &stage, &responsibility, &costEstimateEUR, &text, &confidence, &source); err != nil {
 			return err
 		}
 		var done *bool
-		if status == "done" {
+		switch status {
+		case "done":
 			done = ptrBool(true)
+		case "planned":
+			done = ptrBool(false)
 		}
-		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(category, done, year))
+		renovation := buildingRenovation(category, done, year)
+		renovation.Component = component
+		renovation.Scope = firstNonEmpty(scope, inferRenovationScope(category+" "+component+" "+text))
+		renovation.Stage = firstNonEmpty(stage, inferRenovationStage(text))
+		renovation.Responsibility = firstNonEmpty(responsibility, inferRenovationResponsibility(text))
+		renovation.CostEstimateEUR = costEstimateEUR
+		renovation.Text = cleanDisplayString(text)
+		renovation.Confidence = confidence
+		renovation.Source = source
+		listing.Building.Renovations = append(listing.Building.Renovations, renovation)
 	}
 	if err := rows.Err(); err != nil {
 		return err

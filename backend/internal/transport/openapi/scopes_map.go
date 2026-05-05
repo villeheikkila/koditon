@@ -18,6 +18,8 @@ var operationIDScopes = map[string][]string{
 	"availability-plots":                         {auth.ScopeCoreRead},
 	"sale-listings-transaction-match-postals":    {auth.ScopeCoreRead},
 	"sale-listings-transaction-match-candidates": {auth.ScopeCoreRead},
+	"sale-listings-renovations-extract":          {auth.ScopeCoreRead},
+	"sale-listings-description-extract":          {auth.ScopeCoreRead},
 	"entity-detail":                              {},
 	"search":                                     {},
 	"auth-apple-web":                             {},

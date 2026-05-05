@@ -613,6 +613,11 @@ INSERT INTO public.property_source_offering_renovations (
     property_source_offering_renovation_category,
     property_source_offering_renovation_status,
     property_source_offering_renovation_year,
+    property_source_offering_renovation_component,
+    property_source_offering_renovation_scope,
+    property_source_offering_renovation_stage,
+    property_source_offering_renovation_responsibility,
+    property_source_offering_renovation_cost_estimate_eur,
     property_source_offering_renovation_text,
     property_source_offering_renovation_confidence
 )
@@ -622,6 +627,11 @@ SELECT
     renovation.category,
     'done',
     renovation.year,
+    NULL,
+    'unknown',
+    'completed',
+    'housing_company',
+    NULL,
     renovation.text,
     100
 FROM listing
@@ -639,6 +649,54 @@ WHERE renovation.done IS TRUE;
 
 -- name: RefreshHousingCompanyFactsForPropertySourceOffering :exec
 SELECT public.fnc__refresh_housing_company_facts_for_property_source_offering(sqlc.arg(sale_listing_id));
+
+-- name: GetPropertySourceOfferingDescriptionTexts :one
+SELECT
+    COALESCE(sale_listing_description_text, '') AS description_text,
+    COALESCE(sale_listing_building_description_text, sale_listing_building_other_info_text, '') AS building_text,
+    COALESCE(sale_listing_additional_info_text, '') AS additional_info_text
+FROM public.property_source_offerings
+WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+LIMIT 1;
+
+-- name: ListPropertySourceOfferingInsights :many
+SELECT
+    property_source_offering_insight_key,
+    property_source_offering_insight_value,
+    property_source_offering_insight_direction,
+    property_source_offering_insight_severity,
+    property_source_offering_insight_confidence,
+    property_source_offering_insight_source_field,
+    COALESCE(property_source_offering_insight_text, '') AS property_source_offering_insight_text
+FROM public.property_source_offering_insights
+WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+ORDER BY property_source_offering_insight_severity DESC, property_source_offering_insight_key;
+
+-- name: DeleteLLMPropertySourceOfferingInsights :exec
+DELETE FROM public.property_source_offering_insights
+WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+    AND property_source_offering_insight_source_field LIKE 'llm_%';
+
+-- name: InsertPropertySourceOfferingInsight :exec
+INSERT INTO public.property_source_offering_insights (
+    sale_listing_id,
+    property_source_offering_insight_source_field,
+    property_source_offering_insight_key,
+    property_source_offering_insight_value,
+    property_source_offering_insight_direction,
+    property_source_offering_insight_severity,
+    property_source_offering_insight_confidence,
+    property_source_offering_insight_text
+) VALUES (
+    sqlc.arg(sale_listing_id),
+    sqlc.arg(source_field),
+    sqlc.arg(key),
+    sqlc.arg(value),
+    sqlc.arg(direction),
+    sqlc.arg(severity),
+    sqlc.arg(confidence),
+    NULLIF(sqlc.arg(text), '')
+);
 
 -- name: SearchUnifiedEntities :many
 WITH unified AS (
@@ -1046,8 +1104,8 @@ SELECT
     COALESCE(sl.sale_listing_condition, '')::text AS ad_condition,
     COALESCE(sl.sale_listing_description_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{basicDetails,description}'), '')) AS frontdoor_ad_description_text,
     COALESCE(sl.sale_listing_availability_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,freeingDescription}'), '')) AS frontdoor_ad_availability_text,
-    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}'), '')) AS frontdoor_ad_renovations_done_text,
-    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}'), '')) AS frontdoor_ad_renovations_planned_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}')), '')) AS frontdoor_ad_renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}')), '')) AS frontdoor_ad_renovations_planned_text,
     COALESCE(sl.sale_listing_additional_info_text, NULLIF(trim(fa.frontdoor_ad_data #>> '{property,additionalInfo}'), '')) AS frontdoor_ad_additional_info_text,
     COALESCE(sl.sale_listing_charges_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', fa.frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}')), '')) AS frontdoor_ad_charges_text,
     COALESCE(sl.sale_listing_maintenance_charge_monthly, public.fnc__jsonb_periodic_charge_price(fa.frontdoor_ad_data, 'HOUSING_COMPANY_MAINTENANCE_CHARGE')) AS frontdoor_ad_maintenance_charge_monthly,
@@ -1222,8 +1280,8 @@ SELECT
     sl.sale_listing_new_development,
     COALESCE(sl.sale_listing_description_text, '') AS description_text,
     COALESCE(sl.sale_listing_availability_text, '') AS availability_text,
-    COALESCE(sl.sale_listing_renovations_done_text, '') AS renovations_done_text,
-    COALESCE(sl.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
+    COALESCE(sl.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '') AS renovations_done_text,
+    COALESCE(sl.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '') AS renovations_planned_text,
     COALESCE(sl.sale_listing_additional_info_text, '') AS additional_info_text,
     COALESCE(sl.sale_listing_charges_text, '') AS charges_text,
     sl.sale_listing_maintenance_charge_monthly,
@@ -1239,6 +1297,8 @@ SELECT
     COALESCE(sl.sale_listing_building_description_text, '') AS building_description_text,
     COALESCE(sl.sale_listing_building_other_info_text, '') AS building_other_info_text
 FROM public.property_source_offerings sl
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 LIMIT 1;
