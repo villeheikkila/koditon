@@ -21,6 +21,8 @@ var operationIDScopes = map[string][]string{
 	"sale-listings-renovations-extract":          {auth.ScopeCoreRead},
 	"sale-listings-description-extract":          {auth.ScopeCoreRead},
 	"sale-listings-valuation-inputs-extract":     {auth.ScopeCoreRead},
+	"sale-listings-apartment-profile-project":    {auth.ScopeCoreRead},
+	"sale-listings-house-overview-generate":      {auth.ScopeCoreRead},
 	"entity-detail":                              {},
 	"search":                                     {},
 	"auth-apple-web":                             {},

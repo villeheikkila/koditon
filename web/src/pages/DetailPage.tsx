@@ -71,6 +71,77 @@ type ValuationInputExtractionResponse = {
   status: number
   headers: Headers
 }
+type ApartmentProfile = {
+  housing_company_id?: string
+  property_unit_id?: string
+  area_m2?: number
+  living_area_m2?: number
+  room_layout?: string
+  room_count?: number
+  bedroom_count?: number
+  floor_level?: number
+  total_floors?: number
+  kitchen_type?: string
+  layout_quality?: string
+  awkward_layout?: boolean
+  condition?: string
+  kitchen_condition?: string
+  bathroom_condition?: string
+  surface_renovation_need?: boolean
+  modernization_need?: boolean
+  sauna?: boolean
+  balcony?: boolean
+  balcony_glazing?: boolean
+  parking_type?: string
+  storage_quality?: string
+  view_quality?: string
+  noise_risk?: boolean
+  accessibility?: string
+  confidence?: string
+  updated_at?: string
+}
+type ApartmentProfileProjectionResult = {
+  sale_listing_id: string
+  apartment_profile?: ApartmentProfile
+}
+type ApartmentProfileProjectionResponse = {
+  data: ApartmentProfileProjectionResult
+  status: number
+  headers: Headers
+}
+type HouseOverview = {
+  headline?: string
+  summary?: string
+  renovation_readiness?: string
+  expensive_window?: string
+  key_strengths?: string[] | null
+  key_risks?: string[] | null
+  evidence_gaps?: string[] | null
+  confidence?: string
+  generated_at?: string
+  model?: string
+}
+type HouseOverviewGenerationResult = {
+  sale_listing_id: string
+  model: string
+  overview: HouseOverview
+}
+type HouseOverviewGenerationResponse = {
+  data: HouseOverviewGenerationResult
+  status: number
+  headers: Headers
+}
+type ApartmentProfileFact = {
+  key: string
+  label: string
+  value: string
+  tone?: 'positive' | 'negative'
+}
+type ApartmentProfileGroup = {
+  key: string
+  title: string
+  facts: ApartmentProfileFact[]
+}
 type ValuationInput = {
   unit?: Record<string, unknown>
   layout?: Record<string, unknown>
@@ -107,6 +178,12 @@ type RenovationForecastItem = {
   depends_on?: string[] | null
   price_mechanisms?: string[] | null
   explanation: string
+}
+type KeyRenovationGridItem = {
+  category: string
+  done?: RenovationItem
+  planned?: RenovationItem
+  forecast?: RenovationForecastItem
 }
 type ValueRange = {
   low?: number
@@ -163,6 +240,8 @@ type ValuationBrief = {
   explanation?: string
 }
 type SaleListingWithValuation = SaleListing & {
+  apartment_profile?: ApartmentProfile
+  house_overview?: HouseOverview
   valuation_inputs?: {
     facts?: ValuationFact[] | null
   }
@@ -230,6 +309,8 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const [renovationExtractionResult, setRenovationExtractionResult] = useState<RenovationExtractionResult | null>(null)
   const [descriptionExtractionResult, setDescriptionExtractionResult] = useState<DescriptionExtractionResult | null>(null)
   const [valuationInputExtractionResult, setValuationInputExtractionResult] = useState<ValuationInputExtractionResult | null>(null)
+  const [apartmentProfileProjectionResult, setApartmentProfileProjectionResult] = useState<ApartmentProfileProjectionResult | null>(null)
+  const [houseOverviewResult, setHouseOverviewResult] = useState<HouseOverviewGenerationResult | null>(null)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -268,10 +349,15 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const valuationRenovations = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.renovations
   const valuationBrief = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.brief
   const offerAssessment = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.offer_assessment
+  const apartmentProfile = apartmentProfileProjectionResult?.apartment_profile ?? (saleDetail as SaleListingWithValuation | undefined)?.apartment_profile
+  const apartmentProfileGroups = apartmentProfile ? groupApartmentProfile(apartmentProfile) : []
+  const apartmentProfileCompleteness = apartmentProfile ? profileCompleteness(apartmentProfile) : { completed: 0, total: PROFILE_COMPLETENESS_FIELDS.length }
   const valuationInput = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.input
   const valuationFacts = valuationInput?.facts ?? (saleDetail as SaleListingWithValuation | undefined)?.valuation_inputs?.facts ?? []
   const valuationDisplayFacts = valuationInputDisplayFacts(valuationInput, valuationFacts)
   const renovationForecastRows = valuationRenovations?.next_40_years ?? []
+  const keyRenovationGrid = keyRenovationGridItems(renovationRows, renovationForecastRows)
+  const houseOverview = houseOverviewResult?.overview ?? (saleDetail as SaleListingWithValuation | undefined)?.house_overview
   const transactionDate = matchedTransaction?.first_seen_at ? fmtDate(matchedTransaction.first_seen_at) : undefined
   const mapLatitude = location.latitude ?? building.location.latitude
   const mapLongitude = location.longitude ?? building.location.longitude
@@ -333,13 +419,71 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
     : valuationInputExtractionResult
       ? `${valuationInputExtractionResult.facts?.length ?? 0} facts · ${valuationInputExtractionResult.model}`
       : undefined
+  const projectApartmentProfile = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Apartment profile projection is only available for sale listings')
+      return projectSaleListingApartmentProfile(saleDetail.id)
+    },
+    onSuccess: async response => {
+      setApartmentProfileProjectionResult(response.data)
+      await onRefresh?.()
+    },
+  })
+  const generateHouseOverview = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('House overview generation is only available for sale listings')
+      return generateSaleListingHouseOverview(saleDetail.id)
+    },
+    onSuccess: response => {
+      setHouseOverviewResult(response.data)
+    },
+  })
+  const populateEverything = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Profile population is only available for sale listings')
+      const renovations = await extractSaleListingRenovations(saleDetail.id)
+      const description = await extractSaleListingDescription(saleDetail.id)
+      const valuationInputs = await extractSaleListingValuationInputs(saleDetail.id)
+      const profile = await projectSaleListingApartmentProfile(saleDetail.id)
+      const overview = await generateSaleListingHouseOverview(saleDetail.id)
+      return { renovations, description, valuationInputs, profile, overview }
+    },
+    onSuccess: async result => {
+      setRenovationExtractionResult(result.renovations.data)
+      setDescriptionExtractionResult(result.description.data)
+      setValuationInputExtractionResult(result.valuationInputs.data)
+      setApartmentProfileProjectionResult(result.profile.data)
+      setHouseOverviewResult(result.overview.data)
+      await onRefresh?.()
+    },
+  })
+  const apartmentProfileMessage = populateEverything.isError
+    ? (populateEverything.error as Error)?.message ?? 'Populate all failed'
+    : projectApartmentProfile.isError
+      ? (projectApartmentProfile.error as Error)?.message ?? 'Profile projection failed'
+      : generateHouseOverview.isError
+        ? (generateHouseOverview.error as Error)?.message ?? 'House overview generation failed'
+      : populateEverything.data
+        ? 'profile and overview populated from provider fields and AI extraction'
+        : apartmentProfileProjectionResult
+          ? 'profile projected'
+          : undefined
   const offerActions = saleDetail ? (
     <div className="listing-section-actions">
-      {(descriptionExtractionMessage || valuationInputExtractionMessage) && (
-        <span className={`listing-section-status${extractDescription.isError || extractValuationInputs.isError ? ' listing-section-status--error' : ''}`}>
-          {[descriptionExtractionMessage, valuationInputExtractionMessage].filter(Boolean).join(' · ')}
+      {(descriptionExtractionMessage || valuationInputExtractionMessage || apartmentProfileMessage) && (
+        <span className={`listing-section-status${extractDescription.isError || extractValuationInputs.isError || projectApartmentProfile.isError || generateHouseOverview.isError || populateEverything.isError ? ' listing-section-status--error' : ''}`}>
+          {[descriptionExtractionMessage, valuationInputExtractionMessage, apartmentProfileMessage].filter(Boolean).join(' · ')}
         </span>
       )}
+      <button type="button" className="listing-action-button" onClick={() => populateEverything.mutate()} disabled={populateEverything.isPending || extractValuationInputs.isPending || extractDescription.isPending || extractRenovations.isPending || projectApartmentProfile.isPending || generateHouseOverview.isPending}>
+        {populateEverything.isPending ? 'Running…' : 'Populate all'}
+      </button>
+      <button type="button" className="listing-action-button" onClick={() => generateHouseOverview.mutate()} disabled={generateHouseOverview.isPending}>
+        {generateHouseOverview.isPending ? 'Generating…' : 'Generate overview'}
+      </button>
+      <button type="button" className="listing-action-button" onClick={() => projectApartmentProfile.mutate()} disabled={projectApartmentProfile.isPending}>
+        {projectApartmentProfile.isPending ? 'Projecting…' : 'Build profile'}
+      </button>
       <button type="button" className="listing-action-button" onClick={() => extractValuationInputs.mutate()} disabled={extractValuationInputs.isPending}>
         {extractValuationInputs.isPending ? 'Running…' : 'Extract inputs'}
       </button>
@@ -411,6 +555,89 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
           <ListingLocationMap latitude={mapLatitude} longitude={mapLongitude} label={mapLabel || 'Listing location'} />
         )}
         <div className="listing-body">
+          {saleDetail && (
+            <Section title="Profile Workbench" actions={offerActions}>
+              <div className="profile-workbench">
+                <div className="profile-workbench-summary">
+                  <div>
+                    <div className="profile-workbench-title">{apartmentProfile ? 'Typed apartment profile' : 'No typed apartment profile yet'}</div>
+                    <p className="profile-workbench-copy">
+                      {apartmentProfile
+                        ? 'Canonical apartment facts are projected from provider fields and targeted AI extraction. Use this as the main valuation input surface.'
+                        : 'Populate the profile to canonicalize apartment-level facts before reviewing value, renovation exposure, and source evidence.'}
+                    </p>
+                  </div>
+                  <div className="profile-workbench-metrics">
+                    <span>{apartmentProfileCompleteness.completed} / {apartmentProfileCompleteness.total} fields</span>
+                    {apartmentProfile?.confidence && <span>{apartmentProfile.confidence} confidence</span>}
+                    {apartmentProfile?.updated_at && <span>{fmtDateTime(apartmentProfile.updated_at)}</span>}
+                  </div>
+                </div>
+                <div className="profile-workbench-steps">
+                  <ProfileStep label="Source rows linked" done={(saleDetail.canonical.source_count ?? 0) > 0} detail={saleDetail.canonical.source_count != null ? `${saleDetail.canonical.source_count} source row${saleDetail.canonical.source_count === 1 ? '' : 's'}` : undefined} />
+                  <ProfileStep label="Description parsed" done={(valuationFacts?.length ?? 0) > 0 || !!descriptionExtractionResult} detail={(valuationFacts?.length ?? 0) > 0 ? `${valuationFacts.length} valuation facts` : descriptionExtractionMessage} />
+                  <ProfileStep label="Renovations structured" done={renovationRows.length > 0 || !!renovationExtractionResult} detail={renovationRows.length > 0 ? `${renovationRows.length} renovation facts` : renovationExtractionMessage} />
+                  <ProfileStep label="Apartment profile projected" done={!!apartmentProfile} detail={apartmentProfile?.updated_at ? fmtDateTime(apartmentProfile.updated_at) : apartmentProfileMessage} />
+                </div>
+              </div>
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Key Renovation Dates" actions={!valuationBrief && !offerAssessment ? renovationActions : undefined}>
+              {keyRenovationGrid.length ? (
+                <div className="renovation-date-grid">
+                  {keyRenovationGrid.map(item => (
+                    <div className={`renovation-date-card renovation-date-card--${renovationGridTone(item)}`} key={item.category}>
+                      <div className="renovation-date-card-head">
+                        <strong>{renovationStatusLabel(item.category)}</strong>
+                        <span>{renovationGridStatus(item)}</span>
+                      </div>
+                      <div className="renovation-date-card-body">
+                        <RenovationDate label="Done" value={item.done?.year} detail={item.done?.kind} />
+                        <RenovationDate label="Planned" value={item.planned?.year} detail={item.planned?.kind} />
+                        <RenovationDate label="Expected" value={renovationForecastDate(item.forecast)} detail={item.forecast?.severity && `${item.forecast.severity} impact`} />
+                      </div>
+                      {renovationGridExplanation(item) && <p>{renovationGridExplanation(item)}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">Run renovation extraction to parse key dates into structured facts</div>
+              )}
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="House Overview" actions={!houseOverview ? offerActions : undefined}>
+              {houseOverview ? (
+                <div className="house-overview">
+                  <div className={`house-overview-hero house-overview-hero--${houseOverview.renovation_readiness || 'unclear'}`}>
+                    <div>
+                      <div className="house-overview-title">{houseOverview.headline || 'Generated building overview'}</div>
+                      {houseOverview.summary && <p>{houseOverview.summary}</p>}
+                    </div>
+                    <div className="house-overview-meta">
+                      {houseOverview.renovation_readiness && <span>{houseOverview.renovation_readiness} readiness</span>}
+                      {houseOverview.confidence && <span>{houseOverview.confidence} confidence</span>}
+                      {houseOverview.generated_at && <span>{fmtDateTime(houseOverview.generated_at)}</span>}
+                    </div>
+                  </div>
+                  {houseOverview.expensive_window && (
+                    <div className="house-overview-window">
+                      <span>Expensive window</span>
+                      <strong>{houseOverview.expensive_window}</strong>
+                    </div>
+                  )}
+                  <div className="house-overview-columns">
+                    <HouseOverviewList title="Strengths" items={houseOverview.key_strengths} empty="No strong positives extracted" />
+                    <HouseOverviewList title="Risks" items={houseOverview.key_risks} empty="No major risks extracted" />
+                    <HouseOverviewList title="Evidence gaps" items={houseOverview.evidence_gaps} empty="No major gaps listed" />
+                  </div>
+                </div>
+              ) : (
+                <div className="listing-empty-state">Generate an overview after the structured renovation and profile facts are populated</div>
+              )}
+            </Section>
+          )}
           <Section title="Provenance & Timing">
             <div className="listing-table">
               {saleDetail?.canonical.offering_id && <Row label="Offering ID" value={saleDetail.canonical.offering_id} />}
@@ -547,6 +774,29 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
                   <div className="offer-missing">Missing: {offerAssessment.missing.map(renovationStatusLabel).join(', ')}</div>
                 ) : null}
               </div>
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Apartment Profile" actions={!valuationBrief && !offerAssessment ? offerActions : undefined}>
+              {apartmentProfileGroups.length ? (
+                <div className="apartment-profile">
+                  {apartmentProfileGroups.map(group => (
+                    <div className="apartment-profile-group" key={group.key}>
+                      <div className="apartment-profile-group-title">{group.title}</div>
+                      <div className="apartment-profile-grid">
+                        {group.facts.map(fact => (
+                          <div className={`apartment-profile-fact${fact.tone ? ` apartment-profile-fact--${fact.tone}` : ''}`} key={fact.key}>
+                            <span>{fact.label}</span>
+                            <strong>{fact.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">Build the typed profile from provider fields and extracted inputs</div>
+              )}
             </Section>
           )}
           {saleDetail && (
@@ -1064,6 +1314,20 @@ function extractSaleListingValuationInputs(id: string): Promise<ValuationInputEx
   )
 }
 
+function projectSaleListingApartmentProfile(id: string): Promise<ApartmentProfileProjectionResponse> {
+  return customInstance<ApartmentProfileProjectionResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/apartment-profile/project`,
+    { method: 'POST' },
+  )
+}
+
+function generateSaleListingHouseOverview(id: string): Promise<HouseOverviewGenerationResponse> {
+  return customInstance<HouseOverviewGenerationResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/house-overview/generate?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+    { method: 'POST' },
+  )
+}
+
 function groupValuationFacts(facts: ValuationFact[]): Array<{ section: string; facts: ValuationFact[] }> {
   const grouped = new Map<string, ValuationFact[]>()
   for (const fact of facts) {
@@ -1098,6 +1362,196 @@ function formatValuationFactValue(fact: ValuationFact): string {
   if (fact.value_kind === 'bool' && fact.value_bool != null) return fact.value_bool ? 'yes' : 'no'
   if (fact.value_kind === 'number' && fact.value_number != null) return String(fact.value_number)
   return fact.value_text || '—'
+}
+
+const PROFILE_COMPLETENESS_FIELDS: Array<keyof ApartmentProfile> = [
+  'area_m2',
+  'room_layout',
+  'room_count',
+  'bedroom_count',
+  'floor_level',
+  'total_floors',
+  'kitchen_type',
+  'layout_quality',
+  'condition',
+  'kitchen_condition',
+  'bathroom_condition',
+  'surface_renovation_need',
+  'modernization_need',
+  'sauna',
+  'balcony',
+  'balcony_glazing',
+  'parking_type',
+  'storage_quality',
+  'view_quality',
+  'noise_risk',
+  'accessibility',
+]
+
+function profileCompleteness(profile: ApartmentProfile): { completed: number; total: number } {
+  return {
+    completed: PROFILE_COMPLETENESS_FIELDS.filter(key => hasProfileValue(profile[key])).length,
+    total: PROFILE_COMPLETENESS_FIELDS.length,
+  }
+}
+
+function groupApartmentProfile(profile: ApartmentProfile): ApartmentProfileGroup[] {
+  return [
+    profileGroup('basics', 'Apartment', [
+      profileFact('area_m2', 'Area', profile.area_m2 != null ? `${profile.area_m2.toFixed(1)} m²` : undefined),
+      profileFact('living_area_m2', 'Living area', profile.living_area_m2 != null ? `${profile.living_area_m2.toFixed(1)} m²` : undefined),
+      profileFact('room_layout', 'Layout', profile.room_layout),
+      profileFact('room_count', 'Rooms', profile.room_count),
+      profileFact('bedroom_count', 'Bedrooms', profile.bedroom_count),
+      profileFact('floor_level', 'Floor', floorLabel(profile.floor_level, profile.total_floors)),
+    ]),
+    profileGroup('layout', 'Layout Quality', [
+      profileFact('kitchen_type', 'Kitchen', profile.kitchen_type),
+      profileFact('layout_quality', 'Layout quality', profile.layout_quality, positiveFor(profile.layout_quality, ['good', 'excellent', 'efficient'])),
+      profileFact('awkward_layout', 'Awkward layout', profile.awkward_layout, profile.awkward_layout ? 'negative' : 'positive'),
+    ]),
+    profileGroup('condition', 'Condition', [
+      profileFact('condition', 'Overall condition', profile.condition, positiveFor(profile.condition, ['good', 'excellent', 'new'])),
+      profileFact('kitchen_condition', 'Kitchen', profile.kitchen_condition, positiveFor(profile.kitchen_condition, ['good', 'excellent', 'renovated', 'new'])),
+      profileFact('bathroom_condition', 'Bathroom', profile.bathroom_condition, positiveFor(profile.bathroom_condition, ['good', 'excellent', 'renovated', 'new'])),
+      profileFact('surface_renovation_need', 'Surface need', profile.surface_renovation_need, profile.surface_renovation_need ? 'negative' : 'positive'),
+      profileFact('modernization_need', 'Modernization need', profile.modernization_need, profile.modernization_need ? 'negative' : 'positive'),
+    ]),
+    profileGroup('features', 'Features', [
+      profileFact('sauna', 'Sauna', profile.sauna, profile.sauna ? 'positive' : undefined),
+      profileFact('balcony', 'Balcony', profile.balcony, profile.balcony ? 'positive' : undefined),
+      profileFact('balcony_glazing', 'Balcony glazing', profile.balcony_glazing, profile.balcony_glazing ? 'positive' : undefined),
+      profileFact('parking_type', 'Parking', profile.parking_type),
+      profileFact('storage_quality', 'Storage', profile.storage_quality, positiveFor(profile.storage_quality, ['good', 'excellent'])),
+      profileFact('view_quality', 'Views', profile.view_quality, positiveFor(profile.view_quality, ['good', 'excellent', 'open', 'sea'])),
+      profileFact('noise_risk', 'Noise risk', profile.noise_risk, profile.noise_risk ? 'negative' : 'positive'),
+      profileFact('accessibility', 'Accessibility', profile.accessibility, positiveFor(profile.accessibility, ['good', 'excellent', 'accessible'])),
+    ]),
+    profileGroup('links', 'Canonical Links', [
+      profileFact('housing_company_id', 'Housing company ID', profile.housing_company_id),
+      profileFact('property_unit_id', 'Property unit ID', profile.property_unit_id),
+      profileFact('confidence', 'Confidence', profile.confidence),
+      profileFact('updated_at', 'Updated', profile.updated_at ? fmtDateTime(profile.updated_at) : undefined),
+    ]),
+  ].filter(group => group.facts.length > 0)
+}
+
+function profileGroup(key: string, title: string, facts: Array<ApartmentProfileFact | null>): ApartmentProfileGroup {
+  return { key, title, facts: facts.filter((fact): fact is ApartmentProfileFact => fact != null) }
+}
+
+function profileFact(key: string, label: string, value: unknown, tone?: ApartmentProfileFact['tone']): ApartmentProfileFact | null {
+  if (!hasProfileValue(value)) return null
+  return { key, label, value: typeof value === 'boolean' ? (value ? 'yes' : 'no') : String(value), tone }
+}
+
+function floorLabel(floor?: number, total?: number): string | undefined {
+  if (floor == null) return undefined
+  return total != null ? `${floor} / ${total}` : String(floor)
+}
+
+function hasProfileValue(value: unknown): boolean {
+  return value != null && value !== ''
+}
+
+function positiveFor(value: string | undefined, positiveTerms: string[]): ApartmentProfileFact['tone'] | undefined {
+  if (!value) return undefined
+  const normalized = value.toLowerCase()
+  if (positiveTerms.some(term => normalized.includes(term))) return 'positive'
+  if (['poor', 'bad', 'weak', 'renovation', 'needs'].some(term => normalized.includes(term))) return 'negative'
+  return undefined
+}
+
+const KEY_RENOVATION_CATEGORIES = ['pipe', 'sewer', 'water_supply', 'roof', 'facade', 'window', 'balcony', 'elevator', 'heating', 'ventilation', 'electricity', 'drainage']
+
+function keyRenovationGridItems(rows: RenovationItem[], forecasts: RenovationForecastItem[]): KeyRenovationGridItem[] {
+  const categories = new Set(KEY_RENOVATION_CATEGORIES)
+  for (const row of rows) categories.add(normalizeRenovationCategoryKey(row.kind))
+  for (const forecast of forecasts) categories.add(normalizeRenovationCategoryKey(forecast.category))
+  return Array.from(categories).map(category => {
+    const matchingRows = rows.filter(row => normalizeRenovationCategoryKey(row.kind) === category)
+    const done = matchingRows.filter(row => row.status === 'done').sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0]
+    const planned = matchingRows.filter(row => row.status === 'planned').sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999))[0]
+    const forecast = forecasts.filter(item => normalizeRenovationCategoryKey(item.category) === category).sort((a, b) => renovationForecastSortYear(a) - renovationForecastSortYear(b))[0]
+    return { category, done, planned, forecast }
+  }).filter(item => item.done || item.planned || item.forecast || KEY_RENOVATION_CATEGORIES.includes(item.category))
+}
+
+function normalizeRenovationCategoryKey(value: string): string {
+  const key = value.toLowerCase().replace(/[^a-z0-9åäö]+/g, '_').replace(/^_+|_+$/g, '')
+  if (['pipes', 'pipe_renovation', 'plumbing', 'putkiremontti', 'linjasaneeraus'].includes(key)) return 'pipe'
+  if (['windows', 'ikkunat'].includes(key)) return 'window'
+  if (['balconies', 'parvekkeet'].includes(key)) return 'balcony'
+  if (['electric', 'electrical', 'sahko', 'sähkö'].includes(key)) return 'electricity'
+  if (['water', 'water_supply', 'vesijohto'].includes(key)) return 'water_supply'
+  return key
+}
+
+function renovationForecastSortYear(item: RenovationForecastItem): number {
+  return item.year ?? item.window_start_year ?? 9999
+}
+
+function renovationForecastDate(item?: RenovationForecastItem): string | number | undefined {
+  if (!item) return undefined
+  if (item.year != null) return item.year
+  if (item.year_range) return item.year_range
+  if (item.window_start_year != null && item.window_end_year != null) return `${item.window_start_year}-${item.window_end_year}`
+  return undefined
+}
+
+function renovationGridTone(item: KeyRenovationGridItem): string {
+  if (item.planned || ['planned', 'expected', 'follow_up', 'verify_status'].includes(item.forecast?.status || '')) return 'risk'
+  if (item.done && !item.forecast) return 'done'
+  return 'unknown'
+}
+
+function renovationGridStatus(item: KeyRenovationGridItem): string {
+  if (item.planned) return 'planned'
+  if (item.forecast?.status) return renovationStatusLabel(item.forecast.status)
+  if (item.done) return 'done'
+  return 'missing'
+}
+
+function renovationGridExplanation(item: KeyRenovationGridItem): string {
+  if (item.forecast?.explanation) return item.forecast.explanation
+  if (item.planned?.kind) return item.planned.kind
+  if (item.done?.kind) return item.done.kind
+  return ''
+}
+
+function RenovationDate({ label, value, detail }: { label: string; value?: string | number; detail?: string }) {
+  return (
+    <div className="renovation-date-cell">
+      <span>{label}</span>
+      <strong>{value ?? '—'}</strong>
+      {detail && <small>{detail}</small>}
+    </div>
+  )
+}
+
+function HouseOverviewList({ title, items, empty }: { title: string; items?: string[] | null; empty: string }) {
+  return (
+    <div className="house-overview-list">
+      <span>{title}</span>
+      {items?.length ? (
+        <ul>
+          {items.map(item => <li key={item}>{item}</li>)}
+        </ul>
+      ) : (
+        <p>{empty}</p>
+      )}
+    </div>
+  )
+}
+
+function ProfileStep({ label, done, detail }: { label: string; done: boolean; detail?: string }) {
+  return (
+    <div className={`profile-step${done ? ' profile-step--done' : ' profile-step--pending'}`}>
+      <span>{done ? 'Ready' : 'Missing'}</span>
+      <strong>{label}</strong>
+      {detail && <p>{detail}</p>}
+    </div>
+  )
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

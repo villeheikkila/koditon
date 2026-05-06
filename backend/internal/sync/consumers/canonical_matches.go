@@ -150,7 +150,10 @@ func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, lo
 		return err
 	}
 	if row.LinkMethod != nil && *row.LinkMethod == "manual" {
-		return c.updateCanonicalSourceMatchState(ctx, row.ID, "manual_linked", nil, nil)
+		if err := c.updateCanonicalSourceMatchState(ctx, row.ID, "manual_linked", nil, nil); err != nil {
+			return err
+		}
+		return c.projectTypedHousingCompanyProfileForSaleListing(ctx, row.ID)
 	}
 	run, err := c.runCanonicalSourceMatchForSaleListing(ctx, row.ID)
 	if err != nil {
@@ -158,7 +161,10 @@ func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, lo
 	}
 	if run.AutoLinked > 0 {
 		logger.InfoContext(ctx, "canonical sale listing source auto-linked", "sale_listing_id", row.ID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
-		return c.updateCanonicalSourceMatchState(ctx, row.ID, "auto_linked", nil, &run.RunID)
+		if err := c.updateCanonicalSourceMatchState(ctx, row.ID, "auto_linked", nil, &run.RunID); err != nil {
+			return err
+		}
+		return c.projectTypedHousingCompanyProfileForSaleListing(ctx, row.ID)
 	}
 	if run.Ambiguous > 0 {
 		logger.InfoContext(ctx, "canonical sale listing source needs review", "sale_listing_id", row.ID, "run_id", run.RunID, "candidates", run.Ambiguous)
@@ -169,6 +175,26 @@ func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, lo
 		return c.updateCanonicalSourceMatchState(ctx, row.ID, "noop", &next, &run.RunID)
 	}
 	return c.updateCanonicalSourceMatchState(ctx, row.ID, "deferred", &next, &run.RunID)
+}
+
+func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.Context, saleListingID string) error {
+	id, err := uuid.Parse(saleListingID)
+	if err != nil {
+		return fmt.Errorf("parse sale listing id for typed projection: %w", err)
+	}
+	if err := c.queries.ProjectSaleListingApartmentProfile(ctx, id); err != nil {
+		return fmt.Errorf("project sale listing apartment profile: %w", err)
+	}
+	if err := c.queries.UpsertSaleListingApartmentProfileProviderFieldSources(ctx, id); err != nil {
+		return fmt.Errorf("upsert apartment profile provider field sources: %w", err)
+	}
+	if err := c.queries.ProjectHousingCompanyRenovationsForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project housing company renovations: %w", err)
+	}
+	if err := c.queries.ProjectHousingCompanySystemsFromRenovationsForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project housing company systems from renovations: %w", err)
+	}
+	return nil
 }
 
 func decodeCanonicalMatchSaleListingPayload(job db.SyncJob) (canonicalMatchSaleListingPayload, error) {

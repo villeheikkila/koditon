@@ -1500,6 +1500,388 @@ td.dim { color: var(--text-3); font-size: 12px; }
   padding-top: 4px;
 }
 
+.profile-workbench {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-workbench-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.profile-workbench-title {
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.profile-workbench-copy {
+  max-width: 720px;
+  margin: 5px 0 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.profile-workbench-metrics {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.profile-workbench-metrics span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-workbench-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.profile-step {
+  min-width: 0;
+  padding: 13px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.profile-step:last-child {
+  border-right: none;
+}
+
+.profile-step span {
+  display: inline-flex;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-step--done span {
+  background: color-mix(in srgb, #157f3b 11%, var(--surface-2));
+  color: #157f3b;
+}
+
+.profile-step--pending span {
+  background: color-mix(in srgb, #b42318 9%, var(--surface-2));
+  color: #b42318;
+}
+
+.profile-step strong {
+  display: block;
+  margin-top: 7px;
+  color: var(--text-1);
+  font-size: 12.5px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.profile-step p {
+  margin: 5px 0 0;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.apartment-profile {
+  display: flex;
+  flex-direction: column;
+}
+
+.apartment-profile-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.apartment-profile-group:last-child {
+  border-bottom: none;
+}
+
+.apartment-profile-group-title {
+  padding: 10px 16px 0;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.apartment-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 16px 14px;
+}
+
+.apartment-profile-fact {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.apartment-profile-fact--positive {
+  border-color: color-mix(in srgb, #157f3b 34%, var(--border));
+  background: color-mix(in srgb, #157f3b 5%, var(--surface));
+}
+
+.apartment-profile-fact--negative {
+  border-color: color-mix(in srgb, #b42318 34%, var(--border));
+  background: color-mix(in srgb, #b42318 5%, var(--surface));
+}
+
+.apartment-profile-fact span {
+  display: block;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.apartment-profile-fact strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.renovation-date-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.renovation-date-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.renovation-date-card--done {
+  border-color: color-mix(in srgb, #157f3b 28%, var(--border));
+}
+
+.renovation-date-card--risk {
+  border-color: color-mix(in srgb, #b45309 32%, var(--border));
+}
+
+.renovation-date-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.renovation-date-card-head strong {
+  min-width: 0;
+  color: var(--text-1);
+  font-size: 12.5px;
+  font-weight: 760;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.renovation-date-card-head span {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.renovation-date-card-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+}
+
+.renovation-date-cell {
+  min-width: 0;
+  padding: 9px 10px;
+  border-right: 1px solid var(--border);
+}
+
+.renovation-date-cell:last-child {
+  border-right: none;
+}
+
+.renovation-date-cell span {
+  display: block;
+  color: var(--text-3);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.renovation-date-cell strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.renovation-date-cell small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.renovation-date-card > p {
+  margin: 0;
+  padding: 9px 12px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.house-overview {
+  display: flex;
+  flex-direction: column;
+}
+
+.house-overview-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.house-overview-hero--strong {
+  background: color-mix(in srgb, #157f3b 5%, var(--surface));
+}
+
+.house-overview-hero--risky {
+  background: color-mix(in srgb, #b42318 5%, var(--surface));
+}
+
+.house-overview-title {
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.house-overview-hero p {
+  max-width: 780px;
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.house-overview-meta {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.house-overview-meta span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.house-overview-window {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.house-overview-window span,
+.house-overview-list > span {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.house-overview-window strong {
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.house-overview-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.house-overview-list {
+  min-width: 0;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.house-overview-list:last-child {
+  border-right: none;
+}
+
+.house-overview-list ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.house-overview-list li + li {
+  margin-top: 5px;
+}
+
+.house-overview-list p {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
 .valuation-brief {
   display: flex;
   flex-direction: column;
@@ -3212,6 +3594,25 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .brief-panel { border-right: none; border-bottom: 1px solid var(--border); }
   .brief-panel:last-child { border-bottom: none; }
   .brief-renovations { grid-template-columns: 1fr; }
+  .listing-section-header { align-items: stretch; flex-direction: column; gap: 0; }
+  .listing-section-actions { justify-content: flex-start; flex-wrap: wrap; border-top: 1px solid var(--border); }
+  .listing-section-status { flex-basis: 100%; white-space: normal; }
+  .profile-workbench-summary { flex-direction: column; }
+  .profile-workbench-metrics { justify-content: flex-start; }
+  .profile-workbench-steps { grid-template-columns: 1fr; }
+  .profile-step { border-right: none; border-bottom: 1px solid var(--border); }
+  .profile-step:last-child { border-bottom: none; }
+  .apartment-profile-grid { grid-template-columns: 1fr; }
+  .renovation-date-grid { grid-template-columns: 1fr; }
+  .renovation-date-card-body { grid-template-columns: 1fr; }
+  .renovation-date-cell { border-right: none; border-bottom: 1px solid var(--border); }
+  .renovation-date-cell:last-child { border-bottom: none; }
+  .house-overview-hero { flex-direction: column; }
+  .house-overview-meta { justify-content: flex-start; }
+  .house-overview-window { grid-template-columns: 1fr; }
+  .house-overview-columns { grid-template-columns: 1fr; }
+  .house-overview-list { border-right: none; border-bottom: 1px solid var(--border); }
+  .house-overview-list:last-child { border-bottom: none; }
   .valuation-input-grid { grid-template-columns: 1fr; }
 }
 

@@ -89,6 +89,22 @@ type FeatureFlag struct {
 	FlagID             int64     `json:"flag_id"`
 }
 
+type FieldSource struct {
+	FieldSourceID                uuid.UUID  `json:"field_source_id"`
+	FieldSourceTargetTable       string     `json:"field_source_target_table"`
+	FieldSourceTargetID          uuid.UUID  `json:"field_source_target_id"`
+	FieldSourceTargetField       string     `json:"field_source_target_field"`
+	FieldSourceSourceRecordTable string     `json:"field_source_source_record_table"`
+	FieldSourceSourceRecordID    uuid.UUID  `json:"field_source_source_record_id"`
+	FieldSourceSourcePath        *string    `json:"field_source_source_path"`
+	FieldSourceEvidenceText      *string    `json:"field_source_evidence_text"`
+	FieldSourceMethod            string     `json:"field_source_method"`
+	FieldSourceConfidence        float64    `json:"field_source_confidence"`
+	FieldSourceObservedAt        time.Time  `json:"field_source_observed_at"`
+	FieldSourceValidFrom         *time.Time `json:"field_source_valid_from"`
+	FieldSourceValidUntil        *time.Time `json:"field_source_valid_until"`
+}
+
 type FrontdoorAd struct {
 	FrontdoorAdID                    uuid.UUID       `json:"frontdoor_ad_id"`
 	FrontdoorAdExternalID            string          `json:"frontdoor_ad_external_id"`
@@ -247,6 +263,26 @@ type HousingCompanyMergeDecision struct {
 	HousingCompanyMergeDecisionDecidedAt  time.Time       `json:"housing_company_merge_decision_decided_at"`
 }
 
+type HousingCompanyRenovation struct {
+	HousingCompanyRenovationID              uuid.UUID  `json:"housing_company_renovation_id"`
+	HousingCompanyID                        uuid.UUID  `json:"housing_company_id"`
+	SourceSaleListingID                     *uuid.UUID `json:"source_sale_listing_id"`
+	HousingCompanyRenovationCategory        string     `json:"housing_company_renovation_category"`
+	HousingCompanyRenovationStatus          string     `json:"housing_company_renovation_status"`
+	HousingCompanyRenovationStage           string     `json:"housing_company_renovation_stage"`
+	HousingCompanyRenovationScope           string     `json:"housing_company_renovation_scope"`
+	HousingCompanyRenovationResponsibility  string     `json:"housing_company_renovation_responsibility"`
+	HousingCompanyRenovationYear            *int32     `json:"housing_company_renovation_year"`
+	HousingCompanyRenovationWindowStartYear *int32     `json:"housing_company_renovation_window_start_year"`
+	HousingCompanyRenovationWindowEndYear   *int32     `json:"housing_company_renovation_window_end_year"`
+	HousingCompanyRenovationCostEstimateEur *int64     `json:"housing_company_renovation_cost_estimate_eur"`
+	HousingCompanyRenovationConfidence      string     `json:"housing_company_renovation_confidence"`
+	HousingCompanyRenovationEvidenceLevel   string     `json:"housing_company_renovation_evidence_level"`
+	HousingCompanyRenovationSummary         *string    `json:"housing_company_renovation_summary"`
+	HousingCompanyRenovationCreatedAt       time.Time  `json:"housing_company_renovation_created_at"`
+	HousingCompanyRenovationUpdatedAt       time.Time  `json:"housing_company_renovation_updated_at"`
+}
+
 type HousingCompanySource struct {
 	HousingCompanySourceID          uuid.UUID       `json:"housing_company_source_id"`
 	HousingCompanyID                uuid.UUID       `json:"housing_company_id"`
@@ -264,6 +300,20 @@ type HousingCompanySource struct {
 	HousingCompanySourceLastSeenAt  *time.Time      `json:"housing_company_source_last_seen_at"`
 	HousingCompanySourceCreatedAt   time.Time       `json:"housing_company_source_created_at"`
 	HousingCompanySourceUpdatedAt   time.Time       `json:"housing_company_source_updated_at"`
+}
+
+type HousingCompanySystem struct {
+	HousingCompanySystemID                    uuid.UUID `json:"housing_company_system_id"`
+	HousingCompanyID                          uuid.UUID `json:"housing_company_id"`
+	HousingCompanySystemType                  string    `json:"housing_company_system_type"`
+	HousingCompanySystemStatus                string    `json:"housing_company_system_status"`
+	HousingCompanySystemLastRenovatedYear     *int32    `json:"housing_company_system_last_renovated_year"`
+	HousingCompanySystemNextExpectedStartYear *int32    `json:"housing_company_system_next_expected_start_year"`
+	HousingCompanySystemNextExpectedEndYear   *int32    `json:"housing_company_system_next_expected_end_year"`
+	HousingCompanySystemConfidence            string    `json:"housing_company_system_confidence"`
+	HousingCompanySystemEvidenceLevel         string    `json:"housing_company_system_evidence_level"`
+	HousingCompanySystemSummary               *string   `json:"housing_company_system_summary"`
+	HousingCompanySystemUpdatedAt             time.Time `json:"housing_company_system_updated_at"`
 }
 
 type OauthAuthorizationCode struct {
@@ -728,6 +778,37 @@ type RuntimeKvStore struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type SaleListingApartmentProfile struct {
+	SaleListingID                         uuid.UUID  `json:"sale_listing_id"`
+	HousingCompanyID                      *uuid.UUID `json:"housing_company_id"`
+	PropertyUnitID                        *uuid.UUID `json:"property_unit_id"`
+	ApartmentProfileAreaM2                *float64   `json:"apartment_profile_area_m2"`
+	ApartmentProfileLivingAreaM2          *float64   `json:"apartment_profile_living_area_m2"`
+	ApartmentProfileRoomLayout            *string    `json:"apartment_profile_room_layout"`
+	ApartmentProfileRoomCount             *int32     `json:"apartment_profile_room_count"`
+	ApartmentProfileBedroomCount          *int32     `json:"apartment_profile_bedroom_count"`
+	ApartmentProfileFloorLevel            *int32     `json:"apartment_profile_floor_level"`
+	ApartmentProfileTotalFloors           *int32     `json:"apartment_profile_total_floors"`
+	ApartmentProfileKitchenType           *string    `json:"apartment_profile_kitchen_type"`
+	ApartmentProfileLayoutQuality         *string    `json:"apartment_profile_layout_quality"`
+	ApartmentProfileAwkwardLayout         *bool      `json:"apartment_profile_awkward_layout"`
+	ApartmentProfileCondition             *string    `json:"apartment_profile_condition"`
+	ApartmentProfileKitchenCondition      *string    `json:"apartment_profile_kitchen_condition"`
+	ApartmentProfileBathroomCondition     *string    `json:"apartment_profile_bathroom_condition"`
+	ApartmentProfileSurfaceRenovationNeed *bool      `json:"apartment_profile_surface_renovation_need"`
+	ApartmentProfileModernizationNeed     *bool      `json:"apartment_profile_modernization_need"`
+	ApartmentProfileSauna                 *bool      `json:"apartment_profile_sauna"`
+	ApartmentProfileBalcony               *bool      `json:"apartment_profile_balcony"`
+	ApartmentProfileBalconyGlazing        *bool      `json:"apartment_profile_balcony_glazing"`
+	ApartmentProfileParkingType           *string    `json:"apartment_profile_parking_type"`
+	ApartmentProfileStorageQuality        *string    `json:"apartment_profile_storage_quality"`
+	ApartmentProfileViewQuality           *string    `json:"apartment_profile_view_quality"`
+	ApartmentProfileNoiseRisk             *bool      `json:"apartment_profile_noise_risk"`
+	ApartmentProfileAccessibility         *string    `json:"apartment_profile_accessibility"`
+	ApartmentProfileConfidence            string     `json:"apartment_profile_confidence"`
+	ApartmentProfileUpdatedAt             time.Time  `json:"apartment_profile_updated_at"`
 }
 
 type SaleListingPlotTypeAlias struct {

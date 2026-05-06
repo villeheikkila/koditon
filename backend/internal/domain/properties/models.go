@@ -532,23 +532,79 @@ type RentalSummary struct {
 }
 
 type SaleListing struct {
-	ID              string                        `json:"id"`
-	Canonical       CanonicalOffering             `json:"canonical"`
-	Source          ListingSource                 `json:"source"`
-	SourceRecords   []OfferingSourceRecord        `json:"source_records,omitempty"`
-	Headline        string                        `json:"headline"`
-	Unit            UnitDetails                   `json:"unit"`
-	Building        BuildingDetails               `json:"building"`
-	Site            SiteDetails                   `json:"site,omitempty"`
-	Commercial      CommercialDetails             `json:"commercial"`
-	Texts           TextSections                  `json:"texts,omitempty"`
-	Media           Media                         `json:"media,omitempty"`
-	Contacts        []Contact                     `json:"contacts,omitempty"`
-	Showings        []Showing                     `json:"showings,omitempty"`
-	Links           []Link                        `json:"links,omitempty"`
-	Insights        ListingInsights               `json:"insights,omitempty"`
-	ValuationInputs valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
-	Valuation       *valuation.ApartmentValuation `json:"valuation,omitempty"`
+	ID               string                        `json:"id"`
+	Canonical        CanonicalOffering             `json:"canonical"`
+	Source           ListingSource                 `json:"source"`
+	SourceRecords    []OfferingSourceRecord        `json:"source_records,omitempty"`
+	Headline         string                        `json:"headline"`
+	Unit             UnitDetails                   `json:"unit"`
+	Building         BuildingDetails               `json:"building"`
+	Site             SiteDetails                   `json:"site,omitempty"`
+	Commercial       CommercialDetails             `json:"commercial"`
+	Texts            TextSections                  `json:"texts,omitempty"`
+	Media            Media                         `json:"media,omitempty"`
+	Contacts         []Contact                     `json:"contacts,omitempty"`
+	Showings         []Showing                     `json:"showings,omitempty"`
+	Links            []Link                        `json:"links,omitempty"`
+	Insights         ListingInsights               `json:"insights,omitempty"`
+	ApartmentProfile ApartmentProfile              `json:"apartment_profile,omitempty"`
+	HouseOverview    HouseOverview                 `json:"house_overview,omitempty"`
+	ValuationInputs  valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
+	Valuation        *valuation.ApartmentValuation `json:"valuation,omitempty"`
+}
+
+type ApartmentProfile struct {
+	HousingCompanyID      string   `json:"housing_company_id,omitempty"`
+	PropertyUnitID        string   `json:"property_unit_id,omitempty"`
+	AreaM2                *float64 `json:"area_m2,omitempty"`
+	LivingAreaM2          *float64 `json:"living_area_m2,omitempty"`
+	RoomLayout            string   `json:"room_layout,omitempty"`
+	RoomCount             *int32   `json:"room_count,omitempty"`
+	BedroomCount          *int32   `json:"bedroom_count,omitempty"`
+	FloorLevel            *int32   `json:"floor_level,omitempty"`
+	TotalFloors           *int32   `json:"total_floors,omitempty"`
+	KitchenType           string   `json:"kitchen_type,omitempty"`
+	LayoutQuality         string   `json:"layout_quality,omitempty"`
+	AwkwardLayout         *bool    `json:"awkward_layout,omitempty"`
+	Condition             string   `json:"condition,omitempty"`
+	KitchenCondition      string   `json:"kitchen_condition,omitempty"`
+	BathroomCondition     string   `json:"bathroom_condition,omitempty"`
+	SurfaceRenovationNeed *bool    `json:"surface_renovation_need,omitempty"`
+	ModernizationNeed     *bool    `json:"modernization_need,omitempty"`
+	Sauna                 *bool    `json:"sauna,omitempty"`
+	Balcony               *bool    `json:"balcony,omitempty"`
+	BalconyGlazing        *bool    `json:"balcony_glazing,omitempty"`
+	ParkingType           string   `json:"parking_type,omitempty"`
+	StorageQuality        string   `json:"storage_quality,omitempty"`
+	ViewQuality           string   `json:"view_quality,omitempty"`
+	NoiseRisk             *bool    `json:"noise_risk,omitempty"`
+	Accessibility         string   `json:"accessibility,omitempty"`
+	Confidence            string   `json:"confidence,omitempty"`
+	UpdatedAt             string   `json:"updated_at,omitempty"`
+}
+
+type ApartmentProfileProjectionResult struct {
+	SaleListingID    string           `json:"sale_listing_id"`
+	ApartmentProfile ApartmentProfile `json:"apartment_profile,omitempty"`
+}
+
+type HouseOverview struct {
+	Headline            string   `json:"headline,omitempty"`
+	Summary             string   `json:"summary,omitempty"`
+	RenovationReadiness string   `json:"renovation_readiness,omitempty"`
+	ExpensiveWindow     string   `json:"expensive_window,omitempty"`
+	KeyStrengths        []string `json:"key_strengths,omitempty"`
+	KeyRisks            []string `json:"key_risks,omitempty"`
+	EvidenceGaps        []string `json:"evidence_gaps,omitempty"`
+	Confidence          string   `json:"confidence,omitempty"`
+	GeneratedAt         string   `json:"generated_at,omitempty"`
+	Model               string   `json:"model,omitempty"`
+}
+
+type HouseOverviewGenerationResult struct {
+	SaleListingID string        `json:"sale_listing_id"`
+	Model         string        `json:"model"`
+	Overview      HouseOverview `json:"overview"`
 }
 
 type Rental struct {

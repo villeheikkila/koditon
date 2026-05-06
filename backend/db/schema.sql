@@ -98,6 +98,28 @@ create table public.feature_flags (
   flag_id bigint generated always as identity not null constraint feature_flags_pkey primary key
 );
 
+create table public.field_sources (
+  field_source_id uuid default gen_random_uuid() not null constraint field_sources_pkey primary key,
+  field_source_target_table text not null,
+  field_source_target_id uuid not null,
+  field_source_target_field text not null,
+  field_source_source_record_table text not null,
+  field_source_source_record_id uuid not null,
+  field_source_source_path text,
+  field_source_evidence_text text,
+  field_source_method text not null,
+  field_source_confidence double precision default 1 not null,
+  field_source_observed_at timestamp with time zone default now() not null,
+  field_source_valid_from date,
+  field_source_valid_until date,
+  constraint field_sources_field_source_confidence_check CHECK (((field_source_confidence >= (0)::double precision) AND (field_source_confidence <= (1)::double precision))),
+  constraint field_sources_field_source_method_check CHECK ((field_source_method = ANY (ARRAY['provider_field'::text, 'llm'::text, 'manual'::text, 'parser'::text, 'forecast'::text])))
+);
+
+CREATE INDEX idx_field_sources_source ON public.field_sources USING btree (field_source_source_record_table, field_source_source_record_id);
+CREATE INDEX idx_field_sources_target ON public.field_sources USING btree (field_source_target_table, field_source_target_id, field_source_target_field);
+CREATE UNIQUE INDEX idx_field_sources_unique ON public.field_sources USING btree (field_source_target_table, field_source_target_id, field_source_target_field, field_source_source_record_table, field_source_source_record_id, COALESCE(field_source_source_path, ''::text), field_source_method);
+
 create table public.frontdoor_ads (
   frontdoor_ad_id uuid default gen_random_uuid() not null constraint frontdoor_ads_pkey primary key,
   frontdoor_ad_external_id text not null constraint frontdoor_ads_frontdoor_ads_external_id_key unique,
@@ -285,6 +307,37 @@ CREATE UNIQUE INDEX idx_housing_company_merge_decisions_active_pair ON public.ho
 CREATE INDEX idx_housing_company_merge_decisions_source ON public.housing_company_merge_decisions USING btree (source_housing_company_id, housing_company_merge_decision_status);
 CREATE INDEX idx_housing_company_merge_decisions_target ON public.housing_company_merge_decisions USING btree (target_housing_company_id, housing_company_merge_decision_status);
 
+create table public.housing_company_renovations (
+  housing_company_renovation_id uuid default gen_random_uuid() not null constraint housing_company_renovations_pkey primary key,
+  housing_company_id uuid not null constraint housing_company_renovations_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  source_sale_listing_id uuid constraint housing_company_renovations_source_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE SET NULL,
+  housing_company_renovation_category text not null,
+  housing_company_renovation_status text not null,
+  housing_company_renovation_stage text default 'unknown'::text not null,
+  housing_company_renovation_scope text default 'unknown'::text not null,
+  housing_company_renovation_responsibility text default 'unknown'::text not null,
+  housing_company_renovation_year integer,
+  housing_company_renovation_window_start_year integer,
+  housing_company_renovation_window_end_year integer,
+  housing_company_renovation_cost_estimate_eur bigint,
+  housing_company_renovation_confidence text default 'low'::text not null,
+  housing_company_renovation_evidence_level text default 'none'::text not null,
+  housing_company_renovation_summary text,
+  housing_company_renovation_created_at timestamp with time zone default now() not null,
+  housing_company_renovation_updated_at timestamp with time zone default now() not null,
+  constraint housing_company_renovations_housing_company_renovation_ca_check CHECK ((housing_company_renovation_category = ANY (ARRAY['pipe'::text, 'water_supply'::text, 'sewer'::text, 'roof'::text, 'facade'::text, 'window'::text, 'balcony'::text, 'elevator'::text, 'heating'::text, 'ventilation'::text, 'drainage'::text, 'electricity'::text, 'yard'::text, 'common_areas'::text, 'other'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_co_check CHECK ((housing_company_renovation_confidence = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_ev_check CHECK ((housing_company_renovation_evidence_level = ANY (ARRAY['none'::text, 'ad_only'::text, 'multiple_ads'::text, 'announcement'::text, 'manager_certificate'::text, 'financial_statement'::text, 'manual'::text, 'forecast'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_re_check CHECK ((housing_company_renovation_responsibility = ANY (ARRAY['unknown'::text, 'housing_company'::text, 'shareholder'::text, 'mixed'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_s_check1 CHECK ((housing_company_renovation_stage = ANY (ARRAY['unknown'::text, 'study'::text, 'condition_assessment'::text, 'planning'::text, 'tendering'::text, 'execution'::text, 'completed'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_sc_check CHECK ((housing_company_renovation_scope = ANY (ARRAY['unknown'::text, 'full'::text, 'partial'::text, 'maintenance'::text]))),
+  constraint housing_company_renovations_housing_company_renovation_st_check CHECK ((housing_company_renovation_status = ANY (ARRAY['done'::text, 'planned'::text, 'suspected'::text, 'forecast'::text, 'cancelled'::text, 'unknown'::text])))
+);
+
+CREATE INDEX idx_housing_company_renovations_company ON public.housing_company_renovations USING btree (housing_company_id);
+CREATE UNIQUE INDEX idx_housing_company_renovations_source_unique ON public.housing_company_renovations USING btree (housing_company_id, source_sale_listing_id, housing_company_renovation_category, housing_company_renovation_status, housing_company_renovation_stage, housing_company_renovation_scope, COALESCE(housing_company_renovation_year, '-1'::integer), md5(COALESCE(housing_company_renovation_summary, ''::text))) WHERE (source_sale_listing_id IS NOT NULL);
+CREATE INDEX idx_housing_company_renovations_timing ON public.housing_company_renovations USING btree (housing_company_renovation_status, housing_company_renovation_year, housing_company_renovation_window_start_year);
+
 create table public.housing_company_sources (
   housing_company_source_id uuid default gen_random_uuid() not null constraint housing_company_sources_pkey primary key,
   housing_company_id uuid not null constraint housing_company_sources_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
@@ -307,6 +360,26 @@ create table public.housing_company_sources (
 );
 
 CREATE INDEX idx_housing_company_sources_company ON public.housing_company_sources USING btree (housing_company_id);
+
+create table public.housing_company_systems (
+  housing_company_system_id uuid default gen_random_uuid() not null constraint housing_company_systems_pkey primary key,
+  housing_company_id uuid not null constraint housing_company_systems_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
+  housing_company_system_type text not null,
+  housing_company_system_status text default 'unknown'::text not null,
+  housing_company_system_last_renovated_year integer,
+  housing_company_system_next_expected_start_year integer,
+  housing_company_system_next_expected_end_year integer,
+  housing_company_system_confidence text default 'low'::text not null,
+  housing_company_system_evidence_level text default 'none'::text not null,
+  housing_company_system_summary text,
+  housing_company_system_updated_at timestamp with time zone default now() not null,
+  constraint housing_company_systems_housing_company_system_confidence_check CHECK ((housing_company_system_confidence = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))),
+  constraint housing_company_systems_housing_company_system_evidence_l_check CHECK ((housing_company_system_evidence_level = ANY (ARRAY['none'::text, 'ad_only'::text, 'multiple_ads'::text, 'announcement'::text, 'manager_certificate'::text, 'financial_statement'::text, 'manual'::text, 'forecast'::text]))),
+  constraint housing_company_systems_housing_company_system_status_check CHECK ((housing_company_system_status = ANY (ARRAY['unknown'::text, 'original'::text, 'maintained'::text, 'partly_renewed'::text, 'renewed'::text, 'under_study'::text, 'planned'::text, 'under_construction'::text, 'risk'::text]))),
+  constraint housing_company_systems_housing_company_system_type_check CHECK ((housing_company_system_type = ANY (ARRAY['pipes'::text, 'water_supply'::text, 'sewer'::text, 'roof'::text, 'facade'::text, 'windows'::text, 'balconies'::text, 'elevator'::text, 'heating'::text, 'ventilation'::text, 'drainage'::text, 'electrical'::text, 'yard'::text, 'common_areas'::text])))
+);
+
+CREATE UNIQUE INDEX idx_housing_company_systems_unique ON public.housing_company_systems USING btree (housing_company_id, housing_company_system_type);
 
 create table public.oauth_authorization_codes (
   oauth_authorization_code_id uuid default gen_random_uuid() not null constraint oauth_authorization_codes_pkey primary key,
@@ -885,6 +958,49 @@ create table public.roles (
   role_created_at timestamp with time zone default now() not null,
   role_id bigint generated always as identity not null constraint roles_pkey primary key
 );
+
+create table public.sale_listing_apartment_profiles (
+  sale_listing_id uuid not null constraint sale_listing_apartment_profiles_pkey primary key constraint sale_listing_apartment_profiles_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
+  housing_company_id uuid constraint sale_listing_apartment_profiles_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE SET NULL,
+  property_unit_id uuid constraint sale_listing_apartment_profiles_property_unit_id_fkey references property_units(property_unit_id) ON DELETE SET NULL,
+  apartment_profile_area_m2 double precision,
+  apartment_profile_living_area_m2 double precision,
+  apartment_profile_room_layout text,
+  apartment_profile_room_count integer,
+  apartment_profile_bedroom_count integer,
+  apartment_profile_floor_level integer,
+  apartment_profile_total_floors integer,
+  apartment_profile_kitchen_type text,
+  apartment_profile_layout_quality text,
+  apartment_profile_awkward_layout boolean,
+  apartment_profile_condition text,
+  apartment_profile_kitchen_condition text,
+  apartment_profile_bathroom_condition text,
+  apartment_profile_surface_renovation_need boolean,
+  apartment_profile_modernization_need boolean,
+  apartment_profile_sauna boolean,
+  apartment_profile_balcony boolean,
+  apartment_profile_balcony_glazing boolean,
+  apartment_profile_parking_type text,
+  apartment_profile_storage_quality text,
+  apartment_profile_view_quality text,
+  apartment_profile_noise_risk boolean,
+  apartment_profile_accessibility text,
+  apartment_profile_confidence text default 'low'::text not null,
+  apartment_profile_updated_at timestamp with time zone default now() not null,
+  constraint sale_listing_apartment_profi_apartment_profile_accessibil_check CHECK (((apartment_profile_accessibility IS NULL) OR (apartment_profile_accessibility = ANY (ARRAY['poor'::text, 'average'::text, 'good'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_bathroom_c_check CHECK (((apartment_profile_bathroom_condition IS NULL) OR (apartment_profile_bathroom_condition = ANY (ARRAY['poor'::text, 'fair'::text, 'good'::text, 'excellent'::text, 'new'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_confidence_check CHECK ((apartment_profile_confidence = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))),
+  constraint sale_listing_apartment_profi_apartment_profile_kitchen_co_check CHECK (((apartment_profile_kitchen_condition IS NULL) OR (apartment_profile_kitchen_condition = ANY (ARRAY['poor'::text, 'fair'::text, 'good'::text, 'excellent'::text, 'new'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_kitchen_ty_check CHECK (((apartment_profile_kitchen_type IS NULL) OR (apartment_profile_kitchen_type = ANY (ARRAY['separate'::text, 'open'::text, 'kitchenette'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_layout_qua_check CHECK (((apartment_profile_layout_quality IS NULL) OR (apartment_profile_layout_quality = ANY (ARRAY['weak'::text, 'average'::text, 'good'::text, 'excellent'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_parking_ty_check CHECK (((apartment_profile_parking_type IS NULL) OR (apartment_profile_parking_type = ANY (ARRAY['none'::text, 'street'::text, 'yard'::text, 'garage'::text, 'carport'::text, 'separate_share'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_storage_qu_check CHECK (((apartment_profile_storage_quality IS NULL) OR (apartment_profile_storage_quality = ANY (ARRAY['weak'::text, 'normal'::text, 'good'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profi_apartment_profile_view_quali_check CHECK (((apartment_profile_view_quality IS NULL) OR (apartment_profile_view_quality = ANY (ARRAY['weak'::text, 'normal'::text, 'good'::text, 'excellent'::text, 'unknown'::text])))),
+  constraint sale_listing_apartment_profil_apartment_profile_condition_check CHECK (((apartment_profile_condition IS NULL) OR (apartment_profile_condition = ANY (ARRAY['poor'::text, 'fair'::text, 'good'::text, 'excellent'::text, 'new'::text, 'unknown'::text]))))
+);
+
+CREATE INDEX idx_sale_listing_apartment_profiles_company ON public.sale_listing_apartment_profiles USING btree (housing_company_id);
 
 create table public.sale_listing_plot_type_aliases (
   sale_listing_plot_type_alias text not null constraint sale_listing_plot_type_aliases_pkey primary key,

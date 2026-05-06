@@ -224,6 +224,9 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	if err := s.enrichSaleListingValuationFacts(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
+	if err := s.enrichSaleListingApartmentProfile(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
 	return listing, nil
 }
 

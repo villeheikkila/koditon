@@ -133,6 +133,20 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Sale Listings"}
 		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-valuation-inputs-extract"))
 	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/apartment-profile/project", a.saleListingApartmentProfileProjectHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-apartment-profile-project"
+		op.Summary = "Project typed sale listing apartment profile"
+		op.Description = "Projects provider fields, extracted valuation facts, and typed renovation rows into the typed apartment and housing-company profile tables"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-apartment-profile-project"))
+	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/house-overview/generate", a.saleListingHouseOverviewGenerateHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-house-overview-generate"
+		op.Summary = "Generate sale listing house overview"
+		op.Description = "Uses the configured Fantasy/OpenRouter model to summarize the building and renovation situation from already structured listing facts"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-house-overview-generate"))
+	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-search"
 		op.Summary = "Search rentals"

@@ -60,6 +60,15 @@ type saleListingValuationInputsExtractInput struct {
 	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
 }
 
+type saleListingApartmentProfileProjectInput struct {
+	ID string `path:"id" required:"true" doc:"Canonical offering UUID"`
+}
+
+type saleListingHouseOverviewGenerateInput struct {
+	ID    string `path:"id"     required:"true" doc:"Canonical offering UUID"`
+	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
+}
+
 type transactionMatchPostalsInput struct {
 	Limit int32 `query:"limit" doc:"Maximum postal codes to return"`
 }
@@ -154,6 +163,14 @@ type saleListingDescriptionExtractOutput struct {
 
 type saleListingValuationInputsExtractOutput struct {
 	Body properties.ValuationInputExtractionResult
+}
+
+type saleListingApartmentProfileProjectOutput struct {
+	Body properties.ApartmentProfileProjectionResult
+}
+
+type saleListingHouseOverviewGenerateOutput struct {
+	Body properties.HouseOverviewGenerationResult
 }
 
 type rentalDetailOutput struct {
@@ -283,6 +300,33 @@ func (a *API) saleListingValuationInputsExtractHandler(ctx context.Context, inpu
 		return nil, huma.Error400BadRequest("valuation input extraction failed")
 	}
 	return &saleListingValuationInputsExtractOutput{Body: result}, nil
+}
+
+func (a *API) saleListingApartmentProfileProjectHandler(ctx context.Context, input *saleListingApartmentProfileProjectInput) (*saleListingApartmentProfileProjectOutput, error) {
+	result, err := a.propertiesService.ProjectSaleListingApartmentProfile(ctx, input.ID)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		a.logger.ErrorContext(ctx, "sale listing apartment profile projection failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("apartment profile projection failed")
+	}
+	return &saleListingApartmentProfileProjectOutput{Body: result}, nil
+}
+
+func (a *API) saleListingHouseOverviewGenerateHandler(ctx context.Context, input *saleListingHouseOverviewGenerateInput) (*saleListingHouseOverviewGenerateOutput, error) {
+	result, err := a.propertiesService.GenerateSaleListingHouseOverview(ctx, input.ID, input.Model)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
+			return nil, huma.Error503ServiceUnavailable("house overview generator not configured")
+		}
+		a.logger.ErrorContext(ctx, "sale listing house overview generation failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("house overview generation failed")
+	}
+	return &saleListingHouseOverviewGenerateOutput{Body: result}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {

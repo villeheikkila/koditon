@@ -114,6 +114,12 @@ func (s *Service) replaceLLMValuationFacts(ctx context.Context, saleListingID uu
 			return fmt.Errorf("insert llm valuation fact: %w", err)
 		}
 	}
+	if err := queries.ProjectSaleListingApartmentProfileLLMFacts(ctx, saleListingID); err != nil {
+		return fmt.Errorf("project llm valuation facts to apartment profile: %w", err)
+	}
+	if err := queries.UpsertSaleListingApartmentProfileLLMFieldSources(ctx, saleListingID); err != nil {
+		return fmt.Errorf("upsert llm apartment profile field sources: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit valuation input extraction transaction: %w", err)
 	}
