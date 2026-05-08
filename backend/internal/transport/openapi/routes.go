@@ -133,12 +133,12 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Sale Listings"}
 		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-valuation-inputs-extract"))
 	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/apartment-profile/project", a.saleListingApartmentProfileProjectHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-apartment-profile-project"
-		op.Summary = "Project typed sale listing apartment profile"
-		op.Description = "Projects provider fields, extracted valuation facts, and typed renovation rows into the typed apartment and housing-company profile tables"
+	huma.Post(api, "/api/v1/sale-listings/{id}/canonical-profile/project", a.saleListingCanonicalProfileProjectHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-canonical-profile-project"
+		op.Summary = "Project canonical sale listing profile"
+		op.Description = "Projects provider fields, extracted property claims, and typed renovation rows into the canonical apartment, building, housing-company, and quality-score tables"
 		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-apartment-profile-project"))
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-canonical-profile-project"))
 	})
 	huma.Post(api, "/api/v1/sale-listings/{id}/house-overview/generate", a.saleListingHouseOverviewGenerateHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-house-overview-generate"

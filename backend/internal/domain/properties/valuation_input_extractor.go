@@ -41,7 +41,7 @@ type valuationInputExtractionFact struct {
 	Evidence    string   `json:"evidence,omitempty" description:"Short supporting phrase from the source field."`
 }
 
-const valuationFactEntitySaleListing = "sale_listing"
+const valuationClaimTargetSaleListing = "sale_listing"
 const valuationInputPromptVersion = "valuation_inputs.v1"
 
 func (s *Service) ExtractSaleListingValuationInputs(ctx context.Context, input string, modelName string) (ValuationInputExtractionResult, error) {
@@ -71,7 +71,7 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 		return ValuationInputExtractionResult{}, err
 	}
 	if !valuationInputPromptHasContent(row) {
-		if err := s.replaceLLMValuationFacts(ctx, saleListingID, modelName, nil); err != nil {
+		if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, nil); err != nil {
 			return ValuationInputExtractionResult{}, err
 		}
 		return result, nil
@@ -85,14 +85,14 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 		return ValuationInputExtractionResult{}, fmt.Errorf("extract valuation inputs with fantasy: %w", err)
 	}
 	facts := normalizeValuationInputFacts(objectResult.Object.Facts, modelName)
-	if err := s.replaceLLMValuationFacts(ctx, saleListingID, modelName, facts); err != nil {
+	if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, facts); err != nil {
 		return ValuationInputExtractionResult{}, err
 	}
 	result.Facts = facts
 	return result, nil
 }
 
-func (s *Service) replaceLLMValuationFacts(ctx context.Context, saleListingID uuid.UUID, modelName string, facts []valuation.ValuationFact) error {
+func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uuid.UUID, modelName string, facts []valuation.ValuationFact) error {
 	beginner, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
 	})
@@ -105,20 +105,29 @@ func (s *Service) replaceLLMValuationFacts(ctx context.Context, saleListingID uu
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
-	entity := db.DeleteLLMPropertyValuationFactsForEntityParams{EntityType: valuationFactEntitySaleListing, EntityID: saleListingID}
-	if err := queries.DeleteLLMPropertyValuationFactsForEntity(ctx, entity); err != nil {
+	entity := db.DeleteLLMPropertyClaimsForEntityParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID}
+	if err := queries.DeleteLLMPropertyClaimsForEntity(ctx, entity); err != nil {
 		return fmt.Errorf("delete previous llm valuation facts: %w", err)
 	}
 	for _, fact := range facts {
-		if err := queries.InsertPropertyValuationFact(ctx, db.InsertPropertyValuationFactParams{EntityType: valuationFactEntitySaleListing, EntityID: saleListingID, SourceField: llmValuationFactSourceField(fact.Source), Section: fact.Section, Key: fact.Key, ValueKind: fact.ValueKind, ValueText: fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: int32(fact.Confidence * 100), EvidenceText: fact.Evidence, Model: modelName, PromptVersion: valuationInputPromptVersion}); err != nil {
+		if err := queries.InsertPropertyClaim(ctx, db.InsertPropertyClaimParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID, SourceField: llmValuationFactSourceField(fact.Source), Section: fact.Section, Key: fact.Key, ValueKind: fact.ValueKind, ValueText: fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: fact.Confidence * 100, EvidenceText: fact.Evidence, Model: modelName, PromptVersion: valuationInputPromptVersion}); err != nil {
 			return fmt.Errorf("insert llm valuation fact: %w", err)
 		}
 	}
-	if err := queries.ProjectSaleListingApartmentProfileLLMFacts(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project llm valuation facts to apartment profile: %w", err)
+	if err := queries.EnsurePhysicalBuildingForSaleListing(ctx, saleListingID); err != nil {
+		return fmt.Errorf("ensure physical building after valuation extraction: %w", err)
 	}
-	if err := queries.UpsertSaleListingApartmentProfileLLMFieldSources(ctx, saleListingID); err != nil {
-		return fmt.Errorf("upsert llm apartment profile field sources: %w", err)
+	if err := queries.ProjectApartmentProfileForSaleListing(ctx, saleListingID); err != nil {
+		return fmt.Errorf("project apartment profile after valuation extraction: %w", err)
+	}
+	if err := queries.ProjectBuildingProfileForSaleListing(ctx, saleListingID); err != nil {
+		return fmt.Errorf("project building profile after valuation extraction: %w", err)
+	}
+	if err := queries.ProjectHousingCompanyProfileForSaleListing(ctx, saleListingID); err != nil {
+		return fmt.Errorf("project housing company profile after valuation extraction: %w", err)
+	}
+	if err := queries.ProjectQualityScoresForSaleListing(ctx, saleListingID); err != nil {
+		return fmt.Errorf("project quality scores after valuation extraction: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit valuation input extraction transaction: %w", err)

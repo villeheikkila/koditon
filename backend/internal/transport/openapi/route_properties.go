@@ -60,7 +60,7 @@ type saleListingValuationInputsExtractInput struct {
 	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
 }
 
-type saleListingApartmentProfileProjectInput struct {
+type saleListingCanonicalProfileProjectInput struct {
 	ID string `path:"id" required:"true" doc:"Canonical offering UUID"`
 }
 
@@ -165,8 +165,8 @@ type saleListingValuationInputsExtractOutput struct {
 	Body properties.ValuationInputExtractionResult
 }
 
-type saleListingApartmentProfileProjectOutput struct {
-	Body properties.ApartmentProfileProjectionResult
+type saleListingCanonicalProfileProjectOutput struct {
+	Body properties.CanonicalProfileProjectionResult
 }
 
 type saleListingHouseOverviewGenerateOutput struct {
@@ -240,7 +240,7 @@ func (a *API) saleListingDetailHandler(ctx context.Context, input *propertyDetai
 			return nil, huma.Error404NotFound("sale listing not found")
 		}
 		a.logger.ErrorContext(ctx, "sale listing detail failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
-		return nil, huma.Error400BadRequest("invalid sale listing canonical ID")
+		return nil, huma.Error500InternalServerError("sale listing detail failed")
 	}
 	return &saleListingDetailOutput{Body: listing}, nil
 }
@@ -302,16 +302,16 @@ func (a *API) saleListingValuationInputsExtractHandler(ctx context.Context, inpu
 	return &saleListingValuationInputsExtractOutput{Body: result}, nil
 }
 
-func (a *API) saleListingApartmentProfileProjectHandler(ctx context.Context, input *saleListingApartmentProfileProjectInput) (*saleListingApartmentProfileProjectOutput, error) {
-	result, err := a.propertiesService.ProjectSaleListingApartmentProfile(ctx, input.ID)
+func (a *API) saleListingCanonicalProfileProjectHandler(ctx context.Context, input *saleListingCanonicalProfileProjectInput) (*saleListingCanonicalProfileProjectOutput, error) {
+	result, err := a.propertiesService.ProjectSaleListingCanonicalProfile(ctx, input.ID)
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("sale listing not found")
 		}
-		a.logger.ErrorContext(ctx, "sale listing apartment profile projection failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
-		return nil, huma.Error400BadRequest("apartment profile projection failed")
+		a.logger.ErrorContext(ctx, "sale listing canonical profile projection failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("canonical profile projection failed")
 	}
-	return &saleListingApartmentProfileProjectOutput{Body: result}, nil
+	return &saleListingCanonicalProfileProjectOutput{Body: result}, nil
 }
 
 func (a *API) saleListingHouseOverviewGenerateHandler(ctx context.Context, input *saleListingHouseOverviewGenerateInput) (*saleListingHouseOverviewGenerateOutput, error) {

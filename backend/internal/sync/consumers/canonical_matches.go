@@ -182,17 +182,29 @@ func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.C
 	if err != nil {
 		return fmt.Errorf("parse sale listing id for typed projection: %w", err)
 	}
-	if err := c.queries.ProjectSaleListingApartmentProfile(ctx, id); err != nil {
-		return fmt.Errorf("project sale listing apartment profile: %w", err)
+	if err := c.queries.EnsurePhysicalBuildingForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("ensure physical building: %w", err)
 	}
-	if err := c.queries.UpsertSaleListingApartmentProfileProviderFieldSources(ctx, id); err != nil {
-		return fmt.Errorf("upsert apartment profile provider field sources: %w", err)
+	if err := c.queries.UpsertSaleListingProviderClaims(ctx, id); err != nil {
+		return fmt.Errorf("upsert provider property claims: %w", err)
+	}
+	if err := c.queries.ProjectApartmentProfileForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project apartment profile: %w", err)
 	}
 	if err := c.queries.ProjectHousingCompanyRenovationsForSaleListing(ctx, id); err != nil {
 		return fmt.Errorf("project housing company renovations: %w", err)
 	}
 	if err := c.queries.ProjectHousingCompanySystemsFromRenovationsForSaleListing(ctx, id); err != nil {
 		return fmt.Errorf("project housing company systems from renovations: %w", err)
+	}
+	if err := c.queries.ProjectBuildingProfileForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project building profile: %w", err)
+	}
+	if err := c.queries.ProjectHousingCompanyProfileForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project housing company profile: %w", err)
+	}
+	if err := c.queries.ProjectQualityScoresForSaleListing(ctx, id); err != nil {
+		return fmt.Errorf("project quality scores: %w", err)
 	}
 	return nil
 }

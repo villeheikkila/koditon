@@ -100,14 +100,51 @@ type ApartmentProfile = {
   confidence?: string
   updated_at?: string
 }
-type ApartmentProfileProjectionResult = {
+type CanonicalProfileProjectionResult = {
   sale_listing_id: string
   apartment_profile?: ApartmentProfile
 }
-type ApartmentProfileProjectionResponse = {
-  data: ApartmentProfileProjectionResult
+type CanonicalProfileProjectionResponse = {
+  data: CanonicalProfileProjectionResult
   status: number
   headers: Headers
+}
+type BuildingProfile = {
+  physical_building_id?: string
+  housing_company_id?: string
+  build_year?: number
+  floor_count?: number
+  apartment_count?: number
+  energy_class?: string
+  heating_method?: string
+  material?: string
+  roof_type?: string
+  roof_material?: string
+  elevator?: boolean
+  confidence?: string
+  updated_at?: string
+}
+type HousingCompanyProfile = {
+  housing_company_id?: string
+  name?: string
+  business_id?: string
+  build_year?: number
+  apartment_count?: number
+  plot_ownership_type?: string
+  energy_class?: string
+  maintenance_risk?: string
+  financial_risk?: string
+  repair_backlog_risk?: string
+  confidence?: string
+  updated_at?: string
+}
+type PropertyQualityScore = {
+  target_type: string
+  dimension: string
+  value: number
+  confidence?: string
+  reasons?: string[] | null
+  updated_at?: string
 }
 type HouseOverview = {
   headline?: string
@@ -241,6 +278,9 @@ type ValuationBrief = {
 }
 type SaleListingWithValuation = SaleListing & {
   apartment_profile?: ApartmentProfile
+  building_profile?: BuildingProfile
+  housing_company_profile?: HousingCompanyProfile
+  quality_scores?: PropertyQualityScore[] | null
   house_overview?: HouseOverview
   valuation_inputs?: {
     facts?: ValuationFact[] | null
@@ -309,7 +349,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const [renovationExtractionResult, setRenovationExtractionResult] = useState<RenovationExtractionResult | null>(null)
   const [descriptionExtractionResult, setDescriptionExtractionResult] = useState<DescriptionExtractionResult | null>(null)
   const [valuationInputExtractionResult, setValuationInputExtractionResult] = useState<ValuationInputExtractionResult | null>(null)
-  const [apartmentProfileProjectionResult, setApartmentProfileProjectionResult] = useState<ApartmentProfileProjectionResult | null>(null)
+  const [canonicalProfileProjectionResult, setCanonicalProfileProjectionResult] = useState<CanonicalProfileProjectionResult | null>(null)
   const [houseOverviewResult, setHouseOverviewResult] = useState<HouseOverviewGenerationResult | null>(null)
   const unit = d.unit
   const building = d.building
@@ -349,7 +389,12 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const valuationRenovations = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.renovations
   const valuationBrief = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.brief
   const offerAssessment = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.offer_assessment
-  const apartmentProfile = apartmentProfileProjectionResult?.apartment_profile ?? (saleDetail as SaleListingWithValuation | undefined)?.apartment_profile
+  const apartmentProfile = canonicalProfileProjectionResult?.apartment_profile ?? (saleDetail as SaleListingWithValuation | undefined)?.apartment_profile
+  const buildingProfile = (saleDetail as SaleListingWithValuation | undefined)?.building_profile
+  const housingProfile = (saleDetail as SaleListingWithValuation | undefined)?.housing_company_profile
+  const qualityScores = (saleDetail as SaleListingWithValuation | undefined)?.quality_scores ?? []
+  const buildingQualityScores = qualityScores.filter(score => score.target_type === 'physical_building' || score.target_type === 'housing_company' || score.target_type === 'property_offering')
+  const hasCanonicalBuildingDetails = hasBuildingProfileValue(buildingProfile) || hasHousingCompanyProfileValue(housingProfile) || buildingQualityScores.length > 0
   const apartmentProfileGroups = apartmentProfile ? groupApartmentProfile(apartmentProfile) : []
   const apartmentProfileCompleteness = apartmentProfile ? profileCompleteness(apartmentProfile) : { completed: 0, total: PROFILE_COMPLETENESS_FIELDS.length }
   const valuationInput = (saleDetail as SaleListingWithValuation | undefined)?.valuation?.input
@@ -419,13 +464,13 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
     : valuationInputExtractionResult
       ? `${valuationInputExtractionResult.facts?.length ?? 0} facts · ${valuationInputExtractionResult.model}`
       : undefined
-  const projectApartmentProfile = useMutation({
+  const projectCanonicalProfile = useMutation({
     mutationFn: async () => {
-      if (!saleDetail) throw new Error('Apartment profile projection is only available for sale listings')
-      return projectSaleListingApartmentProfile(saleDetail.id)
+      if (!saleDetail) throw new Error('Canonical profile projection is only available for sale listings')
+      return projectSaleListingCanonicalProfile(saleDetail.id)
     },
     onSuccess: async response => {
-      setApartmentProfileProjectionResult(response.data)
+      setCanonicalProfileProjectionResult(response.data)
       await onRefresh?.()
     },
   })
@@ -444,7 +489,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
       const renovations = await extractSaleListingRenovations(saleDetail.id)
       const description = await extractSaleListingDescription(saleDetail.id)
       const valuationInputs = await extractSaleListingValuationInputs(saleDetail.id)
-      const profile = await projectSaleListingApartmentProfile(saleDetail.id)
+      const profile = await projectSaleListingCanonicalProfile(saleDetail.id)
       const overview = await generateSaleListingHouseOverview(saleDetail.id)
       return { renovations, description, valuationInputs, profile, overview }
     },
@@ -452,37 +497,37 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
       setRenovationExtractionResult(result.renovations.data)
       setDescriptionExtractionResult(result.description.data)
       setValuationInputExtractionResult(result.valuationInputs.data)
-      setApartmentProfileProjectionResult(result.profile.data)
+      setCanonicalProfileProjectionResult(result.profile.data)
       setHouseOverviewResult(result.overview.data)
       await onRefresh?.()
     },
   })
   const apartmentProfileMessage = populateEverything.isError
     ? (populateEverything.error as Error)?.message ?? 'Populate all failed'
-    : projectApartmentProfile.isError
-      ? (projectApartmentProfile.error as Error)?.message ?? 'Profile projection failed'
+    : projectCanonicalProfile.isError
+      ? (projectCanonicalProfile.error as Error)?.message ?? 'Profile projection failed'
       : generateHouseOverview.isError
         ? (generateHouseOverview.error as Error)?.message ?? 'House overview generation failed'
       : populateEverything.data
         ? 'profile and overview populated from provider fields and AI extraction'
-        : apartmentProfileProjectionResult
+        : canonicalProfileProjectionResult
           ? 'profile projected'
           : undefined
   const offerActions = saleDetail ? (
     <div className="listing-section-actions">
       {(descriptionExtractionMessage || valuationInputExtractionMessage || apartmentProfileMessage) && (
-        <span className={`listing-section-status${extractDescription.isError || extractValuationInputs.isError || projectApartmentProfile.isError || generateHouseOverview.isError || populateEverything.isError ? ' listing-section-status--error' : ''}`}>
+        <span className={`listing-section-status${extractDescription.isError || extractValuationInputs.isError || projectCanonicalProfile.isError || generateHouseOverview.isError || populateEverything.isError ? ' listing-section-status--error' : ''}`}>
           {[descriptionExtractionMessage, valuationInputExtractionMessage, apartmentProfileMessage].filter(Boolean).join(' · ')}
         </span>
       )}
-      <button type="button" className="listing-action-button" onClick={() => populateEverything.mutate()} disabled={populateEverything.isPending || extractValuationInputs.isPending || extractDescription.isPending || extractRenovations.isPending || projectApartmentProfile.isPending || generateHouseOverview.isPending}>
+      <button type="button" className="listing-action-button" onClick={() => populateEverything.mutate()} disabled={populateEverything.isPending || extractValuationInputs.isPending || extractDescription.isPending || extractRenovations.isPending || projectCanonicalProfile.isPending || generateHouseOverview.isPending}>
         {populateEverything.isPending ? 'Running…' : 'Populate all'}
       </button>
       <button type="button" className="listing-action-button" onClick={() => generateHouseOverview.mutate()} disabled={generateHouseOverview.isPending}>
         {generateHouseOverview.isPending ? 'Generating…' : 'Generate overview'}
       </button>
-      <button type="button" className="listing-action-button" onClick={() => projectApartmentProfile.mutate()} disabled={projectApartmentProfile.isPending}>
-        {projectApartmentProfile.isPending ? 'Projecting…' : 'Build profile'}
+      <button type="button" className="listing-action-button" onClick={() => projectCanonicalProfile.mutate()} disabled={projectCanonicalProfile.isPending}>
+        {projectCanonicalProfile.isPending ? 'Projecting…' : 'Build profile'}
       </button>
       <button type="button" className="listing-action-button" onClick={() => extractValuationInputs.mutate()} disabled={extractValuationInputs.isPending}>
         {extractValuationInputs.isPending ? 'Running…' : 'Extract inputs'}
@@ -560,11 +605,11 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
               <div className="profile-workbench">
                 <div className="profile-workbench-summary">
                   <div>
-                    <div className="profile-workbench-title">{apartmentProfile ? 'Typed apartment profile' : 'No typed apartment profile yet'}</div>
+                    <div className="profile-workbench-title">{apartmentProfile || hasCanonicalBuildingDetails ? 'Canonical apartment and building profile' : 'No canonical profile yet'}</div>
                     <p className="profile-workbench-copy">
-                      {apartmentProfile
-                        ? 'Canonical apartment facts are projected from provider fields and targeted AI extraction. Use this as the main valuation input surface.'
-                        : 'Populate the profile to canonicalize apartment-level facts before reviewing value, renovation exposure, and source evidence.'}
+                      {apartmentProfile || hasCanonicalBuildingDetails
+                        ? 'Canonical apartment, building, housing-company, and price-quality signals are projected from provider fields, linked sources, transaction matches, and targeted extraction.'
+                        : 'Populate the profile to canonicalize apartment and building facts before reviewing value, renovation exposure, and source evidence.'}
                     </p>
                   </div>
                   <div className="profile-workbench-metrics">
@@ -577,9 +622,43 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
                   <ProfileStep label="Source rows linked" done={(saleDetail.canonical.source_count ?? 0) > 0} detail={saleDetail.canonical.source_count != null ? `${saleDetail.canonical.source_count} source row${saleDetail.canonical.source_count === 1 ? '' : 's'}` : undefined} />
                   <ProfileStep label="Description parsed" done={(valuationFacts?.length ?? 0) > 0 || !!descriptionExtractionResult} detail={(valuationFacts?.length ?? 0) > 0 ? `${valuationFacts.length} valuation facts` : descriptionExtractionMessage} />
                   <ProfileStep label="Renovations structured" done={renovationRows.length > 0 || !!renovationExtractionResult} detail={renovationRows.length > 0 ? `${renovationRows.length} renovation facts` : renovationExtractionMessage} />
-                  <ProfileStep label="Apartment profile projected" done={!!apartmentProfile} detail={apartmentProfile?.updated_at ? fmtDateTime(apartmentProfile.updated_at) : apartmentProfileMessage} />
+                  <ProfileStep label="Canonical profile projected" done={!!apartmentProfile} detail={apartmentProfile?.updated_at ? fmtDateTime(apartmentProfile.updated_at) : apartmentProfileMessage} />
+                  <ProfileStep label="Building quality scored" done={hasCanonicalBuildingDetails} detail={buildingQualityScores.length ? `${buildingQualityScores.length} quality dimensions` : undefined} />
                 </div>
               </div>
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Canonical Building" actions={!hasCanonicalBuildingDetails ? offerActions : undefined}>
+              {hasCanonicalBuildingDetails ? (
+                <div className="canonical-building">
+                  {buildingQualityScores.length > 0 && (
+                    <div className="quality-score-grid">
+                      {buildingQualityScores.map(score => <QualityScoreCard score={score} key={`${score.target_type}-${score.dimension}`} />)}
+                    </div>
+                  )}
+                  <div className="listing-table">
+                    {buildingProfile?.physical_building_id && <Row label="Physical building" value={buildingProfile.physical_building_id} />}
+                    {buildingProfile?.build_year != null && <Row label="Canonical build year" value={String(buildingProfile.build_year)} />}
+                    {buildingProfile?.floor_count != null && <Row label="Canonical floors" value={String(buildingProfile.floor_count)} />}
+                    {buildingProfile?.apartment_count != null && <Row label="Canonical apartments" value={String(buildingProfile.apartment_count)} />}
+                    {buildingProfile?.energy_class && <Row label="Canonical energy" value={buildingProfile.energy_class} />}
+                    {buildingProfile?.heating_method && <Row label="Canonical heating" value={buildingProfile.heating_method} />}
+                    {buildingProfile?.material && <Row label="Canonical material" value={buildingProfile.material} />}
+                    {buildingProfile?.roof_type && <Row label="Canonical roof" value={[buildingProfile.roof_type, buildingProfile.roof_material].filter(Boolean).join(' · ')} />}
+                    {buildingProfile?.elevator != null && <Row label="Canonical elevator" value={fmtBool(buildingProfile.elevator)} />}
+                    {buildingProfile?.confidence && <Row label="Building confidence" value={buildingProfile.confidence} />}
+                    {housingProfile?.name && <Row label="Housing company profile" value={housingProfile.name} />}
+                    {housingProfile?.business_id && <Row label="Business ID" value={housingProfile.business_id} />}
+                    {housingProfile?.plot_ownership_type && <Row label="Plot tenure" value={housingProfile.plot_ownership_type} />}
+                    {housingProfile?.financial_risk && <Row label="Financial risk" value={housingProfile.financial_risk} highlight={housingProfile.financial_risk === 'high'} />}
+                    {housingProfile?.maintenance_risk && <Row label="Maintenance risk" value={housingProfile.maintenance_risk} highlight={housingProfile.maintenance_risk === 'high'} />}
+                    {housingProfile?.repair_backlog_risk && <Row label="Repair backlog" value={housingProfile.repair_backlog_risk} highlight={housingProfile.repair_backlog_risk === 'high'} />}
+                  </div>
+                </div>
+              ) : (
+                <div className="listing-empty-state">Build the canonical profile to show building, housing-company, and market-quality dimensions</div>
+              )}
             </Section>
           )}
           {saleDetail && (
@@ -1314,9 +1393,9 @@ function extractSaleListingValuationInputs(id: string): Promise<ValuationInputEx
   )
 }
 
-function projectSaleListingApartmentProfile(id: string): Promise<ApartmentProfileProjectionResponse> {
-  return customInstance<ApartmentProfileProjectionResponse>(
-    `/api/v1/sale-listings/${encodeURIComponent(id)}/apartment-profile/project`,
+function projectSaleListingCanonicalProfile(id: string): Promise<CanonicalProfileProjectionResponse> {
+  return customInstance<CanonicalProfileProjectionResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/canonical-profile/project`,
     { method: 'POST' },
   )
 }
@@ -1454,6 +1533,14 @@ function hasProfileValue(value: unknown): boolean {
   return value != null && value !== ''
 }
 
+function hasBuildingProfileValue(profile?: BuildingProfile): boolean {
+  return !!profile && Object.entries(profile).some(([key, value]) => key !== 'physical_building_id' && key !== 'housing_company_id' && hasProfileValue(value))
+}
+
+function hasHousingCompanyProfileValue(profile?: HousingCompanyProfile): boolean {
+  return !!profile && Object.entries(profile).some(([key, value]) => key !== 'housing_company_id' && hasProfileValue(value))
+}
+
 function positiveFor(value: string | undefined, positiveTerms: string[]): ApartmentProfileFact['tone'] | undefined {
   if (!value) return undefined
   const normalized = value.toLowerCase()
@@ -1552,6 +1639,26 @@ function ProfileStep({ label, done, detail }: { label: string; done: boolean; de
       {detail && <p>{detail}</p>}
     </div>
   )
+}
+
+function QualityScoreCard({ score }: { score: PropertyQualityScore }) {
+  return (
+    <div className={`quality-score-card quality-score-card--${qualityScoreTone(score.value)}`}>
+      <div className="quality-score-card-head">
+        <span>{renovationStatusLabel(score.target_type)}</span>
+        <strong>{score.value}</strong>
+      </div>
+      <div className="quality-score-card-title">{renovationStatusLabel(score.dimension)}</div>
+      {score.reasons?.length ? <p>{score.reasons.filter(Boolean).slice(0, 2).join(' · ')}</p> : null}
+      {score.confidence && <small>{score.confidence} confidence</small>}
+    </div>
+  )
+}
+
+function qualityScoreTone(value: number): string {
+  if (value >= 75) return 'positive'
+  if (value <= 40) return 'negative'
+  return 'neutral'
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

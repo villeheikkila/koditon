@@ -650,18 +650,173 @@ WHERE renovation.done IS TRUE;
 -- name: RefreshHousingCompanyFactsForPropertySourceOffering :exec
 SELECT public.fnc__refresh_housing_company_facts_for_property_source_offering(sqlc.arg(sale_listing_id));
 
--- name: GetSaleListingApartmentProfile :one
-SELECT *
-FROM public.sale_listing_apartment_profiles
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+-- name: GetApartmentProfileForSaleListing :one
+WITH linked AS (
+    SELECT pu.property_unit_id
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+)
+SELECT ap.*
+FROM public.apartment_profiles ap
+JOIN linked ON linked.property_unit_id = ap.property_unit_id
 LIMIT 1;
 
--- name: ProjectSaleListingApartmentProfile :exec
+-- name: EnsurePhysicalBuildingForSaleListing :exec
 WITH linked AS (
     SELECT
         pos.sale_listing_id,
         pu.property_unit_id,
-        pu.housing_company_id
+        pu.housing_company_id,
+        hc.housing_company_identity_key
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+),
+listing AS (
+    SELECT
+        sl.*,
+        linked.housing_company_id,
+        linked.property_unit_id,
+        linked.housing_company_identity_key
+    FROM public.property_source_offerings sl
+    JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
+    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+),
+inserted AS (
+    INSERT INTO public.physical_buildings (
+        housing_company_id,
+        physical_building_identity_key,
+        physical_building_address_norm,
+        physical_building_postal_norm,
+        physical_building_city_norm,
+        physical_building_build_year,
+        physical_building_floor_count,
+        physical_building_apartment_count,
+        physical_building_elevator,
+        physical_building_latitude,
+        physical_building_longitude,
+        physical_building_updated_at
+    )
+    SELECT
+        housing_company_id,
+        housing_company_identity_key || ':building:' || COALESCE(public.fnc__canonical_identity_part(sale_listing_address_norm), 'main'),
+        sale_listing_address_norm,
+        sale_listing_postal_norm,
+        sale_listing_city_norm,
+        sale_listing_build_year,
+        sale_listing_total_floors,
+        sale_listing_apartment_count,
+        sale_listing_elevator,
+        sale_listing_latitude,
+        sale_listing_longitude,
+        now()
+    FROM listing
+    ON CONFLICT (physical_building_identity_key) DO UPDATE SET
+        housing_company_id = COALESCE(public.physical_buildings.housing_company_id, EXCLUDED.housing_company_id),
+        physical_building_address_norm = COALESCE(public.physical_buildings.physical_building_address_norm, EXCLUDED.physical_building_address_norm),
+        physical_building_postal_norm = COALESCE(public.physical_buildings.physical_building_postal_norm, EXCLUDED.physical_building_postal_norm),
+        physical_building_city_norm = COALESCE(public.physical_buildings.physical_building_city_norm, EXCLUDED.physical_building_city_norm),
+        physical_building_build_year = COALESCE(public.physical_buildings.physical_building_build_year, EXCLUDED.physical_building_build_year),
+        physical_building_floor_count = COALESCE(public.physical_buildings.physical_building_floor_count, EXCLUDED.physical_building_floor_count),
+        physical_building_apartment_count = COALESCE(public.physical_buildings.physical_building_apartment_count, EXCLUDED.physical_building_apartment_count),
+        physical_building_elevator = COALESCE(public.physical_buildings.physical_building_elevator, EXCLUDED.physical_building_elevator),
+        physical_building_latitude = COALESCE(public.physical_buildings.physical_building_latitude, EXCLUDED.physical_building_latitude),
+        physical_building_longitude = COALESCE(public.physical_buildings.physical_building_longitude, EXCLUDED.physical_building_longitude),
+        physical_building_updated_at = now()
+    RETURNING physical_building_id
+)
+UPDATE public.property_units pu
+SET physical_building_id = inserted.physical_building_id,
+    property_unit_updated_at = now()
+FROM listing, inserted
+WHERE pu.property_unit_id = listing.property_unit_id;
+
+-- name: UpsertSaleListingProviderClaims :exec
+WITH source_values AS (
+    SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()) AS observed_at, 'unit'::text AS claim_namespace, 'area_m2'::text AS claim_key, 'number'::text AS value_kind, NULL::text AS value_text, sl.sale_listing_area_value AS value_number, NULL::boolean AS value_bool, 'sale_listing_area_value'::text AS source_path, sl.sale_listing_area_value::text AS evidence_text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_area_value IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'unit', 'living_area_m2', 'number', NULL::text, sl.sale_listing_living_area_value, NULL::boolean, 'sale_listing_living_area_value', sl.sale_listing_living_area_value::text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_living_area_value IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'layout', 'room_layout', 'text', sl.sale_listing_room_layout, NULL::double precision, NULL::boolean, 'sale_listing_room_layout', sl.sale_listing_room_layout FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND NULLIF(trim(sl.sale_listing_room_layout), '') IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'layout', 'room_count', 'number', NULL::text, sl.sale_listing_rooms_count::double precision, NULL::boolean, 'sale_listing_rooms_count', sl.sale_listing_rooms_count::text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_rooms_count IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'condition', 'condition', 'text', sl.sale_listing_condition, NULL::double precision, NULL::boolean, 'sale_listing_condition', sl.sale_listing_condition FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND NULLIF(trim(sl.sale_listing_condition), '') IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'unit', 'sauna', 'bool', NULL::text, NULL::double precision, sl.sale_listing_sauna, 'sale_listing_sauna', sl.sale_listing_sauna::text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_sauna IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'unit', 'balcony', 'bool', NULL::text, NULL::double precision, sl.sale_listing_balcony, 'sale_listing_balcony', sl.sale_listing_balcony::text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_balcony IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'parking', 'parking_text', 'text', sl.sale_listing_parking_text, NULL::double precision, NULL::boolean, 'sale_listing_parking_text', sl.sale_listing_parking_text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND NULLIF(trim(sl.sale_listing_parking_text), '') IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'building', 'build_year', 'number', NULL::text, sl.sale_listing_build_year::double precision, NULL::boolean, 'sale_listing_build_year', sl.sale_listing_build_year::text FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND sl.sale_listing_build_year IS NOT NULL
+    UNION ALL SELECT sl.sale_listing_id, COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_first_seen_at, sl.sale_listing_published_at, now()), 'building', 'heating_method', 'text', sl.sale_listing_heating_system, NULL::double precision, NULL::boolean, 'sale_listing_heating_system', sl.sale_listing_heating_system FROM public.property_source_offerings sl WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id) AND NULLIF(trim(sl.sale_listing_heating_system), '') IS NOT NULL
+)
+INSERT INTO public.property_claims (
+    property_claim_target_type,
+    property_claim_target_id,
+    property_claim_namespace,
+    property_claim_key,
+    property_claim_value_kind,
+    property_claim_value_text,
+    property_claim_value_number,
+    property_claim_value_bool,
+    property_claim_source_record_table,
+    property_claim_source_record_id,
+    property_claim_source_path,
+    property_claim_evidence_text,
+    property_claim_method,
+    property_claim_confidence,
+    property_claim_source_reliability,
+    property_claim_observed_at
+)
+SELECT
+    'sale_listing',
+    sale_listing_id,
+    claim_namespace,
+    claim_key,
+    value_kind,
+    NULLIF(value_text, ''),
+    value_number,
+    value_bool,
+    'property_source_offerings',
+    sale_listing_id,
+    source_path,
+    evidence_text,
+    'provider_field',
+    1,
+    0.85,
+    observed_at
+FROM source_values
+ON CONFLICT (
+    property_claim_target_type,
+    property_claim_target_id,
+    property_claim_namespace,
+    property_claim_key,
+    property_claim_source_record_table,
+    property_claim_source_record_id,
+    COALESCE(property_claim_source_path, ''),
+    property_claim_method
+) DO UPDATE SET
+    property_claim_value_kind = EXCLUDED.property_claim_value_kind,
+    property_claim_value_text = EXCLUDED.property_claim_value_text,
+    property_claim_value_number = EXCLUDED.property_claim_value_number,
+    property_claim_value_bool = EXCLUDED.property_claim_value_bool,
+    property_claim_evidence_text = EXCLUDED.property_claim_evidence_text,
+    property_claim_confidence = EXCLUDED.property_claim_confidence,
+    property_claim_source_reliability = EXCLUDED.property_claim_source_reliability,
+    property_claim_observed_at = EXCLUDED.property_claim_observed_at,
+    property_claim_updated_at = now();
+
+-- name: ProjectApartmentProfileForSaleListing :exec
+WITH linked AS (
+    SELECT
+        pos.sale_listing_id,
+        pu.property_unit_id,
+        pu.housing_company_id,
+        pu.physical_building_id
     FROM public.property_offering_sources pos
     JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
@@ -674,15 +829,36 @@ listing AS (
     SELECT
         sl.*,
         linked.housing_company_id,
-        linked.property_unit_id
+        linked.property_unit_id,
+        linked.physical_building_id
     FROM public.property_source_offerings sl
-    LEFT JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
+    JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
     WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+),
+claims AS (
+    SELECT
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace = 'balcony' AND property_claim_key IN ('glazing','balcony_glazing')) AS balcony_glazing,
+        max(property_claim_value_text) FILTER (WHERE property_claim_namespace = 'layout' AND property_claim_key = 'kitchen_type' AND property_claim_value_text = ANY (ARRAY['separate','open','kitchenette','unknown']::text[])) AS kitchen_type,
+        max(property_claim_value_text) FILTER (WHERE property_claim_namespace = 'layout' AND property_claim_key = 'layout_quality' AND property_claim_value_text = ANY (ARRAY['weak','average','good','excellent','unknown']::text[])) AS layout_quality,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace = 'layout' AND property_claim_key = 'awkward_layout') AS awkward_layout,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace IN ('condition','unit') AND property_claim_key = 'surface_renovation_need') AS surface_renovation_need,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace IN ('condition','unit') AND property_claim_key = 'modernization_need') AS modernization_need,
+        max(property_claim_value_text) FILTER (WHERE property_claim_namespace = 'storage' AND property_claim_key = 'storage_quality' AND property_claim_value_text = ANY (ARRAY['weak','normal','good','unknown']::text[])) AS storage_quality,
+        max(property_claim_value_text) FILTER (WHERE property_claim_namespace = 'views' AND property_claim_key = 'view_quality' AND property_claim_value_text = ANY (ARRAY['weak','normal','good','excellent','unknown']::text[])) AS view_quality,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace = 'views' AND property_claim_key = 'noise_risk') AS noise_risk,
+        max(property_claim_value_text) FILTER (WHERE property_claim_namespace IN ('building','unit') AND property_claim_key = 'accessibility' AND property_claim_value_text = ANY (ARRAY['poor','average','good','unknown']::text[])) AS accessibility,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace = 'kitchen' AND property_claim_key = 'renovated') AS kitchen_renovated,
+        bool_or(property_claim_value_bool) FILTER (WHERE property_claim_namespace = 'bathroom' AND property_claim_key = 'renovated') AS bathroom_renovated,
+        max(property_claim_confidence * property_claim_source_reliability) AS evidence_score
+    FROM public.property_claims
+    WHERE property_claim_target_type = 'sale_listing'
+        AND property_claim_target_id = sqlc.arg(sale_listing_id)
 )
-INSERT INTO public.sale_listing_apartment_profiles (
-    sale_listing_id,
-    housing_company_id,
+INSERT INTO public.apartment_profiles (
     property_unit_id,
+    housing_company_id,
+    physical_building_id,
+    source_sale_listing_id,
     apartment_profile_area_m2,
     apartment_profile_living_area_m2,
     apartment_profile_room_layout,
@@ -695,13 +871,25 @@ INSERT INTO public.sale_listing_apartment_profiles (
     apartment_profile_sauna,
     apartment_profile_balcony,
     apartment_profile_parking_type,
+    apartment_profile_balcony_glazing,
+    apartment_profile_layout_quality,
+    apartment_profile_awkward_layout,
+    apartment_profile_surface_renovation_need,
+    apartment_profile_modernization_need,
+    apartment_profile_storage_quality,
+    apartment_profile_view_quality,
+    apartment_profile_noise_risk,
+    apartment_profile_accessibility,
+    apartment_profile_kitchen_condition,
+    apartment_profile_bathroom_condition,
     apartment_profile_confidence,
     apartment_profile_updated_at
 )
 SELECT
-    sale_listing_id,
-    housing_company_id,
     property_unit_id,
+    housing_company_id,
+    physical_building_id,
+    sale_listing_id,
     sale_listing_area_value,
     sale_listing_living_area_value,
     sale_listing_room_layout,
@@ -709,12 +897,12 @@ SELECT
     sale_listing_bedrooms_count,
     sale_listing_floor_level,
     sale_listing_total_floors,
-    CASE
+    COALESCE(claims.kitchen_type, CASE
         WHEN lower(COALESCE(sale_listing_room_layout, '')) LIKE '%avok%' OR lower(COALESCE(sale_listing_kitchen_description_text, '')) LIKE '%avokeitti%' THEN 'open'
         WHEN lower(COALESCE(sale_listing_room_layout, '')) LIKE '%kk%' OR lower(COALESCE(sale_listing_room_layout, '')) LIKE '%keittonurk%' THEN 'kitchenette'
         WHEN lower(COALESCE(sale_listing_room_layout, '')) LIKE '%k%' OR lower(COALESCE(sale_listing_kitchen_description_text, '')) LIKE '%erillinen%' THEN 'separate'
         ELSE NULL
-    END,
+    END),
     CASE
         WHEN lower(COALESCE(sale_listing_condition, '')) LIKE '%uusi%' OR lower(COALESCE(sale_listing_condition, '')) LIKE '%new%' THEN 'new'
         WHEN lower(COALESCE(sale_listing_condition, '')) LIKE '%erinomain%' OR lower(COALESCE(sale_listing_condition, '')) LIKE '%excellent%' THEN 'excellent'
@@ -734,15 +922,29 @@ SELECT
         WHEN lower(sale_listing_parking_text) LIKE '%katu%' OR lower(sale_listing_parking_text) LIKE '%street%' THEN 'street'
         ELSE 'unknown'
     END,
+    claims.balcony_glazing,
+    claims.layout_quality,
+    claims.awkward_layout,
+    claims.surface_renovation_need,
+    claims.modernization_need,
+    claims.storage_quality,
+    claims.view_quality,
+    claims.noise_risk,
+    claims.accessibility,
+    CASE WHEN claims.kitchen_renovated IS TRUE THEN 'good' ELSE NULL END,
+    CASE WHEN claims.bathroom_renovated IS TRUE THEN 'good' ELSE NULL END,
     CASE
+        WHEN claims.evidence_score >= 0.8 AND sale_listing_area_value IS NOT NULL AND sale_listing_room_layout IS NOT NULL THEN 'high'
         WHEN sale_listing_area_value IS NOT NULL AND sale_listing_room_layout IS NOT NULL THEN 'medium'
         ELSE 'low'
     END,
     now()
 FROM listing
-ON CONFLICT (sale_listing_id) DO UPDATE SET
+LEFT JOIN claims ON true
+ON CONFLICT (property_unit_id) DO UPDATE SET
     housing_company_id = EXCLUDED.housing_company_id,
-    property_unit_id = EXCLUDED.property_unit_id,
+    physical_building_id = EXCLUDED.physical_building_id,
+    source_sale_listing_id = EXCLUDED.source_sale_listing_id,
     apartment_profile_area_m2 = EXCLUDED.apartment_profile_area_m2,
     apartment_profile_living_area_m2 = EXCLUDED.apartment_profile_living_area_m2,
     apartment_profile_room_layout = EXCLUDED.apartment_profile_room_layout,
@@ -750,72 +952,24 @@ ON CONFLICT (sale_listing_id) DO UPDATE SET
     apartment_profile_bedroom_count = EXCLUDED.apartment_profile_bedroom_count,
     apartment_profile_floor_level = EXCLUDED.apartment_profile_floor_level,
     apartment_profile_total_floors = EXCLUDED.apartment_profile_total_floors,
-    apartment_profile_kitchen_type = COALESCE(public.sale_listing_apartment_profiles.apartment_profile_kitchen_type, EXCLUDED.apartment_profile_kitchen_type),
+    apartment_profile_kitchen_type = COALESCE(EXCLUDED.apartment_profile_kitchen_type, public.apartment_profiles.apartment_profile_kitchen_type),
     apartment_profile_condition = EXCLUDED.apartment_profile_condition,
     apartment_profile_sauna = EXCLUDED.apartment_profile_sauna,
     apartment_profile_balcony = EXCLUDED.apartment_profile_balcony,
     apartment_profile_parking_type = EXCLUDED.apartment_profile_parking_type,
+    apartment_profile_balcony_glazing = COALESCE(EXCLUDED.apartment_profile_balcony_glazing, public.apartment_profiles.apartment_profile_balcony_glazing),
+    apartment_profile_layout_quality = COALESCE(EXCLUDED.apartment_profile_layout_quality, public.apartment_profiles.apartment_profile_layout_quality),
+    apartment_profile_awkward_layout = COALESCE(EXCLUDED.apartment_profile_awkward_layout, public.apartment_profiles.apartment_profile_awkward_layout),
+    apartment_profile_surface_renovation_need = COALESCE(EXCLUDED.apartment_profile_surface_renovation_need, public.apartment_profiles.apartment_profile_surface_renovation_need),
+    apartment_profile_modernization_need = COALESCE(EXCLUDED.apartment_profile_modernization_need, public.apartment_profiles.apartment_profile_modernization_need),
+    apartment_profile_storage_quality = COALESCE(EXCLUDED.apartment_profile_storage_quality, public.apartment_profiles.apartment_profile_storage_quality),
+    apartment_profile_view_quality = COALESCE(EXCLUDED.apartment_profile_view_quality, public.apartment_profiles.apartment_profile_view_quality),
+    apartment_profile_noise_risk = COALESCE(EXCLUDED.apartment_profile_noise_risk, public.apartment_profiles.apartment_profile_noise_risk),
+    apartment_profile_accessibility = COALESCE(EXCLUDED.apartment_profile_accessibility, public.apartment_profiles.apartment_profile_accessibility),
+    apartment_profile_kitchen_condition = COALESCE(EXCLUDED.apartment_profile_kitchen_condition, public.apartment_profiles.apartment_profile_kitchen_condition),
+    apartment_profile_bathroom_condition = COALESCE(EXCLUDED.apartment_profile_bathroom_condition, public.apartment_profiles.apartment_profile_bathroom_condition),
     apartment_profile_confidence = EXCLUDED.apartment_profile_confidence,
     apartment_profile_updated_at = now();
-
--- name: UpsertSaleListingApartmentProfileProviderFieldSources :exec
-WITH source_values AS (
-    SELECT *
-    FROM public.property_source_offerings sl
-    CROSS JOIN LATERAL (
-        VALUES
-            ('apartment_profile_area_m2', 'sale_listing_area_value', sl.sale_listing_area_value::text),
-            ('apartment_profile_living_area_m2', 'sale_listing_living_area_value', sl.sale_listing_living_area_value::text),
-            ('apartment_profile_room_layout', 'sale_listing_room_layout', sl.sale_listing_room_layout),
-            ('apartment_profile_room_count', 'sale_listing_rooms_count', sl.sale_listing_rooms_count::text),
-            ('apartment_profile_bedroom_count', 'sale_listing_bedrooms_count', sl.sale_listing_bedrooms_count::text),
-            ('apartment_profile_floor_level', 'sale_listing_floor_level', sl.sale_listing_floor_level::text),
-            ('apartment_profile_total_floors', 'sale_listing_total_floors', sl.sale_listing_total_floors::text),
-            ('apartment_profile_condition', 'sale_listing_condition', sl.sale_listing_condition),
-            ('apartment_profile_sauna', 'sale_listing_sauna', sl.sale_listing_sauna::text),
-            ('apartment_profile_balcony', 'sale_listing_balcony', sl.sale_listing_balcony::text),
-            ('apartment_profile_parking_type', 'sale_listing_parking_text', sl.sale_listing_parking_text)
-    ) AS source(target_field, source_path, evidence_text)
-    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
-        AND source.evidence_text IS NOT NULL
-        AND trim(source.evidence_text) <> ''
-)
-INSERT INTO public.field_sources (
-    field_source_target_table,
-    field_source_target_id,
-    field_source_target_field,
-    field_source_source_record_table,
-    field_source_source_record_id,
-    field_source_source_path,
-    field_source_evidence_text,
-    field_source_method,
-    field_source_confidence,
-    field_source_observed_at
-)
-SELECT
-    'sale_listing_apartment_profiles',
-    sale_listing_id,
-    target_field,
-    'property_source_offerings',
-    sale_listing_id,
-    source_path,
-    evidence_text,
-    'provider_field',
-    1,
-    COALESCE(sale_listing_last_seen_at, sale_listing_first_seen_at, sale_listing_published_at, now())
-FROM source_values
-ON CONFLICT (
-    field_source_target_table,
-    field_source_target_id,
-    field_source_target_field,
-    field_source_source_record_table,
-    field_source_source_record_id,
-    COALESCE(field_source_source_path, ''),
-    field_source_method
-) DO UPDATE SET
-    field_source_evidence_text = EXCLUDED.field_source_evidence_text,
-    field_source_confidence = EXCLUDED.field_source_confidence,
-    field_source_observed_at = EXCLUDED.field_source_observed_at;
 
 -- name: ProjectHousingCompanyRenovationsForSaleListing :exec
 WITH linked AS (
@@ -906,161 +1060,6 @@ ON CONFLICT (
     housing_company_renovation_summary = EXCLUDED.housing_company_renovation_summary,
     housing_company_renovation_updated_at = now();
 
--- name: ProjectSaleListingApartmentProfileLLMFacts :exec
-WITH linked AS (
-    SELECT
-        pos.sale_listing_id,
-        pu.property_unit_id,
-        pu.housing_company_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
-    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
-    LIMIT 1
-),
-facts AS (
-    SELECT
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section IN ('balcony','unit') AND property_valuation_fact_key IN ('glazing','balcony_glazing')) AS balcony_glazing,
-        max(property_valuation_fact_value_text) FILTER (WHERE property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'kitchen_type' AND property_valuation_fact_value_text = ANY (ARRAY['separate','open','kitchenette','unknown']::text[])) AS kitchen_type,
-        max(property_valuation_fact_value_text) FILTER (WHERE property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'layout_quality' AND property_valuation_fact_value_text = ANY (ARRAY['weak','average','good','excellent','unknown']::text[])) AS layout_quality,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'awkward_layout') AS awkward_layout,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section IN ('condition','unit') AND property_valuation_fact_key = 'surface_renovation_need') AS surface_renovation_need,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section IN ('condition','unit') AND property_valuation_fact_key = 'modernization_need') AS modernization_need,
-        max(property_valuation_fact_value_text) FILTER (WHERE property_valuation_fact_section = 'storage' AND property_valuation_fact_key = 'storage_quality' AND property_valuation_fact_value_text = ANY (ARRAY['weak','normal','good','unknown']::text[])) AS storage_quality,
-        max(property_valuation_fact_value_text) FILTER (WHERE property_valuation_fact_section = 'views' AND property_valuation_fact_key = 'view_quality' AND property_valuation_fact_value_text = ANY (ARRAY['weak','normal','good','excellent','unknown']::text[])) AS view_quality,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section = 'views' AND property_valuation_fact_key = 'noise_risk') AS noise_risk,
-        max(property_valuation_fact_value_text) FILTER (WHERE property_valuation_fact_section IN ('building','unit') AND property_valuation_fact_key = 'accessibility' AND property_valuation_fact_value_text = ANY (ARRAY['poor','average','good','unknown']::text[])) AS accessibility,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section = 'kitchen' AND property_valuation_fact_key = 'renovated') AS kitchen_renovated,
-        bool_or(property_valuation_fact_value_bool) FILTER (WHERE property_valuation_fact_section = 'bathroom' AND property_valuation_fact_key = 'renovated') AS bathroom_renovated
-    FROM public.property_valuation_facts
-    WHERE property_valuation_fact_entity_type = 'sale_listing'
-        AND property_valuation_fact_entity_id = sqlc.arg(sale_listing_id)
-        AND property_valuation_fact_source_field LIKE 'llm_%'
-)
-INSERT INTO public.sale_listing_apartment_profiles (
-    sale_listing_id,
-    housing_company_id,
-    property_unit_id,
-    apartment_profile_balcony_glazing,
-    apartment_profile_kitchen_type,
-    apartment_profile_layout_quality,
-    apartment_profile_awkward_layout,
-    apartment_profile_surface_renovation_need,
-    apartment_profile_modernization_need,
-    apartment_profile_storage_quality,
-    apartment_profile_view_quality,
-    apartment_profile_noise_risk,
-    apartment_profile_accessibility,
-    apartment_profile_kitchen_condition,
-    apartment_profile_bathroom_condition,
-    apartment_profile_confidence,
-    apartment_profile_updated_at
-)
-SELECT
-    sqlc.arg(sale_listing_id),
-    linked.housing_company_id,
-    linked.property_unit_id,
-    facts.balcony_glazing,
-    facts.kitchen_type,
-    facts.layout_quality,
-    facts.awkward_layout,
-    facts.surface_renovation_need,
-    facts.modernization_need,
-    facts.storage_quality,
-    facts.view_quality,
-    facts.noise_risk,
-    facts.accessibility,
-    CASE WHEN facts.kitchen_renovated IS TRUE THEN 'good' ELSE NULL END,
-    CASE WHEN facts.bathroom_renovated IS TRUE THEN 'good' ELSE NULL END,
-    'medium',
-    now()
-FROM facts
-LEFT JOIN linked ON true
-ON CONFLICT (sale_listing_id) DO UPDATE SET
-    housing_company_id = COALESCE(public.sale_listing_apartment_profiles.housing_company_id, EXCLUDED.housing_company_id),
-    property_unit_id = COALESCE(public.sale_listing_apartment_profiles.property_unit_id, EXCLUDED.property_unit_id),
-    apartment_profile_balcony_glazing = COALESCE(EXCLUDED.apartment_profile_balcony_glazing, public.sale_listing_apartment_profiles.apartment_profile_balcony_glazing),
-    apartment_profile_kitchen_type = COALESCE(EXCLUDED.apartment_profile_kitchen_type, public.sale_listing_apartment_profiles.apartment_profile_kitchen_type),
-    apartment_profile_layout_quality = COALESCE(EXCLUDED.apartment_profile_layout_quality, public.sale_listing_apartment_profiles.apartment_profile_layout_quality),
-    apartment_profile_awkward_layout = COALESCE(EXCLUDED.apartment_profile_awkward_layout, public.sale_listing_apartment_profiles.apartment_profile_awkward_layout),
-    apartment_profile_surface_renovation_need = COALESCE(EXCLUDED.apartment_profile_surface_renovation_need, public.sale_listing_apartment_profiles.apartment_profile_surface_renovation_need),
-    apartment_profile_modernization_need = COALESCE(EXCLUDED.apartment_profile_modernization_need, public.sale_listing_apartment_profiles.apartment_profile_modernization_need),
-    apartment_profile_storage_quality = COALESCE(EXCLUDED.apartment_profile_storage_quality, public.sale_listing_apartment_profiles.apartment_profile_storage_quality),
-    apartment_profile_view_quality = COALESCE(EXCLUDED.apartment_profile_view_quality, public.sale_listing_apartment_profiles.apartment_profile_view_quality),
-    apartment_profile_noise_risk = COALESCE(EXCLUDED.apartment_profile_noise_risk, public.sale_listing_apartment_profiles.apartment_profile_noise_risk),
-    apartment_profile_accessibility = COALESCE(EXCLUDED.apartment_profile_accessibility, public.sale_listing_apartment_profiles.apartment_profile_accessibility),
-    apartment_profile_kitchen_condition = COALESCE(EXCLUDED.apartment_profile_kitchen_condition, public.sale_listing_apartment_profiles.apartment_profile_kitchen_condition),
-    apartment_profile_bathroom_condition = COALESCE(EXCLUDED.apartment_profile_bathroom_condition, public.sale_listing_apartment_profiles.apartment_profile_bathroom_condition),
-    apartment_profile_confidence = CASE WHEN public.sale_listing_apartment_profiles.apartment_profile_confidence = 'high' THEN 'high' ELSE 'medium' END,
-    apartment_profile_updated_at = now();
-
--- name: UpsertSaleListingApartmentProfileLLMFieldSources :exec
-WITH facts AS (
-    SELECT
-        property_valuation_fact_entity_id AS sale_listing_id,
-        property_valuation_fact_source_field,
-        property_valuation_fact_evidence_text,
-        property_valuation_fact_confidence,
-        CASE
-            WHEN property_valuation_fact_section IN ('balcony','unit') AND property_valuation_fact_key IN ('glazing','balcony_glazing') THEN 'apartment_profile_balcony_glazing'
-            WHEN property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'kitchen_type' THEN 'apartment_profile_kitchen_type'
-            WHEN property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'layout_quality' THEN 'apartment_profile_layout_quality'
-            WHEN property_valuation_fact_section = 'layout' AND property_valuation_fact_key = 'awkward_layout' THEN 'apartment_profile_awkward_layout'
-            WHEN property_valuation_fact_section IN ('condition','unit') AND property_valuation_fact_key = 'surface_renovation_need' THEN 'apartment_profile_surface_renovation_need'
-            WHEN property_valuation_fact_section IN ('condition','unit') AND property_valuation_fact_key = 'modernization_need' THEN 'apartment_profile_modernization_need'
-            WHEN property_valuation_fact_section = 'storage' AND property_valuation_fact_key = 'storage_quality' THEN 'apartment_profile_storage_quality'
-            WHEN property_valuation_fact_section = 'views' AND property_valuation_fact_key = 'view_quality' THEN 'apartment_profile_view_quality'
-            WHEN property_valuation_fact_section = 'views' AND property_valuation_fact_key = 'noise_risk' THEN 'apartment_profile_noise_risk'
-            WHEN property_valuation_fact_section IN ('building','unit') AND property_valuation_fact_key = 'accessibility' THEN 'apartment_profile_accessibility'
-            WHEN property_valuation_fact_section = 'kitchen' AND property_valuation_fact_key = 'renovated' THEN 'apartment_profile_kitchen_condition'
-            WHEN property_valuation_fact_section = 'bathroom' AND property_valuation_fact_key = 'renovated' THEN 'apartment_profile_bathroom_condition'
-            ELSE NULL
-        END AS target_field
-    FROM public.property_valuation_facts
-    WHERE property_valuation_fact_entity_type = 'sale_listing'
-        AND property_valuation_fact_entity_id = sqlc.arg(sale_listing_id)
-        AND property_valuation_fact_source_field LIKE 'llm_%'
-)
-INSERT INTO public.field_sources (
-    field_source_target_table,
-    field_source_target_id,
-    field_source_target_field,
-    field_source_source_record_table,
-    field_source_source_record_id,
-    field_source_source_path,
-    field_source_evidence_text,
-    field_source_method,
-    field_source_confidence,
-    field_source_observed_at
-)
-SELECT
-    'sale_listing_apartment_profiles',
-    sale_listing_id,
-    target_field,
-    'property_source_offerings',
-    sale_listing_id,
-    property_valuation_fact_source_field,
-    property_valuation_fact_evidence_text,
-    'llm',
-    property_valuation_fact_confidence::double precision / 100,
-    now()
-FROM facts
-WHERE target_field IS NOT NULL
-ON CONFLICT (
-    field_source_target_table,
-    field_source_target_id,
-    field_source_target_field,
-    field_source_source_record_table,
-    field_source_source_record_id,
-    COALESCE(field_source_source_path, ''),
-    field_source_method
-) DO UPDATE SET
-    field_source_evidence_text = EXCLUDED.field_source_evidence_text,
-    field_source_confidence = EXCLUDED.field_source_confidence,
-    field_source_observed_at = EXCLUDED.field_source_observed_at;
-
 -- name: ProjectHousingCompanySystemsFromRenovationsForSaleListing :exec
 WITH linked AS (
     SELECT pu.housing_company_id
@@ -1141,6 +1140,379 @@ ON CONFLICT (housing_company_id, housing_company_system_type) DO UPDATE SET
     housing_company_system_summary = EXCLUDED.housing_company_system_summary,
     housing_company_system_updated_at = now();
 
+-- name: ProjectBuildingProfileForSaleListing :exec
+WITH linked AS (
+    SELECT
+        pu.physical_building_id,
+        pu.housing_company_id,
+        sl.*
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+        AND pos.property_offering_source_link_status <> 'rejected'
+        AND pu.physical_building_id IS NOT NULL
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+)
+INSERT INTO public.building_profiles (
+    physical_building_id,
+    housing_company_id,
+    building_profile_build_year,
+    building_profile_floor_count,
+    building_profile_apartment_count,
+    building_profile_energy_class,
+    building_profile_heating_method,
+    building_profile_material,
+    building_profile_roof_type,
+    building_profile_roof_material,
+    building_profile_elevator,
+    building_profile_confidence,
+    building_profile_updated_at
+)
+SELECT
+    physical_building_id,
+    housing_company_id,
+    sale_listing_build_year,
+    sale_listing_total_floors,
+    sale_listing_apartment_count,
+    COALESCE(sale_listing_energy_efficiency_label, sale_listing_energy_class),
+    sale_listing_heating_system,
+    sale_listing_building_material,
+    sale_listing_roof_type,
+    sale_listing_roof_material,
+    sale_listing_elevator,
+    CASE WHEN sale_listing_build_year IS NOT NULL AND sale_listing_total_floors IS NOT NULL THEN 'medium' ELSE 'low' END,
+    now()
+FROM linked
+ON CONFLICT (physical_building_id) DO UPDATE SET
+    housing_company_id = COALESCE(public.building_profiles.housing_company_id, EXCLUDED.housing_company_id),
+    building_profile_build_year = COALESCE(public.building_profiles.building_profile_build_year, EXCLUDED.building_profile_build_year),
+    building_profile_floor_count = COALESCE(public.building_profiles.building_profile_floor_count, EXCLUDED.building_profile_floor_count),
+    building_profile_apartment_count = COALESCE(public.building_profiles.building_profile_apartment_count, EXCLUDED.building_profile_apartment_count),
+    building_profile_energy_class = COALESCE(public.building_profiles.building_profile_energy_class, EXCLUDED.building_profile_energy_class),
+    building_profile_heating_method = COALESCE(public.building_profiles.building_profile_heating_method, EXCLUDED.building_profile_heating_method),
+    building_profile_material = COALESCE(public.building_profiles.building_profile_material, EXCLUDED.building_profile_material),
+    building_profile_roof_type = COALESCE(public.building_profiles.building_profile_roof_type, EXCLUDED.building_profile_roof_type),
+    building_profile_roof_material = COALESCE(public.building_profiles.building_profile_roof_material, EXCLUDED.building_profile_roof_material),
+    building_profile_elevator = COALESCE(public.building_profiles.building_profile_elevator, EXCLUDED.building_profile_elevator),
+    building_profile_confidence = EXCLUDED.building_profile_confidence,
+    building_profile_updated_at = now();
+
+-- name: ProjectHousingCompanyProfileForSaleListing :exec
+WITH linked AS (
+    SELECT
+        pu.housing_company_id,
+        hc.housing_company_name,
+        hc.housing_company_business_id,
+        hc.housing_company_build_year,
+        hc.housing_company_apartment_count,
+        hc.housing_company_energy_efficiency_label,
+        sl.sale_listing_plot_type_code,
+        sl.sale_listing_plot_type_raw
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+),
+repair AS (
+    SELECT
+        linked.housing_company_id,
+        count(*) FILTER (WHERE r.housing_company_renovation_status IN ('planned','suspected','forecast')) AS upcoming_count
+    FROM linked
+    LEFT JOIN public.housing_company_renovations r ON r.housing_company_id = linked.housing_company_id
+    GROUP BY linked.housing_company_id
+)
+INSERT INTO public.housing_company_profiles (
+    housing_company_id,
+    housing_company_profile_name,
+    housing_company_profile_business_id,
+    housing_company_profile_build_year,
+    housing_company_profile_apartment_count,
+    housing_company_profile_plot_ownership_type,
+    housing_company_profile_energy_class,
+    housing_company_profile_repair_backlog_risk,
+    housing_company_profile_confidence,
+    housing_company_profile_updated_at
+)
+SELECT
+    linked.housing_company_id,
+    housing_company_name,
+    housing_company_business_id,
+    housing_company_build_year,
+    housing_company_apartment_count,
+    COALESCE(NULLIF(sale_listing_plot_type_code, ''), NULLIF(sale_listing_plot_type_raw, '')),
+    housing_company_energy_efficiency_label,
+    CASE WHEN repair.upcoming_count >= 3 THEN 'high' WHEN repair.upcoming_count > 0 THEN 'medium' ELSE 'unknown' END,
+    CASE WHEN housing_company_business_id IS NOT NULL OR housing_company_name IS NOT NULL THEN 'medium' ELSE 'low' END,
+    now()
+FROM linked
+JOIN repair ON repair.housing_company_id = linked.housing_company_id
+ON CONFLICT (housing_company_id) DO UPDATE SET
+    housing_company_profile_name = COALESCE(public.housing_company_profiles.housing_company_profile_name, EXCLUDED.housing_company_profile_name),
+    housing_company_profile_business_id = COALESCE(public.housing_company_profiles.housing_company_profile_business_id, EXCLUDED.housing_company_profile_business_id),
+    housing_company_profile_build_year = COALESCE(public.housing_company_profiles.housing_company_profile_build_year, EXCLUDED.housing_company_profile_build_year),
+    housing_company_profile_apartment_count = COALESCE(public.housing_company_profiles.housing_company_profile_apartment_count, EXCLUDED.housing_company_profile_apartment_count),
+    housing_company_profile_plot_ownership_type = COALESCE(public.housing_company_profiles.housing_company_profile_plot_ownership_type, EXCLUDED.housing_company_profile_plot_ownership_type),
+    housing_company_profile_energy_class = COALESCE(public.housing_company_profiles.housing_company_profile_energy_class, EXCLUDED.housing_company_profile_energy_class),
+    housing_company_profile_repair_backlog_risk = EXCLUDED.housing_company_profile_repair_backlog_risk,
+    housing_company_profile_confidence = EXCLUDED.housing_company_profile_confidence,
+    housing_company_profile_updated_at = now();
+
+-- name: ProjectQualityScoresForSaleListing :exec
+WITH linked AS (
+    SELECT
+        pu.property_unit_id,
+        po.property_offering_id,
+        pu.physical_building_id,
+        pu.housing_company_id,
+        sl.sale_listing_asking_price,
+        sl.sale_listing_debt_free_price,
+        pt.prices_transaction_price,
+        c.sale_listing_prices_transaction_match_score,
+        ap.apartment_profile_condition,
+        ap.apartment_profile_layout_quality,
+        ap.apartment_profile_floor_level,
+        ap.apartment_profile_total_floors,
+        ap.apartment_profile_kitchen_condition,
+        ap.apartment_profile_bathroom_condition,
+        ap.apartment_profile_modernization_need,
+        ap.apartment_profile_surface_renovation_need,
+        ap.apartment_profile_balcony,
+        ap.apartment_profile_balcony_glazing,
+        ap.apartment_profile_storage_quality,
+        ap.apartment_profile_parking_type,
+        ap.apartment_profile_view_quality,
+        ap.apartment_profile_noise_risk,
+        ap.apartment_profile_accessibility,
+        bp.building_profile_build_year,
+        bp.building_profile_energy_class,
+        bp.building_profile_heating_method,
+        bp.building_profile_elevator,
+        hcp.housing_company_profile_financial_risk,
+        hcp.housing_company_profile_maintenance_risk,
+        hcp.housing_company_profile_plot_ownership_type,
+        hcp.housing_company_profile_repair_backlog_risk
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = sl.prices_transaction_id
+    LEFT JOIN LATERAL (
+        SELECT sale_listing_prices_transaction_match_score
+        FROM public.sale_listing_prices_transaction_match_candidates c
+        WHERE c.sale_listing_id = sl.sale_listing_id
+            AND c.prices_transaction_id = sl.prices_transaction_id
+        ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
+        LIMIT 1
+    ) c ON true
+    LEFT JOIN public.apartment_profiles ap ON ap.property_unit_id = pu.property_unit_id
+    LEFT JOIN public.building_profiles bp ON bp.physical_building_id = pu.physical_building_id
+    LEFT JOIN public.housing_company_profiles hcp ON hcp.housing_company_id = pu.housing_company_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+),
+scores AS (
+    SELECT 'property_unit'::text AS target_type, property_unit_id AS target_id, 'apartment_condition'::text AS dimension,
+        CASE
+            WHEN apartment_profile_modernization_need IS TRUE OR apartment_profile_surface_renovation_need IS TRUE THEN 40
+            WHEN apartment_profile_condition = 'new' THEN 95
+            WHEN apartment_profile_condition = 'excellent' THEN 90
+            WHEN apartment_profile_condition = 'good' THEN 75
+            WHEN apartment_profile_condition = 'fair' THEN 45
+            WHEN apartment_profile_condition = 'poor' THEN 20
+            ELSE 50
+        END AS score,
+        jsonb_build_array(COALESCE(apartment_profile_condition, 'condition unknown'), CASE WHEN apartment_profile_modernization_need IS TRUE THEN 'modernization need' ELSE NULL END, CASE WHEN apartment_profile_surface_renovation_need IS TRUE THEN 'surface renovation need' ELSE NULL END) AS reasons
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'layout_efficiency',
+        CASE apartment_profile_layout_quality WHEN 'excellent' THEN 95 WHEN 'good' THEN 80 WHEN 'average' THEN 60 WHEN 'weak' THEN 35 ELSE 55 END,
+        jsonb_build_array(COALESCE(apartment_profile_layout_quality, 'layout quality unknown'))
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'wet_room_state',
+        CASE apartment_profile_bathroom_condition WHEN 'new' THEN 95 WHEN 'excellent' THEN 90 WHEN 'good' THEN 75 WHEN 'fair' THEN 45 WHEN 'poor' THEN 20 ELSE 50 END,
+        jsonb_build_array(COALESCE(apartment_profile_bathroom_condition, 'bathroom state unknown'))
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'kitchen_state',
+        CASE apartment_profile_kitchen_condition WHEN 'new' THEN 95 WHEN 'excellent' THEN 90 WHEN 'good' THEN 75 WHEN 'fair' THEN 45 WHEN 'poor' THEN 20 ELSE 50 END,
+        jsonb_build_array(COALESCE(apartment_profile_kitchen_condition, 'kitchen state unknown'))
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'floor_elevator_fit',
+        CASE
+            WHEN building_profile_elevator IS TRUE THEN 85
+            WHEN apartment_profile_floor_level >= 4 THEN 25
+            WHEN apartment_profile_floor_level >= 3 THEN 45
+            WHEN apartment_profile_floor_level IS NULL THEN 50
+            ELSE 70
+        END,
+        jsonb_build_array(COALESCE('floor ' || apartment_profile_floor_level::text, 'floor unknown'), CASE WHEN building_profile_elevator IS TRUE THEN 'elevator' WHEN building_profile_elevator IS FALSE THEN 'no elevator' ELSE 'elevator unknown' END)
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'balcony_storage_parking',
+        LEAST(100, 45 + CASE WHEN apartment_profile_balcony IS TRUE THEN 15 ELSE 0 END + CASE WHEN apartment_profile_balcony_glazing IS TRUE THEN 10 ELSE 0 END + CASE apartment_profile_storage_quality WHEN 'good' THEN 15 WHEN 'normal' THEN 8 ELSE 0 END + CASE WHEN apartment_profile_parking_type IN ('garage','carport','yard','separate_share') THEN 15 ELSE 0 END),
+        jsonb_build_array(CASE WHEN apartment_profile_balcony IS TRUE THEN 'balcony' ELSE 'balcony unknown or absent' END, COALESCE(apartment_profile_storage_quality, 'storage unknown'), COALESCE(apartment_profile_parking_type, 'parking unknown'))
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'view_noise_privacy',
+        CASE
+            WHEN apartment_profile_noise_risk IS TRUE THEN 35
+            WHEN apartment_profile_view_quality = 'excellent' THEN 90
+            WHEN apartment_profile_view_quality = 'good' THEN 75
+            WHEN apartment_profile_view_quality = 'weak' THEN 40
+            ELSE 55
+        END,
+        jsonb_build_array(COALESCE(apartment_profile_view_quality, 'view unknown'), CASE WHEN apartment_profile_noise_risk IS TRUE THEN 'noise risk' ELSE NULL END)
+    FROM linked
+    UNION ALL
+    SELECT 'property_unit', property_unit_id, 'apartment_document_consistency',
+        CASE WHEN apartment_profile_confidence = 'high' THEN 90 WHEN apartment_profile_confidence = 'medium' THEN 65 ELSE 35 END,
+        jsonb_build_array('apartment profile confidence ' || COALESCE(apartment_profile_confidence, 'unknown'))
+    FROM linked
+    UNION ALL
+    SELECT 'physical_building', physical_building_id, 'building_age',
+        CASE WHEN building_profile_build_year IS NULL THEN 50 WHEN building_profile_build_year >= 2015 THEN 90 WHEN building_profile_build_year >= 1990 THEN 75 WHEN building_profile_build_year >= 1970 THEN 55 ELSE 40 END,
+        jsonb_build_array(COALESCE(building_profile_build_year::text, 'build year unknown'))
+    FROM linked
+    WHERE physical_building_id IS NOT NULL
+    UNION ALL
+    SELECT 'physical_building', physical_building_id, 'energy_operating_cost',
+        CASE
+            WHEN building_profile_energy_class ~* '^[ABC]' THEN 85
+            WHEN building_profile_energy_class ~* '^[D]' THEN 65
+            WHEN building_profile_energy_class ~* '^[EFG]' THEN 35
+            WHEN lower(COALESCE(building_profile_heating_method, '')) LIKE '%maalämp%' OR lower(COALESCE(building_profile_heating_method, '')) LIKE '%geothermal%' THEN 80
+            ELSE 50
+        END,
+        jsonb_build_array(COALESCE(building_profile_energy_class, 'energy class unknown'), COALESCE(building_profile_heating_method, 'heating unknown'))
+    FROM linked
+    WHERE physical_building_id IS NOT NULL
+    UNION ALL
+    SELECT 'physical_building', physical_building_id, 'accessibility',
+        CASE
+            WHEN building_profile_elevator IS TRUE OR apartment_profile_accessibility = 'good' THEN 85
+            WHEN apartment_profile_accessibility = 'poor' THEN 30
+            ELSE 50
+        END,
+        jsonb_build_array(CASE WHEN building_profile_elevator IS TRUE THEN 'elevator' WHEN building_profile_elevator IS FALSE THEN 'no elevator' ELSE 'elevator unknown' END, COALESCE(apartment_profile_accessibility, 'accessibility unknown'))
+    FROM linked
+    WHERE physical_building_id IS NOT NULL
+    UNION ALL
+    SELECT 'physical_building', physical_building_id, 'repair_backlog',
+        CASE housing_company_profile_repair_backlog_risk WHEN 'low' THEN 85 WHEN 'medium' THEN 55 WHEN 'high' THEN 25 ELSE 50 END,
+        jsonb_build_array(COALESCE(housing_company_profile_repair_backlog_risk, 'repair backlog unknown'))
+    FROM linked
+    WHERE physical_building_id IS NOT NULL
+    UNION ALL
+    SELECT 'housing_company', housing_company_id, 'financial_health',
+        CASE housing_company_profile_financial_risk WHEN 'low' THEN 85 WHEN 'medium' THEN 55 WHEN 'high' THEN 25 ELSE 50 END,
+        jsonb_build_array(COALESCE(housing_company_profile_financial_risk, 'financial risk unknown'))
+    FROM linked
+    WHERE housing_company_id IS NOT NULL
+    UNION ALL
+    SELECT 'housing_company', housing_company_id, 'charge_pressure',
+        CASE housing_company_profile_maintenance_risk WHEN 'low' THEN 85 WHEN 'medium' THEN 55 WHEN 'high' THEN 25 ELSE 50 END,
+        jsonb_build_array(COALESCE(housing_company_profile_maintenance_risk, 'maintenance risk unknown'))
+    FROM linked
+    WHERE housing_company_id IS NOT NULL
+    UNION ALL
+    SELECT 'housing_company', housing_company_id, 'plot_tenure_risk',
+        CASE
+            WHEN lower(COALESCE(housing_company_profile_plot_ownership_type, '')) LIKE '%own%' OR lower(COALESCE(housing_company_profile_plot_ownership_type, '')) LIKE '%oma%' THEN 85
+            WHEN lower(COALESCE(housing_company_profile_plot_ownership_type, '')) LIKE '%rent%' OR lower(COALESCE(housing_company_profile_plot_ownership_type, '')) LIKE '%vuokra%' THEN 45
+            ELSE 50
+        END,
+        jsonb_build_array(COALESCE(housing_company_profile_plot_ownership_type, 'plot tenure unknown'))
+    FROM linked
+    WHERE housing_company_id IS NOT NULL
+    UNION ALL
+    SELECT 'housing_company', housing_company_id, 'administrative_legal_risk',
+        50,
+        jsonb_build_array('manager certificate restrictions not loaded')
+    FROM linked
+    WHERE housing_company_id IS NOT NULL
+    UNION ALL
+    SELECT 'housing_company', housing_company_id, 'document_freshness',
+        25,
+        jsonb_build_array('manager certificate not loaded')
+    FROM linked
+    WHERE housing_company_id IS NOT NULL
+    UNION ALL
+    SELECT 'property_offering', property_offering_id, 'comparable_support',
+        CASE
+            WHEN sale_listing_prices_transaction_match_score >= 95 THEN 90
+            WHEN sale_listing_prices_transaction_match_score >= 85 THEN 75
+            WHEN prices_transaction_price IS NOT NULL THEN 65
+            ELSE 25
+        END,
+        jsonb_build_array(COALESCE('transaction match score ' || sale_listing_prices_transaction_match_score::text, 'no matched transaction'))
+    FROM linked
+    WHERE property_offering_id IS NOT NULL
+    UNION ALL
+    SELECT 'property_offering', property_offering_id, 'market_liquidity',
+        CASE WHEN prices_transaction_price IS NOT NULL THEN 65 ELSE 35 END,
+        jsonb_build_array(CASE WHEN prices_transaction_price IS NOT NULL THEN 'transaction anchor available' ELSE 'transaction anchor missing' END)
+    FROM linked
+    WHERE property_offering_id IS NOT NULL
+    UNION ALL
+    SELECT 'property_offering', property_offering_id, 'price_attractiveness',
+        CASE
+            WHEN prices_transaction_price IS NULL OR COALESCE(sale_listing_debt_free_price, sale_listing_asking_price) IS NULL THEN 50
+            WHEN COALESCE(sale_listing_debt_free_price, sale_listing_asking_price) <= prices_transaction_price * 0.95 THEN 85
+            WHEN COALESCE(sale_listing_debt_free_price, sale_listing_asking_price) <= prices_transaction_price * 1.03 THEN 65
+            WHEN COALESCE(sale_listing_debt_free_price, sale_listing_asking_price) <= prices_transaction_price * 1.10 THEN 40
+            ELSE 20
+        END,
+        jsonb_build_array(COALESCE('asking ' || COALESCE(sale_listing_debt_free_price, sale_listing_asking_price)::text, 'asking missing'), COALESCE('transaction ' || prices_transaction_price::text, 'transaction missing'))
+    FROM linked
+    WHERE property_offering_id IS NOT NULL
+    UNION ALL
+    SELECT 'property_offering', property_offering_id, 'renovation_adjusted_value',
+        CASE housing_company_profile_repair_backlog_risk WHEN 'high' THEN 30 WHEN 'medium' THEN 50 WHEN 'low' THEN 75 ELSE 50 END,
+        jsonb_build_array(COALESCE(housing_company_profile_repair_backlog_risk, 'repair backlog unknown'))
+    FROM linked
+    WHERE property_offering_id IS NOT NULL
+)
+INSERT INTO public.property_quality_scores (
+    property_quality_score_target_type,
+    property_quality_score_target_id,
+    property_quality_score_dimension,
+    property_quality_score_value,
+    property_quality_score_confidence,
+    property_quality_score_reasons,
+    property_quality_score_updated_at
+)
+SELECT
+    target_type,
+    target_id,
+    dimension,
+    score,
+    'medium',
+    reasons,
+    now()
+FROM scores
+WHERE target_id IS NOT NULL
+ON CONFLICT (
+    property_quality_score_target_type,
+    property_quality_score_target_id,
+    property_quality_score_dimension
+) DO UPDATE SET
+    property_quality_score_value = EXCLUDED.property_quality_score_value,
+    property_quality_score_confidence = EXCLUDED.property_quality_score_confidence,
+    property_quality_score_reasons = EXCLUDED.property_quality_score_reasons,
+    property_quality_score_updated_at = now();
+
 -- name: GetPropertySourceOfferingDescriptionTexts :one
 SELECT
     COALESCE(sale_listing_description_text, '') AS description_text,
@@ -1201,34 +1573,34 @@ FROM public.property_source_offering_insights
 WHERE sale_listing_id = sqlc.arg(sale_listing_id)
 ORDER BY property_source_offering_insight_severity DESC, property_source_offering_insight_key;
 
--- name: ListPropertyValuationFactsForEntity :many
+-- name: ListPropertyClaimsForEntity :many
 SELECT
-    property_valuation_fact_source_field,
-    property_valuation_fact_section,
-    property_valuation_fact_key,
-    property_valuation_fact_value_kind,
-    COALESCE(property_valuation_fact_value_text, '') AS property_valuation_fact_value_text,
-    property_valuation_fact_value_number,
-    property_valuation_fact_value_bool,
-    property_valuation_fact_confidence,
-    COALESCE(property_valuation_fact_evidence_text, '') AS property_valuation_fact_evidence_text,
-    COALESCE(property_valuation_fact_model, '') AS property_valuation_fact_model,
-    COALESCE(property_valuation_fact_prompt_version, '') AS property_valuation_fact_prompt_version
-FROM public.property_valuation_facts
-WHERE property_valuation_fact_entity_type = sqlc.arg(entity_type)
-    AND property_valuation_fact_entity_id = sqlc.arg(entity_id)
-ORDER BY property_valuation_fact_section, property_valuation_fact_key;
+    COALESCE(property_claim_source_path, property_claim_method) AS property_claim_source_field,
+    property_claim_namespace,
+    property_claim_key,
+    property_claim_value_kind,
+    COALESCE(property_claim_value_text, '') AS property_claim_value_text,
+    property_claim_value_number,
+    property_claim_value_bool,
+    round(property_claim_confidence * 100)::integer AS property_claim_confidence,
+    COALESCE(property_claim_evidence_text, '') AS property_claim_evidence_text,
+    COALESCE(property_claim_model, '') AS property_claim_model,
+    COALESCE(property_claim_prompt_version, '') AS property_claim_prompt_version
+FROM public.property_claims
+WHERE property_claim_target_type = sqlc.arg(entity_type)
+    AND property_claim_target_id = sqlc.arg(entity_id)
+ORDER BY property_claim_namespace, property_claim_key;
 
 -- name: DeleteLLMPropertySourceOfferingInsights :exec
 DELETE FROM public.property_source_offering_insights
 WHERE sale_listing_id = sqlc.arg(sale_listing_id)
     AND property_source_offering_insight_source_field LIKE 'llm_%';
 
--- name: DeleteLLMPropertyValuationFactsForEntity :exec
-DELETE FROM public.property_valuation_facts
-WHERE property_valuation_fact_entity_type = sqlc.arg(entity_type)
-    AND property_valuation_fact_entity_id = sqlc.arg(entity_id)
-    AND property_valuation_fact_source_field LIKE 'llm_%';
+-- name: DeleteLLMPropertyClaimsForEntity :exec
+DELETE FROM public.property_claims
+WHERE property_claim_target_type = sqlc.arg(entity_type)
+    AND property_claim_target_id = sqlc.arg(entity_id)
+    AND property_claim_method = 'llm';
 
 -- name: InsertPropertySourceOfferingInsight :exec
 INSERT INTO public.property_source_offering_insights (
@@ -1251,51 +1623,66 @@ INSERT INTO public.property_source_offering_insights (
     NULLIF(sqlc.arg(text), '')
 );
 
--- name: InsertPropertyValuationFact :exec
-INSERT INTO public.property_valuation_facts (
-    property_valuation_fact_entity_type,
-    property_valuation_fact_entity_id,
-    property_valuation_fact_source_field,
-    property_valuation_fact_section,
-    property_valuation_fact_key,
-    property_valuation_fact_value_kind,
-    property_valuation_fact_value_text,
-    property_valuation_fact_value_number,
-    property_valuation_fact_value_bool,
-    property_valuation_fact_confidence,
-    property_valuation_fact_evidence_text,
-    property_valuation_fact_model,
-    property_valuation_fact_prompt_version
+-- name: InsertPropertyClaim :exec
+INSERT INTO public.property_claims (
+    property_claim_target_type,
+    property_claim_target_id,
+    property_claim_namespace,
+    property_claim_key,
+    property_claim_value_kind,
+    property_claim_value_text,
+    property_claim_value_number,
+    property_claim_value_bool,
+    property_claim_source_record_table,
+    property_claim_source_record_id,
+    property_claim_source_path,
+    property_claim_evidence_text,
+    property_claim_method,
+    property_claim_confidence,
+    property_claim_source_reliability,
+    property_claim_model,
+    property_claim_prompt_version,
+    property_claim_observed_at
 ) VALUES (
     sqlc.arg(entity_type),
     sqlc.arg(entity_id),
-    sqlc.arg(source_field),
     sqlc.arg(section),
     sqlc.arg(key),
     sqlc.arg(value_kind),
     NULLIF(sqlc.arg(value_text), ''),
     sqlc.narg(value_number),
     sqlc.narg(value_bool),
-    sqlc.arg(confidence),
+    'property_source_offerings',
+    sqlc.arg(entity_id),
+    NULLIF(sqlc.arg(source_field), ''),
     NULLIF(sqlc.arg(evidence_text), ''),
+    'llm',
+    GREATEST(0, LEAST(1, sqlc.arg(confidence)::double precision / 100)),
+    0.65,
     NULLIF(sqlc.arg(model), ''),
-    NULLIF(sqlc.arg(prompt_version), '')
+    NULLIF(sqlc.arg(prompt_version), ''),
+    now()
 ) ON CONFLICT (
-    property_valuation_fact_entity_type,
-    property_valuation_fact_entity_id,
-    property_valuation_fact_source_field,
-    property_valuation_fact_section,
-    property_valuation_fact_key
+    property_claim_target_type,
+    property_claim_target_id,
+    property_claim_namespace,
+    property_claim_key,
+    property_claim_source_record_table,
+    property_claim_source_record_id,
+    COALESCE(property_claim_source_path, ''),
+    property_claim_method
 ) DO UPDATE SET
-    property_valuation_fact_value_kind = EXCLUDED.property_valuation_fact_value_kind,
-    property_valuation_fact_value_text = EXCLUDED.property_valuation_fact_value_text,
-    property_valuation_fact_value_number = EXCLUDED.property_valuation_fact_value_number,
-    property_valuation_fact_value_bool = EXCLUDED.property_valuation_fact_value_bool,
-    property_valuation_fact_confidence = EXCLUDED.property_valuation_fact_confidence,
-    property_valuation_fact_evidence_text = EXCLUDED.property_valuation_fact_evidence_text,
-    property_valuation_fact_model = EXCLUDED.property_valuation_fact_model,
-    property_valuation_fact_prompt_version = EXCLUDED.property_valuation_fact_prompt_version,
-    property_valuation_fact_updated_at = now();
+    property_claim_value_kind = EXCLUDED.property_claim_value_kind,
+    property_claim_value_text = EXCLUDED.property_claim_value_text,
+    property_claim_value_number = EXCLUDED.property_claim_value_number,
+    property_claim_value_bool = EXCLUDED.property_claim_value_bool,
+    property_claim_evidence_text = EXCLUDED.property_claim_evidence_text,
+    property_claim_confidence = EXCLUDED.property_claim_confidence,
+    property_claim_source_reliability = EXCLUDED.property_claim_source_reliability,
+    property_claim_model = EXCLUDED.property_claim_model,
+    property_claim_prompt_version = EXCLUDED.property_claim_prompt_version,
+    property_claim_observed_at = EXCLUDED.property_claim_observed_at,
+    property_claim_updated_at = now();
 
 -- name: SearchUnifiedEntities :many
 WITH unified AS (

@@ -221,10 +221,16 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 	if err := s.enrichSaleListingInsights(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
-	if err := s.enrichSaleListingValuationFacts(ctx, &listing, saleListingID); err != nil {
+	if err := s.enrichSaleListingPropertyClaims(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
-	if err := s.enrichSaleListingApartmentProfile(ctx, &listing, saleListingID); err != nil {
+	if err := s.enrichSaleListingCanonicalApartmentProfile(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
+	if err := s.enrichSaleListingCanonicalBuildingProfile(ctx, &listing, saleListingID); err != nil {
+		return SaleListing{}, err
+	}
+	if err := s.enrichSaleListingQualityScores(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
 	}
 	return listing, nil
@@ -241,19 +247,19 @@ func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleLi
 	return nil
 }
 
-func (s *Service) enrichSaleListingValuationFacts(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.queries.ListPropertyValuationFactsForEntity(ctx, db.ListPropertyValuationFactsForEntityParams{EntityType: valuationFactEntitySaleListing, EntityID: saleListingID})
+func (s *Service) enrichSaleListingPropertyClaims(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	rows, err := s.queries.ListPropertyClaimsForEntity(ctx, db.ListPropertyClaimsForEntityParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID})
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		fact := valuation.ValuationFact{Section: row.PropertyValuationFactSection, Key: row.PropertyValuationFactKey, ValueKind: row.PropertyValuationFactValueKind, ValueText: row.PropertyValuationFactValueText, Confidence: float64(row.PropertyValuationFactConfidence) / 100, Source: row.PropertyValuationFactSourceField, Evidence: row.PropertyValuationFactEvidenceText, Model: row.PropertyValuationFactModel, Prompt: row.PropertyValuationFactPromptVersion}
-		if row.PropertyValuationFactValueNumber != nil {
-			value := *row.PropertyValuationFactValueNumber
+		fact := valuation.ValuationFact{Section: row.PropertyClaimNamespace, Key: row.PropertyClaimKey, ValueKind: row.PropertyClaimValueKind, ValueText: row.PropertyClaimValueText, Confidence: float64(row.PropertyClaimConfidence) / 100, Source: row.PropertyClaimSourceField, Evidence: row.PropertyClaimEvidenceText, Model: row.PropertyClaimModel, Prompt: row.PropertyClaimPromptVersion}
+		if row.PropertyClaimValueNumber != nil {
+			value := *row.PropertyClaimValueNumber
 			fact.ValueNumber = &value
 		}
-		if row.PropertyValuationFactValueBool != nil {
-			value := *row.PropertyValuationFactValueBool
+		if row.PropertyClaimValueBool != nil {
+			value := *row.PropertyClaimValueBool
 			fact.ValueBool = &value
 		}
 		listing.ValuationInputs.Facts = append(listing.ValuationInputs.Facts, fact)

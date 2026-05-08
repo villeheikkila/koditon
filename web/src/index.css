@@ -1550,7 +1550,7 @@ td.dim { color: var(--text-3); font-size: 12px; }
 
 .profile-workbench-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .profile-step {
@@ -1665,6 +1665,73 @@ td.dim { color: var(--text-3); font-size: 12px; }
   font-size: 13px;
   font-weight: 720;
   overflow-wrap: anywhere;
+}
+
+.canonical-building {
+  display: flex;
+  flex-direction: column;
+}
+
+.quality-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quality-score-card {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.quality-score-card--positive {
+  border-color: color-mix(in srgb, #157f3b 30%, var(--border));
+  background: color-mix(in srgb, #157f3b 5%, var(--surface));
+}
+
+.quality-score-card--negative {
+  border-color: color-mix(in srgb, #b42318 30%, var(--border));
+  background: color-mix(in srgb, #b42318 5%, var(--surface));
+}
+
+.quality-score-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quality-score-card-head span,
+.quality-score-card small {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.quality-score-card-head strong {
+  color: var(--text-1);
+  font-size: 20px;
+  font-weight: 780;
+}
+
+.quality-score-card-title {
+  margin-top: 8px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.quality-score-card p {
+  margin: 5px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .renovation-date-grid {
@@ -3603,6 +3670,7 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .profile-step { border-right: none; border-bottom: 1px solid var(--border); }
   .profile-step:last-child { border-bottom: none; }
   .apartment-profile-grid { grid-template-columns: 1fr; }
+  .quality-score-grid { grid-template-columns: 1fr; }
   .renovation-date-grid { grid-template-columns: 1fr; }
   .renovation-date-card-body { grid-template-columns: 1fr; }
   .renovation-date-cell { border-right: none; border-bottom: 1px solid var(--border); }

@@ -11,6 +11,39 @@ import (
 	"github.com/google/uuid"
 )
 
+type ApartmentProfile struct {
+	ApartmentProfileID                    uuid.UUID  `json:"apartment_profile_id"`
+	PropertyUnitID                        uuid.UUID  `json:"property_unit_id"`
+	HousingCompanyID                      *uuid.UUID `json:"housing_company_id"`
+	PhysicalBuildingID                    *uuid.UUID `json:"physical_building_id"`
+	SourceSaleListingID                   *uuid.UUID `json:"source_sale_listing_id"`
+	ApartmentProfileAreaM2                *float64   `json:"apartment_profile_area_m2"`
+	ApartmentProfileLivingAreaM2          *float64   `json:"apartment_profile_living_area_m2"`
+	ApartmentProfileRoomLayout            *string    `json:"apartment_profile_room_layout"`
+	ApartmentProfileRoomCount             *int32     `json:"apartment_profile_room_count"`
+	ApartmentProfileBedroomCount          *int32     `json:"apartment_profile_bedroom_count"`
+	ApartmentProfileFloorLevel            *int32     `json:"apartment_profile_floor_level"`
+	ApartmentProfileTotalFloors           *int32     `json:"apartment_profile_total_floors"`
+	ApartmentProfileKitchenType           *string    `json:"apartment_profile_kitchen_type"`
+	ApartmentProfileLayoutQuality         *string    `json:"apartment_profile_layout_quality"`
+	ApartmentProfileAwkwardLayout         *bool      `json:"apartment_profile_awkward_layout"`
+	ApartmentProfileCondition             *string    `json:"apartment_profile_condition"`
+	ApartmentProfileKitchenCondition      *string    `json:"apartment_profile_kitchen_condition"`
+	ApartmentProfileBathroomCondition     *string    `json:"apartment_profile_bathroom_condition"`
+	ApartmentProfileSurfaceRenovationNeed *bool      `json:"apartment_profile_surface_renovation_need"`
+	ApartmentProfileModernizationNeed     *bool      `json:"apartment_profile_modernization_need"`
+	ApartmentProfileSauna                 *bool      `json:"apartment_profile_sauna"`
+	ApartmentProfileBalcony               *bool      `json:"apartment_profile_balcony"`
+	ApartmentProfileBalconyGlazing        *bool      `json:"apartment_profile_balcony_glazing"`
+	ApartmentProfileParkingType           *string    `json:"apartment_profile_parking_type"`
+	ApartmentProfileStorageQuality        *string    `json:"apartment_profile_storage_quality"`
+	ApartmentProfileViewQuality           *string    `json:"apartment_profile_view_quality"`
+	ApartmentProfileNoiseRisk             *bool      `json:"apartment_profile_noise_risk"`
+	ApartmentProfileAccessibility         *string    `json:"apartment_profile_accessibility"`
+	ApartmentProfileConfidence            string     `json:"apartment_profile_confidence"`
+	ApartmentProfileUpdatedAt             time.Time  `json:"apartment_profile_updated_at"`
+}
+
 type AuthSignupEmailToken struct {
 	AuthSignupEmailTokenID     int64      `json:"auth_signup_email_token_id"`
 	AuthSignupEmailTokenUuid   uuid.UUID  `json:"auth_signup_email_token_uuid"`
@@ -44,6 +77,23 @@ type AuthWebauthnChallenge struct {
 	AuthWebauthnChallengeCreatedAt       time.Time       `json:"auth_webauthn_challenge_created_at"`
 	AuthWebauthnChallengeVerifiedEmail   *string         `json:"auth_webauthn_challenge_verified_email"`
 	UserID                               *int64          `json:"user_id"`
+}
+
+type BuildingProfile struct {
+	BuildingProfileID             uuid.UUID  `json:"building_profile_id"`
+	PhysicalBuildingID            uuid.UUID  `json:"physical_building_id"`
+	HousingCompanyID              *uuid.UUID `json:"housing_company_id"`
+	BuildingProfileBuildYear      *int32     `json:"building_profile_build_year"`
+	BuildingProfileFloorCount     *int32     `json:"building_profile_floor_count"`
+	BuildingProfileApartmentCount *int32     `json:"building_profile_apartment_count"`
+	BuildingProfileEnergyClass    *string    `json:"building_profile_energy_class"`
+	BuildingProfileHeatingMethod  *string    `json:"building_profile_heating_method"`
+	BuildingProfileMaterial       *string    `json:"building_profile_material"`
+	BuildingProfileRoofType       *string    `json:"building_profile_roof_type"`
+	BuildingProfileRoofMaterial   *string    `json:"building_profile_roof_material"`
+	BuildingProfileElevator       *bool      `json:"building_profile_elevator"`
+	BuildingProfileConfidence     string     `json:"building_profile_confidence"`
+	BuildingProfileUpdatedAt      time.Time  `json:"building_profile_updated_at"`
 }
 
 type DeviceSession struct {
@@ -87,22 +137,6 @@ type FeatureFlag struct {
 	FlagDefaultEnabled bool      `json:"flag_default_enabled"`
 	FlagCreatedAt      time.Time `json:"flag_created_at"`
 	FlagID             int64     `json:"flag_id"`
-}
-
-type FieldSource struct {
-	FieldSourceID                uuid.UUID  `json:"field_source_id"`
-	FieldSourceTargetTable       string     `json:"field_source_target_table"`
-	FieldSourceTargetID          uuid.UUID  `json:"field_source_target_id"`
-	FieldSourceTargetField       string     `json:"field_source_target_field"`
-	FieldSourceSourceRecordTable string     `json:"field_source_source_record_table"`
-	FieldSourceSourceRecordID    uuid.UUID  `json:"field_source_source_record_id"`
-	FieldSourceSourcePath        *string    `json:"field_source_source_path"`
-	FieldSourceEvidenceText      *string    `json:"field_source_evidence_text"`
-	FieldSourceMethod            string     `json:"field_source_method"`
-	FieldSourceConfidence        float64    `json:"field_source_confidence"`
-	FieldSourceObservedAt        time.Time  `json:"field_source_observed_at"`
-	FieldSourceValidFrom         *time.Time `json:"field_source_valid_from"`
-	FieldSourceValidUntil        *time.Time `json:"field_source_valid_until"`
 }
 
 type FrontdoorAd struct {
@@ -263,6 +297,22 @@ type HousingCompanyMergeDecision struct {
 	HousingCompanyMergeDecisionDecidedAt  time.Time       `json:"housing_company_merge_decision_decided_at"`
 }
 
+type HousingCompanyProfile struct {
+	HousingCompanyProfileID                uuid.UUID `json:"housing_company_profile_id"`
+	HousingCompanyID                       uuid.UUID `json:"housing_company_id"`
+	HousingCompanyProfileName              *string   `json:"housing_company_profile_name"`
+	HousingCompanyProfileBusinessID        *string   `json:"housing_company_profile_business_id"`
+	HousingCompanyProfileBuildYear         *int32    `json:"housing_company_profile_build_year"`
+	HousingCompanyProfileApartmentCount    *int32    `json:"housing_company_profile_apartment_count"`
+	HousingCompanyProfilePlotOwnershipType *string   `json:"housing_company_profile_plot_ownership_type"`
+	HousingCompanyProfileEnergyClass       *string   `json:"housing_company_profile_energy_class"`
+	HousingCompanyProfileMaintenanceRisk   string    `json:"housing_company_profile_maintenance_risk"`
+	HousingCompanyProfileFinancialRisk     string    `json:"housing_company_profile_financial_risk"`
+	HousingCompanyProfileRepairBacklogRisk string    `json:"housing_company_profile_repair_backlog_risk"`
+	HousingCompanyProfileConfidence        string    `json:"housing_company_profile_confidence"`
+	HousingCompanyProfileUpdatedAt         time.Time `json:"housing_company_profile_updated_at"`
+}
+
 type HousingCompanyRenovation struct {
 	HousingCompanyRenovationID              uuid.UUID  `json:"housing_company_renovation_id"`
 	HousingCompanyID                        uuid.UUID  `json:"housing_company_id"`
@@ -411,6 +461,23 @@ type PersonalAccessToken struct {
 	UserID                        int64      `json:"user_id"`
 }
 
+type PhysicalBuilding struct {
+	PhysicalBuildingID             uuid.UUID  `json:"physical_building_id"`
+	HousingCompanyID               *uuid.UUID `json:"housing_company_id"`
+	PhysicalBuildingIdentityKey    string     `json:"physical_building_identity_key"`
+	PhysicalBuildingAddressNorm    *string    `json:"physical_building_address_norm"`
+	PhysicalBuildingPostalNorm     *string    `json:"physical_building_postal_norm"`
+	PhysicalBuildingCityNorm       *string    `json:"physical_building_city_norm"`
+	PhysicalBuildingBuildYear      *int32     `json:"physical_building_build_year"`
+	PhysicalBuildingFloorCount     *int32     `json:"physical_building_floor_count"`
+	PhysicalBuildingApartmentCount *int32     `json:"physical_building_apartment_count"`
+	PhysicalBuildingElevator       *bool      `json:"physical_building_elevator"`
+	PhysicalBuildingLatitude       *float64   `json:"physical_building_latitude"`
+	PhysicalBuildingLongitude      *float64   `json:"physical_building_longitude"`
+	PhysicalBuildingCreatedAt      time.Time  `json:"physical_building_created_at"`
+	PhysicalBuildingUpdatedAt      time.Time  `json:"physical_building_updated_at"`
+}
+
 type PostalAdArea struct {
 	PostalAdAreaID        uuid.UUID `json:"postal_ad_area_id"`
 	PostalAdAreaCode      string    `json:"postal_ad_area_code"`
@@ -491,6 +558,33 @@ type PricesTransaction struct {
 	PricesTransactionCategory            string     `json:"prices_transaction_category"`
 	PricesNeighborhoodID                 *uuid.UUID `json:"prices_neighborhood_id"`
 	PricesTransactionPlotOwned           *bool      `json:"prices_transaction_plot_owned"`
+}
+
+type PropertyClaim struct {
+	PropertyClaimID                uuid.UUID       `json:"property_claim_id"`
+	PropertyClaimTargetType        string          `json:"property_claim_target_type"`
+	PropertyClaimTargetID          uuid.UUID       `json:"property_claim_target_id"`
+	PropertyClaimNamespace         string          `json:"property_claim_namespace"`
+	PropertyClaimKey               string          `json:"property_claim_key"`
+	PropertyClaimValueKind         string          `json:"property_claim_value_kind"`
+	PropertyClaimValueText         *string         `json:"property_claim_value_text"`
+	PropertyClaimValueNumber       *float64        `json:"property_claim_value_number"`
+	PropertyClaimValueBool         *bool           `json:"property_claim_value_bool"`
+	PropertyClaimValueJson         json.RawMessage `json:"property_claim_value_json"`
+	PropertyClaimSourceRecordTable string          `json:"property_claim_source_record_table"`
+	PropertyClaimSourceRecordID    uuid.UUID       `json:"property_claim_source_record_id"`
+	PropertyClaimSourcePath        *string         `json:"property_claim_source_path"`
+	PropertyClaimEvidenceText      *string         `json:"property_claim_evidence_text"`
+	PropertyClaimMethod            string          `json:"property_claim_method"`
+	PropertyClaimConfidence        float64         `json:"property_claim_confidence"`
+	PropertyClaimSourceReliability float64         `json:"property_claim_source_reliability"`
+	PropertyClaimModel             *string         `json:"property_claim_model"`
+	PropertyClaimPromptVersion     *string         `json:"property_claim_prompt_version"`
+	PropertyClaimObservedAt        time.Time       `json:"property_claim_observed_at"`
+	PropertyClaimValidFrom         *time.Time      `json:"property_claim_valid_from"`
+	PropertyClaimValidUntil        *time.Time      `json:"property_claim_valid_until"`
+	PropertyClaimCreatedAt         time.Time       `json:"property_claim_created_at"`
+	PropertyClaimUpdatedAt         time.Time       `json:"property_claim_updated_at"`
 }
 
 type PropertyOffering struct {
@@ -574,6 +668,17 @@ type PropertyOfferingTransaction struct {
 	PropertyOfferingTransactionLinkReasons json.RawMessage `json:"property_offering_transaction_link_reasons"`
 	PropertyOfferingTransactionCreatedAt   time.Time       `json:"property_offering_transaction_created_at"`
 	PropertyOfferingTransactionUpdatedAt   time.Time       `json:"property_offering_transaction_updated_at"`
+}
+
+type PropertyQualityScore struct {
+	PropertyQualityScoreID         uuid.UUID       `json:"property_quality_score_id"`
+	PropertyQualityScoreTargetType string          `json:"property_quality_score_target_type"`
+	PropertyQualityScoreTargetID   uuid.UUID       `json:"property_quality_score_target_id"`
+	PropertyQualityScoreDimension  string          `json:"property_quality_score_dimension"`
+	PropertyQualityScoreValue      int32           `json:"property_quality_score_value"`
+	PropertyQualityScoreConfidence string          `json:"property_quality_score_confidence"`
+	PropertyQualityScoreReasons    json.RawMessage `json:"property_quality_score_reasons"`
+	PropertyQualityScoreUpdatedAt  time.Time       `json:"property_quality_score_updated_at"`
 }
 
 type PropertySourceOffering struct {
@@ -738,25 +843,26 @@ type PropertyUnit struct {
 	PropertyUnitMatchReasons   json.RawMessage `json:"property_unit_match_reasons"`
 	PropertyUnitCreatedAt      time.Time       `json:"property_unit_created_at"`
 	PropertyUnitUpdatedAt      time.Time       `json:"property_unit_updated_at"`
+	PhysicalBuildingID         *uuid.UUID      `json:"physical_building_id"`
 }
 
-type PropertyValuationFact struct {
-	PropertyValuationFactID            uuid.UUID `json:"property_valuation_fact_id"`
-	PropertyValuationFactEntityType    string    `json:"property_valuation_fact_entity_type"`
-	PropertyValuationFactEntityID      uuid.UUID `json:"property_valuation_fact_entity_id"`
-	PropertyValuationFactSourceField   string    `json:"property_valuation_fact_source_field"`
-	PropertyValuationFactSection       string    `json:"property_valuation_fact_section"`
-	PropertyValuationFactKey           string    `json:"property_valuation_fact_key"`
-	PropertyValuationFactValueKind     string    `json:"property_valuation_fact_value_kind"`
-	PropertyValuationFactValueText     *string   `json:"property_valuation_fact_value_text"`
-	PropertyValuationFactValueNumber   *float64  `json:"property_valuation_fact_value_number"`
-	PropertyValuationFactValueBool     *bool     `json:"property_valuation_fact_value_bool"`
-	PropertyValuationFactConfidence    int32     `json:"property_valuation_fact_confidence"`
-	PropertyValuationFactEvidenceText  *string   `json:"property_valuation_fact_evidence_text"`
-	PropertyValuationFactModel         *string   `json:"property_valuation_fact_model"`
-	PropertyValuationFactPromptVersion *string   `json:"property_valuation_fact_prompt_version"`
-	PropertyValuationFactCreatedAt     time.Time `json:"property_valuation_fact_created_at"`
-	PropertyValuationFactUpdatedAt     time.Time `json:"property_valuation_fact_updated_at"`
+type PropertyValuationRun struct {
+	PropertyValuationRunID                    uuid.UUID       `json:"property_valuation_run_id"`
+	PropertyOfferingID                        *uuid.UUID      `json:"property_offering_id"`
+	PropertyUnitID                            *uuid.UUID      `json:"property_unit_id"`
+	HousingCompanyID                          *uuid.UUID      `json:"housing_company_id"`
+	PropertyValuationRunModelVersion          string          `json:"property_valuation_run_model_version"`
+	PropertyValuationRunMarketValueLow        *int64          `json:"property_valuation_run_market_value_low"`
+	PropertyValuationRunMarketValueHigh       *int64          `json:"property_valuation_run_market_value_high"`
+	PropertyValuationRunRiskAdjustedValueLow  *int64          `json:"property_valuation_run_risk_adjusted_value_low"`
+	PropertyValuationRunRiskAdjustedValueHigh *int64          `json:"property_valuation_run_risk_adjusted_value_high"`
+	PropertyValuationRunRecommendedOfferLow   *int64          `json:"property_valuation_run_recommended_offer_low"`
+	PropertyValuationRunRecommendedOfferHigh  *int64          `json:"property_valuation_run_recommended_offer_high"`
+	PropertyValuationRunVerdict               string          `json:"property_valuation_run_verdict"`
+	PropertyValuationRunConfidence            string          `json:"property_valuation_run_confidence"`
+	PropertyValuationRunReasons               json.RawMessage `json:"property_valuation_run_reasons"`
+	PropertyValuationRunMissingEvidence       []string        `json:"property_valuation_run_missing_evidence"`
+	PropertyValuationRunCreatedAt             time.Time       `json:"property_valuation_run_created_at"`
 }
 
 type Role struct {
@@ -778,37 +884,6 @@ type RuntimeKvStore struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type SaleListingApartmentProfile struct {
-	SaleListingID                         uuid.UUID  `json:"sale_listing_id"`
-	HousingCompanyID                      *uuid.UUID `json:"housing_company_id"`
-	PropertyUnitID                        *uuid.UUID `json:"property_unit_id"`
-	ApartmentProfileAreaM2                *float64   `json:"apartment_profile_area_m2"`
-	ApartmentProfileLivingAreaM2          *float64   `json:"apartment_profile_living_area_m2"`
-	ApartmentProfileRoomLayout            *string    `json:"apartment_profile_room_layout"`
-	ApartmentProfileRoomCount             *int32     `json:"apartment_profile_room_count"`
-	ApartmentProfileBedroomCount          *int32     `json:"apartment_profile_bedroom_count"`
-	ApartmentProfileFloorLevel            *int32     `json:"apartment_profile_floor_level"`
-	ApartmentProfileTotalFloors           *int32     `json:"apartment_profile_total_floors"`
-	ApartmentProfileKitchenType           *string    `json:"apartment_profile_kitchen_type"`
-	ApartmentProfileLayoutQuality         *string    `json:"apartment_profile_layout_quality"`
-	ApartmentProfileAwkwardLayout         *bool      `json:"apartment_profile_awkward_layout"`
-	ApartmentProfileCondition             *string    `json:"apartment_profile_condition"`
-	ApartmentProfileKitchenCondition      *string    `json:"apartment_profile_kitchen_condition"`
-	ApartmentProfileBathroomCondition     *string    `json:"apartment_profile_bathroom_condition"`
-	ApartmentProfileSurfaceRenovationNeed *bool      `json:"apartment_profile_surface_renovation_need"`
-	ApartmentProfileModernizationNeed     *bool      `json:"apartment_profile_modernization_need"`
-	ApartmentProfileSauna                 *bool      `json:"apartment_profile_sauna"`
-	ApartmentProfileBalcony               *bool      `json:"apartment_profile_balcony"`
-	ApartmentProfileBalconyGlazing        *bool      `json:"apartment_profile_balcony_glazing"`
-	ApartmentProfileParkingType           *string    `json:"apartment_profile_parking_type"`
-	ApartmentProfileStorageQuality        *string    `json:"apartment_profile_storage_quality"`
-	ApartmentProfileViewQuality           *string    `json:"apartment_profile_view_quality"`
-	ApartmentProfileNoiseRisk             *bool      `json:"apartment_profile_noise_risk"`
-	ApartmentProfileAccessibility         *string    `json:"apartment_profile_accessibility"`
-	ApartmentProfileConfidence            string     `json:"apartment_profile_confidence"`
-	ApartmentProfileUpdatedAt             time.Time  `json:"apartment_profile_updated_at"`
 }
 
 type SaleListingPlotTypeAlias struct {

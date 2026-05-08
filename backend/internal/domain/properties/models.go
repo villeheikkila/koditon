@@ -548,6 +548,9 @@ type SaleListing struct {
 	Links            []Link                        `json:"links,omitempty"`
 	Insights         ListingInsights               `json:"insights,omitempty"`
 	ApartmentProfile ApartmentProfile              `json:"apartment_profile,omitempty"`
+	BuildingProfile  BuildingProfile               `json:"building_profile,omitempty"`
+	HousingProfile   HousingCompanyProfile         `json:"housing_company_profile,omitempty"`
+	QualityScores    []PropertyQualityScore        `json:"quality_scores,omitempty"`
 	HouseOverview    HouseOverview                 `json:"house_overview,omitempty"`
 	ValuationInputs  valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
 	Valuation        *valuation.ApartmentValuation `json:"valuation,omitempty"`
@@ -583,9 +586,49 @@ type ApartmentProfile struct {
 	UpdatedAt             string   `json:"updated_at,omitempty"`
 }
 
-type ApartmentProfileProjectionResult struct {
+type CanonicalProfileProjectionResult struct {
 	SaleListingID    string           `json:"sale_listing_id"`
 	ApartmentProfile ApartmentProfile `json:"apartment_profile,omitempty"`
+}
+
+type BuildingProfile struct {
+	PhysicalBuildingID string `json:"physical_building_id,omitempty"`
+	HousingCompanyID   string `json:"housing_company_id,omitempty"`
+	BuildYear          *int32 `json:"build_year,omitempty"`
+	FloorCount         *int32 `json:"floor_count,omitempty"`
+	ApartmentCount     *int32 `json:"apartment_count,omitempty"`
+	EnergyClass        string `json:"energy_class,omitempty"`
+	HeatingMethod      string `json:"heating_method,omitempty"`
+	Material           string `json:"material,omitempty"`
+	RoofType           string `json:"roof_type,omitempty"`
+	RoofMaterial       string `json:"roof_material,omitempty"`
+	Elevator           *bool  `json:"elevator,omitempty"`
+	Confidence         string `json:"confidence,omitempty"`
+	UpdatedAt          string `json:"updated_at,omitempty"`
+}
+
+type HousingCompanyProfile struct {
+	HousingCompanyID  string `json:"housing_company_id,omitempty"`
+	Name              string `json:"name,omitempty"`
+	BusinessID        string `json:"business_id,omitempty"`
+	BuildYear         *int32 `json:"build_year,omitempty"`
+	ApartmentCount    *int32 `json:"apartment_count,omitempty"`
+	PlotOwnershipType string `json:"plot_ownership_type,omitempty"`
+	EnergyClass       string `json:"energy_class,omitempty"`
+	MaintenanceRisk   string `json:"maintenance_risk,omitempty"`
+	FinancialRisk     string `json:"financial_risk,omitempty"`
+	RepairBacklogRisk string `json:"repair_backlog_risk,omitempty"`
+	Confidence        string `json:"confidence,omitempty"`
+	UpdatedAt         string `json:"updated_at,omitempty"`
+}
+
+type PropertyQualityScore struct {
+	TargetType string   `json:"target_type"`
+	Dimension  string   `json:"dimension"`
+	Value      int32    `json:"value"`
+	Confidence string   `json:"confidence,omitempty"`
+	Reasons    []string `json:"reasons,omitempty"`
+	UpdatedAt  string   `json:"updated_at,omitempty"`
 }
 
 type HouseOverview struct {
