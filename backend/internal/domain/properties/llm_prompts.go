@@ -46,12 +46,12 @@ var propertyLLMOperations = map[string]propertyLLMOperation{
 		MaxOutputTokens:   5000,
 	},
 	"manager_certificate_extraction": {
-		Version:           "manager_certificate_pdf_v1",
+		Version:           "manager_certificate_pdf_v2",
 		SystemTemplate:    "prompts/manager_certificate_extraction.system.md",
 		UserTemplate:      "prompts/manager_certificate_extraction.user.md",
 		SchemaName:        "extract_manager_certificate",
 		SchemaDescription: "Extract normalized apartment, building, housing company, finance, renovation, and risk facts from a Finnish isännöitsijäntodistus PDF",
-		MaxOutputTokens:   9000,
+		MaxOutputTokens:   20000,
 	},
 	"house_overview_generation": {
 		Version:           "house_overview.v1",

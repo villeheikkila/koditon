@@ -958,6 +958,57 @@ SET property_document_extraction_run_status = sqlc.arg(status),
     property_document_extraction_run_finished_at = now()
 WHERE property_document_extraction_run_id = sqlc.arg(property_document_extraction_run_id);
 
+-- name: UpsertPropertyDocumentExtraction :one
+WITH superseded AS (
+    UPDATE public.property_document_extractions
+    SET property_document_extraction_status = 'superseded',
+        property_document_extraction_superseded_at = now()
+    WHERE property_document_id = sqlc.arg(property_document_id)
+        AND property_document_extraction_kind = sqlc.arg(kind)
+        AND property_document_extraction_superseded_at IS NULL
+    RETURNING property_document_extraction_id
+)
+INSERT INTO public.property_document_extractions (
+    property_document_id,
+    property_document_extraction_kind,
+    property_document_extraction_schema_version,
+    property_document_extraction_model,
+    property_document_extraction_prompt_version,
+    property_document_extraction_source_json,
+    property_document_extraction_status,
+    property_document_extraction_error
+) VALUES (
+    sqlc.arg(property_document_id),
+    sqlc.arg(kind),
+    sqlc.arg(schema_version),
+    sqlc.arg(model),
+    sqlc.arg(prompt_version),
+    sqlc.arg(source_json),
+    'succeeded',
+    NULL
+)
+RETURNING property_document_extraction_id;
+
+-- name: GetLatestPropertyDocumentExtraction :one
+SELECT
+    property_document_extraction_id,
+    property_document_id,
+    property_document_extraction_kind,
+    property_document_extraction_schema_version,
+    property_document_extraction_model,
+    property_document_extraction_prompt_version,
+    property_document_extraction_source_json,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_extraction_created_at,
+    property_document_extraction_extracted_at,
+    property_document_extraction_superseded_at
+FROM public.property_document_extractions
+WHERE property_document_id = sqlc.arg(property_document_id)
+    AND property_document_extraction_kind = sqlc.arg(kind)
+    AND property_document_extraction_superseded_at IS NULL
+LIMIT 1;
+
 -- name: UpdatePropertyDocumentExtractionStatus :exec
 UPDATE public.property_documents
 SET property_document_extraction_status = sqlc.arg(status),

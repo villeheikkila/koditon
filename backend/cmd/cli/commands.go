@@ -17,6 +17,7 @@ import (
 	"koditon/cmd/cli/internal/cli"
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/schema"
 	"koditon/internal/sync/consumers"
 	"koditon/internal/sync/frontdoor"
@@ -54,8 +55,62 @@ func newRootCommand(ctx context.Context, stdout, stderr io.Writer, getenv func(s
 	cmd.AddCommand(newDetailCommand(opts))
 	cmd.AddCommand(newTransactionsCommand(opts))
 	cmd.AddCommand(newPricesCommand(opts))
+	cmd.AddCommand(newManagerCertificateCommand(opts))
 	cmd.AddCommand(newSyncCommand(opts))
 	cmd.AddCommand(newAPIQueryCommand(opts))
+	return cmd
+}
+
+func newManagerCertificateCommand(opts *commandOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "manager-certificate",
+		Short: "Parse isännöitsijäntodistus PDFs",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
+	}
+	var f cli.ManagerCertificateParseFlags
+	parse := &cobra.Command{
+		Use:   "parse [offering-id] <pdf-path>",
+		Short: "Upload and parse an isännöitsijäntodistus PDF",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			pool, cfg, err := setup(opts.ctx)
+			if err != nil {
+				return err
+			}
+			defer pool.Close()
+			if len(args) == 1 {
+				f.OfferingID = ""
+				f.Path = args[0]
+			} else {
+				f.OfferingID = args[0]
+				f.Path = args[1]
+			}
+			f.JSON = opts.json
+			f.Out = opts.stdout
+			service := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
+			return cli.RunManagerCertificateParse(opts.ctx, service, f)
+		},
+	}
+	parse.Flags().StringVar(&f.Model, "model", "", "OpenAI model ID, defaults to OPENAI_MANAGER_CERTIFICATE_MODEL")
+	cmd.AddCommand(parse)
+	project := &cobra.Command{
+		Use:   "project <document-id>",
+		Short: "Project the latest stored manager-certificate extraction to claims",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			pool, cfg, err := setup(opts.ctx)
+			if err != nil {
+				return err
+			}
+			defer pool.Close()
+			service := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
+			return cli.RunManagerCertificateProject(opts.ctx, service, args[0], opts.json, opts.stdout)
+		},
+	}
+	cmd.AddCommand(project)
 	return cmd
 }
 

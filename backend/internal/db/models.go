@@ -599,6 +599,21 @@ type PropertyDocument struct {
 	PropertyDocumentUpdatedAt        time.Time  `json:"property_document_updated_at"`
 }
 
+type PropertyDocumentExtraction struct {
+	PropertyDocumentExtractionID            uuid.UUID       `json:"property_document_extraction_id"`
+	PropertyDocumentID                      uuid.UUID       `json:"property_document_id"`
+	PropertyDocumentExtractionKind          string          `json:"property_document_extraction_kind"`
+	PropertyDocumentExtractionSchemaVersion string          `json:"property_document_extraction_schema_version"`
+	PropertyDocumentExtractionModel         string          `json:"property_document_extraction_model"`
+	PropertyDocumentExtractionPromptVersion string          `json:"property_document_extraction_prompt_version"`
+	PropertyDocumentExtractionSourceJson    json.RawMessage `json:"property_document_extraction_source_json"`
+	PropertyDocumentExtractionStatus        string          `json:"property_document_extraction_status"`
+	PropertyDocumentExtractionError         *string         `json:"property_document_extraction_error"`
+	PropertyDocumentExtractionCreatedAt     time.Time       `json:"property_document_extraction_created_at"`
+	PropertyDocumentExtractionExtractedAt   time.Time       `json:"property_document_extraction_extracted_at"`
+	PropertyDocumentExtractionSupersededAt  *time.Time      `json:"property_document_extraction_superseded_at"`
+}
+
 type PropertyDocumentExtractionRun struct {
 	PropertyDocumentExtractionRunID            uuid.UUID       `json:"property_document_extraction_run_id"`
 	PropertyDocumentID                         uuid.UUID       `json:"property_document_id"`

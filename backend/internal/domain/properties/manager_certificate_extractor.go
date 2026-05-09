@@ -18,8 +18,11 @@ import (
 )
 
 const (
-	managerCertificateDocumentType = "manager_certificate"
-	maxPropertyDocumentBytes       = 25 * 1024 * 1024
+	managerCertificateDocumentType            = "manager_certificate"
+	managerCertificateExtractionKind          = "manager_certificate"
+	managerCertificateExtractionSchemaVersion = "manager_certificate_source.v1"
+	maxPropertyDocumentBytes                  = 25 * 1024 * 1024
+	managerCertificateClaimConfidence         = 90
 )
 
 var ErrPropertyDocumentInvalid = errors.New("property document invalid")
@@ -35,86 +38,113 @@ type managerCertificateObject struct {
 	Risks          managerCertificateRiskObject           `json:"risks" description:"Administrative, legal, financial, maintenance, and document-quality risk signals."`
 }
 
+type managerCertificateEvidenceObject struct {
+	Text    string `json:"text,omitempty"`
+	Page    *int32 `json:"page,omitempty"`
+	Section string `json:"section,omitempty"`
+}
+
 type managerCertificateDocumentObject struct {
-	DocumentDate    string   `json:"document_date,omitempty" description:"Certificate or print date in YYYY-MM-DD when available."`
-	Issuer          string   `json:"issuer,omitempty" description:"Issuer or property manager name."`
-	PropertyManager string   `json:"property_manager,omitempty" description:"Isännöitsijä or management company."`
-	Warnings        []string `json:"warnings,omitempty" description:"Ambiguities, missing sections, unreadable pages, or fields that need human review."`
-	Confidence      int32    `json:"confidence" description:"Overall extraction confidence from 0 to 100."`
+	DocumentDate    string                             `json:"document_date,omitempty" description:"Certificate or print date in YYYY-MM-DD when available."`
+	Issuer          string                             `json:"issuer,omitempty" description:"Issuer or property manager name."`
+	PropertyManager string                             `json:"property_manager,omitempty" description:"Isännöitsijä or management company."`
+	Warnings        []string                           `json:"warnings,omitempty" description:"Ambiguities, missing sections, unreadable pages, or fields that need human review."`
+	Evidence        []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateHousingCompanyObject struct {
-	Name              string `json:"name,omitempty"`
-	BusinessID        string `json:"business_id,omitempty"`
-	BuildYear         *int32 `json:"build_year,omitempty"`
-	ApartmentCount    *int32 `json:"apartment_count,omitempty"`
-	PlotOwnershipType string `json:"plot_ownership_type,omitempty" enum:"owned,rented,unknown"`
-	EnergyClass       string `json:"energy_class,omitempty"`
-	Evidence          string `json:"evidence,omitempty"`
-	Confidence        int32  `json:"confidence"`
+	Name              string                             `json:"name,omitempty"`
+	BusinessID        string                             `json:"business_id,omitempty"`
+	BuildYear         *int32                             `json:"build_year,omitempty"`
+	ApartmentCount    *int32                             `json:"apartment_count,omitempty"`
+	PlotOwnershipType string                             `json:"plot_ownership_type,omitempty" enum:"owned,rented,unknown"`
+	EnergyClass       string                             `json:"energy_class,omitempty"`
+	Evidence          []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateBuildingObject struct {
-	BuildYear      *int32 `json:"build_year,omitempty"`
-	FloorCount     *int32 `json:"floor_count,omitempty"`
-	ApartmentCount *int32 `json:"apartment_count,omitempty"`
-	EnergyClass    string `json:"energy_class,omitempty"`
-	HeatingMethod  string `json:"heating_method,omitempty"`
-	Material       string `json:"material,omitempty"`
-	RoofType       string `json:"roof_type,omitempty"`
-	RoofMaterial   string `json:"roof_material,omitempty"`
-	Elevator       *bool  `json:"elevator,omitempty"`
-	Evidence       string `json:"evidence,omitempty"`
-	Confidence     int32  `json:"confidence"`
+	BuildYear      *int32                             `json:"build_year,omitempty"`
+	FloorCount     *int32                             `json:"floor_count,omitempty"`
+	ApartmentCount *int32                             `json:"apartment_count,omitempty"`
+	EnergyClass    string                             `json:"energy_class,omitempty"`
+	HeatingMethod  string                             `json:"heating_method,omitempty"`
+	Material       string                             `json:"material,omitempty"`
+	RoofType       string                             `json:"roof_type,omitempty"`
+	RoofMaterial   string                             `json:"roof_material,omitempty"`
+	Elevator       *bool                              `json:"elevator,omitempty"`
+	Evidence       []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateUnitObject struct {
-	ApartmentNumber      string   `json:"apartment_number,omitempty"`
-	Shares               string   `json:"shares,omitempty"`
-	AreaM2               *float64 `json:"area_m2,omitempty"`
-	RoomLayout           string   `json:"room_layout,omitempty"`
-	FloorLevel           *int32   `json:"floor_level,omitempty"`
-	MaintenanceCharge    *float64 `json:"maintenance_charge_monthly,omitempty"`
-	CapitalCharge        *float64 `json:"capital_charge_monthly,omitempty"`
-	TotalCharge          *float64 `json:"total_charge_monthly,omitempty"`
-	DebtShare            *float64 `json:"debt_share_eur,omitempty"`
-	ShareholderLiability string   `json:"shareholder_liability,omitempty"`
-	Evidence             string   `json:"evidence,omitempty"`
-	Confidence           int32    `json:"confidence"`
+	ApartmentNumber      string                             `json:"apartment_number,omitempty"`
+	Shares               string                             `json:"shares,omitempty"`
+	AreaM2               *float64                           `json:"area_m2,omitempty"`
+	RoomLayout           string                             `json:"room_layout,omitempty"`
+	FloorLevel           *int32                             `json:"floor_level,omitempty"`
+	MaintenanceCharge    *float64                           `json:"maintenance_charge_monthly,omitempty"`
+	CapitalCharge        *float64                           `json:"capital_charge_monthly,omitempty"`
+	TotalCharge          *float64                           `json:"total_charge_monthly,omitempty"`
+	DebtShare            *float64                           `json:"debt_share_eur,omitempty"`
+	ShareholderLiability string                             `json:"shareholder_liability,omitempty"`
+	Evidence             []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateFinancesObject struct {
-	FinancialRisk     string `json:"financial_risk,omitempty" enum:"unknown,low,medium,high"`
-	MaintenanceRisk   string `json:"maintenance_risk,omitempty" enum:"unknown,low,medium,high"`
-	RepairBacklogRisk string `json:"repair_backlog_risk,omitempty" enum:"unknown,low,medium,high"`
-	LoanSummary       string `json:"loan_summary,omitempty"`
-	ChargeSummary     string `json:"charge_summary,omitempty"`
-	Evidence          string `json:"evidence,omitempty"`
-	Confidence        int32  `json:"confidence"`
+	FinancialRisk     string                             `json:"financial_risk,omitempty" enum:"unknown,low,medium,high"`
+	MaintenanceRisk   string                             `json:"maintenance_risk,omitempty" enum:"unknown,low,medium,high"`
+	RepairBacklogRisk string                             `json:"repair_backlog_risk,omitempty" enum:"unknown,low,medium,high"`
+	LoanSummary       string                             `json:"loan_summary,omitempty"`
+	ChargeSummary     string                             `json:"charge_summary,omitempty"`
+	Loans             []managerCertificateLoanObject     `json:"loans,omitempty"`
+	Charges           []managerCertificateChargeObject   `json:"charges,omitempty"`
+	Evidence          []managerCertificateEvidenceObject `json:"evidence,omitempty"`
+}
+
+type managerCertificateLoanObject struct {
+	Name       string                             `json:"name,omitempty"`
+	Lender     string                             `json:"lender,omitempty"`
+	Purpose    string                             `json:"purpose,omitempty"`
+	BalanceEUR *float64                           `json:"balance_eur,omitempty"`
+	LimitEUR   *float64                           `json:"limit_eur,omitempty"`
+	UsedEUR    *float64                           `json:"used_eur,omitempty"`
+	AsOf       string                             `json:"as_of,omitempty"`
+	Evidence   []managerCertificateEvidenceObject `json:"evidence,omitempty"`
+}
+
+type managerCertificateChargeObject struct {
+	ChargeType    string                             `json:"charge_type,omitempty" enum:"maintenance,capital,water,parking,sauna,storage,other,unknown"`
+	Target        string                             `json:"target,omitempty" enum:"unit,housing_company,unknown"`
+	Label         string                             `json:"label,omitempty"`
+	AmountMonthly *float64                           `json:"amount_monthly,omitempty"`
+	AmountPerM2   *float64                           `json:"amount_per_m2,omitempty"`
+	Basis         string                             `json:"basis,omitempty"`
+	LoanName      string                             `json:"loan_name,omitempty"`
+	VATIncluded   *bool                              `json:"vat_included,omitempty"`
+	Evidence      []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateRenovationObject struct {
-	Category        string `json:"category" description:"pipe, water_supply, sewer, roof, facade, window, balcony, elevator, heating, ventilation, drainage, electricity, yard, common_areas, other."`
-	Status          string `json:"status" enum:"done,planned,suspected,forecast,unknown"`
-	Stage           string `json:"stage" enum:"unknown,study,condition_assessment,planning,tendering,execution,completed"`
-	Scope           string `json:"scope" enum:"unknown,full,partial,maintenance"`
-	Responsibility  string `json:"responsibility" enum:"unknown,housing_company,shareholder,mixed"`
-	Year            *int32 `json:"year,omitempty"`
-	StartYear       *int32 `json:"start_year,omitempty"`
-	EndYear         *int32 `json:"end_year,omitempty"`
-	CostEstimateEUR *int64 `json:"cost_estimate_eur,omitempty"`
-	Summary         string `json:"summary,omitempty"`
-	Evidence        string `json:"evidence,omitempty"`
-	Confidence      int32  `json:"confidence"`
+	SystemType      string                             `json:"system_type" description:"pipe, water_supply, sewer, roof, facade, window, balcony, elevator, heating, ventilation, drainage, electricity, yard, common_areas, other."`
+	Action          string                             `json:"action" enum:"replacement,repair,renovation,maintenance,inspection,condition_assessment,planning,installation,painting,cleaning,unknown"`
+	SourceLabel     string                             `json:"source_label,omitempty"`
+	Status          string                             `json:"status" enum:"done,planned,suspected,forecast,unknown"`
+	Stage           string                             `json:"stage" enum:"unknown,study,condition_assessment,planning,tendering,execution,completed"`
+	Scope           string                             `json:"scope" enum:"unknown,full,partial,maintenance"`
+	Responsibility  string                             `json:"responsibility" enum:"unknown,housing_company,shareholder,mixed"`
+	Year            *int32                             `json:"year,omitempty"`
+	StartYear       *int32                             `json:"start_year,omitempty"`
+	EndYear         *int32                             `json:"end_year,omitempty"`
+	CostEstimateEUR *int64                             `json:"cost_estimate_eur,omitempty"`
+	Summary         string                             `json:"summary,omitempty"`
+	Evidence        []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 type managerCertificateRiskObject struct {
-	AdministrativeLegalRisk string   `json:"administrative_legal_risk,omitempty" enum:"unknown,low,medium,high"`
-	Restrictions            []string `json:"restrictions,omitempty"`
-	Disputes                []string `json:"disputes,omitempty"`
-	MissingEvidence         []string `json:"missing_evidence,omitempty"`
-	Evidence                string   `json:"evidence,omitempty"`
-	Confidence              int32    `json:"confidence"`
+	AdministrativeLegalRisk string                             `json:"administrative_legal_risk,omitempty" enum:"unknown,low,medium,high"`
+	Restrictions            []string                           `json:"restrictions,omitempty"`
+	Disputes                []string                           `json:"disputes,omitempty"`
+	MissingEvidence         []string                           `json:"missing_evidence,omitempty"`
+	Evidence                []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
 func (s *Service) UploadManagerCertificate(ctx context.Context, input string, upload PropertyDocumentUpload) (PropertyDocumentSummary, error) {
@@ -183,7 +213,11 @@ func (s *Service) ExtractManagerCertificate(ctx context.Context, input string, m
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateExtractionResult{}, err
 	}
-	claims, err := s.persistManagerCertificateExtraction(ctx, document, extracted, modelName, operation.Version, rawJSON)
+	if _, err := s.queries.UpsertPropertyDocumentExtraction(ctx, db.UpsertPropertyDocumentExtractionParams{PropertyDocumentID: documentID, Kind: managerCertificateExtractionKind, SchemaVersion: managerCertificateExtractionSchemaVersion, Model: modelName, PromptVersion: operation.Version, SourceJson: rawJSON}); err != nil {
+		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
+		return ManagerCertificateExtractionResult{}, fmt.Errorf("store manager certificate source extraction: %w", err)
+	}
+	claims, err := s.projectManagerCertificateExtraction(ctx, document, extracted, modelName, operation.Version, rawJSON)
 	if err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateExtractionResult{}, err
@@ -201,13 +235,72 @@ func (s *Service) ExtractManagerCertificate(ctx context.Context, input string, m
 	return ManagerCertificateExtractionResult{Document: summary, Model: modelName, Claims: claims}, nil
 }
 
+func (s *Service) ProjectManagerCertificateExtraction(ctx context.Context, input string) (ManagerCertificateExtractionResult, error) {
+	documentID, err := uuid.Parse(strings.TrimSpace(input))
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, ErrNotFound
+	}
+	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, documentID)
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, mapNotFound(err)
+	}
+	extraction, err := s.queries.GetLatestPropertyDocumentExtraction(ctx, db.GetLatestPropertyDocumentExtractionParams{PropertyDocumentID: documentID, Kind: managerCertificateExtractionKind})
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, mapNotFound(err)
+	}
+	var extracted managerCertificateObject
+	if err := json.Unmarshal(extraction.PropertyDocumentExtractionSourceJson, &extracted); err != nil {
+		return ManagerCertificateExtractionResult{}, fmt.Errorf("decode stored manager certificate extraction: %w", err)
+	}
+	claims, err := s.projectManagerCertificateExtraction(ctx, document, extracted, extraction.PropertyDocumentExtractionModel, extraction.PropertyDocumentExtractionPromptVersion, extraction.PropertyDocumentExtractionSourceJson)
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, err
+	}
+	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracted", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
+		return ManagerCertificateExtractionResult{}, err
+	}
+	summary, err := s.propertyDocumentSummary(ctx, documentID)
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, err
+	}
+	return ManagerCertificateExtractionResult{Document: summary, Model: extraction.PropertyDocumentExtractionModel, Claims: claims}, nil
+}
+
+func (s *Service) ExtractManagerCertificatePDF(ctx context.Context, upload PropertyDocumentUpload, modelName string) (ManagerCertificatePDFExtractionResult, error) {
+	if strings.TrimSpace(s.managerCertificateAPIKey) == "" {
+		return ManagerCertificatePDFExtractionResult{}, ErrManagerCertificateExtractorNotConfigured
+	}
+	filename := cleanDisplayString(upload.Filename)
+	if filename == "" {
+		filename = "isannoitsijantodistus.pdf"
+	}
+	mimeType := strings.ToLower(strings.TrimSpace(upload.MimeType))
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		mimeType = "application/pdf"
+	}
+	if len(upload.Bytes) == 0 || !bytes.HasPrefix(upload.Bytes, []byte("%PDF-")) || mimeType != "application/pdf" {
+		return ManagerCertificatePDFExtractionResult{}, ErrPropertyDocumentInvalid
+	}
+	if len(upload.Bytes) > maxPropertyDocumentBytes {
+		return ManagerCertificatePDFExtractionResult{}, ErrPropertyDocumentTooLarge
+	}
+	modelName = firstNonEmpty(modelName, s.managerCertificateModelName, defaultOpenAIManagerCertificateModel)
+	operation := propertyLLMOperationConfig("manager_certificate_extraction")
+	extractor := openAIManagerCertificateExtractor{apiKey: s.managerCertificateAPIKey}
+	_, rawJSON, err := extractor.ExtractPDF(ctx, filename, upload.Bytes, operation, modelName)
+	if err != nil {
+		return ManagerCertificatePDFExtractionResult{}, err
+	}
+	return ManagerCertificatePDFExtractionResult{Filename: filename, Model: modelName, SchemaVersion: managerCertificateExtractionSchemaVersion, CreatedAt: time.Now().UTC().Format(time.RFC3339), RawJSON: rawJSON}, nil
+}
+
 func (s *Service) finishFailedDocumentExtraction(ctx context.Context, documentID uuid.UUID, runID uuid.UUID, cause error) {
 	message := cause.Error()
 	_ = s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: "failed", RawJson: json.RawMessage(`null`), ErrorText: message, PropertyDocumentExtractionRunID: runID})
 	_ = s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "failed", ErrorText: message, PropertyDocumentID: documentID})
 }
 
-func (s *Service) persistManagerCertificateExtraction(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject, modelName string, promptVersion string, rawJSON []byte) (int, error) {
+func (s *Service) projectManagerCertificateExtraction(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject, modelName string, promptVersion string, rawJSON []byte) (int, error) {
 	beginner, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
 	})
@@ -224,51 +317,53 @@ func (s *Service) persistManagerCertificateExtraction(ctx context.Context, docum
 		return 0, fmt.Errorf("delete previous document claims: %w", err)
 	}
 	claimWriter := managerCertificateClaimWriter{ctx: ctx, queries: queries, documentID: document.PropertyDocumentID, model: modelName, promptVersion: promptVersion}
-	claimWriter.writeJSON("document", document.PropertyDocumentID, "document", "raw_extraction", rawJSON, "document", extracted.Document.Confidence, "Complete structured LLM extraction")
-	claimWriter.writeText("document", document.PropertyDocumentID, "document", "document_date", extracted.Document.DocumentDate, "document.document_date", extracted.Document.Confidence, extracted.Document.Issuer)
-	claimWriter.writeText("document", document.PropertyDocumentID, "document", "issuer", extracted.Document.Issuer, "document.issuer", extracted.Document.Confidence, extracted.Document.Issuer)
-	claimWriter.writeText("document", document.PropertyDocumentID, "document", "property_manager", extracted.Document.PropertyManager, "document.property_manager", extracted.Document.Confidence, extracted.Document.PropertyManager)
-	claimWriter.writeStringSlice("document", document.PropertyDocumentID, "document", "warnings", extracted.Document.Warnings, "document.warnings", extracted.Document.Confidence, strings.Join(extracted.Document.Warnings, "; "))
+	claimWriter.writeJSON("document", document.PropertyDocumentID, "document", "raw_extraction", rawJSON, "document", managerCertificateClaimConfidence, "Complete structured LLM extraction")
+	claimWriter.writeText("document", document.PropertyDocumentID, "document", "document_date", extracted.Document.DocumentDate, "document.document_date", managerCertificateClaimConfidence, evidenceText(extracted.Document.Evidence))
+	claimWriter.writeText("document", document.PropertyDocumentID, "document", "issuer", extracted.Document.Issuer, "document.issuer", managerCertificateClaimConfidence, evidenceText(extracted.Document.Evidence))
+	claimWriter.writeText("document", document.PropertyDocumentID, "document", "property_manager", extracted.Document.PropertyManager, "document.property_manager", managerCertificateClaimConfidence, evidenceText(extracted.Document.Evidence))
+	claimWriter.writeStringSlice("document", document.PropertyDocumentID, "document", "warnings", extracted.Document.Warnings, "document.warnings", managerCertificateClaimConfidence, strings.Join(extracted.Document.Warnings, "; "))
 	if document.HousingCompanyID != nil {
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "housing_company", "name", extracted.HousingCompany.Name, "housing_company.name", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "housing_company", "business_id", extracted.HousingCompany.BusinessID, "housing_company.business_id", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeNumberInt("housing_company", *document.HousingCompanyID, "housing_company", "build_year", extracted.HousingCompany.BuildYear, "housing_company.build_year", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeNumberInt("housing_company", *document.HousingCompanyID, "housing_company", "apartment_count", extracted.HousingCompany.ApartmentCount, "housing_company.apartment_count", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "site", "plot_ownership_type", normalizePlotOwnership(extracted.HousingCompany.PlotOwnershipType), "housing_company.plot_ownership_type", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "building", "energy_class", extracted.HousingCompany.EnergyClass, "housing_company.energy_class", extracted.HousingCompany.Confidence, extracted.HousingCompany.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "financial_risk", normalizeRiskLevel(extracted.Finances.FinancialRisk), "finances.financial_risk", extracted.Finances.Confidence, extracted.Finances.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "maintenance_risk", normalizeRiskLevel(extracted.Finances.MaintenanceRisk), "finances.maintenance_risk", extracted.Finances.Confidence, extracted.Finances.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "repair_backlog_risk", normalizeRiskLevel(extracted.Finances.RepairBacklogRisk), "finances.repair_backlog_risk", extracted.Finances.Confidence, extracted.Finances.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "administrative_legal_risk", normalizeRiskLevel(extracted.Risks.AdministrativeLegalRisk), "risks.administrative_legal_risk", extracted.Risks.Confidence, extracted.Risks.Evidence)
-		claimWriter.writeStringSlice("housing_company", *document.HousingCompanyID, "risk", "restrictions", extracted.Risks.Restrictions, "risks.restrictions", extracted.Risks.Confidence, extracted.Risks.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "finances", "loan_summary", extracted.Finances.LoanSummary, "finances.loan_summary", extracted.Finances.Confidence, extracted.Finances.Evidence)
-		claimWriter.writeText("housing_company", *document.HousingCompanyID, "finances", "charge_summary", extracted.Finances.ChargeSummary, "finances.charge_summary", extracted.Finances.Confidence, extracted.Finances.Evidence)
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "housing_company", "name", extracted.HousingCompany.Name, "housing_company.name", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "housing_company", "business_id", extracted.HousingCompany.BusinessID, "housing_company.business_id", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeNumberInt("housing_company", *document.HousingCompanyID, "housing_company", "build_year", extracted.HousingCompany.BuildYear, "housing_company.build_year", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeNumberInt("housing_company", *document.HousingCompanyID, "housing_company", "apartment_count", extracted.HousingCompany.ApartmentCount, "housing_company.apartment_count", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "site", "plot_ownership_type", normalizePlotOwnership(extracted.HousingCompany.PlotOwnershipType), "housing_company.plot_ownership_type", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "building", "energy_class", extracted.HousingCompany.EnergyClass, "housing_company.energy_class", managerCertificateClaimConfidence, evidenceText(extracted.HousingCompany.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "financial_risk", normalizeRiskLevel(extracted.Finances.FinancialRisk), "finances.financial_risk", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "maintenance_risk", normalizeRiskLevel(extracted.Finances.MaintenanceRisk), "finances.maintenance_risk", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "repair_backlog_risk", normalizeRiskLevel(extracted.Finances.RepairBacklogRisk), "finances.repair_backlog_risk", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "risk", "administrative_legal_risk", normalizeRiskLevel(extracted.Risks.AdministrativeLegalRisk), "risks.administrative_legal_risk", managerCertificateClaimConfidence, evidenceText(extracted.Risks.Evidence))
+		claimWriter.writeStringSlice("housing_company", *document.HousingCompanyID, "risk", "restrictions", extracted.Risks.Restrictions, "risks.restrictions", managerCertificateClaimConfidence, evidenceText(extracted.Risks.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "finances", "loan_summary", extracted.Finances.LoanSummary, "finances.loan_summary", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeText("housing_company", *document.HousingCompanyID, "finances", "charge_summary", extracted.Finances.ChargeSummary, "finances.charge_summary", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "loans", extracted.Finances.Loans, "finances.loans", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
+		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "charges", extracted.Finances.Charges, "finances.charges", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
 		if err := replaceManagerCertificateRenovations(ctx, tx, *document.HousingCompanyID, document.PropertyOfferingID, extracted.Renovations); err != nil {
 			return 0, err
 		}
 	}
 	if document.PhysicalBuildingID != nil {
-		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "build_year", firstInt32(extracted.Building.BuildYear, extracted.HousingCompany.BuildYear), "building.build_year", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "floor_count", extracted.Building.FloorCount, "building.floor_count", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "apartment_count", firstInt32(extracted.Building.ApartmentCount, extracted.HousingCompany.ApartmentCount), "building.apartment_count", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "energy_class", firstNonEmpty(extracted.Building.EnergyClass, extracted.HousingCompany.EnergyClass), "building.energy_class", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "heating_method", extracted.Building.HeatingMethod, "building.heating_method", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "material", extracted.Building.Material, "building.material", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "roof_type", extracted.Building.RoofType, "building.roof_type", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "roof_material", extracted.Building.RoofMaterial, "building.roof_material", extracted.Building.Confidence, extracted.Building.Evidence)
-		claimWriter.writeBool("physical_building", *document.PhysicalBuildingID, "building", "elevator", extracted.Building.Elevator, "building.elevator", extracted.Building.Confidence, extracted.Building.Evidence)
+		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "build_year", firstInt32(extracted.Building.BuildYear, extracted.HousingCompany.BuildYear), "building.build_year", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "floor_count", extracted.Building.FloorCount, "building.floor_count", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeNumberInt("physical_building", *document.PhysicalBuildingID, "building", "apartment_count", firstInt32(extracted.Building.ApartmentCount, extracted.HousingCompany.ApartmentCount), "building.apartment_count", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "energy_class", firstNonEmpty(extracted.Building.EnergyClass, extracted.HousingCompany.EnergyClass), "building.energy_class", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "heating_method", extracted.Building.HeatingMethod, "building.heating_method", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "material", extracted.Building.Material, "building.material", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "roof_type", extracted.Building.RoofType, "building.roof_type", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeText("physical_building", *document.PhysicalBuildingID, "building", "roof_material", extracted.Building.RoofMaterial, "building.roof_material", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
+		claimWriter.writeBool("physical_building", *document.PhysicalBuildingID, "building", "elevator", extracted.Building.Elevator, "building.elevator", managerCertificateClaimConfidence, evidenceText(extracted.Building.Evidence))
 	}
 	if document.PropertyUnitID != nil {
-		claimWriter.writeText("property_unit", *document.PropertyUnitID, "unit", "apartment_number", extracted.Unit.ApartmentNumber, "unit.apartment_number", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeText("property_unit", *document.PropertyUnitID, "unit", "shares", extracted.Unit.Shares, "unit.shares", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "unit", "area_m2", extracted.Unit.AreaM2, "unit.area_m2", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeText("property_unit", *document.PropertyUnitID, "layout", "room_layout", extracted.Unit.RoomLayout, "unit.room_layout", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumberInt("property_unit", *document.PropertyUnitID, "unit", "floor_level", extracted.Unit.FloorLevel, "unit.floor_level", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "maintenance_charge_monthly", extracted.Unit.MaintenanceCharge, "unit.maintenance_charge_monthly", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "capital_charge_monthly", extracted.Unit.CapitalCharge, "unit.capital_charge_monthly", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "total_charge_monthly", extracted.Unit.TotalCharge, "unit.total_charge_monthly", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "debt_share_eur", extracted.Unit.DebtShare, "unit.debt_share_eur", extracted.Unit.Confidence, extracted.Unit.Evidence)
-		claimWriter.writeText("property_unit", *document.PropertyUnitID, "risk", "shareholder_liability", extracted.Unit.ShareholderLiability, "unit.shareholder_liability", extracted.Unit.Confidence, extracted.Unit.Evidence)
+		claimWriter.writeText("property_unit", *document.PropertyUnitID, "unit", "apartment_number", extracted.Unit.ApartmentNumber, "unit.apartment_number", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeText("property_unit", *document.PropertyUnitID, "unit", "shares", extracted.Unit.Shares, "unit.shares", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "unit", "area_m2", extracted.Unit.AreaM2, "unit.area_m2", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeText("property_unit", *document.PropertyUnitID, "layout", "room_layout", extracted.Unit.RoomLayout, "unit.room_layout", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumberInt("property_unit", *document.PropertyUnitID, "unit", "floor_level", extracted.Unit.FloorLevel, "unit.floor_level", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "maintenance_charge_monthly", extracted.Unit.MaintenanceCharge, "unit.maintenance_charge_monthly", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "capital_charge_monthly", extracted.Unit.CapitalCharge, "unit.capital_charge_monthly", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "total_charge_monthly", extracted.Unit.TotalCharge, "unit.total_charge_monthly", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeNumber("property_unit", *document.PropertyUnitID, "charges", "debt_share_eur", extracted.Unit.DebtShare, "unit.debt_share_eur", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
+		claimWriter.writeText("property_unit", *document.PropertyUnitID, "risk", "shareholder_liability", extracted.Unit.ShareholderLiability, "unit.shareholder_liability", managerCertificateClaimConfidence, evidenceText(extracted.Unit.Evidence))
 	}
 	if claimWriter.err != nil {
 		return claimWriter.count, claimWriter.err
@@ -331,6 +426,21 @@ func (w *managerCertificateClaimWriter) writeJSON(entityType string, entityID uu
 		return
 	}
 	w.insert(entityType, entityID, section, key, "json", "", nil, nil, value, sourceField, confidence, evidence)
+}
+
+func (w *managerCertificateClaimWriter) writeAnyJSON(entityType string, entityID uuid.UUID, section string, key string, value any, sourceField string, confidence int32, evidence string) {
+	if w.err != nil {
+		return
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.err = err
+		return
+	}
+	if string(data) == "null" || string(data) == "[]" || string(data) == "{}" {
+		return
+	}
+	w.writeJSON(entityType, entityID, section, key, data, sourceField, confidence, evidence)
 }
 
 func (w *managerCertificateClaimWriter) writeStringSlice(entityType string, entityID uuid.UUID, section string, key string, values []string, sourceField string, confidence int32, evidence string) {
@@ -406,7 +516,7 @@ WHERE event_scope = 'source'
 		return fmt.Errorf("delete previous manager certificate renovations: %w", err)
 	}
 	for _, item := range items {
-		category := normalizeManagerCertificateRenovationCategory(item.Category)
+		category := normalizeManagerCertificateRenovationCategory(item.SystemType)
 		if category == "" || cleanDisplayString(item.Summary) == "" {
 			continue
 		}
@@ -414,15 +524,7 @@ WHERE event_scope = 'source'
 		stage := normalizeManagerCertificateRenovationStage(item.Stage)
 		scope := normalizeManagerCertificateRenovationScope(item.Scope)
 		responsibility := normalizeRenovationResponsibility(item.Responsibility)
-		confidence := 0.5
-		switch normalizeConfidenceText(item.Confidence) {
-		case "high":
-			confidence = 0.9
-		case "medium":
-			confidence = 0.7
-		case "low":
-			confidence = 0.4
-		}
+		summary := cleanDisplayString(firstNonEmpty(item.Summary, item.SourceLabel))
 		if _, err := tx.Exec(ctx, `
 INSERT INTO public.property_renovation_events (
     property_dimension_projection_run_id,
@@ -447,7 +549,7 @@ INSERT INTO public.property_renovation_events (
     evidence,
     confidence,
     source_reliability
-) VALUES ($1, 'manager-certificate-renovations-v1', 'source', 'housing_company', $2, 'property_offerings', $3, 'manager_certificate', $4, NULL, $5, $6, $7, $8, $9, $10, $11, $12, $13, jsonb_build_object('evidence_level', 'manager_certificate'), $14, 0.9)
+) VALUES ($1, 'manager-certificate-renovations-v1', 'source', 'housing_company', $2, 'property_offerings', $3, 'manager_certificate', $4, NULL, $5, $6, $7, $8, $9, $10, $11, $12, $13, jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF($14, ''), 'action', NULLIF($15, ''), 'evidence', NULLIF($16, '')), 0.9, 0.9)
 ON CONFLICT (
     event_scope,
     target_type,
@@ -470,7 +572,7 @@ ON CONFLICT (
     end_year = EXCLUDED.end_year,
     cost_estimate_eur = EXCLUDED.cost_estimate_eur,
     confidence = EXCLUDED.confidence,
-    evidence = EXCLUDED.evidence`, runID, housingCompanyID, offeringID, category, status, stage, scope, responsibility, item.Year, item.StartYear, item.EndYear, item.CostEstimateEUR, cleanDisplayString(firstNonEmpty(item.Summary, item.Evidence)), confidence); err != nil {
+    evidence = EXCLUDED.evidence`, runID, housingCompanyID, offeringID, category, status, stage, scope, responsibility, item.Year, item.StartYear, item.EndYear, item.CostEstimateEUR, summary, cleanDisplayString(item.SourceLabel), normalizeManagerCertificateRenovationAction(item.Action), evidenceText(item.Evidence)); err != nil {
 			return fmt.Errorf("insert manager certificate renovation: %w", err)
 		}
 	}
@@ -597,13 +699,29 @@ func normalizeManagerCertificateRenovationScope(value string) string {
 	}
 }
 
-func normalizeConfidenceText(value int32) string {
-	switch {
-	case value >= 80:
-		return "high"
-	case value >= 55:
-		return "medium"
+func normalizeManagerCertificateRenovationAction(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "replacement", "repair", "renovation", "maintenance", "inspection", "condition_assessment", "planning", "installation", "painting", "cleaning":
+		return strings.ToLower(strings.TrimSpace(value))
 	default:
-		return "low"
+		return "unknown"
 	}
+}
+
+func evidenceText(items []managerCertificateEvidenceObject) string {
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		text := cleanDisplayString(item.Text)
+		if text == "" {
+			continue
+		}
+		if item.Page != nil && *item.Page > 0 {
+			text = fmt.Sprintf("%s (s.%d)", text, *item.Page)
+		}
+		if section := cleanDisplayString(item.Section); section != "" {
+			text = section + ": " + text
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, "; ")
 }

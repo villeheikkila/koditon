@@ -677,6 +677,14 @@ type ManagerCertificateExtractionResult struct {
 	Claims   int                     `json:"claims"`
 }
 
+type ManagerCertificatePDFExtractionResult struct {
+	Filename      string          `json:"filename"`
+	Model         string          `json:"model"`
+	SchemaVersion string          `json:"schema_version"`
+	CreatedAt     string          `json:"created_at"`
+	RawJSON       json.RawMessage `json:"raw_json"`
+}
+
 type HouseOverview struct {
 	Headline            string   `json:"headline,omitempty"`
 	Summary             string   `json:"summary,omitempty"`

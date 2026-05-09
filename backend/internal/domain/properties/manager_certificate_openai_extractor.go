@@ -39,11 +39,15 @@ type openAIResponse struct {
 }
 
 func (e openAIManagerCertificateExtractor) Extract(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, operation propertyLLMOperation, modelName string) (managerCertificateObject, []byte, error) {
+	return e.ExtractPDF(ctx, document.PropertyDocumentFilename, document.PropertyDocumentBytes, operation, modelName)
+}
+
+func (e openAIManagerCertificateExtractor) ExtractPDF(ctx context.Context, filename string, data []byte, operation propertyLLMOperation, modelName string) (managerCertificateObject, []byte, error) {
 	systemPrompt, userPrompt, err := propertyLLMPromptText("manager_certificate_extraction", nil)
 	if err != nil {
 		return managerCertificateObject{}, nil, err
 	}
-	fileID, err := e.uploadPDF(ctx, document.PropertyDocumentFilename, document.PropertyDocumentBytes)
+	fileID, err := e.uploadPDF(ctx, filename, data)
 	if err != nil {
 		return managerCertificateObject{}, nil, err
 	}
@@ -194,7 +198,7 @@ func managerCertificateJSONSchema() map[string]any {
 			"issuer":           str(),
 			"property_manager": str(),
 			"warnings":         arr(str()),
-			"confidence":       integer(),
+			"evidence":         evidenceSchema(),
 		}),
 		"housing_company": obj(map[string]any{
 			"name":                str(),
@@ -203,8 +207,7 @@ func managerCertificateJSONSchema() map[string]any {
 			"apartment_count":     nullableInt(),
 			"plot_ownership_type": enum("owned", "rented", "unknown", ""),
 			"energy_class":        str(),
-			"evidence":            str(),
-			"confidence":          integer(),
+			"evidence":            evidenceSchema(),
 		}),
 		"building": obj(map[string]any{
 			"build_year":      nullableInt(),
@@ -216,8 +219,7 @@ func managerCertificateJSONSchema() map[string]any {
 			"roof_type":       str(),
 			"roof_material":   str(),
 			"elevator":        map[string]any{"type": []string{"boolean", "null"}},
-			"evidence":        str(),
-			"confidence":      integer(),
+			"evidence":        evidenceSchema(),
 		}),
 		"unit": obj(map[string]any{
 			"apartment_number":           str(),
@@ -230,8 +232,7 @@ func managerCertificateJSONSchema() map[string]any {
 			"total_charge_monthly":       nullableNumber(),
 			"debt_share_eur":             nullableNumber(),
 			"shareholder_liability":      str(),
-			"evidence":                   str(),
-			"confidence":                 integer(),
+			"evidence":                   evidenceSchema(),
 		}),
 		"finances": obj(map[string]any{
 			"financial_risk":      risk(),
@@ -239,11 +240,14 @@ func managerCertificateJSONSchema() map[string]any {
 			"repair_backlog_risk": risk(),
 			"loan_summary":        str(),
 			"charge_summary":      str(),
-			"evidence":            str(),
-			"confidence":          integer(),
+			"loans":               arr(loanSchema()),
+			"charges":             arr(chargeSchema()),
+			"evidence":            evidenceSchema(),
 		}),
 		"renovations": arr(obj(map[string]any{
-			"category":          str(),
+			"system_type":       enum("pipe", "water_supply", "sewer", "roof", "facade", "window", "balcony", "elevator", "heating", "ventilation", "drainage", "electricity", "yard", "common_areas", "other"),
+			"action":            enum("replacement", "repair", "renovation", "maintenance", "inspection", "condition_assessment", "planning", "installation", "painting", "cleaning", "unknown"),
+			"source_label":      str(),
 			"status":            enum("done", "planned", "suspected", "forecast", "unknown"),
 			"stage":             enum("unknown", "study", "condition_assessment", "planning", "tendering", "execution", "completed"),
 			"scope":             enum("unknown", "full", "partial", "maintenance"),
@@ -253,17 +257,46 @@ func managerCertificateJSONSchema() map[string]any {
 			"end_year":          nullableInt(),
 			"cost_estimate_eur": nullableInt(),
 			"summary":           str(),
-			"evidence":          str(),
-			"confidence":        integer(),
+			"evidence":          evidenceSchema(),
 		})),
 		"risks": obj(map[string]any{
 			"administrative_legal_risk": risk(),
 			"restrictions":              arr(str()),
 			"disputes":                  arr(str()),
 			"missing_evidence":          arr(str()),
-			"evidence":                  str(),
-			"confidence":                integer(),
+			"evidence":                  evidenceSchema(),
 		}),
+	})
+}
+
+func evidenceSchema() map[string]any {
+	return arr(obj(map[string]any{"text": str(), "page": nullableInt(), "section": str()}))
+}
+
+func loanSchema() map[string]any {
+	return obj(map[string]any{
+		"name":        str(),
+		"lender":      str(),
+		"purpose":     str(),
+		"balance_eur": nullableNumber(),
+		"limit_eur":   nullableNumber(),
+		"used_eur":    nullableNumber(),
+		"as_of":       str(),
+		"evidence":    evidenceSchema(),
+	})
+}
+
+func chargeSchema() map[string]any {
+	return obj(map[string]any{
+		"charge_type":    enum("maintenance", "capital", "water", "parking", "sauna", "storage", "other", "unknown"),
+		"target":         enum("unit", "housing_company", "unknown"),
+		"label":          str(),
+		"amount_monthly": nullableNumber(),
+		"amount_per_m2":  nullableNumber(),
+		"basis":          str(),
+		"loan_name":      str(),
+		"vat_included":   map[string]any{"type": []string{"boolean", "null"}},
+		"evidence":       evidenceSchema(),
 	})
 }
 

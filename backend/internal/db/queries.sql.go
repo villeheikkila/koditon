@@ -1723,6 +1723,52 @@ func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildin
 	return i, err
 }
 
+const getLatestPropertyDocumentExtraction = `-- name: GetLatestPropertyDocumentExtraction :one
+SELECT
+    property_document_extraction_id,
+    property_document_id,
+    property_document_extraction_kind,
+    property_document_extraction_schema_version,
+    property_document_extraction_model,
+    property_document_extraction_prompt_version,
+    property_document_extraction_source_json,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_extraction_created_at,
+    property_document_extraction_extracted_at,
+    property_document_extraction_superseded_at
+FROM public.property_document_extractions
+WHERE property_document_id = $1
+    AND property_document_extraction_kind = $2
+    AND property_document_extraction_superseded_at IS NULL
+LIMIT 1
+`
+
+type GetLatestPropertyDocumentExtractionParams struct {
+	PropertyDocumentID uuid.UUID `json:"property_document_id"`
+	Kind               string    `json:"kind"`
+}
+
+func (q *Queries) GetLatestPropertyDocumentExtraction(ctx context.Context, arg GetLatestPropertyDocumentExtractionParams) (PropertyDocumentExtraction, error) {
+	row := q.db.QueryRow(ctx, getLatestPropertyDocumentExtraction, arg.PropertyDocumentID, arg.Kind)
+	var i PropertyDocumentExtraction
+	err := row.Scan(
+		&i.PropertyDocumentExtractionID,
+		&i.PropertyDocumentID,
+		&i.PropertyDocumentExtractionKind,
+		&i.PropertyDocumentExtractionSchemaVersion,
+		&i.PropertyDocumentExtractionModel,
+		&i.PropertyDocumentExtractionPromptVersion,
+		&i.PropertyDocumentExtractionSourceJson,
+		&i.PropertyDocumentExtractionStatus,
+		&i.PropertyDocumentExtractionError,
+		&i.PropertyDocumentExtractionCreatedAt,
+		&i.PropertyDocumentExtractionExtractedAt,
+		&i.PropertyDocumentExtractionSupersededAt,
+	)
+	return i, err
+}
+
 const getPropertyDocumentDownload = `-- name: GetPropertyDocumentDownload :one
 SELECT
     property_document_id,
@@ -4186,6 +4232,61 @@ func (q *Queries) UpsertPostalPostalCodesBulk(ctx context.Context, arg UpsertPos
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertPropertyDocumentExtraction = `-- name: UpsertPropertyDocumentExtraction :one
+WITH superseded AS (
+    UPDATE public.property_document_extractions
+    SET property_document_extraction_status = 'superseded',
+        property_document_extraction_superseded_at = now()
+    WHERE property_document_id = $1
+        AND property_document_extraction_kind = $2
+        AND property_document_extraction_superseded_at IS NULL
+    RETURNING property_document_extraction_id
+)
+INSERT INTO public.property_document_extractions (
+    property_document_id,
+    property_document_extraction_kind,
+    property_document_extraction_schema_version,
+    property_document_extraction_model,
+    property_document_extraction_prompt_version,
+    property_document_extraction_source_json,
+    property_document_extraction_status,
+    property_document_extraction_error
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    'succeeded',
+    NULL
+)
+RETURNING property_document_extraction_id
+`
+
+type UpsertPropertyDocumentExtractionParams struct {
+	PropertyDocumentID uuid.UUID       `json:"property_document_id"`
+	Kind               string          `json:"kind"`
+	SchemaVersion      string          `json:"schema_version"`
+	Model              string          `json:"model"`
+	PromptVersion      string          `json:"prompt_version"`
+	SourceJson         json.RawMessage `json:"source_json"`
+}
+
+func (q *Queries) UpsertPropertyDocumentExtraction(ctx context.Context, arg UpsertPropertyDocumentExtractionParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertPropertyDocumentExtraction,
+		arg.PropertyDocumentID,
+		arg.Kind,
+		arg.SchemaVersion,
+		arg.Model,
+		arg.PromptVersion,
+		arg.SourceJson,
+	)
+	var property_document_extraction_id uuid.UUID
+	err := row.Scan(&property_document_extraction_id)
+	return property_document_extraction_id, err
 }
 
 const upsertRuntimeKV = `-- name: UpsertRuntimeKV :exec

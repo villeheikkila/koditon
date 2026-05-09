@@ -723,6 +723,27 @@ create table public.property_document_extraction_runs (
 
 CREATE INDEX idx_property_document_extraction_runs_document ON public.property_document_extraction_runs USING btree (property_document_id, property_document_extraction_run_started_at DESC);
 
+create table public.property_document_extractions (
+  property_document_extraction_id uuid default gen_random_uuid() not null constraint property_document_extractions_pkey primary key,
+  property_document_id uuid not null constraint property_document_extractions_property_document_id_fkey references property_documents(property_document_id) ON DELETE CASCADE,
+  property_document_extraction_kind text not null,
+  property_document_extraction_schema_version text not null,
+  property_document_extraction_model text not null,
+  property_document_extraction_prompt_version text not null,
+  property_document_extraction_source_json jsonb not null,
+  property_document_extraction_status text default 'succeeded'::text not null,
+  property_document_extraction_error text,
+  property_document_extraction_created_at timestamp with time zone default now() not null,
+  property_document_extraction_extracted_at timestamp with time zone default now() not null,
+  property_document_extraction_superseded_at timestamp with time zone,
+  constraint property_document_extractions_kind_check CHECK ((property_document_extraction_kind = ANY (ARRAY['manager_certificate'::text]))),
+  constraint property_document_extractions_schema_version_check CHECK ((property_document_extraction_schema_version <> ''::text)),
+  constraint property_document_extractions_status_check CHECK ((property_document_extraction_status = ANY (ARRAY['succeeded'::text, 'failed'::text, 'superseded'::text])))
+);
+
+CREATE INDEX idx_property_document_extractions_document ON public.property_document_extractions USING btree (property_document_id, property_document_extraction_created_at DESC);
+CREATE UNIQUE INDEX idx_property_document_extractions_latest ON public.property_document_extractions USING btree (property_document_id, property_document_extraction_kind) WHERE (property_document_extraction_superseded_at IS NULL);
+
 create table public.property_documents (
   property_document_id uuid default gen_random_uuid() not null constraint property_documents_pkey primary key,
   property_offering_id uuid not null constraint property_documents_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
