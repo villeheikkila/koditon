@@ -34,6 +34,7 @@ const (
 	CapacityClassPrices           = "provider_prices"
 	CapacityClassPostal           = "provider_postal"
 	CapacityClassInternalDB       = "internal_db"
+	CapacityClassLLM              = "llm"
 	defaultDispatchRetryDelay     = 30 * time.Second
 	defaultStaleClaimAfter        = 35 * time.Minute
 	dispatchAdmissionLockClassID  = int32(174201)
@@ -165,6 +166,8 @@ var jobDefinitions = []JobDefinition{
 	{Provider: "canonical", Kind: "canonical_rebuild_dimension_layer_listing", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 2},
 	{Provider: "canonical", Kind: "canonical_resolve_dirty_dimension_targets", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
 	{Provider: "canonical", Kind: "canonical_resolve_dimension_target", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 8},
+	{Provider: "canonical", Kind: "canonical_extract_manager_certificate", Queue: "canonical", CapacityClass: CapacityClassLLM, MaxInProgress: 2},
+	{Provider: "canonical", Kind: "canonical_project_manager_certificate", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 4},
 	{Provider: "postal", Kind: "postal_sync", Queue: "postal", CapacityClass: CapacityClassPostal, MaxInProgress: 1},
 }
 
@@ -206,6 +209,7 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			CapacityClassPrices:          1,
 			CapacityClassPostal:          1,
 			CapacityClassInternalDB:      8,
+			CapacityClassLLM:             2,
 		},
 		KindMaxInProgress: kindMaxInProgress,
 		BaseDeferDelay:    5 * time.Second,

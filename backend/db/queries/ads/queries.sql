@@ -886,6 +886,178 @@ RETURNING
     property_document_uploaded_at,
     property_document_extracted_at;
 
+-- name: CreateDetachedPropertyDocument :one
+INSERT INTO public.property_documents (
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_bytes
+) VALUES (
+    sqlc.arg(document_type),
+    sqlc.arg(filename),
+    sqlc.arg(mime_type),
+    sqlc.arg(size_bytes),
+    sqlc.arg(sha256),
+    sqlc.arg(document_bytes)
+)
+ON CONFLICT (property_document_type, property_document_sha256) WHERE property_offering_id IS NULL DO UPDATE SET
+    property_document_filename = EXCLUDED.property_document_filename,
+    property_document_mime_type = EXCLUDED.property_document_mime_type,
+    property_document_size_bytes = EXCLUDED.property_document_size_bytes,
+    property_document_bytes = EXCLUDED.property_document_bytes,
+    property_document_extraction_status = 'uploaded',
+    property_document_extraction_error = NULL,
+    property_document_updated_at = now()
+RETURNING
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at;
+
+-- name: AttachPropertyDocumentToOffering :one
+WITH relinked AS (
+    SELECT public.fnc__relink_property_document_offering(
+        sqlc.arg(property_document_id)::uuid,
+        sqlc.arg(property_offering_id)::uuid,
+        sqlc.arg(reason)::text
+    ) AS result
+)
+SELECT
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at
+FROM public.property_documents
+JOIN relinked ON true
+WHERE property_document_id = sqlc.arg(property_document_id);
+
+-- name: EnsureManagerCertificateHousingCompany :one
+INSERT INTO public.housing_companies (
+    housing_company_identity_key,
+    housing_company_name,
+    housing_company_business_id,
+    housing_company_build_year,
+    housing_company_apartment_count,
+    housing_company_energy_efficiency_label,
+    housing_company_match_reasons
+) VALUES (
+    sqlc.arg(identity_key),
+    sqlc.narg(name),
+    sqlc.narg(business_id),
+    sqlc.narg(build_year),
+    sqlc.narg(apartment_count),
+    sqlc.narg(energy_class),
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', sqlc.arg(property_document_id)::text)
+)
+ON CONFLICT (housing_company_identity_key) DO UPDATE SET
+    housing_company_name = COALESCE(EXCLUDED.housing_company_name, public.housing_companies.housing_company_name),
+    housing_company_business_id = COALESCE(EXCLUDED.housing_company_business_id, public.housing_companies.housing_company_business_id),
+    housing_company_build_year = COALESCE(EXCLUDED.housing_company_build_year, public.housing_companies.housing_company_build_year),
+    housing_company_apartment_count = COALESCE(EXCLUDED.housing_company_apartment_count, public.housing_companies.housing_company_apartment_count),
+    housing_company_energy_efficiency_label = COALESCE(EXCLUDED.housing_company_energy_efficiency_label, public.housing_companies.housing_company_energy_efficiency_label),
+    housing_company_updated_at = now()
+RETURNING housing_company_id;
+
+-- name: EnsureManagerCertificatePhysicalBuilding :one
+INSERT INTO public.physical_buildings (
+    housing_company_id,
+    physical_building_identity_key,
+    physical_building_build_year,
+    physical_building_floor_count,
+    physical_building_apartment_count,
+    physical_building_elevator
+) VALUES (
+    sqlc.arg(housing_company_id),
+    sqlc.arg(identity_key),
+    sqlc.narg(build_year),
+    sqlc.narg(floor_count),
+    sqlc.narg(apartment_count),
+    sqlc.narg(elevator)
+)
+ON CONFLICT (physical_building_identity_key) DO UPDATE SET
+    housing_company_id = COALESCE(EXCLUDED.housing_company_id, public.physical_buildings.housing_company_id),
+    physical_building_build_year = COALESCE(EXCLUDED.physical_building_build_year, public.physical_buildings.physical_building_build_year),
+    physical_building_floor_count = COALESCE(EXCLUDED.physical_building_floor_count, public.physical_buildings.physical_building_floor_count),
+    physical_building_apartment_count = COALESCE(EXCLUDED.physical_building_apartment_count, public.physical_buildings.physical_building_apartment_count),
+    physical_building_elevator = COALESCE(EXCLUDED.physical_building_elevator, public.physical_buildings.physical_building_elevator),
+    physical_building_updated_at = now()
+RETURNING physical_building_id;
+
+-- name: EnsureManagerCertificatePropertyUnit :one
+INSERT INTO public.property_units (
+    housing_company_id,
+    physical_building_id,
+    property_unit_identity_key,
+    property_unit_floor_level,
+    property_unit_area_value,
+    property_unit_rooms_count,
+    property_unit_room_layout,
+    property_unit_layout_match_key,
+    property_unit_match_reasons
+) VALUES (
+    sqlc.arg(housing_company_id),
+    sqlc.arg(physical_building_id),
+    sqlc.arg(identity_key),
+    sqlc.narg(floor_level),
+    sqlc.narg(area_m2),
+    sqlc.narg(rooms_count),
+    sqlc.narg(room_layout),
+    sqlc.narg(layout_match_key),
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', sqlc.arg(property_document_id)::text)
+)
+ON CONFLICT (property_unit_identity_key) DO UPDATE SET
+    housing_company_id = EXCLUDED.housing_company_id,
+    physical_building_id = EXCLUDED.physical_building_id,
+    property_unit_floor_level = COALESCE(EXCLUDED.property_unit_floor_level, public.property_units.property_unit_floor_level),
+    property_unit_area_value = COALESCE(EXCLUDED.property_unit_area_value, public.property_units.property_unit_area_value),
+    property_unit_rooms_count = COALESCE(EXCLUDED.property_unit_rooms_count, public.property_units.property_unit_rooms_count),
+    property_unit_room_layout = COALESCE(EXCLUDED.property_unit_room_layout, public.property_units.property_unit_room_layout),
+    property_unit_layout_match_key = COALESCE(EXCLUDED.property_unit_layout_match_key, public.property_units.property_unit_layout_match_key),
+    property_unit_updated_at = now()
+RETURNING property_unit_id;
+
+-- name: EnsureManagerCertificatePropertyOffering :one
+INSERT INTO public.property_offerings (
+    property_unit_id,
+    property_offering_identity_key,
+    property_offering_type,
+    property_offering_headline,
+    property_offering_match_reasons
+) VALUES (
+    sqlc.arg(property_unit_id),
+    sqlc.arg(identity_key),
+    'sale',
+    sqlc.arg(headline),
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', sqlc.arg(property_document_id)::text)
+)
+ON CONFLICT (property_offering_identity_key) DO UPDATE SET
+    property_unit_id = EXCLUDED.property_unit_id,
+    property_offering_headline = EXCLUDED.property_offering_headline,
+    property_offering_updated_at = now()
+RETURNING property_offering_id;
+
 -- name: GetPropertyDocumentDownload :one
 SELECT
     property_document_id,
@@ -912,6 +1084,26 @@ SELECT
     property_document_size_bytes,
     property_document_sha256,
     property_document_bytes
+FROM public.property_documents
+WHERE property_document_id = sqlc.arg(property_document_id)
+LIMIT 1;
+
+-- name: GetPropertyDocumentSummary :one
+SELECT
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at
 FROM public.property_documents
 WHERE property_document_id = sqlc.arg(property_document_id)
 LIMIT 1;

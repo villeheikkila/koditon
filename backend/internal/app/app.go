@@ -19,6 +19,7 @@ import (
 	db "koditon/internal/db"
 	"koditon/internal/domain/auth"
 	"koditon/internal/domain/emailauth"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/buildinfo"
 	"koditon/internal/platform/config"
 	"koditon/internal/platform/email"
@@ -125,6 +126,7 @@ func run(
 			cfg.Frontdoor.SitemapBase,
 		)
 		postalService := postal.NewService(pool)
+		propertiesService := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
 		consumer := consumers.New(
 			logger,
 			pool,
@@ -132,6 +134,7 @@ func run(
 			shortcutService,
 			frontdoorService,
 			postalService,
+			propertiesService,
 		)
 		consumerConfig := consumers.DefaultConfig()
 		if err := consumer.Start(ctx, consumerConfig); err != nil {

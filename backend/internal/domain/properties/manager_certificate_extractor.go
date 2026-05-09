@@ -28,6 +28,13 @@ const (
 var ErrPropertyDocumentInvalid = errors.New("property document invalid")
 var ErrPropertyDocumentTooLarge = errors.New("property document too large")
 
+type normalizedPropertyDocumentUpload struct {
+	Filename string
+	MimeType string
+	SHA256   string
+	Bytes    []byte
+}
+
 type managerCertificateObject struct {
 	Document       managerCertificateDocumentObject       `json:"document" description:"Document-level metadata and extraction warnings."`
 	HousingCompany managerCertificateHousingCompanyObject `json:"housing_company" description:"Housing company facts from the certificate."`
@@ -147,11 +154,7 @@ type managerCertificateRiskObject struct {
 	Evidence                []managerCertificateEvidenceObject `json:"evidence,omitempty"`
 }
 
-func (s *Service) UploadManagerCertificate(ctx context.Context, input string, upload PropertyDocumentUpload) (PropertyDocumentSummary, error) {
-	offeringID, err := uuid.Parse(strings.TrimSpace(input))
-	if err != nil {
-		return PropertyDocumentSummary{}, ErrNotFound
-	}
+func normalizePropertyDocumentUpload(upload PropertyDocumentUpload) (normalizedPropertyDocumentUpload, error) {
 	filename := cleanDisplayString(upload.Filename)
 	if filename == "" {
 		filename = "isannoitsijantodistus.pdf"
@@ -161,17 +164,41 @@ func (s *Service) UploadManagerCertificate(ctx context.Context, input string, up
 		mimeType = "application/pdf"
 	}
 	if len(upload.Bytes) == 0 || !bytes.HasPrefix(upload.Bytes, []byte("%PDF-")) || mimeType != "application/pdf" {
-		return PropertyDocumentSummary{}, ErrPropertyDocumentInvalid
+		return normalizedPropertyDocumentUpload{}, ErrPropertyDocumentInvalid
 	}
 	if len(upload.Bytes) > maxPropertyDocumentBytes {
-		return PropertyDocumentSummary{}, ErrPropertyDocumentTooLarge
+		return normalizedPropertyDocumentUpload{}, ErrPropertyDocumentTooLarge
 	}
 	hashBytes := sha256.Sum256(upload.Bytes)
-	row, err := s.queries.CreatePropertyDocumentForOffering(ctx, db.CreatePropertyDocumentForOfferingParams{DocumentType: managerCertificateDocumentType, Filename: filename, MimeType: mimeType, SizeBytes: int64(len(upload.Bytes)), Sha256: hex.EncodeToString(hashBytes[:]), DocumentBytes: upload.Bytes, PropertyOfferingID: offeringID})
+	return normalizedPropertyDocumentUpload{Filename: filename, MimeType: mimeType, SHA256: hex.EncodeToString(hashBytes[:]), Bytes: upload.Bytes}, nil
+}
+
+func (s *Service) UploadManagerCertificate(ctx context.Context, input string, upload PropertyDocumentUpload) (PropertyDocumentSummary, error) {
+	offeringID, err := uuid.Parse(strings.TrimSpace(input))
+	if err != nil {
+		return PropertyDocumentSummary{}, ErrNotFound
+	}
+	normalized, err := normalizePropertyDocumentUpload(upload)
+	if err != nil {
+		return PropertyDocumentSummary{}, err
+	}
+	row, err := s.queries.CreatePropertyDocumentForOffering(ctx, db.CreatePropertyDocumentForOfferingParams{DocumentType: managerCertificateDocumentType, Filename: normalized.Filename, MimeType: normalized.MimeType, SizeBytes: int64(len(normalized.Bytes)), Sha256: normalized.SHA256, DocumentBytes: normalized.Bytes, PropertyOfferingID: offeringID})
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}
 	return propertyDocumentSummaryFromCreateRow(row), nil
+}
+
+func (s *Service) UploadDetachedManagerCertificate(ctx context.Context, upload PropertyDocumentUpload) (PropertyDocumentSummary, error) {
+	normalized, err := normalizePropertyDocumentUpload(upload)
+	if err != nil {
+		return PropertyDocumentSummary{}, err
+	}
+	row, err := s.queries.CreateDetachedPropertyDocument(ctx, db.CreateDetachedPropertyDocumentParams{DocumentType: managerCertificateDocumentType, Filename: normalized.Filename, MimeType: normalized.MimeType, SizeBytes: int64(len(normalized.Bytes)), Sha256: normalized.SHA256, DocumentBytes: normalized.Bytes})
+	if err != nil {
+		return PropertyDocumentSummary{}, err
+	}
+	return propertyDocumentSummaryFromDetachedCreateRow(row), nil
 }
 
 func (s *Service) DownloadPropertyDocument(ctx context.Context, input string) (PropertyDocumentDownload, error) {
@@ -186,53 +213,77 @@ func (s *Service) DownloadPropertyDocument(ctx context.Context, input string) (P
 	return PropertyDocumentDownload{ID: row.PropertyDocumentID.String(), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, Bytes: row.PropertyDocumentBytes}, nil
 }
 
+func (s *Service) PropertyDocumentSummary(ctx context.Context, input string) (PropertyDocumentSummary, error) {
+	documentID, err := uuid.Parse(strings.TrimSpace(input))
+	if err != nil {
+		return PropertyDocumentSummary{}, ErrNotFound
+	}
+	return s.propertyDocumentSummary(ctx, documentID)
+}
+
 func (s *Service) ExtractManagerCertificate(ctx context.Context, input string, modelName string) (ManagerCertificateExtractionResult, error) {
+	source, err := s.ExtractManagerCertificateSource(ctx, input, modelName)
+	if err != nil {
+		return ManagerCertificateExtractionResult{}, err
+	}
+	return s.ProjectManagerCertificateExtraction(ctx, source.Document.ID)
+}
+
+func (s *Service) ExtractManagerCertificateSource(ctx context.Context, input string, modelName string) (ManagerCertificateSourceExtractionResult, error) {
 	if strings.TrimSpace(s.managerCertificateAPIKey) == "" {
-		return ManagerCertificateExtractionResult{}, ErrManagerCertificateExtractorNotConfigured
+		return ManagerCertificateSourceExtractionResult{}, ErrManagerCertificateExtractorNotConfigured
 	}
 	documentID, err := uuid.Parse(strings.TrimSpace(input))
 	if err != nil {
-		return ManagerCertificateExtractionResult{}, ErrNotFound
+		return ManagerCertificateSourceExtractionResult{}, ErrNotFound
 	}
 	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, documentID)
 	if err != nil {
-		return ManagerCertificateExtractionResult{}, mapNotFound(err)
+		return ManagerCertificateSourceExtractionResult{}, mapNotFound(err)
 	}
 	modelName = firstNonEmpty(modelName, s.managerCertificateModelName, defaultOpenAIManagerCertificateModel)
 	operation := propertyLLMOperationConfig("manager_certificate_extraction")
 	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracting", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, err
 	}
 	runID, err := s.queries.CreatePropertyDocumentExtractionRun(ctx, db.CreatePropertyDocumentExtractionRunParams{PropertyDocumentID: documentID, Model: modelName, PromptVersion: operation.Version})
 	if err != nil {
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, err
 	}
 	extractor := openAIManagerCertificateExtractor{apiKey: s.managerCertificateAPIKey}
 	extracted, rawJSON, err := extractor.Extract(ctx, document, operation, modelName)
 	if err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, err
 	}
 	if _, err := s.queries.UpsertPropertyDocumentExtraction(ctx, db.UpsertPropertyDocumentExtractionParams{PropertyDocumentID: documentID, Kind: managerCertificateExtractionKind, SchemaVersion: managerCertificateExtractionSchemaVersion, Model: modelName, PromptVersion: operation.Version, SourceJson: rawJSON}); err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
-		return ManagerCertificateExtractionResult{}, fmt.Errorf("store manager certificate source extraction: %w", err)
-	}
-	claims, err := s.projectManagerCertificateExtraction(ctx, document, extracted, modelName, operation.Version, rawJSON)
-	if err != nil {
-		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, fmt.Errorf("store manager certificate source extraction: %w", err)
 	}
 	if err := s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: "succeeded", RawJson: rawJSON, ErrorText: "", PropertyDocumentExtractionRunID: runID}); err != nil {
-		return ManagerCertificateExtractionResult{}, err
-	}
-	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracted", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, err
 	}
 	summary, err := s.propertyDocumentSummary(ctx, documentID)
 	if err != nil {
-		return ManagerCertificateExtractionResult{}, err
+		return ManagerCertificateSourceExtractionResult{}, err
 	}
-	return ManagerCertificateExtractionResult{Document: summary, Model: modelName, Claims: claims}, nil
+	return ManagerCertificateSourceExtractionResult{Document: summary, Model: modelName, SchemaVersion: managerCertificateExtractionSchemaVersion, CreatedAt: time.Now().UTC().Format(time.RFC3339), RawJSON: rawJSON, Warnings: extracted.Document.Warnings}, nil
+}
+
+func (s *Service) AttachPropertyDocumentToOffering(ctx context.Context, documentInput string, offeringInput string) (PropertyDocumentSummary, error) {
+	documentID, err := uuid.Parse(strings.TrimSpace(documentInput))
+	if err != nil {
+		return PropertyDocumentSummary{}, ErrNotFound
+	}
+	offeringID, err := uuid.Parse(strings.TrimSpace(offeringInput))
+	if err != nil {
+		return PropertyDocumentSummary{}, ErrNotFound
+	}
+	row, err := s.queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: documentID, PropertyOfferingID: offeringID, Reason: "property_document_relinked"})
+	if err != nil {
+		return PropertyDocumentSummary{}, mapNotFound(err)
+	}
+	return propertyDocumentSummaryFromAttachRow(row), nil
 }
 
 func (s *Service) ProjectManagerCertificateExtraction(ctx context.Context, input string) (ManagerCertificateExtractionResult, error) {
@@ -300,6 +351,71 @@ func (s *Service) finishFailedDocumentExtraction(ctx context.Context, documentID
 	_ = s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "failed", ErrorText: message, PropertyDocumentID: documentID})
 }
 
+func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, queries *db.Queries, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject) (db.GetPropertyDocumentForExtractionRow, error) {
+	if document.PropertyOfferingID != nil && document.PropertyUnitID != nil && document.HousingCompanyID != nil {
+		return document, nil
+	}
+	documentKey := document.PropertyDocumentID.String()
+	companyIdentityKey := "manager_certificate_document:" + documentKey + ":housing_company"
+	if businessID := normalizeIdentityPart(extracted.HousingCompany.BusinessID); businessID != "" {
+		companyIdentityKey = "business_id:" + businessID
+	}
+	companyID, err := queries.EnsureManagerCertificateHousingCompany(ctx, db.EnsureManagerCertificateHousingCompanyParams{
+		IdentityKey:        companyIdentityKey,
+		Name:               optionalText(extracted.HousingCompany.Name),
+		BusinessID:         optionalText(extracted.HousingCompany.BusinessID),
+		BuildYear:          firstInt32(extracted.HousingCompany.BuildYear, extracted.Building.BuildYear),
+		ApartmentCount:     firstInt32(extracted.HousingCompany.ApartmentCount, extracted.Building.ApartmentCount),
+		EnergyClass:        optionalText(firstNonEmpty(extracted.HousingCompany.EnergyClass, extracted.Building.EnergyClass)),
+		PropertyDocumentID: documentKey,
+	})
+	if err != nil {
+		return document, fmt.Errorf("ensure manager certificate housing company: %w", err)
+	}
+	buildingID, err := queries.EnsureManagerCertificatePhysicalBuilding(ctx, db.EnsureManagerCertificatePhysicalBuildingParams{
+		HousingCompanyID: &companyID,
+		IdentityKey:      "manager_certificate_document:" + documentKey + ":building",
+		BuildYear:        firstInt32(extracted.Building.BuildYear, extracted.HousingCompany.BuildYear),
+		FloorCount:       extracted.Building.FloorCount,
+		ApartmentCount:   firstInt32(extracted.Building.ApartmentCount, extracted.HousingCompany.ApartmentCount),
+		Elevator:         extracted.Building.Elevator,
+	})
+	if err != nil {
+		return document, fmt.Errorf("ensure manager certificate physical building: %w", err)
+	}
+	unitID, err := queries.EnsureManagerCertificatePropertyUnit(ctx, db.EnsureManagerCertificatePropertyUnitParams{
+		HousingCompanyID:   companyID,
+		PhysicalBuildingID: &buildingID,
+		IdentityKey:        "manager_certificate_document:" + documentKey + ":unit",
+		FloorLevel:         extracted.Unit.FloorLevel,
+		AreaM2:             extracted.Unit.AreaM2,
+		RoomsCount:         nil,
+		RoomLayout:         optionalText(extracted.Unit.RoomLayout),
+		LayoutMatchKey:     optionalText(normalizeIdentityPart(extracted.Unit.RoomLayout)),
+		PropertyDocumentID: documentKey,
+	})
+	if err != nil {
+		return document, fmt.Errorf("ensure manager certificate property unit: %w", err)
+	}
+	offeringID, err := queries.EnsureManagerCertificatePropertyOffering(ctx, db.EnsureManagerCertificatePropertyOfferingParams{
+		PropertyUnitID:     unitID,
+		IdentityKey:        "manager_certificate_document:" + documentKey + ":offering",
+		Headline:           managerCertificateOfferingHeadline(extracted),
+		PropertyDocumentID: documentKey,
+	})
+	if err != nil {
+		return document, fmt.Errorf("ensure manager certificate property offering: %w", err)
+	}
+	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: document.PropertyDocumentID, PropertyOfferingID: offeringID, Reason: "manager_certificate_target_created"}); err != nil {
+		return document, fmt.Errorf("attach manager certificate document to offering: %w", err)
+	}
+	updated, err := queries.GetPropertyDocumentForExtraction(ctx, document.PropertyDocumentID)
+	if err != nil {
+		return document, fmt.Errorf("reload manager certificate document target: %w", err)
+	}
+	return updated, nil
+}
+
 func (s *Service) projectManagerCertificateExtraction(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject, modelName string, promptVersion string, rawJSON []byte) (int, error) {
 	beginner, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
@@ -313,6 +429,10 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
+	document, err = s.ensureManagerCertificateDocumentTarget(ctx, queries, document, extracted)
+	if err != nil {
+		return 0, err
+	}
 	if err := queries.DeleteLLMPropertyClaimsForDocument(ctx, document.PropertyDocumentID); err != nil {
 		return 0, fmt.Errorf("delete previous document claims: %w", err)
 	}
@@ -338,8 +458,12 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 		claimWriter.writeText("housing_company", *document.HousingCompanyID, "finances", "charge_summary", extracted.Finances.ChargeSummary, "finances.charge_summary", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
 		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "loans", extracted.Finances.Loans, "finances.loans", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
 		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "charges", extracted.Finances.Charges, "finances.charges", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
-		if err := replaceManagerCertificateRenovations(ctx, tx, *document.HousingCompanyID, document.PropertyOfferingID, extracted.Renovations); err != nil {
-			return 0, err
+		if document.PropertyOfferingID != nil {
+			if err := replaceManagerCertificateRenovations(ctx, tx, *document.HousingCompanyID, *document.PropertyOfferingID, extracted.Renovations); err != nil {
+				return 0, err
+			}
+		} else {
+			return 0, fmt.Errorf("manager certificate document %s has no property offering after target resolution", document.PropertyDocumentID)
 		}
 	}
 	if document.PhysicalBuildingID != nil {
@@ -368,12 +492,10 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 	if claimWriter.err != nil {
 		return claimWriter.count, claimWriter.err
 	}
-	_, saleListingID, err := s.saleOfferingSource(ctx, document.PropertyOfferingID)
-	if err != nil {
-		return claimWriter.count, err
-	}
-	if _, err := db.New(tx).MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "document_claims_changed"}); err != nil {
-		return claimWriter.count, fmt.Errorf("mark dimension targets dirty from document: %w", err)
+	if document.PropertyOfferingID != nil {
+		if _, err := tx.Exec(ctx, `SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1, $2)`, *document.PropertyOfferingID, "document_claims_changed"); err != nil {
+			return claimWriter.count, fmt.Errorf("mark dimension targets dirty from document: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return claimWriter.count, fmt.Errorf("commit manager certificate transaction: %w", err)
@@ -580,24 +702,15 @@ ON CONFLICT (
 }
 
 func (s *Service) propertyDocumentSummary(ctx context.Context, documentID uuid.UUID) (PropertyDocumentSummary, error) {
-	row, err := s.queries.GetPropertyDocumentForExtraction(ctx, documentID)
+	row, err := s.queries.GetPropertyDocumentSummary(ctx, documentID)
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}
-	rows, err := s.queries.ListPropertyDocumentsForOffering(ctx, row.PropertyOfferingID)
-	if err != nil {
-		return PropertyDocumentSummary{}, err
-	}
-	for _, item := range rows {
-		if item.PropertyDocumentID == documentID {
-			return propertyDocumentSummaryFromListRow(item), nil
-		}
-	}
-	return PropertyDocumentSummary{}, ErrNotFound
+	return propertyDocumentSummaryFromGetRow(row), nil
 }
 
 func (s *Service) enrichSaleListingDocuments(ctx context.Context, listing *SaleListing, offeringID uuid.UUID) error {
-	rows, err := s.queries.ListPropertyDocumentsForOffering(ctx, offeringID)
+	rows, err := s.queries.ListPropertyDocumentsForOffering(ctx, &offeringID)
 	if err != nil {
 		return err
 	}
@@ -608,11 +721,23 @@ func (s *Service) enrichSaleListingDocuments(ctx context.Context, listing *SaleL
 }
 
 func propertyDocumentSummaryFromCreateRow(row db.CreatePropertyDocumentForOfferingRow) PropertyDocumentSummary {
-	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: row.PropertyOfferingID.String(), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
+	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: ptrUUIDString(row.PropertyOfferingID), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
+}
+
+func propertyDocumentSummaryFromDetachedCreateRow(row db.CreateDetachedPropertyDocumentRow) PropertyDocumentSummary {
+	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: ptrUUIDString(row.PropertyOfferingID), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
+}
+
+func propertyDocumentSummaryFromAttachRow(row db.AttachPropertyDocumentToOfferingRow) PropertyDocumentSummary {
+	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: ptrUUIDString(row.PropertyOfferingID), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
+}
+
+func propertyDocumentSummaryFromGetRow(row db.GetPropertyDocumentSummaryRow) PropertyDocumentSummary {
+	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: ptrUUIDString(row.PropertyOfferingID), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
 }
 
 func propertyDocumentSummaryFromListRow(row db.ListPropertyDocumentsForOfferingRow) PropertyDocumentSummary {
-	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: row.PropertyOfferingID.String(), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
+	return PropertyDocumentSummary{ID: row.PropertyDocumentID.String(), OfferingID: ptrUUIDString(row.PropertyOfferingID), UnitID: ptrUUIDString(row.PropertyUnitID), PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: ptrUUIDString(row.HousingCompanyID), Type: row.PropertyDocumentType, Filename: row.PropertyDocumentFilename, MimeType: row.PropertyDocumentMimeType, SizeBytes: row.PropertyDocumentSizeBytes, SHA256: row.PropertyDocumentSha256, ExtractionStatus: row.PropertyDocumentExtractionStatus, ExtractionError: valueOrEmpty(row.PropertyDocumentExtractionError), UploadedAt: row.PropertyDocumentUploadedAt.Format(time.RFC3339), ExtractedAt: timePtrString(row.PropertyDocumentExtractedAt), DownloadURL: propertyDocumentDownloadURL(row.PropertyDocumentID)}
 }
 
 func propertyDocumentDownloadURL(id uuid.UUID) string {
@@ -624,6 +749,22 @@ func timePtrString(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+func optionalText(value string) *string {
+	cleaned := cleanDisplayString(value)
+	if cleaned == "" {
+		return nil
+	}
+	return &cleaned
+}
+
+func managerCertificateOfferingHeadline(extracted managerCertificateObject) string {
+	parts := compactStrings([]string{extracted.HousingCompany.Name, extracted.Unit.ApartmentNumber, extracted.Unit.RoomLayout})
+	if len(parts) == 0 {
+		return "Manager certificate offering"
+	}
+	return strings.Join(parts, " ")
 }
 
 func normalizeRiskLevel(value string) string {

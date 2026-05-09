@@ -13,6 +13,9 @@ import (
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
+	"koditon/internal/platform/taskqueue"
+	"koditon/internal/sync/consumers"
+	syncjobs "koditon/internal/sync/jobs"
 )
 
 type propertySearchInput struct {
@@ -78,6 +81,13 @@ type saleListingManagerCertificateUploadInput struct {
 	}]
 }
 
+type managerCertificateUploadInput struct {
+	OfferingID string `query:"offering_id" doc:"Optional canonical offering UUID"`
+	RawBody    huma.MultipartFormFiles[struct {
+		File huma.FormFile `form:"file" contentType:"application/pdf" required:"true"`
+	}]
+}
+
 type propertyDocumentInput struct {
 	ID string `path:"id" required:"true" doc:"Property document UUID"`
 }
@@ -85,6 +95,13 @@ type propertyDocumentInput struct {
 type propertyDocumentExtractInput struct {
 	ID    string `path:"id"     required:"true" doc:"Property document UUID"`
 	Model string `query:"model" doc:"OpenAI model ID, defaults to the configured manager certificate model"`
+}
+
+type propertyDocumentAttachInput struct {
+	ID   string `path:"id" required:"true" doc:"Property document UUID"`
+	Body struct {
+		OfferingID string `json:"offering_id" required:"true" doc:"Target canonical offering UUID"`
+	}
 }
 
 type transactionMatchPostalsInput struct {
@@ -191,12 +208,14 @@ type saleListingHouseOverviewGenerateOutput struct {
 	Body properties.HouseOverviewGenerationResult
 }
 
-type propertyDocumentSummaryOutput struct {
-	Body properties.PropertyDocumentSummary
+type propertyDocumentJobResult struct {
+	Document properties.PropertyDocumentSummary `json:"document"`
+	JobID    string                             `json:"job_id"`
+	Queued   bool                               `json:"queued"`
 }
 
-type propertyDocumentExtractOutput struct {
-	Body properties.ManagerCertificateExtractionResult
+type propertyDocumentJobOutput struct {
+	Body propertyDocumentJobResult
 }
 
 type propertyDocumentDownloadOutput struct {
@@ -362,7 +381,7 @@ func (a *API) saleListingHouseOverviewGenerateHandler(ctx context.Context, input
 	return &saleListingHouseOverviewGenerateOutput{Body: result}, nil
 }
 
-func (a *API) saleListingManagerCertificateUploadHandler(ctx context.Context, input *saleListingManagerCertificateUploadInput) (*propertyDocumentSummaryOutput, error) {
+func (a *API) saleListingManagerCertificateUploadHandler(ctx context.Context, input *saleListingManagerCertificateUploadInput) (*propertyDocumentJobOutput, error) {
 	file := input.RawBody.Data().File
 	if !file.IsSet {
 		return nil, huma.Error400BadRequest("manager certificate PDF is required")
@@ -385,7 +404,89 @@ func (a *API) saleListingManagerCertificateUploadHandler(ctx context.Context, in
 		a.logger.ErrorContext(ctx, "manager certificate upload failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("manager certificate upload failed")
 	}
-	return &propertyDocumentSummaryOutput{Body: document}, nil
+	result, err := a.enqueueManagerCertificateExtraction(ctx, document, "")
+	if err != nil {
+		a.logger.ErrorContext(ctx, "manager certificate extraction enqueue failed", "id", document.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate extraction enqueue failed")
+	}
+	return &propertyDocumentJobOutput{Body: result}, nil
+}
+
+func (a *API) managerCertificateUploadHandler(ctx context.Context, input *managerCertificateUploadInput) (*propertyDocumentJobOutput, error) {
+	file := input.RawBody.Data().File
+	if !file.IsSet {
+		return nil, huma.Error400BadRequest("manager certificate PDF is required")
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, huma.Error400BadRequest("read manager certificate PDF failed")
+	}
+	upload := properties.PropertyDocumentUpload{Filename: file.Filename, MimeType: file.ContentType, Bytes: data}
+	var document properties.PropertyDocumentSummary
+	if strings.TrimSpace(input.OfferingID) == "" {
+		document, err = a.propertiesService.UploadDetachedManagerCertificate(ctx, upload)
+	} else {
+		document, err = a.propertiesService.UploadManagerCertificate(ctx, input.OfferingID, upload)
+	}
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrPropertyDocumentTooLarge) {
+			return nil, huma.Error413RequestEntityTooLarge("manager certificate PDF too large")
+		}
+		if errors.Is(err, properties.ErrPropertyDocumentInvalid) {
+			return nil, huma.Error400BadRequest("invalid manager certificate PDF")
+		}
+		a.logger.ErrorContext(ctx, "manager certificate upload failed", "offering_id", input.OfferingID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate upload failed")
+	}
+	result, err := a.enqueueManagerCertificateExtraction(ctx, document, "")
+	if err != nil {
+		a.logger.ErrorContext(ctx, "manager certificate extraction enqueue failed", "id", document.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate extraction enqueue failed")
+	}
+	return &propertyDocumentJobOutput{Body: result}, nil
+}
+
+func (a *API) enqueueManagerCertificateExtraction(ctx context.Context, document properties.PropertyDocumentSummary, model string) (propertyDocumentJobResult, error) {
+	payload, err := json.Marshal(map[string]string{"property_document_id": document.ID, "model": strings.TrimSpace(model)})
+	if err != nil {
+		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate extraction payload: %w", err)
+	}
+	store := syncjobs.NewStore(a.logger, a.pool)
+	result, err := store.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "canonical",
+		Kind:        consumers.TaskTypeCanonicalExtractManagerCertificate,
+		EntityID:    "property_document:" + document.ID,
+		Priority:    int32(taskqueue.PriorityHigh),
+		MaxAttempts: 3,
+		Payload:     payload,
+	})
+	if err != nil {
+		return propertyDocumentJobResult{}, err
+	}
+	return propertyDocumentJobResult{Document: document, JobID: result.Job.SyncJobID.String(), Queued: result.Enqueued}, nil
+}
+
+func (a *API) enqueueManagerCertificateProjection(ctx context.Context, document properties.PropertyDocumentSummary) (propertyDocumentJobResult, error) {
+	payload, err := json.Marshal(map[string]string{"property_document_id": document.ID})
+	if err != nil {
+		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate projection payload: %w", err)
+	}
+	store := syncjobs.NewStore(a.logger, a.pool)
+	result, err := store.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "canonical",
+		Kind:        consumers.TaskTypeCanonicalProjectManagerCertificate,
+		EntityID:    "property_document:" + document.ID,
+		Priority:    int32(taskqueue.PriorityHigh),
+		MaxAttempts: 3,
+		Payload:     payload,
+	})
+	if err != nil {
+		return propertyDocumentJobResult{}, err
+	}
+	return propertyDocumentJobResult{Document: document, JobID: result.Job.SyncJobID.String(), Queued: result.Enqueued}, nil
 }
 
 func (a *API) propertyDocumentDownloadHandler(ctx context.Context, input *propertyDocumentInput) (*propertyDocumentDownloadOutput, error) {
@@ -400,19 +501,38 @@ func (a *API) propertyDocumentDownloadHandler(ctx context.Context, input *proper
 	return &propertyDocumentDownloadOutput{ContentType: document.MimeType, ContentDisposition: fmt.Sprintf("attachment; filename=%q", document.Filename), ContentLength: int64(len(document.Bytes)), Body: document.Bytes}, nil
 }
 
-func (a *API) propertyDocumentExtractHandler(ctx context.Context, input *propertyDocumentExtractInput) (*propertyDocumentExtractOutput, error) {
-	result, err := a.propertiesService.ExtractManagerCertificate(ctx, input.ID, input.Model)
+func (a *API) propertyDocumentExtractHandler(ctx context.Context, input *propertyDocumentExtractInput) (*propertyDocumentJobOutput, error) {
+	summary, err := a.propertiesService.PropertyDocumentSummary(ctx, input.ID)
 	if err != nil {
 		if errors.Is(err, properties.ErrNotFound) {
 			return nil, huma.Error404NotFound("property document not found")
 		}
-		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
-			return nil, huma.Error503ServiceUnavailable("document extractor not configured")
-		}
-		a.logger.ErrorContext(ctx, "manager certificate extraction failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
-		return nil, huma.Error400BadRequest("manager certificate extraction failed")
+		a.logger.ErrorContext(ctx, "property document lookup failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("property document lookup failed")
 	}
-	return &propertyDocumentExtractOutput{Body: result}, nil
+	result, err := a.enqueueManagerCertificateExtraction(ctx, summary, input.Model)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "manager certificate extraction enqueue failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate extraction enqueue failed")
+	}
+	return &propertyDocumentJobOutput{Body: result}, nil
+}
+
+func (a *API) propertyDocumentAttachHandler(ctx context.Context, input *propertyDocumentAttachInput) (*propertyDocumentJobOutput, error) {
+	document, err := a.propertiesService.AttachPropertyDocumentToOffering(ctx, input.ID, input.Body.OfferingID)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("property document or target offering not found")
+		}
+		a.logger.ErrorContext(ctx, "property document attach failed", "id", input.ID, "offering_id", input.Body.OfferingID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("property document attach failed")
+	}
+	result, err := a.enqueueManagerCertificateProjection(ctx, document)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "manager certificate projection enqueue failed", "id", input.ID, "offering_id", input.Body.OfferingID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate projection enqueue failed")
+	}
+	return &propertyDocumentJobOutput{Body: result}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {

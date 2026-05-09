@@ -404,7 +404,8 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 	shortcutService := shortcut.NewService(pool, logger, cfg.Shortcut.BaseURL, cfg.Shortcut.DocsBaseURL, cfg.Shortcut.AdBaseURL, cfg.Shortcut.UserAgent, cfg.Shortcut.SitemapBase)
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
-	consumer := consumers.New(logger, pool, pricesService, shortcutService, frontdoorService, postalService)
+	propertiesService := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
+	consumer := consumers.New(logger, pool, pricesService, shortcutService, frontdoorService, postalService, propertiesService)
 	if err := consumer.Start(ctx, consumerConfig); err != nil {
 		return fmt.Errorf("start sync consumers: %w", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"koditon/internal/db"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
 	syncflows "koditon/internal/sync/flows"
@@ -26,6 +27,8 @@ type Consumer struct {
 	syncJobs   *syncjobs.Store
 	queries    *db.Queries
 	pool       *pgxpool.Pool
+
+	propertiesService *properties.Service
 
 	frontdoorPool *taskqueue.WorkerPool
 	shortcutPool  *taskqueue.WorkerPool
@@ -56,13 +59,14 @@ func DefaultConfig() Config {
 	}
 }
 
-func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service) *Consumer {
+func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service, propertiesService *properties.Service) *Consumer {
 	return &Consumer{
-		logger:     logger,
-		syncRunner: syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
-		syncJobs:   syncjobs.NewStore(logger, pool),
-		queries:    db.New(pool),
-		pool:       pool,
+		logger:            logger,
+		syncRunner:        syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
+		syncJobs:          syncjobs.NewStore(logger, pool),
+		queries:           db.New(pool),
+		pool:              pool,
+		propertiesService: propertiesService,
 	}
 }
 

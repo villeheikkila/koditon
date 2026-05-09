@@ -65,6 +65,79 @@ func (q *Queries) ArchiveBatch(ctx context.Context, arg ArchiveBatchParams) ([]i
 	return items, nil
 }
 
+const attachPropertyDocumentToOffering = `-- name: AttachPropertyDocumentToOffering :one
+WITH relinked AS (
+    SELECT public.fnc__relink_property_document_offering(
+        $1::uuid,
+        $2::uuid,
+        $3::text
+    ) AS result
+)
+SELECT
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at
+FROM public.property_documents
+JOIN relinked ON true
+WHERE property_document_id = $1
+`
+
+type AttachPropertyDocumentToOfferingParams struct {
+	PropertyDocumentID uuid.UUID `json:"property_document_id"`
+	PropertyOfferingID uuid.UUID `json:"property_offering_id"`
+	Reason             string    `json:"reason"`
+}
+
+type AttachPropertyDocumentToOfferingRow struct {
+	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
+	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
+	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
+	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentType             string     `json:"property_document_type"`
+	PropertyDocumentFilename         string     `json:"property_document_filename"`
+	PropertyDocumentMimeType         string     `json:"property_document_mime_type"`
+	PropertyDocumentSizeBytes        int64      `json:"property_document_size_bytes"`
+	PropertyDocumentSha256           string     `json:"property_document_sha256"`
+	PropertyDocumentExtractionStatus string     `json:"property_document_extraction_status"`
+	PropertyDocumentExtractionError  *string    `json:"property_document_extraction_error"`
+	PropertyDocumentUploadedAt       time.Time  `json:"property_document_uploaded_at"`
+	PropertyDocumentExtractedAt      *time.Time `json:"property_document_extracted_at"`
+}
+
+func (q *Queries) AttachPropertyDocumentToOffering(ctx context.Context, arg AttachPropertyDocumentToOfferingParams) (AttachPropertyDocumentToOfferingRow, error) {
+	row := q.db.QueryRow(ctx, attachPropertyDocumentToOffering, arg.PropertyDocumentID, arg.PropertyOfferingID, arg.Reason)
+	var i AttachPropertyDocumentToOfferingRow
+	err := row.Scan(
+		&i.PropertyDocumentID,
+		&i.PropertyOfferingID,
+		&i.PropertyUnitID,
+		&i.PhysicalBuildingID,
+		&i.HousingCompanyID,
+		&i.PropertyDocumentType,
+		&i.PropertyDocumentFilename,
+		&i.PropertyDocumentMimeType,
+		&i.PropertyDocumentSizeBytes,
+		&i.PropertyDocumentSha256,
+		&i.PropertyDocumentExtractionStatus,
+		&i.PropertyDocumentExtractionError,
+		&i.PropertyDocumentUploadedAt,
+		&i.PropertyDocumentExtractedAt,
+	)
+	return i, err
+}
+
 const canonicalizeFrontdoorAdSaleListing = `-- name: CanonicalizeFrontdoorAdSaleListing :one
 INSERT INTO public.property_source_offerings (
     frontdoor_ad_id,
@@ -802,6 +875,102 @@ func (q *Queries) CountUnifiedEntities(ctx context.Context, arg CountUnifiedEnti
 	return count, err
 }
 
+const createDetachedPropertyDocument = `-- name: CreateDetachedPropertyDocument :one
+INSERT INTO public.property_documents (
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_bytes
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+ON CONFLICT (property_document_type, property_document_sha256) WHERE property_offering_id IS NULL DO UPDATE SET
+    property_document_filename = EXCLUDED.property_document_filename,
+    property_document_mime_type = EXCLUDED.property_document_mime_type,
+    property_document_size_bytes = EXCLUDED.property_document_size_bytes,
+    property_document_bytes = EXCLUDED.property_document_bytes,
+    property_document_extraction_status = 'uploaded',
+    property_document_extraction_error = NULL,
+    property_document_updated_at = now()
+RETURNING
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at
+`
+
+type CreateDetachedPropertyDocumentParams struct {
+	DocumentType  string `json:"document_type"`
+	Filename      string `json:"filename"`
+	MimeType      string `json:"mime_type"`
+	SizeBytes     int64  `json:"size_bytes"`
+	Sha256        string `json:"sha256"`
+	DocumentBytes []byte `json:"document_bytes"`
+}
+
+type CreateDetachedPropertyDocumentRow struct {
+	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
+	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
+	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
+	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentType             string     `json:"property_document_type"`
+	PropertyDocumentFilename         string     `json:"property_document_filename"`
+	PropertyDocumentMimeType         string     `json:"property_document_mime_type"`
+	PropertyDocumentSizeBytes        int64      `json:"property_document_size_bytes"`
+	PropertyDocumentSha256           string     `json:"property_document_sha256"`
+	PropertyDocumentExtractionStatus string     `json:"property_document_extraction_status"`
+	PropertyDocumentExtractionError  *string    `json:"property_document_extraction_error"`
+	PropertyDocumentUploadedAt       time.Time  `json:"property_document_uploaded_at"`
+	PropertyDocumentExtractedAt      *time.Time `json:"property_document_extracted_at"`
+}
+
+func (q *Queries) CreateDetachedPropertyDocument(ctx context.Context, arg CreateDetachedPropertyDocumentParams) (CreateDetachedPropertyDocumentRow, error) {
+	row := q.db.QueryRow(ctx, createDetachedPropertyDocument,
+		arg.DocumentType,
+		arg.Filename,
+		arg.MimeType,
+		arg.SizeBytes,
+		arg.Sha256,
+		arg.DocumentBytes,
+	)
+	var i CreateDetachedPropertyDocumentRow
+	err := row.Scan(
+		&i.PropertyDocumentID,
+		&i.PropertyOfferingID,
+		&i.PropertyUnitID,
+		&i.PhysicalBuildingID,
+		&i.HousingCompanyID,
+		&i.PropertyDocumentType,
+		&i.PropertyDocumentFilename,
+		&i.PropertyDocumentMimeType,
+		&i.PropertyDocumentSizeBytes,
+		&i.PropertyDocumentSha256,
+		&i.PropertyDocumentExtractionStatus,
+		&i.PropertyDocumentExtractionError,
+		&i.PropertyDocumentUploadedAt,
+		&i.PropertyDocumentExtractedAt,
+	)
+	return i, err
+}
+
 const createPartitionedQueue = `-- name: CreatePartitionedQueue :exec
 SELECT pgmq.create_partitioned(
     $1,
@@ -921,7 +1090,7 @@ type CreatePropertyDocumentForOfferingParams struct {
 
 type CreatePropertyDocumentForOfferingRow struct {
 	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
-	PropertyOfferingID               uuid.UUID  `json:"property_offering_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
 	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
 	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
 	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
@@ -1115,6 +1284,211 @@ func (q *Queries) DropQueue(ctx context.Context, queueName interface{}) (bool, e
 	var dropped bool
 	err := row.Scan(&dropped)
 	return dropped, err
+}
+
+const ensureManagerCertificateHousingCompany = `-- name: EnsureManagerCertificateHousingCompany :one
+INSERT INTO public.housing_companies (
+    housing_company_identity_key,
+    housing_company_name,
+    housing_company_business_id,
+    housing_company_build_year,
+    housing_company_apartment_count,
+    housing_company_energy_efficiency_label,
+    housing_company_match_reasons
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', $7::text)
+)
+ON CONFLICT (housing_company_identity_key) DO UPDATE SET
+    housing_company_name = COALESCE(EXCLUDED.housing_company_name, public.housing_companies.housing_company_name),
+    housing_company_business_id = COALESCE(EXCLUDED.housing_company_business_id, public.housing_companies.housing_company_business_id),
+    housing_company_build_year = COALESCE(EXCLUDED.housing_company_build_year, public.housing_companies.housing_company_build_year),
+    housing_company_apartment_count = COALESCE(EXCLUDED.housing_company_apartment_count, public.housing_companies.housing_company_apartment_count),
+    housing_company_energy_efficiency_label = COALESCE(EXCLUDED.housing_company_energy_efficiency_label, public.housing_companies.housing_company_energy_efficiency_label),
+    housing_company_updated_at = now()
+RETURNING housing_company_id
+`
+
+type EnsureManagerCertificateHousingCompanyParams struct {
+	IdentityKey        string  `json:"identity_key"`
+	Name               *string `json:"name"`
+	BusinessID         *string `json:"business_id"`
+	BuildYear          *int32  `json:"build_year"`
+	ApartmentCount     *int32  `json:"apartment_count"`
+	EnergyClass        *string `json:"energy_class"`
+	PropertyDocumentID string  `json:"property_document_id"`
+}
+
+func (q *Queries) EnsureManagerCertificateHousingCompany(ctx context.Context, arg EnsureManagerCertificateHousingCompanyParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, ensureManagerCertificateHousingCompany,
+		arg.IdentityKey,
+		arg.Name,
+		arg.BusinessID,
+		arg.BuildYear,
+		arg.ApartmentCount,
+		arg.EnergyClass,
+		arg.PropertyDocumentID,
+	)
+	var housing_company_id uuid.UUID
+	err := row.Scan(&housing_company_id)
+	return housing_company_id, err
+}
+
+const ensureManagerCertificatePhysicalBuilding = `-- name: EnsureManagerCertificatePhysicalBuilding :one
+INSERT INTO public.physical_buildings (
+    housing_company_id,
+    physical_building_identity_key,
+    physical_building_build_year,
+    physical_building_floor_count,
+    physical_building_apartment_count,
+    physical_building_elevator
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+ON CONFLICT (physical_building_identity_key) DO UPDATE SET
+    housing_company_id = COALESCE(EXCLUDED.housing_company_id, public.physical_buildings.housing_company_id),
+    physical_building_build_year = COALESCE(EXCLUDED.physical_building_build_year, public.physical_buildings.physical_building_build_year),
+    physical_building_floor_count = COALESCE(EXCLUDED.physical_building_floor_count, public.physical_buildings.physical_building_floor_count),
+    physical_building_apartment_count = COALESCE(EXCLUDED.physical_building_apartment_count, public.physical_buildings.physical_building_apartment_count),
+    physical_building_elevator = COALESCE(EXCLUDED.physical_building_elevator, public.physical_buildings.physical_building_elevator),
+    physical_building_updated_at = now()
+RETURNING physical_building_id
+`
+
+type EnsureManagerCertificatePhysicalBuildingParams struct {
+	HousingCompanyID *uuid.UUID `json:"housing_company_id"`
+	IdentityKey      string     `json:"identity_key"`
+	BuildYear        *int32     `json:"build_year"`
+	FloorCount       *int32     `json:"floor_count"`
+	ApartmentCount   *int32     `json:"apartment_count"`
+	Elevator         *bool      `json:"elevator"`
+}
+
+func (q *Queries) EnsureManagerCertificatePhysicalBuilding(ctx context.Context, arg EnsureManagerCertificatePhysicalBuildingParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, ensureManagerCertificatePhysicalBuilding,
+		arg.HousingCompanyID,
+		arg.IdentityKey,
+		arg.BuildYear,
+		arg.FloorCount,
+		arg.ApartmentCount,
+		arg.Elevator,
+	)
+	var physical_building_id uuid.UUID
+	err := row.Scan(&physical_building_id)
+	return physical_building_id, err
+}
+
+const ensureManagerCertificatePropertyOffering = `-- name: EnsureManagerCertificatePropertyOffering :one
+INSERT INTO public.property_offerings (
+    property_unit_id,
+    property_offering_identity_key,
+    property_offering_type,
+    property_offering_headline,
+    property_offering_match_reasons
+) VALUES (
+    $1,
+    $2,
+    'sale',
+    $3,
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', $4::text)
+)
+ON CONFLICT (property_offering_identity_key) DO UPDATE SET
+    property_unit_id = EXCLUDED.property_unit_id,
+    property_offering_headline = EXCLUDED.property_offering_headline,
+    property_offering_updated_at = now()
+RETURNING property_offering_id
+`
+
+type EnsureManagerCertificatePropertyOfferingParams struct {
+	PropertyUnitID     uuid.UUID `json:"property_unit_id"`
+	IdentityKey        string    `json:"identity_key"`
+	Headline           string    `json:"headline"`
+	PropertyDocumentID string    `json:"property_document_id"`
+}
+
+func (q *Queries) EnsureManagerCertificatePropertyOffering(ctx context.Context, arg EnsureManagerCertificatePropertyOfferingParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, ensureManagerCertificatePropertyOffering,
+		arg.PropertyUnitID,
+		arg.IdentityKey,
+		arg.Headline,
+		arg.PropertyDocumentID,
+	)
+	var property_offering_id uuid.UUID
+	err := row.Scan(&property_offering_id)
+	return property_offering_id, err
+}
+
+const ensureManagerCertificatePropertyUnit = `-- name: EnsureManagerCertificatePropertyUnit :one
+INSERT INTO public.property_units (
+    housing_company_id,
+    physical_building_id,
+    property_unit_identity_key,
+    property_unit_floor_level,
+    property_unit_area_value,
+    property_unit_rooms_count,
+    property_unit_room_layout,
+    property_unit_layout_match_key,
+    property_unit_match_reasons
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    jsonb_build_object('source', 'manager_certificate', 'property_document_id', $9::text)
+)
+ON CONFLICT (property_unit_identity_key) DO UPDATE SET
+    housing_company_id = EXCLUDED.housing_company_id,
+    physical_building_id = EXCLUDED.physical_building_id,
+    property_unit_floor_level = COALESCE(EXCLUDED.property_unit_floor_level, public.property_units.property_unit_floor_level),
+    property_unit_area_value = COALESCE(EXCLUDED.property_unit_area_value, public.property_units.property_unit_area_value),
+    property_unit_rooms_count = COALESCE(EXCLUDED.property_unit_rooms_count, public.property_units.property_unit_rooms_count),
+    property_unit_room_layout = COALESCE(EXCLUDED.property_unit_room_layout, public.property_units.property_unit_room_layout),
+    property_unit_layout_match_key = COALESCE(EXCLUDED.property_unit_layout_match_key, public.property_units.property_unit_layout_match_key),
+    property_unit_updated_at = now()
+RETURNING property_unit_id
+`
+
+type EnsureManagerCertificatePropertyUnitParams struct {
+	HousingCompanyID   uuid.UUID  `json:"housing_company_id"`
+	PhysicalBuildingID *uuid.UUID `json:"physical_building_id"`
+	IdentityKey        string     `json:"identity_key"`
+	FloorLevel         *int32     `json:"floor_level"`
+	AreaM2             *float64   `json:"area_m2"`
+	RoomsCount         *int32     `json:"rooms_count"`
+	RoomLayout         *string    `json:"room_layout"`
+	LayoutMatchKey     *string    `json:"layout_match_key"`
+	PropertyDocumentID string     `json:"property_document_id"`
+}
+
+func (q *Queries) EnsureManagerCertificatePropertyUnit(ctx context.Context, arg EnsureManagerCertificatePropertyUnitParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, ensureManagerCertificatePropertyUnit,
+		arg.HousingCompanyID,
+		arg.PhysicalBuildingID,
+		arg.IdentityKey,
+		arg.FloorLevel,
+		arg.AreaM2,
+		arg.RoomsCount,
+		arg.RoomLayout,
+		arg.LayoutMatchKey,
+		arg.PropertyDocumentID,
+	)
+	var property_unit_id uuid.UUID
+	err := row.Scan(&property_unit_id)
+	return property_unit_id, err
 }
 
 const ensurePhysicalBuildingForSaleListing = `-- name: EnsurePhysicalBuildingForSaleListing :exec
@@ -1828,7 +2202,7 @@ LIMIT 1
 
 type GetPropertyDocumentForExtractionRow struct {
 	PropertyDocumentID        uuid.UUID  `json:"property_document_id"`
-	PropertyOfferingID        uuid.UUID  `json:"property_offering_id"`
+	PropertyOfferingID        *uuid.UUID `json:"property_offering_id"`
 	PropertyUnitID            *uuid.UUID `json:"property_unit_id"`
 	PhysicalBuildingID        *uuid.UUID `json:"physical_building_id"`
 	HousingCompanyID          *uuid.UUID `json:"housing_company_id"`
@@ -1855,6 +2229,66 @@ func (q *Queries) GetPropertyDocumentForExtraction(ctx context.Context, property
 		&i.PropertyDocumentSizeBytes,
 		&i.PropertyDocumentSha256,
 		&i.PropertyDocumentBytes,
+	)
+	return i, err
+}
+
+const getPropertyDocumentSummary = `-- name: GetPropertyDocumentSummary :one
+SELECT
+    property_document_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    property_document_type,
+    property_document_filename,
+    property_document_mime_type,
+    property_document_size_bytes,
+    property_document_sha256,
+    property_document_extraction_status,
+    property_document_extraction_error,
+    property_document_uploaded_at,
+    property_document_extracted_at
+FROM public.property_documents
+WHERE property_document_id = $1
+LIMIT 1
+`
+
+type GetPropertyDocumentSummaryRow struct {
+	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
+	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
+	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
+	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentType             string     `json:"property_document_type"`
+	PropertyDocumentFilename         string     `json:"property_document_filename"`
+	PropertyDocumentMimeType         string     `json:"property_document_mime_type"`
+	PropertyDocumentSizeBytes        int64      `json:"property_document_size_bytes"`
+	PropertyDocumentSha256           string     `json:"property_document_sha256"`
+	PropertyDocumentExtractionStatus string     `json:"property_document_extraction_status"`
+	PropertyDocumentExtractionError  *string    `json:"property_document_extraction_error"`
+	PropertyDocumentUploadedAt       time.Time  `json:"property_document_uploaded_at"`
+	PropertyDocumentExtractedAt      *time.Time `json:"property_document_extracted_at"`
+}
+
+func (q *Queries) GetPropertyDocumentSummary(ctx context.Context, propertyDocumentID uuid.UUID) (GetPropertyDocumentSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getPropertyDocumentSummary, propertyDocumentID)
+	var i GetPropertyDocumentSummaryRow
+	err := row.Scan(
+		&i.PropertyDocumentID,
+		&i.PropertyOfferingID,
+		&i.PropertyUnitID,
+		&i.PhysicalBuildingID,
+		&i.HousingCompanyID,
+		&i.PropertyDocumentType,
+		&i.PropertyDocumentFilename,
+		&i.PropertyDocumentMimeType,
+		&i.PropertyDocumentSizeBytes,
+		&i.PropertyDocumentSha256,
+		&i.PropertyDocumentExtractionStatus,
+		&i.PropertyDocumentExtractionError,
+		&i.PropertyDocumentUploadedAt,
+		&i.PropertyDocumentExtractedAt,
 	)
 	return i, err
 }
@@ -3130,7 +3564,7 @@ ORDER BY property_document_uploaded_at DESC
 
 type ListPropertyDocumentsForOfferingRow struct {
 	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
-	PropertyOfferingID               uuid.UUID  `json:"property_offering_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
 	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
 	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
 	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
@@ -3145,7 +3579,7 @@ type ListPropertyDocumentsForOfferingRow struct {
 	PropertyDocumentExtractedAt      *time.Time `json:"property_document_extracted_at"`
 }
 
-func (q *Queries) ListPropertyDocumentsForOffering(ctx context.Context, propertyOfferingID uuid.UUID) ([]ListPropertyDocumentsForOfferingRow, error) {
+func (q *Queries) ListPropertyDocumentsForOffering(ctx context.Context, propertyOfferingID *uuid.UUID) ([]ListPropertyDocumentsForOfferingRow, error) {
 	rows, err := q.db.Query(ctx, listPropertyDocumentsForOffering, propertyOfferingID)
 	if err != nil {
 		return nil, err

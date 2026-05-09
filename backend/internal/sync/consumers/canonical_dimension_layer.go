@@ -20,6 +20,8 @@ const (
 	TaskTypeCanonicalRebuildDimensionLayerListing  = "canonical_rebuild_dimension_layer_listing"
 	TaskTypeCanonicalResolveDirtyDimensionTargets  = "canonical_resolve_dirty_dimension_targets"
 	TaskTypeCanonicalResolveDimensionTarget        = "canonical_resolve_dimension_target"
+	TaskTypeCanonicalExtractManagerCertificate     = "canonical_extract_manager_certificate"
+	TaskTypeCanonicalProjectManagerCertificate     = "canonical_project_manager_certificate"
 )
 
 func (c *Consumer) handleCanonicalTask(ctx context.Context, msg taskqueue.Message) error {
@@ -50,6 +52,10 @@ func (c *Consumer) runCanonicalSyncJob(ctx context.Context, logger *slog.Logger,
 		return c.handleCanonicalResolveDirtyDimensionTargets(ctx, logger, job)
 	case TaskTypeCanonicalResolveDimensionTarget:
 		return c.handleCanonicalResolveDimensionTarget(ctx, logger, job)
+	case TaskTypeCanonicalExtractManagerCertificate:
+		return c.handleCanonicalExtractManagerCertificate(ctx, logger, job)
+	case TaskTypeCanonicalProjectManagerCertificate:
+		return c.handleCanonicalProjectManagerCertificate(ctx, logger, job)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown canonical sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
 	}
@@ -82,10 +88,56 @@ type dirtyDimensionTargetPayload struct {
 	ExpectedDirtyAt *time.Time `json:"expected_dirty_at,omitempty"`
 }
 
+type managerCertificateDocumentPayload struct {
+	PropertyDocumentID string `json:"property_document_id"`
+	Model              string `json:"model,omitempty"`
+}
+
 type dirtyDimensionTargetRow struct {
 	TargetType string
 	TargetID   uuid.UUID
 	DirtyAt    time.Time
+}
+
+func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.canonical.extract_manager_certificate"))
+	if c.propertiesService == nil {
+		return taskqueue.NewPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
+	}
+	payload, err := decodeManagerCertificateDocumentPayload(job)
+	if err != nil {
+		return taskqueue.NewPermanentError(err, "invalid payload")
+	}
+	result, err := c.propertiesService.ExtractManagerCertificateSource(ctx, payload.PropertyDocumentID, payload.Model)
+	if err != nil {
+		return fmt.Errorf("extract manager certificate source %s: %w", payload.PropertyDocumentID, err)
+	}
+	documentID, err := uuid.Parse(result.Document.ID)
+	if err != nil {
+		return taskqueue.NewPermanentError(fmt.Errorf("parse extracted document id: %w", err), "invalid result")
+	}
+	if err := c.enqueueManagerCertificateProjection(ctx, documentID, time.Now()); err != nil {
+		return fmt.Errorf("enqueue manager certificate projection %s: %w", payload.PropertyDocumentID, err)
+	}
+	logger.InfoContext(ctx, "manager certificate source extracted", "property_document_id", payload.PropertyDocumentID, "model", result.Model, "schema_version", result.SchemaVersion, "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
+func (c *Consumer) handleCanonicalProjectManagerCertificate(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.canonical.project_manager_certificate"))
+	if c.propertiesService == nil {
+		return taskqueue.NewPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
+	}
+	payload, err := decodeManagerCertificateDocumentPayload(job)
+	if err != nil {
+		return taskqueue.NewPermanentError(err, "invalid payload")
+	}
+	result, err := c.propertiesService.ProjectManagerCertificateExtraction(ctx, payload.PropertyDocumentID)
+	if err != nil {
+		return fmt.Errorf("project manager certificate %s: %w", payload.PropertyDocumentID, err)
+	}
+	logger.InfoContext(ctx, "manager certificate projected", "property_document_id", payload.PropertyDocumentID, "offering_id", result.Document.OfferingID, "claims", result.Claims, "outcome", logging.OutcomeSuccess)
+	return nil
 }
 
 func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
@@ -322,6 +374,23 @@ func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleL
 	return err
 }
 
+func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, documentID uuid.UUID, runAfter time.Time) error {
+	payload, err := json.Marshal(managerCertificateDocumentPayload{PropertyDocumentID: documentID.String()})
+	if err != nil {
+		return fmt.Errorf("marshal manager certificate projection payload: %w", err)
+	}
+	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "canonical",
+		Kind:        TaskTypeCanonicalProjectManagerCertificate,
+		EntityID:    fmt.Sprintf("property_document:%s", documentID),
+		Priority:    int32(taskqueue.PriorityHigh),
+		MaxAttempts: 3,
+		RunAfter:    runAfter,
+		Payload:     payload,
+	})
+	return err
+}
+
 func (c *Consumer) listDirtyDimensionTargets(ctx context.Context, limit int32) ([]dirtyDimensionTargetRow, error) {
 	rows, err := c.pool.Query(ctx, `
 SELECT target_type, target_id, dirty_at
@@ -353,6 +422,29 @@ func (c *Consumer) markDimensionTargetQueued(ctx context.Context, targetType str
 		return fmt.Errorf("mark dimension target queued: %w", err)
 	}
 	return nil
+}
+
+func decodeManagerCertificateDocumentPayload(job db.SyncJob) (managerCertificateDocumentPayload, error) {
+	var payload managerCertificateDocumentPayload
+	if len(job.SyncJobPayload) > 0 {
+		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
+			return managerCertificateDocumentPayload{}, fmt.Errorf("decode manager certificate payload: %w", err)
+		}
+	}
+	if payload.PropertyDocumentID == "" {
+		_, value, err := parseJobEntity(job.SyncJobEntityID)
+		if err != nil {
+			return managerCertificateDocumentPayload{}, fmt.Errorf("parse property document entity: %w", err)
+		}
+		payload.PropertyDocumentID = value
+	}
+	if payload.PropertyDocumentID == "" {
+		return managerCertificateDocumentPayload{}, fmt.Errorf("property_document_id is required")
+	}
+	if _, err := uuid.Parse(payload.PropertyDocumentID); err != nil {
+		return managerCertificateDocumentPayload{}, fmt.Errorf("property_document_id must be a uuid: %w", err)
+	}
+	return payload, nil
 }
 
 func decodeDimensionLayerListingPayload(job db.SyncJob) (dimensionLayerListingPayload, error) {

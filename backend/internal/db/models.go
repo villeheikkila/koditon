@@ -581,7 +581,7 @@ type PropertyDimensionValue struct {
 
 type PropertyDocument struct {
 	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
-	PropertyOfferingID               uuid.UUID  `json:"property_offering_id"`
+	PropertyOfferingID               *uuid.UUID `json:"property_offering_id"`
 	PropertyUnitID                   *uuid.UUID `json:"property_unit_id"`
 	PhysicalBuildingID               *uuid.UUID `json:"physical_building_id"`
 	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`

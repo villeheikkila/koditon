@@ -150,9 +150,16 @@ func addRoutes(a *API, api huma.API) {
 	huma.Post(api, "/api/v1/sale-listings/{id}/documents/manager-certificate", a.saleListingManagerCertificateUploadHandler, func(op *huma.Operation) {
 		op.OperationID = "sale-listings-manager-certificate-upload"
 		op.Summary = "Upload manager certificate PDF"
-		op.Description = "Stores an isännöitsijäntodistus PDF for a canonical sale offering in Postgres"
+		op.Description = "Stores an isännöitsijäntodistus PDF for a canonical sale offering and queues extraction"
 		op.Tags = []string{"Sale Listings"}
 		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-manager-certificate-upload"))
+	})
+	huma.Post(api, "/api/v1/property-documents/manager-certificate", a.managerCertificateUploadHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-manager-certificate-upload"
+		op.Summary = "Upload manager certificate PDF"
+		op.Description = "Stores an isännöitsijäntodistus PDF with an optional canonical offering target and queues extraction"
+		op.Tags = []string{"Property Documents"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-manager-certificate-upload"))
 	})
 	huma.Get(api, "/api/v1/property-documents/{id}/download", a.propertyDocumentDownloadHandler, func(op *huma.Operation) {
 		op.OperationID = "property-documents-download"
@@ -163,10 +170,17 @@ func addRoutes(a *API, api huma.API) {
 	})
 	huma.Post(api, "/api/v1/property-documents/{id}/extract", a.propertyDocumentExtractHandler, func(op *huma.Operation) {
 		op.OperationID = "property-documents-extract"
-		op.Summary = "Extract property document facts"
-		op.Description = "Uploads the stored PDF to OpenAI and extracts manager-certificate facts into canonical property claims"
+		op.Summary = "Queue property document extraction"
+		op.Description = "Queues OpenAI manager-certificate extraction and claim projection for the stored PDF"
 		op.Tags = []string{"Property Documents"}
 		applyAuth(op, makeMiddleware, resolveScopes("property-documents-extract"))
+	})
+	huma.Post(api, "/api/v1/property-documents/{id}/attach", a.propertyDocumentAttachHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-attach"
+		op.Summary = "Attach property document"
+		op.Description = "Moves a property document to another canonical offering and queues claim projection"
+		op.Tags = []string{"Property Documents"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-attach"))
 	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-search"

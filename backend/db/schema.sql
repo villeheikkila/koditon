@@ -746,7 +746,7 @@ CREATE UNIQUE INDEX idx_property_document_extractions_latest ON public.property_
 
 create table public.property_documents (
   property_document_id uuid default gen_random_uuid() not null constraint property_documents_pkey primary key,
-  property_offering_id uuid not null constraint property_documents_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
+  property_offering_id uuid constraint property_documents_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
   property_unit_id uuid constraint property_documents_property_unit_id_fkey references property_units(property_unit_id) ON DELETE SET NULL,
   physical_building_id uuid constraint property_documents_physical_building_id_fkey references physical_buildings(physical_building_id) ON DELETE SET NULL,
   housing_company_id uuid constraint property_documents_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE SET NULL,
@@ -769,6 +769,7 @@ create table public.property_documents (
   constraint property_documents_size_bytes_check CHECK (((property_document_size_bytes > 0) AND (property_document_size_bytes <= 26214400)))
 );
 
+CREATE UNIQUE INDEX idx_property_documents_detached_type_hash ON public.property_documents USING btree (property_document_type, property_document_sha256) WHERE (property_offering_id IS NULL);
 CREATE INDEX idx_property_documents_housing_company ON public.property_documents USING btree (housing_company_id, property_document_type) WHERE (housing_company_id IS NOT NULL);
 CREATE INDEX idx_property_documents_offering ON public.property_documents USING btree (property_offering_id, property_document_type, property_document_uploaded_at DESC);
 CREATE UNIQUE INDEX idx_property_documents_offering_type_hash ON public.property_documents USING btree (property_offering_id, property_document_type, property_document_sha256);

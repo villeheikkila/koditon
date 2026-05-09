@@ -677,6 +677,15 @@ type ManagerCertificateExtractionResult struct {
 	Claims   int                     `json:"claims"`
 }
 
+type ManagerCertificateSourceExtractionResult struct {
+	Document      PropertyDocumentSummary `json:"document"`
+	Model         string                  `json:"model"`
+	SchemaVersion string                  `json:"schema_version"`
+	CreatedAt     string                  `json:"created_at"`
+	RawJSON       json.RawMessage         `json:"raw_json"`
+	Warnings      []string                `json:"warnings,omitempty"`
+}
+
 type ManagerCertificatePDFExtractionResult struct {
 	Filename      string          `json:"filename"`
 	Model         string          `json:"model"`
