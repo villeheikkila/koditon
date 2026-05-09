@@ -95,7 +95,9 @@ type rawConfig struct {
 	FrontdoorCookie      string `env:"FRONTDOOR_COOKIE" envDefault:""`
 	FrontdoorSitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL" envDefault:""`
 
-	OpenRouterAPIKey string `env:"OPENROUTER_API_KEY" envDefault:""`
+	OpenRouterAPIKey              string `env:"OPENROUTER_API_KEY" envDefault:""`
+	OpenAIAPIKey                  string `env:"OPENAI_API_KEY" envDefault:""`
+	OpenAIManagerCertificateModel string `env:"OPENAI_MANAGER_CERTIFICATE_MODEL" envDefault:"gpt-5"`
 
 	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN" envDefault:""`
 	TelegramChatID   string `env:"TELEGRAM_CHAT_ID" envDefault:""`
@@ -115,6 +117,7 @@ func (r *rawConfig) sanitize() {
 	r.AuthJWTSigningKey = sanitizeSecretValue(r.AuthJWTSigningKey)
 	r.AuthOAuthCookieKey = sanitizeSecretValue(r.AuthOAuthCookieKey)
 	r.OpenRouterAPIKey = sanitizeSecretValue(r.OpenRouterAPIKey)
+	r.OpenAIAPIKey = sanitizeSecretValue(r.OpenAIAPIKey)
 	r.TelegramBotToken = sanitizeSecretValue(r.TelegramBotToken)
 	r.ResendAPIKey = sanitizeSecretValue(r.ResendAPIKey)
 	r.FrontdoorCookie = sanitizeSecretValue(r.FrontdoorCookie)
@@ -179,6 +182,10 @@ func (r rawConfig) toConfig() Config {
 		OpenRouter: OpenRouterConfig{
 			APIKey: r.OpenRouterAPIKey,
 		},
+		OpenAI: OpenAIConfig{
+			APIKey:                  r.OpenAIAPIKey,
+			ManagerCertificateModel: r.OpenAIManagerCertificateModel,
+		},
 		Telegram: TelegramConfig{
 			BotToken: r.TelegramBotToken,
 			ChatID:   r.TelegramChatID,
@@ -213,6 +220,7 @@ type Config struct {
 	Shortcut                 ShortcutConfig
 	Frontdoor                FrontdoorConfig
 	OpenRouter               OpenRouterConfig
+	OpenAI                   OpenAIConfig
 	Telegram                 TelegramConfig
 	Email                    EmailConfig
 	WebBaseURL               string
@@ -313,6 +321,11 @@ type FrontdoorConfig struct {
 
 type OpenRouterConfig struct {
 	APIKey string
+}
+
+type OpenAIConfig struct {
+	APIKey                  string
+	ManagerCertificateModel string
 }
 
 type TelegramConfig struct {

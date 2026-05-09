@@ -2,7 +2,6 @@ package properties
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"strings"
 
@@ -15,9 +14,6 @@ import (
 	"charm.land/fantasy"
 	fantasyobject "charm.land/fantasy/object"
 )
-
-//go:embed prompts/valuation_inputs.md
-var valuationInputPromptFiles embed.FS
 
 type ValuationInputExtractionResult struct {
 	SaleListingID string                    `json:"sale_listing_id"`
@@ -42,7 +38,6 @@ type valuationInputExtractionFact struct {
 }
 
 const valuationClaimTargetSaleListing = "sale_listing"
-const valuationInputPromptVersion = "valuation_inputs.v1"
 
 func (s *Service) ExtractSaleListingValuationInputs(ctx context.Context, input string, modelName string) (ValuationInputExtractionResult, error) {
 	offeringID, err := uuid.Parse(strings.TrimSpace(input))
@@ -70,8 +65,9 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if err != nil {
 		return ValuationInputExtractionResult{}, err
 	}
+	operation := propertyLLMOperationConfig("valuation_input_extraction")
 	if !valuationInputPromptHasContent(row) {
-		if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, nil); err != nil {
+		if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, operation.Version, nil); err != nil {
 			return ValuationInputExtractionResult{}, err
 		}
 		return result, nil
@@ -80,19 +76,19 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if err != nil {
 		return ValuationInputExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[valuationInputExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(prompt)}, SchemaName: "extract_apartment_valuation_inputs", SchemaDescription: "Extract structured apartment valuation inputs from layout and description fields", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(5000)})
+	objectResult, err := fantasyobject.Generate[valuationInputExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
 	if err != nil {
 		return ValuationInputExtractionResult{}, fmt.Errorf("extract valuation inputs with fantasy: %w", err)
 	}
-	facts := normalizeValuationInputFacts(objectResult.Object.Facts, modelName)
-	if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, facts); err != nil {
+	facts := normalizeValuationInputFacts(objectResult.Object.Facts, modelName, operation.Version)
+	if err := s.replaceLLMPropertyClaims(ctx, saleListingID, modelName, operation.Version, facts); err != nil {
 		return ValuationInputExtractionResult{}, err
 	}
 	result.Facts = facts
 	return result, nil
 }
 
-func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uuid.UUID, modelName string, facts []valuation.ValuationFact) error {
+func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uuid.UUID, modelName string, promptVersion string, facts []valuation.ValuationFact) error {
 	beginner, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
 	})
@@ -110,7 +106,7 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 		return fmt.Errorf("delete previous llm valuation facts: %w", err)
 	}
 	for _, fact := range facts {
-		if err := queries.InsertPropertyClaim(ctx, db.InsertPropertyClaimParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID, SourceField: llmValuationFactSourceField(fact.Source), Section: fact.Section, Key: fact.Key, ValueKind: fact.ValueKind, ValueText: fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: fact.Confidence * 100, EvidenceText: fact.Evidence, Model: modelName, PromptVersion: valuationInputPromptVersion}); err != nil {
+		if err := queries.InsertPropertyClaim(ctx, db.InsertPropertyClaimParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID, SourceField: llmValuationFactSourceField(fact.Source), Section: fact.Section, Key: fact.Key, ValueKind: fact.ValueKind, ValueText: fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: fact.Confidence * 100, EvidenceText: fact.Evidence, Model: modelName, PromptVersion: promptVersion}); err != nil {
 			return fmt.Errorf("insert llm valuation fact: %w", err)
 		}
 	}
@@ -123,60 +119,55 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 	return nil
 }
 
-func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExtractionTextsRow) (string, error) {
-	template, err := valuationInputPromptFiles.ReadFile("prompts/valuation_inputs.md")
-	if err != nil {
-		return "", fmt.Errorf("read valuation input prompt template: %w", err)
-	}
-	replacer := strings.NewReplacer(
-		"{{room_layout}}", row.RoomLayout,
-		"{{rooms_count}}", int32PromptValue(row.SaleListingRoomsCount),
-		"{{bedrooms_count}}", int32PromptValue(row.SaleListingBedroomsCount),
-		"{{area_m2}}", float64PromptValue(row.SaleListingAreaValue),
-		"{{living_area_m2}}", float64PromptValue(row.SaleListingLivingAreaValue),
-		"{{total_area_m2}}", float64PromptValue(row.SaleListingTotalAreaValue),
-		"{{other_area_m2}}", float64PromptValue(row.SaleListingOtherAreaValue),
-		"{{floor_level}}", int32PromptValue(row.SaleListingFloorLevel),
-		"{{total_floors}}", int32PromptValue(row.SaleListingTotalFloors),
-		"{{floor_text}}", row.FloorText,
-		"{{condition}}", row.Condition,
-		"{{sauna}}", boolPromptValue(row.SaleListingSauna),
-		"{{balcony}}", boolPromptValue(row.SaleListingBalcony),
-		"{{parking_text}}", row.ParkingText,
-		"{{description_text}}", row.DescriptionText,
-		"{{additional_info_text}}", row.AdditionalInfoText,
-		"{{kitchen_description_text}}", row.KitchenDescriptionText,
-		"{{bathroom_description_text}}", row.BathroomDescriptionText,
-		"{{storage_description_text}}", row.StorageDescriptionText,
-		"{{floor_materials_description_text}}", row.FloorMaterialsDescriptionText,
-		"{{wall_materials_description_text}}", row.WallMaterialsDescriptionText,
-		"{{balcony_description_text}}", row.BalconyDescriptionText,
-		"{{sauna_description_text}}", row.SaunaDescriptionText,
-		"{{views_description_text}}", row.ViewsDescriptionText,
-		"{{building_material}}", row.BuildingMaterial,
-		"{{heating_system}}", row.HeatingSystem,
-		"{{roof_type}}", row.RoofType,
-		"{{roof_material}}", row.RoofMaterial,
-		"{{car_storage_text}}", row.CarStorageText,
-		"{{building_description_text}}", row.BuildingDescriptionText,
-		"{{building_other_info_text}}", row.BuildingOtherInfoText,
-		"{{charges_text}}", row.ChargesText,
-	)
-	return replacer.Replace(string(template)), nil
+func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExtractionTextsRow) (fantasy.Prompt, error) {
+	return propertyLLMPrompt("valuation_input_extraction", map[string]string{
+		"room_layout":                      row.RoomLayout,
+		"rooms_count":                      int32PromptValue(row.SaleListingRoomsCount),
+		"bedrooms_count":                   int32PromptValue(row.SaleListingBedroomsCount),
+		"area_m2":                          float64PromptValue(row.SaleListingAreaValue),
+		"living_area_m2":                   float64PromptValue(row.SaleListingLivingAreaValue),
+		"total_area_m2":                    float64PromptValue(row.SaleListingTotalAreaValue),
+		"other_area_m2":                    float64PromptValue(row.SaleListingOtherAreaValue),
+		"floor_level":                      int32PromptValue(row.SaleListingFloorLevel),
+		"total_floors":                     int32PromptValue(row.SaleListingTotalFloors),
+		"floor_text":                       row.FloorText,
+		"condition":                        row.Condition,
+		"sauna":                            boolPromptValue(row.SaleListingSauna),
+		"balcony":                          boolPromptValue(row.SaleListingBalcony),
+		"parking_text":                     row.ParkingText,
+		"description_text":                 row.DescriptionText,
+		"additional_info_text":             row.AdditionalInfoText,
+		"kitchen_description_text":         row.KitchenDescriptionText,
+		"bathroom_description_text":        row.BathroomDescriptionText,
+		"storage_description_text":         row.StorageDescriptionText,
+		"floor_materials_description_text": row.FloorMaterialsDescriptionText,
+		"wall_materials_description_text":  row.WallMaterialsDescriptionText,
+		"balcony_description_text":         row.BalconyDescriptionText,
+		"sauna_description_text":           row.SaunaDescriptionText,
+		"views_description_text":           row.ViewsDescriptionText,
+		"building_material":                row.BuildingMaterial,
+		"heating_system":                   row.HeatingSystem,
+		"roof_type":                        row.RoofType,
+		"roof_material":                    row.RoofMaterial,
+		"car_storage_text":                 row.CarStorageText,
+		"building_description_text":        row.BuildingDescriptionText,
+		"building_other_info_text":         row.BuildingOtherInfoText,
+		"charges_text":                     row.ChargesText,
+	})
 }
 
 func valuationInputPromptHasContent(row db.GetPropertySourceOfferingValuationExtractionTextsRow) bool {
 	return firstNonEmpty(row.RoomLayout, row.FloorText, row.Condition, row.ParkingText, row.DescriptionText, row.AdditionalInfoText, row.KitchenDescriptionText, row.BathroomDescriptionText, row.StorageDescriptionText, row.FloorMaterialsDescriptionText, row.WallMaterialsDescriptionText, row.BalconyDescriptionText, row.SaunaDescriptionText, row.ViewsDescriptionText, row.BuildingMaterial, row.HeatingSystem, row.RoofType, row.RoofMaterial, row.CarStorageText, row.BuildingDescriptionText, row.BuildingOtherInfoText, row.ChargesText) != "" || row.SaleListingRoomsCount != nil || row.SaleListingAreaValue != nil || row.SaleListingFloorLevel != nil || row.SaleListingSauna != nil || row.SaleListingBalcony != nil
 }
 
-func normalizeValuationInputFacts(items []valuationInputExtractionFact, modelName string) []valuation.ValuationFact {
+func normalizeValuationInputFacts(items []valuationInputExtractionFact, modelName string, promptVersion string) []valuation.ValuationFact {
 	out := make([]valuation.ValuationFact, 0, len(items))
 	seen := map[string]struct{}{}
 	for _, item := range items {
 		section := normalizeDescriptionInsightKey(item.Section)
 		key := normalizeDescriptionInsightKey(item.Key)
 		valueKind := normalizeValuationFactValueKind(item.ValueKind, item)
-		fact := valuation.ValuationFact{Section: section, Key: key, ValueKind: valueKind, ValueText: cleanDisplayString(item.ValueText), ValueNumber: item.ValueNumber, ValueBool: item.ValueBool, Confidence: float64(normalizeConfidence(item.Confidence)) / 100, Source: normalizeValuationFactSourceField(item.SourceField), Evidence: cleanDisplayString(item.Evidence), Model: modelName, Prompt: valuationInputPromptVersion}
+		fact := valuation.ValuationFact{Section: section, Key: key, ValueKind: valueKind, ValueText: cleanDisplayString(item.ValueText), ValueNumber: item.ValueNumber, ValueBool: item.ValueBool, Confidence: float64(normalizeConfidence(item.Confidence)) / 100, Source: normalizeValuationFactSourceField(item.SourceField), Evidence: cleanDisplayString(item.Evidence), Model: modelName, Prompt: promptVersion}
 		if !valuationFactHasValue(fact) || section == "" || key == "" {
 			continue
 		}

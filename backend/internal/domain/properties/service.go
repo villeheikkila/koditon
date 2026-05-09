@@ -19,12 +19,15 @@ import (
 
 var ErrNotFound = errors.New("property not found")
 var ErrRenovationExtractorNotConfigured = errors.New("renovation extractor not configured")
+var ErrManagerCertificateExtractorNotConfigured = errors.New("manager certificate extractor not configured")
 
 type Service struct {
 	db                           db.DBTX
 	queries                      *db.Queries
 	renovationExtractorAPIKey    string
 	renovationExtractorModelName string
+	managerCertificateAPIKey     string
+	managerCertificateModelName  string
 }
 
 type ServiceOption func(*Service)
@@ -41,6 +44,13 @@ func WithOpenRouterRenovationExtractor(apiKey string, modelName string) ServiceO
 	return func(service *Service) {
 		service.renovationExtractorAPIKey = strings.TrimSpace(apiKey)
 		service.renovationExtractorModelName = strings.TrimSpace(modelName)
+	}
+}
+
+func WithOpenAIManagerCertificateExtractor(apiKey string, modelName string) ServiceOption {
+	return func(service *Service) {
+		service.managerCertificateAPIKey = strings.TrimSpace(apiKey)
+		service.managerCertificateModelName = strings.TrimSpace(modelName)
 	}
 }
 

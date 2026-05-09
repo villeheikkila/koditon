@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	openrouter "github.com/revrost/go-openrouter"
 	"github.com/spf13/cobra"
 
 	"koditon/cmd/cli/internal/cli"
@@ -120,8 +119,7 @@ func newTransactionsCommand(opts *commandOptions) *cobra.Command {
 				return err
 			}
 			defer pool.Close()
-			openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
-			pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, openRouterClient)
+			pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
 			if err != nil {
 				return fmt.Errorf("create prices service: %w", err)
 			}
@@ -344,8 +342,7 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 		return fmt.Errorf("check schema: %w", err)
 	}
 	logger := slog.New(slog.NewTextHandler(opts.stderr, &slog.HandlerOptions{}))
-	openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
-	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, openRouterClient)
+	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
 	if err != nil {
 		return fmt.Errorf("create prices service: %w", err)
 	}

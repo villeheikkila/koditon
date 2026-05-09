@@ -41,7 +41,6 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
-	openrouter "github.com/revrost/go-openrouter"
 )
 
 // Run starts the API and/or consumer application for the configured mode.
@@ -100,11 +99,10 @@ func run(
 	}
 	appLogger.DebugContext(ctx, "database connection established")
 	if cfg.Mode.Consumer {
-		openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
 		pricesService, err := prices.NewService(
 			pool,
 			cfg.Prices.BaseURL,
-			openRouterClient,
+			cfg.OpenRouter.APIKey,
 		)
 		if err != nil {
 			return fmt.Errorf("create prices service: %w", err)

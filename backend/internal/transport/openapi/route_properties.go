@@ -84,7 +84,7 @@ type propertyDocumentInput struct {
 
 type propertyDocumentExtractInput struct {
 	ID    string `path:"id"     required:"true" doc:"Property document UUID"`
-	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
+	Model string `query:"model" doc:"OpenAI model ID, defaults to the configured manager certificate model"`
 }
 
 type transactionMatchPostalsInput struct {

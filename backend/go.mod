@@ -18,7 +18,6 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/resend/resend-go/v3 v3.6.0
-	github.com/revrost/go-openrouter v1.2.0
 	github.com/sahilm/fuzzy v0.1.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/speps/go-hashids/v2 v2.0.1

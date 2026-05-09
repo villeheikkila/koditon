@@ -22,7 +22,12 @@ func TestLiveFantasyRenovationExtraction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create model: %v", err)
 	}
-	result, err := fantasyobject.Generate[renovationExtractionObject](context.Background(), model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(renovationExtractionPrompt("Kylpyhuone remontoitu 2019. Ikkunat uusittu 2021.", "Putkiremontti suunnitteilla 2027. Julkisivun kuntotutkimus tulossa."))}, SchemaName: "extract_apartment_renovations", SchemaDescription: "Extract structured apartment and housing company renovations from Finnish real-estate listing text", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(1400)})
+	operation := propertyLLMOperationConfig("renovation_extraction")
+	prompt, err := propertyLLMPrompt("renovation_extraction", map[string]string{"renovations_done_text": "Kylpyhuone remontoitu 2019. Ikkunat uusittu 2021.", "renovations_planned_text": "Putkiremontti suunnitteilla 2027. Julkisivun kuntotutkimus tulossa."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := fantasyobject.Generate[renovationExtractionObject](context.Background(), model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(1400)})
 	if err != nil {
 		t.Fatalf("generate object: %v", err)
 	}

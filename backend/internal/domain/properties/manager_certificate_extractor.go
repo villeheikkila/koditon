@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/fantasy"
-	fantasyobject "charm.land/fantasy/object"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -20,9 +18,8 @@ import (
 )
 
 const (
-	managerCertificateDocumentType  = "manager_certificate"
-	managerCertificatePromptVersion = "manager_certificate_pdf_v1"
-	maxPropertyDocumentBytes        = 25 * 1024 * 1024
+	managerCertificateDocumentType = "manager_certificate"
+	maxPropertyDocumentBytes       = 25 * 1024 * 1024
 )
 
 var ErrPropertyDocumentInvalid = errors.New("property document invalid")
@@ -160,8 +157,8 @@ func (s *Service) DownloadPropertyDocument(ctx context.Context, input string) (P
 }
 
 func (s *Service) ExtractManagerCertificate(ctx context.Context, input string, modelName string) (ManagerCertificateExtractionResult, error) {
-	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
-		return ManagerCertificateExtractionResult{}, ErrRenovationExtractorNotConfigured
+	if strings.TrimSpace(s.managerCertificateAPIKey) == "" {
+		return ManagerCertificateExtractionResult{}, ErrManagerCertificateExtractorNotConfigured
 	}
 	documentID, err := uuid.Parse(strings.TrimSpace(input))
 	if err != nil {
@@ -171,31 +168,22 @@ func (s *Service) ExtractManagerCertificate(ctx context.Context, input string, m
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, mapNotFound(err)
 	}
-	modelName = firstNonEmpty(modelName, s.renovationExtractorModelName, "~google/gemini-flash-latest")
+	modelName = firstNonEmpty(modelName, s.managerCertificateModelName, defaultOpenAIManagerCertificateModel)
+	operation := propertyLLMOperationConfig("manager_certificate_extraction")
 	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracting", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
 		return ManagerCertificateExtractionResult{}, err
 	}
-	runID, err := s.queries.CreatePropertyDocumentExtractionRun(ctx, db.CreatePropertyDocumentExtractionRunParams{PropertyDocumentID: documentID, Model: modelName, PromptVersion: managerCertificatePromptVersion})
+	runID, err := s.queries.CreatePropertyDocumentExtractionRun(ctx, db.CreatePropertyDocumentExtractionRunParams{PropertyDocumentID: documentID, Model: modelName, PromptVersion: operation.Version})
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, err
 	}
-	model, err := s.renovationExtractionModel(ctx, modelName)
+	extractor := openAIManagerCertificateExtractor{apiKey: s.managerCertificateAPIKey}
+	extracted, rawJSON, err := extractor.Extract(ctx, document, operation, modelName)
 	if err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateExtractionResult{}, err
 	}
-	file := fantasy.FilePart{Filename: document.PropertyDocumentFilename, Data: document.PropertyDocumentBytes, MediaType: "application/pdf"}
-	objectResult, err := fantasyobject.Generate[managerCertificateObject](ctx, model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(managerCertificatePrompt(), file)}, SchemaName: "extract_manager_certificate", SchemaDescription: "Extract normalized apartment, building, housing company, finance, renovation, and risk facts from a Finnish isännöitsijäntodistus PDF", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(9000)})
-	if err != nil {
-		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
-		return ManagerCertificateExtractionResult{}, fmt.Errorf("extract manager certificate with fantasy: %w", err)
-	}
-	rawJSON, err := json.Marshal(objectResult.Object)
-	if err != nil {
-		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
-		return ManagerCertificateExtractionResult{}, fmt.Errorf("marshal manager certificate extraction: %w", err)
-	}
-	claims, err := s.persistManagerCertificateExtraction(ctx, document, objectResult.Object, modelName, rawJSON)
+	claims, err := s.persistManagerCertificateExtraction(ctx, document, extracted, modelName, operation.Version, rawJSON)
 	if err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateExtractionResult{}, err
@@ -219,7 +207,7 @@ func (s *Service) finishFailedDocumentExtraction(ctx context.Context, documentID
 	_ = s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "failed", ErrorText: message, PropertyDocumentID: documentID})
 }
 
-func (s *Service) persistManagerCertificateExtraction(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject, modelName string, rawJSON []byte) (int, error) {
+func (s *Service) persistManagerCertificateExtraction(ctx context.Context, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject, modelName string, promptVersion string, rawJSON []byte) (int, error) {
 	beginner, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
 	})
@@ -235,7 +223,7 @@ func (s *Service) persistManagerCertificateExtraction(ctx context.Context, docum
 	if err := queries.DeleteLLMPropertyClaimsForDocument(ctx, document.PropertyDocumentID); err != nil {
 		return 0, fmt.Errorf("delete previous document claims: %w", err)
 	}
-	claimWriter := managerCertificateClaimWriter{ctx: ctx, queries: queries, documentID: document.PropertyDocumentID, model: modelName, promptVersion: managerCertificatePromptVersion}
+	claimWriter := managerCertificateClaimWriter{ctx: ctx, queries: queries, documentID: document.PropertyDocumentID, model: modelName, promptVersion: promptVersion}
 	claimWriter.writeJSON("document", document.PropertyDocumentID, "document", "raw_extraction", rawJSON, "document", extracted.Document.Confidence, "Complete structured LLM extraction")
 	claimWriter.writeText("document", document.PropertyDocumentID, "document", "document_date", extracted.Document.DocumentDate, "document.document_date", extracted.Document.Confidence, extracted.Document.Issuer)
 	claimWriter.writeText("document", document.PropertyDocumentID, "document", "issuer", extracted.Document.Issuer, "document.issuer", extracted.Document.Confidence, extracted.Document.Issuer)
@@ -534,15 +522,6 @@ func timePtrString(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
-}
-
-func managerCertificatePrompt() string {
-	return `Extract the relevant facts from this Finnish isännöitsijäntodistus PDF.
-Use only facts visible in the PDF. Do not infer missing values from general housing-market knowledge.
-Normalize risk levels as low, medium, high, or unknown.
-Normalize plot ownership as owned, rented, or unknown.
-For renovations, include completed repairs, planned repairs, condition assessments, PTS items, and major maintenance decisions. Preserve years and cost estimates when present.
-Return concise evidence text for each group when possible.`
 }
 
 func normalizeRiskLevel(value string) string {

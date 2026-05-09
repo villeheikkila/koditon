@@ -164,7 +164,7 @@ func addRoutes(a *API, api huma.API) {
 	huma.Post(api, "/api/v1/property-documents/{id}/extract", a.propertyDocumentExtractHandler, func(op *huma.Operation) {
 		op.OperationID = "property-documents-extract"
 		op.Summary = "Extract property document facts"
-		op.Description = "Uses a PDF-capable OpenRouter model to extract manager-certificate facts into canonical property claims"
+		op.Description = "Uploads the stored PDF to OpenAI and extracts manager-certificate facts into canonical property claims"
 		op.Tags = []string{"Property Documents"}
 		applyAuth(op, makeMiddleware, resolveScopes("property-documents-extract"))
 	})

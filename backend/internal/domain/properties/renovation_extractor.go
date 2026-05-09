@@ -96,7 +96,12 @@ LIMIT 1`, saleListingID).Scan(&doneText, &plannedText)
 	if err != nil {
 		return RenovationExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[renovationExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(renovationExtractionPrompt(doneText, plannedText))}, SchemaName: "extract_apartment_renovations", SchemaDescription: "Extract structured apartment and housing company renovations from Finnish real-estate listing text", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(6000)})
+	operation := propertyLLMOperationConfig("renovation_extraction")
+	prompt, err := propertyLLMPrompt("renovation_extraction", map[string]string{"renovations_done_text": doneText, "renovations_planned_text": plannedText})
+	if err != nil {
+		return RenovationExtractionResult{}, err
+	}
+	objectResult, err := fantasyobject.Generate[renovationExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
 	if err != nil {
 		return RenovationExtractionResult{}, fmt.Errorf("extract renovations with fantasy: %w", err)
 	}
@@ -165,27 +170,6 @@ INSERT INTO public.property_source_offering_renovations (
 		return fmt.Errorf("commit renovation extraction transaction: %w", err)
 	}
 	return nil
-}
-
-func renovationExtractionPrompt(doneText string, plannedText string) string {
-	return fmt.Sprintf(`Extract structured renovation history from Finnish apartment listing text.
-
-Rules:
-- Use status "done" for completed renovations and "planned" for upcoming, future, decided, proposed, or later renovations.
-- Preserve future renovations even if no year is provided.
-- Normalize categories to concise English keys: pipe, sewer, water_supply, facade, roof, window, balcony, electricity, elevator, heating, ventilation, drainage, yard, common_area, bathroom, kitchen, other.
-- Also extract component, scope, stage, responsibility, and cost_estimate_eur when supported by the text.
-- For Finnish project stages, map kunnossapitotarveselvitys/tarveselvitys to need_assessment, kuntotutkimus/kartoitus/kuvaus to condition_survey, hankesuunnittelu/suunnittelu to project_planning, kilpailutus to tendering, päätös to decision, urakka/toteutus to execution.
-- For scope, use survey for kuntotutkimus/kartoitus/kuvaus, planning for tarveselvitys/hankesuunnittelu/suunnittelu/kilpailutus, partial for huolto/osittainen/sukitus/maalaus/lakkaus, full for uusinta/saneeraus/peruskorjaus.
-- For responsibility, use housing_company for taloyhtiö/kiinteistö/building systems/common areas, shareholder only when text clearly says apartment/shareholder responsibility, otherwise unknown.
-- If a phrase says no planned renovations, do not create an item for it.
-- Do not invent renovations not supported by the text.
-
-renovations_done_text:
-%s
-
-renovations_planned_text:
-%s`, doneText, plannedText)
 }
 
 func normalizeRenovationExtractionItems(items []renovationExtractionItem) []renovationExtractionItem {

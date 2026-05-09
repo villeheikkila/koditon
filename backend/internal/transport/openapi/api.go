@@ -95,7 +95,7 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		authService:       authService,
 		emailAuthService:  emailAuthService,
 		adsService:        adsService,
-		propertiesService: properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, "")),
+		propertiesService: properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel)),
 		shortcutAPI:       shortcutClient,
 		frontdoorAPI:      frontdoorClient,
 	}

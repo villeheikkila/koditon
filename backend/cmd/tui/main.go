@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	openrouter "github.com/revrost/go-openrouter"
 
 	"koditon/cmd/tui/internal/tui"
 	"koditon/internal/domain/ads"
@@ -47,8 +46,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
-	openRouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey)
-	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, openRouterClient)
+	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
 	if err != nil {
 		return fmt.Errorf("create prices service: %w", err)
 	}

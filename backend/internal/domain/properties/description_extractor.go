@@ -79,7 +79,12 @@ func (s *Service) extractSourceListingDescriptionInsights(ctx context.Context, s
 	if err != nil {
 		return DescriptionExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[descriptionExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(descriptionExtractionPrompt(descriptionText, buildingText, additionalInfoText))}, SchemaName: "extract_apartment_description_signals", SchemaDescription: "Extract structured apartment offer signals from Finnish real-estate description text", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(4000)})
+	operation := propertyLLMOperationConfig("description_extraction")
+	prompt, err := propertyLLMPrompt("description_extraction", map[string]string{"description_text": descriptionText, "building_text": buildingText, "additional_info_text": additionalInfoText})
+	if err != nil {
+		return DescriptionExtractionResult{}, err
+	}
+	objectResult, err := fantasyobject.Generate[descriptionExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
 	if err != nil {
 		return DescriptionExtractionResult{}, fmt.Errorf("extract description insights with fantasy: %w", err)
 	}
@@ -116,25 +121,6 @@ func (s *Service) replaceLLMDescriptionInsights(ctx context.Context, saleListing
 		return fmt.Errorf("commit description extraction transaction: %w", err)
 	}
 	return nil
-}
-
-func descriptionExtractionPrompt(descriptionText string, buildingText string, additionalInfoText string) string {
-	return fmt.Sprintf(`Extract apartment offer signals from Finnish listing text.
-
-Rules:
-- Extract only signals supported by text. Do not invent.
-- Prefer practical valuation/liquidity signals: floor drawbacks, elevator/accessibility, light, view, quietness, noise, condition, renovation need inside apartment, storage, parking, balcony, sauna, layout, premium architecture, courtyard, privacy.
-- Use direction positive/negative/neutral from buyer/offer attractiveness.
-- Use severity high only for materially price-relevant issues.
-
-description_text:
-%s
-
-building_text:
-%s
-
-additional_info_text:
-%s`, descriptionText, buildingText, additionalInfoText)
 }
 
 func normalizeDescriptionExtractionItems(items []descriptionExtractionItem) []descriptionExtractionItem {

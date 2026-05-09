@@ -40,7 +40,12 @@ func (s *Service) GenerateSaleListingHouseOverview(ctx context.Context, input st
 	if err != nil {
 		return HouseOverviewGenerationResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[houseOverviewObject](ctx, model, fantasy.ObjectCall{Prompt: fantasy.Prompt{fantasy.NewUserMessage(houseOverviewPrompt(listing))}, SchemaName: "generate_house_overview", SchemaDescription: "Generate a concise housing company overview from preprocessed structured facts", Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(3500)})
+	operation := propertyLLMOperationConfig("house_overview_generation")
+	prompt, err := houseOverviewPrompt(listing)
+	if err != nil {
+		return HouseOverviewGenerationResult{}, err
+	}
+	objectResult, err := fantasyobject.Generate[houseOverviewObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
 	if err != nil {
 		return HouseOverviewGenerationResult{}, fmt.Errorf("generate house overview with fantasy: %w", err)
 	}
@@ -63,34 +68,15 @@ func normalizeHouseOverview(in houseOverviewObject, modelName string) HouseOverv
 	}
 }
 
-func houseOverviewPrompt(listing SaleListing) string {
-	return fmt.Sprintf(`Generate a concise Finnish housing-company overview from preprocessed facts.
-
-Rules:
-- Use only the supplied facts. Do not invent missing renovations or financial data.
-- Treat listing/ad facts as weaker evidence than manager certificate or financial statements. In this input we currently only have provider fields, LLM-extracted listing facts, transactions, and forecasts.
-- Explain whether key building renovations look done, planned, expected, or missing.
-- State why this affects value and when ownership may become expensive.
-- Mention important unknowns as evidence gaps.
-- Keep the summary practical for deciding whether the listed apartment is attractive.
-
-listing:
-%s
-
-building:
-%s
-
-apartment_profile:
-%s
-
-renovation_facts:
-%s
-
-forecast_next_40_years:
-%s
-
-valuation_brief:
-%s`, houseOverviewListingFacts(listing), houseOverviewBuildingFacts(listing), houseOverviewApartmentProfileFacts(listing.ApartmentProfile), houseOverviewRenovationFacts(listing.Building.Renovations), houseOverviewForecastFacts(listing), houseOverviewBriefFacts(listing))
+func houseOverviewPrompt(listing SaleListing) (fantasy.Prompt, error) {
+	return propertyLLMPrompt("house_overview_generation", map[string]string{
+		"listing":                houseOverviewListingFacts(listing),
+		"building":               houseOverviewBuildingFacts(listing),
+		"apartment_profile":      houseOverviewApartmentProfileFacts(listing.ApartmentProfile),
+		"renovation_facts":       houseOverviewRenovationFacts(listing.Building.Renovations),
+		"forecast_next_40_years": houseOverviewForecastFacts(listing),
+		"valuation_brief":        houseOverviewBriefFacts(listing),
+	})
 }
 
 func houseOverviewListingFacts(listing SaleListing) string {

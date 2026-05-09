@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/fantasy"
+	fantasyobject "charm.land/fantasy/object"
+	fantasyopenrouter "charm.land/fantasy/providers/openrouter"
 	"github.com/google/uuid"
-	openrouter "github.com/revrost/go-openrouter"
 
 	client "koditon/internal/clients/prices"
 	"koditon/internal/db"
@@ -18,26 +20,26 @@ import (
 )
 
 type Service struct {
-	client        *client.Client
-	queries       *db.Queries
-	openRouterCli *openrouter.Client
-	nowFunc       func() time.Time
+	client           *client.Client
+	queries          *db.Queries
+	openRouterAPIKey string
+	nowFunc          func() time.Time
 }
 
 func NewService(
 	dbtx db.DBTX,
 	baseURL string,
-	openRouterCli *openrouter.Client,
+	openRouterAPIKey string,
 ) (*Service, error) {
 	pricesClient, err := client.NewClient(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("create prices client: %w", err)
 	}
 	return &Service{
-		client:        pricesClient,
-		queries:       db.New(dbtx),
-		openRouterCli: openRouterCli,
-		nowFunc:       time.Now,
+		client:           pricesClient,
+		queries:          db.New(dbtx),
+		openRouterAPIKey: openRouterAPIKey,
+		nowFunc:          time.Now,
 	}, nil
 }
 
@@ -667,6 +669,13 @@ type LLMMatchResult struct {
 	Reasoning      string
 }
 
+type postalNeighborhoodMatchObject struct {
+	PostalCodeID   *string `json:"postal_code_id" description:"Matched postal code UUID, or null when there is no reasonable match."`
+	PostalCodeName string  `json:"postal_code_name" description:"Matched postal code area name, or empty when there is no match."`
+	Confidence     string  `json:"confidence" enum:"high,medium,low,none" description:"Confidence in the postal code match."`
+	Reasoning      string  `json:"reasoning" description:"Brief explanation for the selected match or non-match."`
+}
+
 type MatchNeighborhoodsProgress struct {
 	Processed       int
 	Matched         int
@@ -682,8 +691,8 @@ func (s *Service) MatchNeighborhoodsWithLLM(
 	batchSize int,
 	progressFn func(MatchNeighborhoodsProgress),
 ) error {
-	if s.openRouterCli == nil {
-		return fmt.Errorf("OpenRouter client not configured")
+	if s.openRouterAPIKey == "" {
+		return fmt.Errorf("OpenRouter API key not configured")
 	}
 	if model == "" {
 		model = "google/gemini-2.0-flash-exp"
@@ -781,64 +790,20 @@ func (s *Service) matchNeighborhoodWithLLM(
 	if err != nil {
 		return nil, fmt.Errorf("marshal postal codes: %w", err)
 	}
-	prompt := fmt.Sprintf(`You are a Finnish postal code matching assistant. Your task is to match a neighborhood name to the most appropriate postal code area.
-
-Neighborhood: %s
-Municipality: %s
-
-Available postal codes in this municipality:
-%s
-
-Instructions:
-1. Analyze the neighborhood name and find the best matching postal code area
-2. Consider that neighborhood names might be informal, compound (comma-separated), or partial matches
-3. If no reasonable match exists, return null for postal_code_id
-4. Respond ONLY with valid JSON in this exact format:
-
-{
-  "postal_code_id": "uuid-here-or-null",
-  "postal_code_name": "name-here-or-empty",
-  "confidence": "high|medium|low|none",
-  "reasoning": "brief explanation"
-}
-
-Do not include any text outside the JSON structure.`, neighborhood.PricesNeighborhoodName, cityName, string(postalCodesJSON))
-
-	temperature := float32(0.1)
-	resp, err := s.openRouterCli.CreateChatCompletion(ctx, openrouter.ChatCompletionRequest{
-		Model: model,
-		Messages: []openrouter.ChatCompletionMessage{
-			openrouter.UserMessage(prompt),
-		},
-		Temperature: temperature,
-		MaxTokens:   500,
-	})
+	modelClient, err := s.priceLLMModel(ctx, model)
 	if err != nil {
-		return nil, fmt.Errorf("chat completion: %w", err)
+		return nil, err
 	}
-	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
+	operation := priceLLMOperationConfig("postal_neighborhood_match")
+	prompt, err := priceLLMPrompt("postal_neighborhood_match", map[string]string{"neighborhood": neighborhood.PricesNeighborhoodName, "municipality": cityName, "postal_codes_json": string(postalCodesJSON)})
+	if err != nil {
+		return nil, err
 	}
-	content := resp.Choices[0].Message.Content.Text
-	content = strings.TrimSpace(content)
-	if after, ok := strings.CutPrefix(content, "```json"); ok {
-		content = after
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	} else if after, ok := strings.CutPrefix(content, "```"); ok {
-		content = after
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
+	objectResult, err := fantasyobject.Generate[postalNeighborhoodMatchObject](ctx, modelClient, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0.1), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
+	if err != nil {
+		return nil, fmt.Errorf("match neighborhood with llm: %w", err)
 	}
-	var result struct {
-		PostalCodeID   *string `json:"postal_code_id"`
-		PostalCodeName string  `json:"postal_code_name"`
-		Confidence     string  `json:"confidence"`
-		Reasoning      string  `json:"reasoning"`
-	}
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		return nil, fmt.Errorf("unmarshal LLM response: %w (content: %s)", err, content)
-	}
+	result := objectResult.Object
 	llmResult := &LLMMatchResult{
 		PostalCodeName: result.PostalCodeName,
 		Confidence:     result.Confidence,
@@ -852,4 +817,27 @@ Do not include any text outside the JSON structure.`, neighborhood.PricesNeighbo
 		llmResult.PostalCodeID = &parsed
 	}
 	return llmResult, nil
+}
+
+func (s *Service) priceLLMModel(ctx context.Context, modelName string) (fantasy.LanguageModel, error) {
+	if s.openRouterAPIKey == "" {
+		return nil, fmt.Errorf("OpenRouter API key not configured")
+	}
+	provider, err := fantasyopenrouter.New(fantasyopenrouter.WithAPIKey(s.openRouterAPIKey), fantasyopenrouter.WithObjectMode(fantasy.ObjectModeText))
+	if err != nil {
+		return nil, fmt.Errorf("create fantasy openrouter provider: %w", err)
+	}
+	model, err := provider.LanguageModel(ctx, modelName)
+	if err != nil {
+		return nil, fmt.Errorf("create fantasy language model %q: %w", modelName, err)
+	}
+	return model, nil
+}
+
+func ptrFloat64(value float64) *float64 {
+	return &value
+}
+
+func ptrInt64(value int64) *int64 {
+	return &value
 }
