@@ -182,29 +182,11 @@ func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.C
 	if err != nil {
 		return fmt.Errorf("parse sale listing id for typed projection: %w", err)
 	}
-	if err := c.queries.EnsurePhysicalBuildingForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("ensure physical building: %w", err)
+	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: id, Reason: "source_link_changed"}); err != nil {
+		return fmt.Errorf("mark dimension targets dirty: %w", err)
 	}
-	if err := c.queries.UpsertSaleListingProviderClaims(ctx, id); err != nil {
-		return fmt.Errorf("upsert provider property claims: %w", err)
-	}
-	if err := c.queries.ProjectApartmentProfileForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project apartment profile: %w", err)
-	}
-	if err := c.queries.ProjectHousingCompanyRenovationsForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project housing company renovations: %w", err)
-	}
-	if err := c.queries.ProjectHousingCompanySystemsFromRenovationsForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project housing company systems from renovations: %w", err)
-	}
-	if err := c.queries.ProjectBuildingProfileForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project building profile: %w", err)
-	}
-	if err := c.queries.ProjectHousingCompanyProfileForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project housing company profile: %w", err)
-	}
-	if err := c.queries.ProjectQualityScoresForSaleListing(ctx, id); err != nil {
-		return fmt.Errorf("project quality scores: %w", err)
+	if err := c.enqueueDimensionLayerListing(ctx, id, "source_link_changed", nil, time.Now()); err != nil {
+		return fmt.Errorf("enqueue dimension layer listing: %w", err)
 	}
 	return nil
 }

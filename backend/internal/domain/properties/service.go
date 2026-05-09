@@ -106,6 +106,9 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 	if err := s.enrichSaleListingFromSharedRow(ctx, &listing, offeringID, sourceListingID); err != nil {
 		return SaleListing{}, err
 	}
+	if err := s.enrichSaleListingDocuments(ctx, &listing, offeringID); err != nil {
+		return SaleListing{}, err
+	}
 	listing.SourceRecords = records
 	listing.Valuation = valuation.Assess(valuationSaleListing(listing))
 	return listing, nil
@@ -248,23 +251,65 @@ func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleLi
 }
 
 func (s *Service) enrichSaleListingPropertyClaims(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.queries.ListPropertyClaimsForEntity(ctx, db.ListPropertyClaimsForEntityParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID})
+	targets, err := s.saleListingValuationClaimTargets(ctx, saleListingID)
 	if err != nil {
 		return err
 	}
-	for _, row := range rows {
-		fact := valuation.ValuationFact{Section: row.PropertyClaimNamespace, Key: row.PropertyClaimKey, ValueKind: row.PropertyClaimValueKind, ValueText: row.PropertyClaimValueText, Confidence: float64(row.PropertyClaimConfidence) / 100, Source: row.PropertyClaimSourceField, Evidence: row.PropertyClaimEvidenceText, Model: row.PropertyClaimModel, Prompt: row.PropertyClaimPromptVersion}
-		if row.PropertyClaimValueNumber != nil {
-			value := *row.PropertyClaimValueNumber
-			fact.ValueNumber = &value
+	for _, target := range targets {
+		rows, err := s.queries.ListPropertyClaimsForEntity(ctx, db.ListPropertyClaimsForEntityParams{EntityType: target.entityType, EntityID: target.entityID})
+		if err != nil {
+			return err
 		}
-		if row.PropertyClaimValueBool != nil {
-			value := *row.PropertyClaimValueBool
-			fact.ValueBool = &value
+		for _, row := range rows {
+			fact := valuation.ValuationFact{Section: row.PropertyClaimNamespace, Key: row.PropertyClaimKey, ValueKind: row.PropertyClaimValueKind, ValueText: row.PropertyClaimValueText, Confidence: float64(row.PropertyClaimConfidence) / 100, Source: row.PropertyClaimSourceField, Evidence: row.PropertyClaimEvidenceText, Model: row.PropertyClaimModel, Prompt: row.PropertyClaimPromptVersion}
+			if row.PropertyClaimValueKind == "number" {
+				value := row.PropertyClaimValueNumber
+				fact.ValueNumber = &value
+			}
+			if row.PropertyClaimValueKind == "bool" {
+				value := row.PropertyClaimValueBool
+				fact.ValueBool = &value
+			}
+			listing.ValuationInputs.Facts = append(listing.ValuationInputs.Facts, fact)
 		}
-		listing.ValuationInputs.Facts = append(listing.ValuationInputs.Facts, fact)
 	}
 	return nil
+}
+
+type valuationClaimTarget struct {
+	entityType string
+	entityID   uuid.UUID
+}
+
+func (s *Service) saleListingValuationClaimTargets(ctx context.Context, saleListingID uuid.UUID) ([]valuationClaimTarget, error) {
+	rows, err := s.db.Query(ctx, `
+WITH linked AS (
+    SELECT pu.property_unit_id, pu.physical_building_id, pu.housing_company_id
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE pos.sale_listing_id = $1
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+)
+SELECT 'sale_listing'::text, $1::uuid
+UNION ALL SELECT 'property_unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
+UNION ALL SELECT 'physical_building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
+UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL`, saleListingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var targets []valuationClaimTarget
+	for rows.Next() {
+		var target valuationClaimTarget
+		if err := rows.Scan(&target.entityType, &target.entityID); err != nil {
+			return nil, err
+		}
+		targets = append(targets, target)
+	}
+	return targets, rows.Err()
 }
 
 func (s *Service) enrichSaleListingMediaFromSource(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {

@@ -127,6 +127,63 @@ type ListFilter struct {
 	Limit    int32
 }
 
+type JobDefinition struct {
+	Provider        string
+	Kind            string
+	Queue           string
+	CapacityClass   string
+	MaxInProgress   int
+	DefaultPriority int32
+	DefaultAttempts int32
+}
+
+var jobDefinitions = []JobDefinition{
+	{Provider: "frontdoor", Kind: "frontdoor_sitemap_sync", Queue: "frontdoor", CapacityClass: CapacityClassFrontdoor, MaxInProgress: 1},
+	{Provider: "frontdoor", Kind: "frontdoor_buildings_sitemap_sync", Queue: "frontdoor", CapacityClass: CapacityClassFrontdoor, MaxInProgress: 1},
+	{Provider: "frontdoor", Kind: "frontdoor_sync", Queue: "frontdoor", CapacityClass: CapacityClassFrontdoor, MaxInProgress: 2},
+	{Provider: "frontdoor", Kind: "frontdoor_ad_data_hash_backfill", Queue: "frontdoor", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "shortcut", Kind: "shortcut_sitemap_sync", Queue: "shortcut", CapacityClass: CapacityClassShortcutAPI, MaxInProgress: 1},
+	{Provider: "shortcut", Kind: "shortcut_buildings_sitemap_sync", Queue: "shortcut", CapacityClass: CapacityClassShortcutAPI, MaxInProgress: 1},
+	{Provider: "shortcut", Kind: "shortcut_scraper_sync", Queue: "shortcut", CapacityClass: CapacityClassShortcutScraper, MaxInProgress: 1},
+	{Provider: "shortcut", Kind: "shortcut_api_sync", Queue: "shortcut", CapacityClass: CapacityClassShortcutAPI, MaxInProgress: 2},
+	{Provider: "shortcut", Kind: "shortcut_ad_data_hash_backfill", Queue: "shortcut", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_cities_init", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_sync", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_postal_code_sync", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_postal_code_page_sync", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_neighborhood_postal_code_sync", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_sync_all", Queue: "prices", CapacityClass: CapacityClassPrices, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_match_sale_listings_backfill", Queue: "prices", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_match_sale_listings_fanout", Queue: "prices", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "prices", Kind: "prices_match_sale_listing", Queue: "prices", CapacityClass: CapacityClassInternalDB, MaxInProgress: 8},
+	{Provider: "canonical", Kind: "canonicalize_source_ads_fanout", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "canonical", Kind: "canonicalize_source_ad", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 8},
+	{Provider: "canonical", Kind: "canonical_match_sale_listing_sources_backfill", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "canonical", Kind: "canonical_match_sale_listing_sources_fanout", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "canonical", Kind: "canonical_match_sale_listing_source", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 8},
+	{Provider: "canonical", Kind: "canonical_rebuild_dimension_layer_backfill", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "canonical", Kind: "canonical_rebuild_dimension_layer_listing", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 2},
+	{Provider: "canonical", Kind: "canonical_resolve_dirty_dimension_targets", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 1},
+	{Provider: "canonical", Kind: "canonical_resolve_dimension_target", Queue: "canonical", CapacityClass: CapacityClassInternalDB, MaxInProgress: 8},
+	{Provider: "postal", Kind: "postal_sync", Queue: "postal", CapacityClass: CapacityClassPostal, MaxInProgress: 1},
+}
+
+func FindJobDefinition(provider, kind string) (JobDefinition, bool) {
+	provider = strings.TrimSpace(provider)
+	kind = strings.TrimSpace(kind)
+	for _, def := range jobDefinitions {
+		if def.Provider == provider && def.Kind == kind {
+			return def, true
+		}
+	}
+	return JobDefinition{}, false
+}
+
+func IsKnownJobKind(provider, kind string) bool {
+	_, ok := FindJobDefinition(provider, kind)
+	return ok
+}
+
 func NewStore(logger *slog.Logger, pool *pgxpool.Pool) *Store {
 	if logger == nil {
 		logger = slog.Default()
@@ -135,6 +192,10 @@ func NewStore(logger *slog.Logger, pool *pgxpool.Pool) *Store {
 }
 
 func DefaultExecutionPolicy() ExecutionPolicy {
+	kindMaxInProgress := make(map[string]int, len(jobDefinitions))
+	for _, def := range jobDefinitions {
+		kindMaxInProgress[def.Kind] = def.MaxInProgress
+	}
 	return ExecutionPolicy{
 		GlobalMaxInProgress: 8,
 		ClassMaxInProgress: map[string]int{
@@ -146,34 +207,9 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 			CapacityClassPostal:          1,
 			CapacityClassInternalDB:      8,
 		},
-		KindMaxInProgress: map[string]int{
-			"frontdoor_sitemap_sync":                        1,
-			"frontdoor_buildings_sitemap_sync":              1,
-			"frontdoor_sync":                                2,
-			"frontdoor_ad_data_hash_backfill":               1,
-			"shortcut_sitemap_sync":                         1,
-			"shortcut_buildings_sitemap_sync":               1,
-			"shortcut_scraper_sync":                         1,
-			"shortcut_api_sync":                             2,
-			"shortcut_ad_data_hash_backfill":                1,
-			"prices_cities_init":                            1,
-			"prices_sync":                                   1,
-			"prices_postal_code_sync":                       1,
-			"prices_postal_code_page_sync":                  1,
-			"prices_neighborhood_postal_code_sync":          1,
-			"prices_sync_all":                               1,
-			"prices_match_sale_listings_backfill":           1,
-			"prices_match_sale_listings_fanout":             1,
-			"prices_match_sale_listing":                     8,
-			"canonicalize_source_ads_fanout":                1,
-			"canonicalize_source_ad":                        8,
-			"canonical_match_sale_listing_sources_backfill": 1,
-			"canonical_match_sale_listing_sources_fanout":   1,
-			"canonical_match_sale_listing_source":           8,
-			"postal_sync":                                   1,
-		},
-		BaseDeferDelay: 5 * time.Second,
-		MaxDeferDelay:  5 * time.Minute,
+		KindMaxInProgress: kindMaxInProgress,
+		BaseDeferDelay:    5 * time.Second,
+		MaxDeferDelay:     5 * time.Minute,
 	}
 }
 
@@ -186,7 +222,7 @@ func QueueNameForProvider(provider string) string {
 	case "prices":
 		return "prices"
 	case "canonical":
-		return "prices"
+		return "canonical"
 	case "postal":
 		return "postal"
 	default:
@@ -195,6 +231,9 @@ func QueueNameForProvider(provider string) string {
 }
 
 func CapacityClassForJob(provider, kind string) string {
+	if def, ok := FindJobDefinition(provider, kind); ok {
+		return def.CapacityClass
+	}
 	switch strings.TrimSpace(provider) {
 	case "frontdoor":
 		if kind == "frontdoor_ad_data_hash_backfill" {

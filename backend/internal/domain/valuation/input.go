@@ -32,7 +32,6 @@ func BuildInput(listing SaleListing) ValuationInputs {
 	if input.Floor.FloorLevel != nil && input.Floor.TotalFloors != nil {
 		input.Floor.TopFloor = boolPtrFromValue(*input.Floor.FloorLevel == *input.Floor.TotalFloors)
 	}
-	input.Floor.ElevatorRelevance = elevatorRelevance(input.Floor)
 	input.Layout.KitchenType = inferKitchenType(listing.Unit.RoomLayout + " " + listing.Unit.KitchenDescription)
 	if input.Layout.KitchenType != "" {
 		input.Layout.SeparateKitchen = boolPtrFromValue(input.Layout.KitchenType == "separate")
@@ -42,6 +41,7 @@ func BuildInput(listing SaleListing) ValuationInputs {
 		input.Layout.Alcove = boolPtrFromValue(true)
 	}
 	input = applyInputFacts(input)
+	input.Floor.ElevatorRelevance = elevatorRelevance(input.Floor)
 	input.Missing = valuationInputMissing(input)
 	return input
 }
@@ -60,6 +60,20 @@ func applyInputFacts(input ValuationInputs) ValuationInputs {
 			input.Unit.Balcony = chooseBool(input.Unit.Balcony, fact, &input)
 		case "unit.sauna", "sauna.has_sauna", "sauna.private_sauna":
 			input.Unit.Sauna = chooseBool(input.Unit.Sauna, fact, &input)
+		case "unit.area_m2":
+			input.Unit.AreaM2 = chooseFloat64(input.Unit.AreaM2, fact, &input)
+		case "unit.living_area_m2":
+			input.Unit.LivingAreaM2 = chooseFloat64(input.Unit.LivingAreaM2, fact, &input)
+		case "unit.total_area_m2":
+			input.Unit.TotalAreaM2 = chooseFloat64(input.Unit.TotalAreaM2, fact, &input)
+		case "unit.other_area_m2":
+			input.Unit.OtherAreaM2 = chooseFloat64(input.Unit.OtherAreaM2, fact, &input)
+		case "unit.floor_level":
+			input.Floor.FloorLevel = chooseInt32(input.Floor.FloorLevel, fact, &input)
+		case "layout.room_layout":
+			input.Layout.RoomLayout = chooseText(input.Layout.RoomLayout, fact, &input)
+		case "layout.room_count":
+			input.Layout.RoomCount = chooseInt32(input.Layout.RoomCount, fact, &input)
 		case "layout.kitchen_type":
 			input.Layout.KitchenType = chooseText(input.Layout.KitchenType, fact, &input)
 		case "layout.has_separate_kitchen":
@@ -92,10 +106,43 @@ func applyInputFacts(input ValuationInputs) ValuationInputs {
 			input.Unit.BathroomRenovated = chooseBool(input.Unit.BathroomRenovated, fact, &input)
 		case "heating.heating_method":
 			input.Building.HeatingMethod = chooseText(input.Building.HeatingMethod, fact, &input)
+		case "building.build_year":
+			input.Building.BuildYear = chooseInt32(input.Building.BuildYear, fact, &input)
+		case "building.energy_class":
+			input.Building.EnergyClass = chooseText(input.Building.EnergyClass, fact, &input)
+		case "building.heating_method":
+			input.Building.HeatingMethod = chooseText(input.Building.HeatingMethod, fact, &input)
+		case "building.material":
+			input.Building.BuildingMaterial = chooseText(input.Building.BuildingMaterial, fact, &input)
+		case "building.roof_type":
+			input.Building.RoofType = chooseText(input.Building.RoofType, fact, &input)
+		case "building.roof_material":
+			input.Building.RoofMaterial = chooseText(input.Building.RoofMaterial, fact, &input)
+		case "building.elevator":
+			input.Building.Elevator = chooseBool(input.Building.Elevator, fact, &input)
+			input.Floor.Elevator = chooseBool(input.Floor.Elevator, fact, &input)
+		case "building.apartment_count":
+			input.Building.ApartmentCount = chooseInt32(input.Building.ApartmentCount, fact, &input)
 		case "building.common_area_quality":
 			input.Building.CommonAreaQuality = chooseText(input.Building.CommonAreaQuality, fact, &input)
+		case "site.plot_ownership_type":
+			input.Site.PlotOwnershipType = chooseText(input.Site.PlotOwnershipType, fact, &input)
+		case "charges.maintenance_charge_monthly":
+			input.Charges.MaintenanceMonthly = chooseFloat64(input.Charges.MaintenanceMonthly, fact, &input)
+		case "charges.capital_charge_monthly":
+			input.Charges.Notes = chooseText(input.Charges.Notes, numberFactNote(fact, "Capital charge monthly"), &input)
+		case "charges.total_charge_monthly":
+			input.Charges.TotalMonthly = chooseFloat64(input.Charges.TotalMonthly, fact, &input)
+		case "charges.debt_share_eur":
+			input.Market.DebtShareAmount = chooseInt64(input.Market.DebtShareAmount, fact, &input)
 		case "charges.charge_risk":
 			input.Charges.ChargeRisk = chooseText(input.Charges.ChargeRisk, fact, &input)
+		case "risk.shareholder_liability":
+			input.Charges.Notes = chooseText(input.Charges.Notes, fact, &input)
+		case "risk.financial_risk":
+			input.Charges.ChargeRisk = chooseRisk(input.Charges.ChargeRisk, fact, &input)
+		case "risk.maintenance_risk", "risk.repair_backlog_risk":
+			input.Charges.ChargeRisk = chooseRisk(input.Charges.ChargeRisk, fact, &input)
 		default:
 			applied = false
 		}
@@ -146,6 +193,74 @@ func chooseInt32(current *int32, fact ValuationFact, input *ValuationInputs) *in
 		input.Conflicts = append(input.Conflicts, conflictFor(fact.Section+"."+fact.Key, providerNumberFact(fact, float64(*current)), fact, "provider value retained"))
 	}
 	return current
+}
+
+func chooseInt64(current *int64, fact ValuationFact, input *ValuationInputs) *int64 {
+	if fact.ValueNumber == nil {
+		return current
+	}
+	value := int64(math.Round(*fact.ValueNumber))
+	if current == nil {
+		return &value
+	}
+	if *current != value {
+		input.Conflicts = append(input.Conflicts, conflictFor(fact.Section+"."+fact.Key, providerNumberFact(fact, float64(*current)), fact, "provider value retained"))
+	}
+	return current
+}
+
+func chooseFloat64(current *float64, fact ValuationFact, input *ValuationInputs) *float64 {
+	if fact.ValueNumber == nil {
+		return current
+	}
+	value := *fact.ValueNumber
+	if current == nil {
+		return &value
+	}
+	if math.Abs(*current-value) > 0.01 {
+		input.Conflicts = append(input.Conflicts, conflictFor(fact.Section+"."+fact.Key, providerNumberFact(fact, *current), fact, "provider value retained"))
+	}
+	return current
+}
+
+func chooseRisk(current string, fact ValuationFact, input *ValuationInputs) string {
+	value := factTextValue(fact)
+	if value == "" || value == "unknown" {
+		return current
+	}
+	if current == "" || current == "unknown" {
+		return value
+	}
+	if riskRank(value) > riskRank(current) {
+		return value
+	}
+	if !strings.EqualFold(current, value) {
+		input.Conflicts = append(input.Conflicts, conflictFor(fact.Section+"."+fact.Key, providerTextFact(fact, current), fact, "higher risk retained"))
+	}
+	return current
+}
+
+func riskRank(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func numberFactNote(fact ValuationFact, label string) ValuationFact {
+	out := fact
+	if fact.ValueNumber != nil {
+		out.ValueKind = "text"
+		out.ValueText = fmt.Sprintf("%s %.2f", label, *fact.ValueNumber)
+		out.ValueNumber = nil
+	}
+	return out
 }
 
 func factTextValue(fact ValuationFact) string {

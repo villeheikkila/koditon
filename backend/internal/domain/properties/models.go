@@ -551,39 +551,45 @@ type SaleListing struct {
 	BuildingProfile  BuildingProfile               `json:"building_profile,omitempty"`
 	HousingProfile   HousingCompanyProfile         `json:"housing_company_profile,omitempty"`
 	QualityScores    []PropertyQualityScore        `json:"quality_scores,omitempty"`
+	Documents        []PropertyDocumentSummary     `json:"documents,omitempty"`
 	HouseOverview    HouseOverview                 `json:"house_overview,omitempty"`
 	ValuationInputs  valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
 	Valuation        *valuation.ApartmentValuation `json:"valuation,omitempty"`
 }
 
 type ApartmentProfile struct {
-	HousingCompanyID      string   `json:"housing_company_id,omitempty"`
-	PropertyUnitID        string   `json:"property_unit_id,omitempty"`
-	AreaM2                *float64 `json:"area_m2,omitempty"`
-	LivingAreaM2          *float64 `json:"living_area_m2,omitempty"`
-	RoomLayout            string   `json:"room_layout,omitempty"`
-	RoomCount             *int32   `json:"room_count,omitempty"`
-	BedroomCount          *int32   `json:"bedroom_count,omitempty"`
-	FloorLevel            *int32   `json:"floor_level,omitempty"`
-	TotalFloors           *int32   `json:"total_floors,omitempty"`
-	KitchenType           string   `json:"kitchen_type,omitempty"`
-	LayoutQuality         string   `json:"layout_quality,omitempty"`
-	AwkwardLayout         *bool    `json:"awkward_layout,omitempty"`
-	Condition             string   `json:"condition,omitempty"`
-	KitchenCondition      string   `json:"kitchen_condition,omitempty"`
-	BathroomCondition     string   `json:"bathroom_condition,omitempty"`
-	SurfaceRenovationNeed *bool    `json:"surface_renovation_need,omitempty"`
-	ModernizationNeed     *bool    `json:"modernization_need,omitempty"`
-	Sauna                 *bool    `json:"sauna,omitempty"`
-	Balcony               *bool    `json:"balcony,omitempty"`
-	BalconyGlazing        *bool    `json:"balcony_glazing,omitempty"`
-	ParkingType           string   `json:"parking_type,omitempty"`
-	StorageQuality        string   `json:"storage_quality,omitempty"`
-	ViewQuality           string   `json:"view_quality,omitempty"`
-	NoiseRisk             *bool    `json:"noise_risk,omitempty"`
-	Accessibility         string   `json:"accessibility,omitempty"`
-	Confidence            string   `json:"confidence,omitempty"`
-	UpdatedAt             string   `json:"updated_at,omitempty"`
+	HousingCompanyID         string   `json:"housing_company_id,omitempty"`
+	PropertyUnitID           string   `json:"property_unit_id,omitempty"`
+	AreaM2                   *float64 `json:"area_m2,omitempty"`
+	LivingAreaM2             *float64 `json:"living_area_m2,omitempty"`
+	RoomLayout               string   `json:"room_layout,omitempty"`
+	RoomCount                *int32   `json:"room_count,omitempty"`
+	BedroomCount             *int32   `json:"bedroom_count,omitempty"`
+	FloorLevel               *int32   `json:"floor_level,omitempty"`
+	TotalFloors              *int32   `json:"total_floors,omitempty"`
+	KitchenType              string   `json:"kitchen_type,omitempty"`
+	LayoutQuality            string   `json:"layout_quality,omitempty"`
+	AwkwardLayout            *bool    `json:"awkward_layout,omitempty"`
+	Condition                string   `json:"condition,omitempty"`
+	KitchenCondition         string   `json:"kitchen_condition,omitempty"`
+	BathroomCondition        string   `json:"bathroom_condition,omitempty"`
+	SurfaceRenovationNeed    *bool    `json:"surface_renovation_need,omitempty"`
+	ModernizationNeed        *bool    `json:"modernization_need,omitempty"`
+	Sauna                    *bool    `json:"sauna,omitempty"`
+	Balcony                  *bool    `json:"balcony,omitempty"`
+	BalconyGlazing           *bool    `json:"balcony_glazing,omitempty"`
+	ParkingType              string   `json:"parking_type,omitempty"`
+	StorageQuality           string   `json:"storage_quality,omitempty"`
+	ViewQuality              string   `json:"view_quality,omitempty"`
+	NoiseRisk                *bool    `json:"noise_risk,omitempty"`
+	Accessibility            string   `json:"accessibility,omitempty"`
+	MaintenanceChargeMonthly *float64 `json:"maintenance_charge_monthly,omitempty"`
+	CapitalChargeMonthly     *float64 `json:"capital_charge_monthly,omitempty"`
+	TotalChargeMonthly       *float64 `json:"total_charge_monthly,omitempty"`
+	DebtShareEUR             *int64   `json:"debt_share_eur,omitempty"`
+	ShareholderLiability     string   `json:"shareholder_liability,omitempty"`
+	Confidence               string   `json:"confidence,omitempty"`
+	UpdatedAt                string   `json:"updated_at,omitempty"`
 }
 
 type CanonicalProfileProjectionResult struct {
@@ -629,6 +635,46 @@ type PropertyQualityScore struct {
 	Confidence string   `json:"confidence,omitempty"`
 	Reasons    []string `json:"reasons,omitempty"`
 	UpdatedAt  string   `json:"updated_at,omitempty"`
+}
+
+type PropertyDocumentSummary struct {
+	ID                 string `json:"id"`
+	OfferingID         string `json:"offering_id"`
+	UnitID             string `json:"unit_id,omitempty"`
+	PhysicalBuildingID string `json:"physical_building_id,omitempty"`
+	HousingCompanyID   string `json:"housing_company_id,omitempty"`
+	Type               string `json:"type"`
+	Filename           string `json:"filename"`
+	MimeType           string `json:"mime_type"`
+	SizeBytes          int64  `json:"size_bytes"`
+	SHA256             string `json:"sha256"`
+	ExtractionStatus   string `json:"extraction_status"`
+	ExtractionError    string `json:"extraction_error,omitempty"`
+	UploadedAt         string `json:"uploaded_at"`
+	ExtractedAt        string `json:"extracted_at,omitempty"`
+	DownloadURL        string `json:"download_url"`
+}
+
+type PropertyDocumentUpload struct {
+	Filename string
+	MimeType string
+	Bytes    []byte
+}
+
+type PropertyDocumentDownload struct {
+	ID        string
+	Type      string
+	Filename  string
+	MimeType  string
+	SizeBytes int64
+	SHA256    string
+	Bytes     []byte
+}
+
+type ManagerCertificateExtractionResult struct {
+	Document PropertyDocumentSummary `json:"document"`
+	Model    string                  `json:"model"`
+	Claims   int                     `json:"claims"`
 }
 
 type HouseOverview struct {

@@ -30,6 +30,7 @@ type Consumer struct {
 	frontdoorPool *taskqueue.WorkerPool
 	shortcutPool  *taskqueue.WorkerPool
 	pricesPool    *taskqueue.WorkerPool
+	canonicalPool *taskqueue.WorkerPool
 	postalPool    *taskqueue.WorkerPool
 
 	maintenanceCancel context.CancelFunc
@@ -69,19 +70,23 @@ func (c *Consumer) Start(ctx context.Context, cfg Config) error {
 	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
 	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
 	pricesQueue := taskqueue.NewQueue(c.pool, "prices")
+	canonicalQueue := taskqueue.NewQueue(c.pool, "canonical")
 	postalQueue := taskqueue.NewQueue(c.pool, "postal")
 	frontdoorConfig := c.baseWorkerConfig()
 	shortcutConfig := c.baseWorkerConfig()
 	pricesConfig := c.baseWorkerConfig()
+	canonicalConfig := c.baseWorkerConfig()
 	postalConfig := c.baseWorkerConfig()
 	c.frontdoorPool = taskqueue.NewWorkerPool(cfg.WorkerCount, frontdoorQueue, c.handleFrontdoorTask, frontdoorConfig)
 	c.shortcutPool = taskqueue.NewWorkerPool(cfg.WorkerCount, shortcutQueue, c.handleShortcutTask, shortcutConfig)
 	c.pricesPool = taskqueue.NewWorkerPool(cfg.WorkerCount, pricesQueue, c.handlePricesTask, pricesConfig)
+	c.canonicalPool = taskqueue.NewWorkerPool(cfg.WorkerCount, canonicalQueue, c.handleCanonicalTask, canonicalConfig)
 	c.postalPool = taskqueue.NewWorkerPool(cfg.WorkerCount, postalQueue, c.handlePostalTask, postalConfig)
 
 	c.frontdoorPool.Start(ctx)
 	c.shortcutPool.Start(ctx)
 	c.pricesPool.Start(ctx)
+	c.canonicalPool.Start(ctx)
 	c.postalPool.Start(ctx)
 	if cfg.MaintenanceEnabled {
 		c.startMaintenance(ctx, cfg)
@@ -105,6 +110,9 @@ func (c *Consumer) Stop() {
 	if c.pricesPool != nil {
 		c.pricesPool.Stop()
 	}
+	if c.canonicalPool != nil {
+		c.canonicalPool.Stop()
+	}
 	if c.postalPool != nil {
 		c.postalPool.Stop()
 	}
@@ -116,6 +124,9 @@ func (c *Consumer) Stop() {
 	}
 	if c.pricesPool != nil {
 		c.pricesPool.Wait()
+	}
+	if c.canonicalPool != nil {
+		c.canonicalPool.Wait()
 	}
 	if c.postalPool != nil {
 		c.postalPool.Wait()
@@ -188,5 +199,11 @@ func (c *Consumer) runMaintenanceOnce(ctx context.Context, logger *slog.Logger, 
 	}
 	if reconciled.Scanned > 0 || reconciled.Reenqueued > 0 {
 		logger.InfoContext(ctx, "sync job pending reconciliation completed", "scanned", reconciled.Scanned, "reenqueued", reconciled.Reenqueued, "outcome", logging.OutcomeSuccess)
+	}
+	if err := c.enqueueDirtyDimensionTargetFanout(ctx); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return
+		}
+		logger.WarnContext(ctx, "dirty dimension target fanout enqueue failed", "error", err, "outcome", logging.OutcomeError)
 	}
 }

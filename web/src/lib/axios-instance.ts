@@ -5,14 +5,11 @@ export const customInstance = async <T>(
   options?: RequestInit,
 ): Promise<T> => {
   const token = getFreshTokenOrNull()
+  const headers = requestHeaders(options, token)
   const response = await fetch(url, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
+    headers,
   })
   if (response.status === 401 && !isSessionRefresh(url)) {
     const refreshedToken = await refreshSession().catch(() => null)
@@ -20,17 +17,24 @@ export const customInstance = async <T>(
       const retryResponse = await fetch(url, {
         ...options,
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...options?.headers,
-          Authorization: `Bearer ${refreshedToken}`,
-        },
+        headers: requestHeaders(options, refreshedToken),
       })
       return parseResponse<T>(retryResponse)
     }
     clearAndRedirectToSignIn()
   }
   return parseResponse<T>(response)
+}
+
+function requestHeaders(options: RequestInit | undefined, token: string | null): HeadersInit {
+  const headers = new Headers(options?.headers)
+  if (!(options?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+  return headers
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {

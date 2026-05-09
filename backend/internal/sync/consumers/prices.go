@@ -177,16 +177,6 @@ func (c *Consumer) runPricesSyncJob(ctx context.Context, logger *slog.Logger, jo
 		return c.handlePricesMatchSaleListingsFanout(ctx, logger, job)
 	case TaskTypePricesMatchSaleListing:
 		return c.handlePricesMatchSaleListing(ctx, logger, job)
-	case TaskTypeCanonicalizeSourceAdsFanout:
-		return c.handleCanonicalizeSourceAdsFanout(ctx, logger, job)
-	case TaskTypeCanonicalizeSourceAd:
-		return c.handleCanonicalizeSourceAd(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSourcesBackfill:
-		return c.handleCanonicalMatchSaleListingSourcesBackfill(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSourcesFanout:
-		return c.handleCanonicalMatchSaleListingSourcesFanout(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSource:
-		return c.handleCanonicalMatchSaleListingSource(ctx, logger, job)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown prices sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
 	}

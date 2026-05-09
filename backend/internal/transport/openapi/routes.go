@@ -147,6 +147,27 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Sale Listings"}
 		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-house-overview-generate"))
 	})
+	huma.Post(api, "/api/v1/sale-listings/{id}/documents/manager-certificate", a.saleListingManagerCertificateUploadHandler, func(op *huma.Operation) {
+		op.OperationID = "sale-listings-manager-certificate-upload"
+		op.Summary = "Upload manager certificate PDF"
+		op.Description = "Stores an isännöitsijäntodistus PDF for a canonical sale offering in Postgres"
+		op.Tags = []string{"Sale Listings"}
+		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-manager-certificate-upload"))
+	})
+	huma.Get(api, "/api/v1/property-documents/{id}/download", a.propertyDocumentDownloadHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-download"
+		op.Summary = "Download property document"
+		op.Description = "Downloads the original stored property document bytes"
+		op.Tags = []string{"Property Documents"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-download"))
+	})
+	huma.Post(api, "/api/v1/property-documents/{id}/extract", a.propertyDocumentExtractHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-extract"
+		op.Summary = "Extract property document facts"
+		op.Description = "Uses a PDF-capable OpenRouter model to extract manager-certificate facts into canonical property claims"
+		op.Tags = []string{"Property Documents"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-extract"))
+	})
 	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
 		op.OperationID = "rentals-search"
 		op.Summary = "Search rentals"

@@ -114,20 +114,8 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 			return fmt.Errorf("insert llm valuation fact: %w", err)
 		}
 	}
-	if err := queries.EnsurePhysicalBuildingForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("ensure physical building after valuation extraction: %w", err)
-	}
-	if err := queries.ProjectApartmentProfileForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project apartment profile after valuation extraction: %w", err)
-	}
-	if err := queries.ProjectBuildingProfileForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project building profile after valuation extraction: %w", err)
-	}
-	if err := queries.ProjectHousingCompanyProfileForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project housing company profile after valuation extraction: %w", err)
-	}
-	if err := queries.ProjectQualityScoresForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project quality scores after valuation extraction: %w", err)
+	if _, err := queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "valuation_claims_changed"}); err != nil {
+		return fmt.Errorf("mark dimension targets dirty after valuation extraction: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit valuation input extraction transaction: %w", err)

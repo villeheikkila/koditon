@@ -157,21 +157,9 @@ INSERT INTO public.property_source_offering_renovations (
 			return fmt.Errorf("insert llm renovation row: %w", err)
 		}
 	}
-	if _, err := tx.Exec(ctx, `SELECT public.fnc__refresh_housing_company_facts_for_property_source_offering($1)`, saleListingID); err != nil {
-		return fmt.Errorf("refresh housing company facts after renovation extraction: %w", err)
-	}
 	queries := db.New(tx)
-	if err := queries.ProjectHousingCompanyRenovationsForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project housing company renovations after extraction: %w", err)
-	}
-	if err := queries.ProjectHousingCompanySystemsFromRenovationsForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project housing company systems after extraction: %w", err)
-	}
-	if err := queries.ProjectHousingCompanyProfileForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project housing company profile after extraction: %w", err)
-	}
-	if err := queries.ProjectQualityScoresForSaleListing(ctx, saleListingID); err != nil {
-		return fmt.Errorf("project quality scores after extraction: %w", err)
+	if _, err := queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "renovation_events_changed"}); err != nil {
+		return fmt.Errorf("mark dimension targets dirty after extraction: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit renovation extraction transaction: %w", err)

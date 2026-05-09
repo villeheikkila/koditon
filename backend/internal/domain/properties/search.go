@@ -19,17 +19,17 @@ SELECT
     COALESCE(sl.sale_listing_city, ''),
     COALESCE(sl.sale_listing_postal, ''),
     sl.sale_listing_asking_price,
-    sl.sale_listing_area_value,
-    COALESCE(sl.sale_listing_room_layout, ''),
+    dims.area_value,
+    COALESCE(dims.room_layout, ''),
     sl.sale_listing_price_per_m2,
     sl.sale_listing_debt_free_price,
     sl.sale_listing_debt_share_amount,
-    sl.sale_listing_rooms_count,
-    sl.sale_listing_floor_level,
-    sl.sale_listing_total_floors,
-    sl.sale_listing_build_year,
-    sl.sale_listing_condition,
-    sl.sale_listing_energy_class,
+    dims.rooms_count,
+    dims.floor_level,
+    dims.total_floors,
+    dims.build_year,
+    dims.condition,
+    dims.energy_class,
     sl.sale_listing_energy_efficiency_label,
     sl.sale_listing_last_seen_at::text,
     sl.sale_listing_published_at::text,
@@ -37,6 +37,26 @@ SELECT
     source_badges.source_providers
 FROM public.property_offerings po
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+    AND unit_profile.target_id = pu.property_unit_id
+LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+    AND building_profile.target_id = pu.physical_building_id
+LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+    AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+JOIN LATERAL (
+    SELECT
+        COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, sl.sale_listing_area_value) AS area_value,
+        COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), sl.sale_listing_room_layout) AS room_layout,
+        COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, sl.sale_listing_rooms_count) AS rooms_count,
+        COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, sl.sale_listing_floor_level) AS floor_level,
+        COALESCE((unit_profile.dimensions #>> '{unit,total_floors}')::int4, (building_profile.dimensions #>> '{building,floor_count}')::int4, sl.sale_listing_total_floors) AS total_floors,
+        COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, sl.sale_listing_build_year) AS build_year,
+        COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition) AS condition,
+        COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class) AS energy_class
+) dims ON true
 JOIN LATERAL (
     SELECT array_agg(provider ORDER BY provider)::text[] AS source_providers
     FROM (
@@ -69,27 +89,27 @@ WHERE EXISTS (
   AND ($7::text IS NULL OR trim($7::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
   AND ($8::bigint IS NULL OR sl.sale_listing_asking_price >= $8::bigint)
   AND ($9::bigint IS NULL OR sl.sale_listing_asking_price <= $9::bigint)
-  AND ($10::float8 IS NULL OR sl.sale_listing_area_value >= $10::float8)
-  AND ($11::float8 IS NULL OR sl.sale_listing_area_value <= $11::float8)
+  AND ($10::float8 IS NULL OR dims.area_value >= $10::float8)
+  AND ($11::float8 IS NULL OR dims.area_value <= $11::float8)
   AND ($12::timestamptz IS NULL OR sl.sale_listing_published_at >= $12::timestamptz)
   AND ($13::timestamptz IS NULL OR sl.sale_listing_published_at <= $13::timestamptz)
   AND ($14::float8 IS NULL OR sl.sale_listing_price_per_m2 >= $14::float8)
   AND ($15::float8 IS NULL OR sl.sale_listing_price_per_m2 <= $15::float8)
-  AND ($16::int4 IS NULL OR sl.sale_listing_rooms_count = $16::int4)
-  AND ($17::int4 IS NULL OR sl.sale_listing_floor_level = $17::int4)
-  AND ($18::int4 IS NULL OR sl.sale_listing_build_year >= $18::int4)
-  AND ($19::int4 IS NULL OR sl.sale_listing_build_year <= $19::int4)
-  AND ($20::text IS NULL OR trim($20::text) = '' OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
-  AND ($21::text IS NULL OR trim($21::text) = '' OR lower(COALESCE(sl.sale_listing_energy_class, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
+  AND ($16::int4 IS NULL OR dims.rooms_count = $16::int4)
+  AND ($17::int4 IS NULL OR dims.floor_level = $17::int4)
+  AND ($18::int4 IS NULL OR dims.build_year >= $18::int4)
+  AND ($19::int4 IS NULL OR dims.build_year <= $19::int4)
+  AND ($20::text IS NULL OR trim($20::text) = '' OR lower(COALESCE(dims.condition, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
+  AND ($21::text IS NULL OR trim($21::text) = '' OR lower(COALESCE(dims.energy_class, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
   AND ($22 = 'all' OR sl.sale_listing_source_kind = $22)
 ORDER BY
     CASE WHEN $1 = 'price_asc' THEN sl.sale_listing_asking_price END ASC NULLS LAST,
     CASE WHEN $1 = 'price_desc' THEN sl.sale_listing_asking_price END DESC NULLS LAST,
-    CASE WHEN $1 = 'area_asc' THEN sl.sale_listing_area_value END ASC NULLS LAST,
-    CASE WHEN $1 = 'area_desc' THEN sl.sale_listing_area_value END DESC NULLS LAST,
+    CASE WHEN $1 = 'area_asc' THEN dims.area_value END ASC NULLS LAST,
+    CASE WHEN $1 = 'area_desc' THEN dims.area_value END DESC NULLS LAST,
     CASE WHEN $1 = 'price_m2_asc' THEN sl.sale_listing_price_per_m2 END ASC NULLS LAST,
     CASE WHEN $1 = 'price_m2_desc' THEN sl.sale_listing_price_per_m2 END DESC NULLS LAST,
-    CASE WHEN $1 = 'build_year_desc' THEN sl.sale_listing_build_year END DESC NULLS LAST,
+    CASE WHEN $1 = 'build_year_desc' THEN dims.build_year END DESC NULLS LAST,
     CASE WHEN $1 = 'seen_desc' THEN sl.sale_listing_last_seen_at END DESC NULLS LAST,
     sl.sale_listing_last_seen_at DESC
 LIMIT $3::int OFFSET $2::int`
@@ -139,6 +159,24 @@ const countSaleListingsSQL = `
 SELECT count(*)::bigint
 FROM public.property_offerings po
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+    AND unit_profile.target_id = pu.property_unit_id
+LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+    AND building_profile.target_id = pu.physical_building_id
+LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+    AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+JOIN LATERAL (
+    SELECT
+        COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, sl.sale_listing_area_value) AS area_value,
+        COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, sl.sale_listing_rooms_count) AS rooms_count,
+        COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, sl.sale_listing_floor_level) AS floor_level,
+        COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, sl.sale_listing_build_year) AS build_year,
+        COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition) AS condition,
+        COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class) AS energy_class
+) dims ON true
 WHERE EXISTS (
     SELECT 1
     FROM public.property_offering_sources active_pos
@@ -161,18 +199,18 @@ WHERE EXISTS (
   AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
   AND ($5::bigint IS NULL OR sl.sale_listing_asking_price >= $5::bigint)
   AND ($6::bigint IS NULL OR sl.sale_listing_asking_price <= $6::bigint)
-  AND ($7::float8 IS NULL OR sl.sale_listing_area_value >= $7::float8)
-  AND ($8::float8 IS NULL OR sl.sale_listing_area_value <= $8::float8)
+  AND ($7::float8 IS NULL OR dims.area_value >= $7::float8)
+  AND ($8::float8 IS NULL OR dims.area_value <= $8::float8)
   AND ($9::timestamptz IS NULL OR sl.sale_listing_published_at >= $9::timestamptz)
   AND ($10::timestamptz IS NULL OR sl.sale_listing_published_at <= $10::timestamptz)
   AND ($11::float8 IS NULL OR sl.sale_listing_price_per_m2 >= $11::float8)
   AND ($12::float8 IS NULL OR sl.sale_listing_price_per_m2 <= $12::float8)
-  AND ($13::int4 IS NULL OR sl.sale_listing_rooms_count = $13::int4)
-  AND ($14::int4 IS NULL OR sl.sale_listing_floor_level = $14::int4)
-  AND ($15::int4 IS NULL OR sl.sale_listing_build_year >= $15::int4)
-  AND ($16::int4 IS NULL OR sl.sale_listing_build_year <= $16::int4)
-  AND ($17::text IS NULL OR trim($17::text) = '' OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($17::text)) || '%'))
-  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(sl.sale_listing_energy_class, '')) LIKE ('%' || lower(trim($18::text)) || '%'))
+  AND ($13::int4 IS NULL OR dims.rooms_count = $13::int4)
+  AND ($14::int4 IS NULL OR dims.floor_level = $14::int4)
+  AND ($15::int4 IS NULL OR dims.build_year >= $15::int4)
+  AND ($16::int4 IS NULL OR dims.build_year <= $16::int4)
+  AND ($17::text IS NULL OR trim($17::text) = '' OR lower(COALESCE(dims.condition, '')) LIKE ('%' || lower(trim($17::text)) || '%'))
+  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(dims.energy_class, '')) LIKE ('%' || lower(trim($18::text)) || '%'))
   AND ($19 = 'all' OR sl.sale_listing_source_kind = $19)`
 
 const countRentalsSQL = `
@@ -293,13 +331,16 @@ WITH visible_base AS (
         pb.housing_company_address_norm,
         pb.housing_company_city_norm,
         pb.housing_company_postal_norm,
-        pb.housing_company_build_year,
+        COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) AS housing_company_build_year,
         po.property_offering_id,
         po.property_offering_headline,
         po.property_offering_asking_price,
         po.property_offering_price_per_m2,
-        pu.property_unit_area_value,
-        pu.property_unit_room_layout,
+        COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) AS property_unit_area_value,
+        COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), pu.property_unit_room_layout, sl.sale_listing_room_layout) AS property_unit_room_layout,
+        COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::integer, pu.property_unit_rooms_count, sl.sale_listing_rooms_count) AS property_unit_rooms_count,
+        COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition) AS property_unit_condition,
+        COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class) AS building_energy_class,
         po.property_offering_last_seen_at,
         sl.sale_listing_street_address,
         sl.sale_listing_city,
@@ -323,6 +364,12 @@ WITH visible_base AS (
     JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+        AND unit_profile.target_id = pu.property_unit_id
+    LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+        AND building_profile.target_id = pu.physical_building_id
+    LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+        AND housing_profile.target_id = pb.housing_company_id
     WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
@@ -335,16 +382,16 @@ WITH visible_base AS (
         AND ($10::text IS NULL OR public.fnc__normalize_postal(COALESCE(sl.sale_listing_postal, pb.housing_company_postal_norm, '')) = public.fnc__normalize_postal($10::text))
         AND ($11::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) >= $11::bigint)
         AND ($12::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) <= $12::bigint)
-        AND ($13::double precision IS NULL OR COALESCE(pu.property_unit_area_value, sl.sale_listing_area_value) >= $13::double precision)
-        AND ($14::double precision IS NULL OR COALESCE(pu.property_unit_area_value, sl.sale_listing_area_value) <= $14::double precision)
+        AND ($13::double precision IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) >= $13::double precision)
+        AND ($14::double precision IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) <= $14::double precision)
         AND ($15::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) >= $15::double precision)
         AND ($16::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) <= $16::double precision)
-        AND ($17::integer IS NULL OR COALESCE(pu.property_unit_rooms_count, sl.sale_listing_rooms_count) = $17::integer)
-        AND ($18::integer IS NULL OR COALESCE(pb.housing_company_build_year, sl.sale_listing_build_year) >= $18::integer)
-        AND ($19::integer IS NULL OR COALESCE(pb.housing_company_build_year, sl.sale_listing_build_year) <= $19::integer)
+        AND ($17::integer IS NULL OR COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::integer, pu.property_unit_rooms_count, sl.sale_listing_rooms_count) = $17::integer)
+        AND ($18::integer IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) >= $18::integer)
+        AND ($19::integer IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) <= $19::integer)
         AND ($20::text IS NULL OR sl.sale_listing_property_type_code = public.fnc__sale_listing_property_type_code($20::text) OR lower(COALESCE(sl.sale_listing_property_type_raw, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
-        AND ($21::text IS NULL OR public.fnc__condition_match_code(sl.sale_listing_condition) = public.fnc__condition_match_code($21::text) OR lower(COALESCE(sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
-        AND ($22::text IS NULL OR sl.sale_listing_energy_efficiency_match_code = public.fnc__energy_efficiency_match_code($22::text) OR lower(concat_ws(' ', sl.sale_listing_energy_class, sl.sale_listing_energy_efficiency_label)) LIKE ('%' || lower(trim($22::text)) || '%'))
+        AND ($21::text IS NULL OR public.fnc__condition_match_code(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition)) = public.fnc__condition_match_code($21::text) OR lower(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
+        AND ($22::text IS NULL OR public.fnc__energy_efficiency_match_code(COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class)) = public.fnc__energy_efficiency_match_code($22::text) OR lower(concat_ws(' ', COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class), sl.sale_listing_energy_efficiency_label)) LIKE ('%' || lower(trim($22::text)) || '%'))
         AND ($23::boolean IS NULL OR sl.sale_listing_elevator IS NOT DISTINCT FROM $23::boolean)
         AND ($24::boolean IS NULL OR sl.sale_listing_sauna IS NOT DISTINCT FROM $24::boolean)
         AND ($25::boolean IS NULL OR sl.sale_listing_balcony IS NOT DISTINCT FROM $25::boolean)

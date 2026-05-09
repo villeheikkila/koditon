@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -66,6 +68,22 @@ type saleListingCanonicalProfileProjectInput struct {
 
 type saleListingHouseOverviewGenerateInput struct {
 	ID    string `path:"id"     required:"true" doc:"Canonical offering UUID"`
+	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
+}
+
+type saleListingManagerCertificateUploadInput struct {
+	ID      string `path:"id" required:"true" doc:"Canonical offering UUID"`
+	RawBody huma.MultipartFormFiles[struct {
+		File huma.FormFile `form:"file" contentType:"application/pdf" required:"true"`
+	}]
+}
+
+type propertyDocumentInput struct {
+	ID string `path:"id" required:"true" doc:"Property document UUID"`
+}
+
+type propertyDocumentExtractInput struct {
+	ID    string `path:"id"     required:"true" doc:"Property document UUID"`
 	Model string `query:"model" doc:"OpenRouter model ID, defaults to the configured extractor model"`
 }
 
@@ -171,6 +189,21 @@ type saleListingCanonicalProfileProjectOutput struct {
 
 type saleListingHouseOverviewGenerateOutput struct {
 	Body properties.HouseOverviewGenerationResult
+}
+
+type propertyDocumentSummaryOutput struct {
+	Body properties.PropertyDocumentSummary
+}
+
+type propertyDocumentExtractOutput struct {
+	Body properties.ManagerCertificateExtractionResult
+}
+
+type propertyDocumentDownloadOutput struct {
+	ContentType        string `header:"Content-Type"`
+	ContentDisposition string `header:"Content-Disposition"`
+	ContentLength      int64  `header:"Content-Length"`
+	Body               []byte
 }
 
 type rentalDetailOutput struct {
@@ -327,6 +360,59 @@ func (a *API) saleListingHouseOverviewGenerateHandler(ctx context.Context, input
 		return nil, huma.Error400BadRequest("house overview generation failed")
 	}
 	return &saleListingHouseOverviewGenerateOutput{Body: result}, nil
+}
+
+func (a *API) saleListingManagerCertificateUploadHandler(ctx context.Context, input *saleListingManagerCertificateUploadInput) (*propertyDocumentSummaryOutput, error) {
+	file := input.RawBody.Data().File
+	if !file.IsSet {
+		return nil, huma.Error400BadRequest("manager certificate PDF is required")
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, huma.Error400BadRequest("read manager certificate PDF failed")
+	}
+	document, err := a.propertiesService.UploadManagerCertificate(ctx, input.ID, properties.PropertyDocumentUpload{Filename: file.Filename, MimeType: file.ContentType, Bytes: data})
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("sale listing not found")
+		}
+		if errors.Is(err, properties.ErrPropertyDocumentTooLarge) {
+			return nil, huma.Error413RequestEntityTooLarge("manager certificate PDF too large")
+		}
+		if errors.Is(err, properties.ErrPropertyDocumentInvalid) {
+			return nil, huma.Error400BadRequest("invalid manager certificate PDF")
+		}
+		a.logger.ErrorContext(ctx, "manager certificate upload failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("manager certificate upload failed")
+	}
+	return &propertyDocumentSummaryOutput{Body: document}, nil
+}
+
+func (a *API) propertyDocumentDownloadHandler(ctx context.Context, input *propertyDocumentInput) (*propertyDocumentDownloadOutput, error) {
+	document, err := a.propertiesService.DownloadPropertyDocument(ctx, input.ID)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("property document not found")
+		}
+		a.logger.ErrorContext(ctx, "property document download failed", "id", input.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("property document download failed")
+	}
+	return &propertyDocumentDownloadOutput{ContentType: document.MimeType, ContentDisposition: fmt.Sprintf("attachment; filename=%q", document.Filename), ContentLength: int64(len(document.Bytes)), Body: document.Bytes}, nil
+}
+
+func (a *API) propertyDocumentExtractHandler(ctx context.Context, input *propertyDocumentExtractInput) (*propertyDocumentExtractOutput, error) {
+	result, err := a.propertiesService.ExtractManagerCertificate(ctx, input.ID, input.Model)
+	if err != nil {
+		if errors.Is(err, properties.ErrNotFound) {
+			return nil, huma.Error404NotFound("property document not found")
+		}
+		if errors.Is(err, properties.ErrRenovationExtractorNotConfigured) {
+			return nil, huma.Error503ServiceUnavailable("document extractor not configured")
+		}
+		a.logger.ErrorContext(ctx, "manager certificate extraction failed", "id", input.ID, "model", input.Model, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error400BadRequest("manager certificate extraction failed")
+	}
+	return &propertyDocumentExtractOutput{Body: result}, nil
 }
 
 func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transactionMatchPostalsInput) (*transactionMatchPostalsOutput, error) {

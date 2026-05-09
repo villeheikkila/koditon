@@ -382,47 +382,10 @@ func setupSyncStore(ctx context.Context) (*syncjobs.Store, func(), error) {
 }
 
 func validateSyncJobTarget(provider, kind string) error {
-	validKinds := map[string]map[string]struct{}{
-		"frontdoor": {
-			"frontdoor_sitemap_sync":           {},
-			"frontdoor_buildings_sitemap_sync": {},
-			"frontdoor_sync":                   {},
-			"frontdoor_ad_data_hash_backfill":  {},
-		},
-		"shortcut": {
-			"shortcut_sitemap_sync":           {},
-			"shortcut_buildings_sitemap_sync": {},
-			"shortcut_scraper_sync":           {},
-			"shortcut_api_sync":               {},
-			"shortcut_ad_data_hash_backfill":  {},
-		},
-		"prices": {
-			"prices_cities_init":                   {},
-			"prices_sync":                          {},
-			"prices_postal_code_sync":              {},
-			"prices_postal_code_page_sync":         {},
-			"prices_neighborhood_postal_code_sync": {},
-			"prices_sync_all":                      {},
-			"prices_match_sale_listings_backfill":  {},
-			"prices_match_sale_listings_fanout":    {},
-			"prices_match_sale_listing":            {},
-		},
-		"canonical": {
-			"canonicalize_source_ads_fanout":                {},
-			"canonicalize_source_ad":                        {},
-			"canonical_match_sale_listing_sources_backfill": {},
-			"canonical_match_sale_listing_sources_fanout":   {},
-			"canonical_match_sale_listing_source":           {},
-		},
-		"postal": {
-			"postal_sync": {},
-		},
-	}
-	kinds, ok := validKinds[strings.TrimSpace(provider)]
-	if !ok {
+	if syncjobs.QueueNameForProvider(provider) == "" {
 		return fmt.Errorf("unknown sync provider %q", provider)
 	}
-	if _, ok := kinds[strings.TrimSpace(kind)]; !ok {
+	if !syncjobs.IsKnownJobKind(provider, kind) {
 		return fmt.Errorf("sync kind %q is not valid for provider %q", kind, provider)
 	}
 	return nil

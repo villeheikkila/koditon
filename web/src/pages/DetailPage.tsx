@@ -146,6 +146,38 @@ type PropertyQualityScore = {
   reasons?: string[] | null
   updated_at?: string
 }
+type PropertyDocumentSummary = {
+  id: string
+  offering_id: string
+  unit_id?: string
+  physical_building_id?: string
+  housing_company_id?: string
+  type: string
+  filename: string
+  mime_type: string
+  size_bytes: number
+  sha256: string
+  extraction_status: string
+  extraction_error?: string
+  uploaded_at: string
+  extracted_at?: string
+  download_url: string
+}
+type PropertyDocumentResponse = {
+  data: PropertyDocumentSummary
+  status: number
+  headers: Headers
+}
+type ManagerCertificateExtractionResult = {
+  document: PropertyDocumentSummary
+  model: string
+  claims: number
+}
+type ManagerCertificateExtractionResponse = {
+  data: ManagerCertificateExtractionResult
+  status: number
+  headers: Headers
+}
 type HouseOverview = {
   headline?: string
   summary?: string
@@ -281,6 +313,7 @@ type SaleListingWithValuation = SaleListing & {
   building_profile?: BuildingProfile
   housing_company_profile?: HousingCompanyProfile
   quality_scores?: PropertyQualityScore[] | null
+  documents?: PropertyDocumentSummary[] | null
   house_overview?: HouseOverview
   valuation_inputs?: {
     facts?: ValuationFact[] | null
@@ -351,6 +384,8 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const [valuationInputExtractionResult, setValuationInputExtractionResult] = useState<ValuationInputExtractionResult | null>(null)
   const [canonicalProfileProjectionResult, setCanonicalProfileProjectionResult] = useState<CanonicalProfileProjectionResult | null>(null)
   const [houseOverviewResult, setHouseOverviewResult] = useState<HouseOverviewGenerationResult | null>(null)
+  const [managerCertificateFile, setManagerCertificateFile] = useState<File | null>(null)
+  const [managerCertificateExtractionResult, setManagerCertificateExtractionResult] = useState<ManagerCertificateExtractionResult | null>(null)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -393,6 +428,8 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const buildingProfile = (saleDetail as SaleListingWithValuation | undefined)?.building_profile
   const housingProfile = (saleDetail as SaleListingWithValuation | undefined)?.housing_company_profile
   const qualityScores = (saleDetail as SaleListingWithValuation | undefined)?.quality_scores ?? []
+  const propertyDocuments = (saleDetail as SaleListingWithValuation | undefined)?.documents ?? []
+  const managerCertificateDocuments = propertyDocuments.filter(document => document.type === 'manager_certificate')
   const buildingQualityScores = qualityScores.filter(score => score.target_type === 'physical_building' || score.target_type === 'housing_company' || score.target_type === 'property_offering')
   const hasCanonicalBuildingDetails = hasBuildingProfileValue(buildingProfile) || hasHousingCompanyProfileValue(housingProfile) || buildingQualityScores.length > 0
   const apartmentProfileGroups = apartmentProfile ? groupApartmentProfile(apartmentProfile) : []
@@ -483,6 +520,24 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
       setHouseOverviewResult(response.data)
     },
   })
+  const uploadManagerCertificate = useMutation({
+    mutationFn: async () => {
+      if (!saleDetail) throw new Error('Manager certificate upload is only available for sale listings')
+      if (!managerCertificateFile) throw new Error('Choose a PDF first')
+      return uploadSaleListingManagerCertificate(saleDetail.id, managerCertificateFile)
+    },
+    onSuccess: async () => {
+      setManagerCertificateFile(null)
+      await onRefresh?.()
+    },
+  })
+  const extractManagerCertificate = useMutation({
+    mutationFn: async (documentId: string) => extractPropertyDocument(documentId),
+    onSuccess: async response => {
+      setManagerCertificateExtractionResult(response.data)
+      await onRefresh?.()
+    },
+  })
   const populateEverything = useMutation({
     mutationFn: async () => {
       if (!saleDetail) throw new Error('Profile population is only available for sale listings')
@@ -534,6 +589,31 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
       </button>
       <button type="button" className="listing-action-button" onClick={() => extractDescription.mutate()} disabled={extractDescription.isPending}>
         {extractDescription.isPending ? 'Running…' : 'Extract description'}
+      </button>
+    </div>
+  ) : undefined
+  const documentMessage = uploadManagerCertificate.isError
+    ? (uploadManagerCertificate.error as Error)?.message ?? 'Upload failed'
+    : extractManagerCertificate.isError
+      ? (extractManagerCertificate.error as Error)?.message ?? 'Extraction failed'
+      : managerCertificateExtractionResult
+        ? `${managerCertificateExtractionResult.claims} document claims · ${managerCertificateExtractionResult.model}`
+        : managerCertificateFile
+          ? managerCertificateFile.name
+          : undefined
+  const documentActions = saleDetail ? (
+    <div className="listing-section-actions">
+      {documentMessage && (
+        <span className={`listing-section-status${uploadManagerCertificate.isError || extractManagerCertificate.isError ? ' listing-section-status--error' : ''}`}>
+          {documentMessage}
+        </span>
+      )}
+      <label className="listing-action-button listing-action-button--file">
+        Choose PDF
+        <input type="file" accept="application/pdf" onChange={event => setManagerCertificateFile(event.target.files?.[0] ?? null)} />
+      </label>
+      <button type="button" className="listing-action-button" onClick={() => uploadManagerCertificate.mutate()} disabled={!managerCertificateFile || uploadManagerCertificate.isPending}>
+        {uploadManagerCertificate.isPending ? 'Uploading…' : 'Upload'}
       </button>
     </div>
   ) : undefined
@@ -622,10 +702,36 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
                   <ProfileStep label="Source rows linked" done={(saleDetail.canonical.source_count ?? 0) > 0} detail={saleDetail.canonical.source_count != null ? `${saleDetail.canonical.source_count} source row${saleDetail.canonical.source_count === 1 ? '' : 's'}` : undefined} />
                   <ProfileStep label="Description parsed" done={(valuationFacts?.length ?? 0) > 0 || !!descriptionExtractionResult} detail={(valuationFacts?.length ?? 0) > 0 ? `${valuationFacts.length} valuation facts` : descriptionExtractionMessage} />
                   <ProfileStep label="Renovations structured" done={renovationRows.length > 0 || !!renovationExtractionResult} detail={renovationRows.length > 0 ? `${renovationRows.length} renovation facts` : renovationExtractionMessage} />
+                  <ProfileStep label="Manager certificate" done={managerCertificateDocuments.some(document => document.extraction_status === 'extracted')} detail={managerCertificateDocuments.length ? `${managerCertificateDocuments.length} PDF${managerCertificateDocuments.length === 1 ? '' : 's'}` : documentMessage} />
                   <ProfileStep label="Canonical profile projected" done={!!apartmentProfile} detail={apartmentProfile?.updated_at ? fmtDateTime(apartmentProfile.updated_at) : apartmentProfileMessage} />
                   <ProfileStep label="Building quality scored" done={hasCanonicalBuildingDetails} detail={buildingQualityScores.length ? `${buildingQualityScores.length} quality dimensions` : undefined} />
                 </div>
               </div>
+            </Section>
+          )}
+          {saleDetail && (
+            <Section title="Manager Certificate" actions={documentActions}>
+              {managerCertificateDocuments.length ? (
+                <div className="document-list">
+                  {managerCertificateDocuments.map(document => (
+                    <div className="document-card" key={document.id}>
+                      <div className="document-card-main">
+                        <strong>{document.filename}</strong>
+                        <span>{fmtBytes(document.size_bytes)} · {document.extraction_status}{document.extracted_at ? ` · ${fmtDateTime(document.extracted_at)}` : ''}</span>
+                        {document.extraction_error && <small>{document.extraction_error}</small>}
+                      </div>
+                      <div className="document-card-actions">
+                        <a className="listing-action-button" href={document.download_url}>Download</a>
+                        <button type="button" className="listing-action-button" onClick={() => extractManagerCertificate.mutate(document.id)} disabled={extractManagerCertificate.isPending}>
+                          {extractManagerCertificate.isPending ? 'Extracting…' : document.extraction_status === 'extracted' ? 'Re-extract' : 'Extract'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="listing-empty-state">Upload the manager certificate PDF to extract official building, housing-company, charge, loan, and renovation facts</div>
+              )}
             </Section>
           )}
           {saleDetail && (
@@ -1407,6 +1513,22 @@ function generateSaleListingHouseOverview(id: string): Promise<HouseOverviewGene
   )
 }
 
+function uploadSaleListingManagerCertificate(id: string, file: File): Promise<PropertyDocumentResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  return customInstance<PropertyDocumentResponse>(
+    `/api/v1/sale-listings/${encodeURIComponent(id)}/documents/manager-certificate`,
+    { method: 'POST', body: form },
+  )
+}
+
+function extractPropertyDocument(id: string): Promise<ManagerCertificateExtractionResponse> {
+  return customInstance<ManagerCertificateExtractionResponse>(
+    `/api/v1/property-documents/${encodeURIComponent(id)}/extract?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+    { method: 'POST' },
+  )
+}
+
 function groupValuationFacts(facts: ValuationFact[]): Array<{ section: string; facts: ValuationFact[] }> {
   const grouped = new Map<string, ValuationFact[]>()
   for (const fact of facts) {
@@ -1792,6 +1914,12 @@ function metadataStringArray(metadata: Record<string, unknown> | undefined, key:
 
 function fmtDateTime(value: string): string {
   return new Date(value).toLocaleString('fi-FI', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function fmtBytes(value: number): string {
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`
+  return `${value} B`
 }
 
 function fmtDate(value: string): string {

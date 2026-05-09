@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
 	"koditon/internal/db"
 	"koditon/internal/platform/taskqueue"
 	syncjobs "koditon/internal/sync/jobs"
@@ -16,6 +19,11 @@ type syncJobRunner func(ctx context.Context, logger *slog.Logger, job db.SyncJob
 func (c *Consumer) handleSyncJobTask(ctx context.Context, queueName string, logger *slog.Logger, msg taskqueue.Message, run syncJobRunner) error {
 	if msg.Data.SyncJobID == nil {
 		return taskqueue.NewPermanentError(errors.New("missing sync job id"), "invalid sync job message")
+	}
+	if stale, err := c.isStaleQueueMessage(ctx, queueName, *msg.Data.SyncJobID); err != nil {
+		return err
+	} else if stale {
+		return nil
 	}
 	decision, err := c.syncJobs.ClaimForDispatch(ctx, *msg.Data.SyncJobID)
 	if err != nil {
@@ -65,6 +73,18 @@ func (c *Consumer) handleSyncJobTask(ctx context.Context, queueName string, logg
 	}
 	_ = c.syncJobs.FinalizeAttempt(ctx, attemptID, syncjobs.StatusSucceeded, nil, nil)
 	return nil
+}
+
+func (c *Consumer) isStaleQueueMessage(ctx context.Context, queueName string, syncJobID uuid.UUID) (bool, error) {
+	job, err := c.queries.GetSyncJobByID(ctx, syncJobID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return true, nil
+		}
+		return false, err
+	}
+	expectedQueue := syncjobs.QueueNameForProvider(job.SyncJobProvider)
+	return expectedQueue != "" && expectedQueue != queueName, nil
 }
 
 func retryDelay(err error) time.Duration {

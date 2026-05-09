@@ -1,0 +1,157 @@
+DELETE FROM public.property_dimension_claims
+WHERE claim_scope = 'canonical';
+DELETE FROM public.property_dimension_projection_runs
+WHERE projection_type = 'canonical_claims';
+ALTER TABLE public.property_dimension_claims
+    DROP CONSTRAINT IF EXISTS property_dimension_claims_claim_scope_check;
+ALTER TABLE public.property_dimension_claims
+    ADD CONSTRAINT property_dimension_claims_claim_scope_check
+    CHECK (claim_scope = ANY (ARRAY['source','manual']::text[]));
+ALTER TABLE public.property_dimension_projection_runs
+    DROP CONSTRAINT IF EXISTS property_dimension_projection_runs_projection_type_check;
+ALTER TABLE public.property_dimension_projection_runs
+    ADD CONSTRAINT property_dimension_projection_runs_projection_type_check
+    CHECK (projection_type = ANY (ARRAY['source_claims','renovation_events','resolved_values','profiles','system_profiles']::text[]));
+DROP FUNCTION IF EXISTS public.fnc__promote_listing_dimension_claims(uuid);
+DROP FUNCTION IF EXISTS public.fnc__refresh_housing_company_facts_for_property_source_offering(uuid);
+CREATE OR REPLACE FUNCTION public.fnc__clear_property_dimension_target_dirty(p_target_type text, p_target_id uuid, p_expected_dirty_at timestamptz DEFAULT NULL)
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_count integer;
+BEGIN
+    UPDATE public.property_dimension_dirty_targets
+    SET resolved_at = now(),
+        dirty_reasons = '{}'
+    WHERE target_type = p_target_type
+        AND target_id = p_target_id
+        AND (p_expected_dirty_at IS NULL OR dirty_at <= p_expected_dirty_at);
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.fnc__clear_listing_dimension_targets_dirty(p_sale_listing_id uuid, p_expected_dirty_at timestamptz DEFAULT NULL)
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_count integer := 0;
+    v_target record;
+BEGIN
+    v_count := v_count + public.fnc__clear_property_dimension_target_dirty('listing', p_sale_listing_id, p_expected_dirty_at);
+    FOR v_target IN
+        WITH linked AS (
+            SELECT
+                po.property_offering_id,
+                pu.property_unit_id,
+                pu.physical_building_id,
+                COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+            FROM public.property_offering_sources pos
+            JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+            JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+            LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+            WHERE pos.sale_listing_id = p_sale_listing_id
+                AND pos.property_offering_source_link_status <> 'rejected'
+            ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_created_at DESC
+            LIMIT 1
+        )
+        SELECT 'offering'::text AS target_type, property_offering_id AS target_id FROM linked WHERE property_offering_id IS NOT NULL
+        UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
+        UNION ALL SELECT 'building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
+        UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL
+    LOOP
+        v_count := v_count + public.fnc__clear_property_dimension_target_dirty(v_target.target_type, v_target.target_id, p_expected_dirty_at);
+    END LOOP;
+    RETURN v_count;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.fnc__resolve_dimension_target(p_target_type text, p_target_id uuid, p_expected_dirty_at timestamptz DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_values integer;
+    v_profiles integer;
+    v_cleared integer;
+BEGIN
+    v_values := public.fnc__resolve_dimension_values_for_target(p_target_type, p_target_id);
+    v_profiles := public.fnc__project_dimension_profile_for_target(p_target_type, p_target_id);
+    v_cleared := public.fnc__clear_property_dimension_target_dirty(p_target_type, p_target_id, p_expected_dirty_at);
+    RETURN jsonb_build_object(
+        'target_type', p_target_type,
+        'target_id', p_target_id,
+        'values', v_values,
+        'profiles', v_profiles,
+        'cleared_dirty_targets', v_cleared
+    );
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.fnc__rebuild_listing_dimension_layer(p_sale_listing_id uuid, p_expected_dirty_at timestamptz DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_source_claims integer;
+    v_values integer := 0;
+    v_profiles integer := 0;
+    v_cleaned integer := 0;
+    v_target record;
+BEGIN
+    v_source_claims := public.fnc__project_listing_provider_dimension_claims(p_sale_listing_id);
+    FOR v_target IN
+        WITH linked AS (
+            SELECT
+                po.property_offering_id,
+                pu.property_unit_id,
+                pu.physical_building_id,
+                COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+            FROM public.property_offering_sources pos
+            JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+            JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+            LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+            WHERE pos.sale_listing_id = p_sale_listing_id
+                AND pos.property_offering_source_link_status <> 'rejected'
+            ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_created_at DESC
+            LIMIT 1
+        ),
+        target_candidates AS (
+            SELECT
+                catalog.target_type,
+                CASE catalog.target_type
+                    WHEN 'offering' THEN linked.property_offering_id
+                    WHEN 'unit' THEN linked.property_unit_id
+                    WHEN 'building' THEN linked.physical_building_id
+                    WHEN 'housing_company' THEN linked.housing_company_id
+                END AS target_id
+            FROM linked
+            JOIN public.property_dimension_claims c
+                ON c.claim_scope = 'source'
+                AND c.target_type = 'listing'
+                AND c.target_id = p_sale_listing_id
+            JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+            UNION
+            SELECT c.target_type, c.target_id
+            FROM public.property_dimension_claims c
+            JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+            WHERE c.claim_scope IN ('source','manual')
+                AND c.source_table = 'property_source_offerings'
+                AND c.source_id = p_sale_listing_id
+                AND c.target_type = catalog.target_type
+        )
+        SELECT DISTINCT target_type, target_id
+        FROM target_candidates
+        WHERE target_id IS NOT NULL
+    LOOP
+        v_values := v_values + public.fnc__resolve_dimension_values_for_target(v_target.target_type, v_target.target_id);
+        v_profiles := v_profiles + public.fnc__project_dimension_profile_for_target(v_target.target_type, v_target.target_id);
+    END LOOP;
+    v_cleaned := public.fnc__clear_listing_dimension_targets_dirty(p_sale_listing_id, p_expected_dirty_at);
+    RETURN jsonb_build_object(
+        'source_claims', v_source_claims,
+        'values', v_values,
+        'profiles', v_profiles,
+        'cleaned_dirty_targets', v_cleaned
+    );
+END;
+$$;

@@ -5,6 +5,7 @@ sql:
     # db:vet injects database.uri into a temporary config for sqlc/db-prepare.
     schema:
       - db/schema.sql
+      - db/migrations/083_drop_old_derived_property_tables.sql
     queries:
       - db/queries/ads
       - db/queries/auth
