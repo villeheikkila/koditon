@@ -50,6 +50,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
+        <Route path="/target/:targetType/:id" element={<DetailPage />} />
         <Route path="/listing/:id" element={<DetailPage kind="listing" />} />
         <Route path="/rental/:id" element={<DetailPage kind="rental" />} />
         <Route path="/housing-company/:id" element={<DetailPage kind="housingCompany" />} />

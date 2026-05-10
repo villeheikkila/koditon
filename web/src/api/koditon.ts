@@ -118,301 +118,156 @@ export interface AvailableTypesOutputBody {
   types: TranslatedValue[] | null;
 }
 
-export type BuildingMetadata = {[key: string]: unknown};
+export type CanonicalTargetRefType = typeof CanonicalTargetRefType[keyof typeof CanonicalTargetRefType];
 
-export interface BuildingSourceID {
-  external_id?: string;
-  kind: string;
-  native_id: string;
-  provider: string;
+
+export const CanonicalTargetRefType = {
+  offering: 'offering',
+  unit: 'unit',
+  building: 'building',
+  housing_company: 'housing_company',
+  listing: 'listing',
+  document: 'document',
+  transaction: 'transaction',
+} as const;
+
+export interface CanonicalTargetRef {
+  id: string;
+  type: CanonicalTargetRefType;
 }
 
-export type BuildingIdentityInputs = {[key: string]: string};
-
-export interface BuildingIdentity {
-  confidence: number;
-  inputs?: BuildingIdentityInputs;
-  key: string;
-  /** @nullable */
-  sources?: BuildingSourceID[] | null;
-  strategy: string;
+export interface PropertyDocumentSummary {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  download_url: string;
+  extracted_at?: string;
+  extraction_error?: string;
+  extraction_status: string;
+  filename: string;
+  housing_company_id?: string;
+  id: string;
+  mime_type: string;
+  offering_id: string;
+  physical_building_id?: string;
+  sha256: string;
+  size_bytes: number;
+  type: string;
+  unit_id?: string;
+  uploaded_at: string;
 }
 
-export interface Location {
-  city?: string;
-  district?: string;
-  latitude?: number;
-  longitude?: number;
-  postal?: string;
-  street_address?: string;
-}
-
-export interface BuildingRenovation {
-  done?: boolean;
-  kind: string;
-  year?: number;
-}
-
-export interface BuildingDetails {
-  apartment_count?: number;
-  build_year?: number;
-  building_material?: string;
-  building_subtype?: string;
-  building_type?: string;
-  business_id?: string;
-  business_premise_count?: number;
-  car_storage?: string;
-  common_areas?: string;
-  connectivity?: string;
-  construction_year?: number;
-  elevator?: boolean;
-  energy_class?: string;
-  floor_count?: number;
-  frame_construction_method?: string;
-  heating?: string;
-  heating_description?: string;
-  heating_fuel?: string;
-  housing_company?: string;
-  identity: BuildingIdentity;
-  location: Location;
-  maintenance_responsibility?: string;
-  management_method?: string;
-  other_info?: string;
-  property_manager?: string;
-  /** @nullable */
-  renovations?: BuildingRenovation[] | null;
-  roof_material?: string;
-  roof_type?: string;
-  sauna?: boolean;
-  wall_structure?: string;
-}
-
-export interface Insight {
-  confidence?: number;
-  key: string;
-  source?: string;
+export interface TargetOverviewField {
+  label: string;
   value: string;
 }
 
-export interface BuildingInsights {
-  /** @nullable */
-  items?: Insight[] | null;
+export interface TargetOverviewRelated {
+  label: string;
+  target: CanonicalTargetRef;
+  title: string;
 }
 
-export type ImageVariants = {[key: string]: string};
-
-export interface Image {
-  description?: string;
-  id?: string;
-  ordinal?: number;
-  provider?: string;
-  provider_id?: string;
-  role?: string;
-  /** @nullable */
-  tags?: string[] | null;
-  url: string;
-  variants?: ImageVariants;
-}
-
-export interface RelatedListing {
-  address?: string;
-  area_m2?: number;
-  build_year?: number;
-  friendly_id?: string;
-  id: string;
-  kind?: string;
-  /** @nullable */
-  kinds?: string[] | null;
-  last_seen_at?: string;
-  main_image?: Image;
-  price?: number;
-  price_per_m2?: number;
-  sold_at?: string;
-  sold_price?: number;
-  /** @nullable */
-  providers?: string[] | null;
-  published?: boolean;
-  rent_period?: string;
-  room_layout?: string;
-}
-
-export interface RelatedListings {
-  /** @nullable */
-  items?: RelatedListing[] | null;
-}
-
-export interface SiteDetails {
-  driving_directions?: string;
-  lot_redemption_info?: string;
-  lot_rental_agreement?: string;
-  plot_area_m2?: number;
-  plot_ownership_type?: string;
-  plot_type?: string;
-  road_access?: string;
-  services?: string;
-  sewer?: string;
-  shore?: string;
-  transport?: string;
-  water_supply?: string;
-  /** @nullable */
-  water_supply_types?: string[] | null;
-  yard?: string;
-  zoning?: string;
-}
-
-export type ListingSourceFlags = {[key: string]: boolean};
-
-export type ListingSourceMetadata = {[key: string]: unknown};
-
-export interface ListingSource {
-  external_id?: string;
-  first_seen_at?: string;
-  flags?: ListingSourceFlags;
-  friendly_id?: string;
+export interface TargetSourceLink {
   kind: string;
+  label: string;
   last_seen_at?: string;
-  metadata?: ListingSourceMetadata;
-  native_id: string;
-  original_url?: string;
   provider: string;
-  published_at?: string;
-  status?: string;
+  source_id?: string;
+  title: string;
   url?: string;
 }
 
-export interface TextSections {
-  additional_info?: string;
-  amenities?: string;
-  area?: string;
-  availability?: string;
-  bathroom?: string;
-  building?: string;
-  charges?: string;
-  description?: string;
-  kitchen?: string;
-  materials?: string;
-  renovations_done?: string;
-  renovations_planned?: string;
-  storage?: string;
-  transport?: string;
+export interface TargetOverview {
+  /** @nullable */
+  fields?: TargetOverviewField[] | null;
+  /** @nullable */
+  related?: TargetOverviewRelated[] | null;
+  /** @nullable */
+  sources?: TargetSourceLink[] | null;
+  subtitle?: string;
+  title: string;
 }
 
-export interface Building {
+export interface RenovationEvent {
+  category: string;
+  component?: string;
+  confidence: number;
+  cost_estimate_eur?: number;
+  created_at: string;
+  end_year?: number;
+  event_scope?: string;
+  evidence?: unknown;
+  id: string;
+  observed_at?: string;
+  projection_version: string;
+  responsibility?: string;
+  scope: string;
+  source_field?: string;
+  source_id: string;
+  source_reliability: number;
+  source_table: string;
+  stage?: string;
+  start_year?: number;
+  status: string;
+  summary?: string;
+  target: CanonicalTargetRef;
+  year?: number;
+}
+
+export type EvidenceRefKind = typeof EvidenceRefKind[keyof typeof EvidenceRefKind];
+
+
+export const EvidenceRefKind = {
+  claim: 'claim',
+  renovation_event: 'renovation_event',
+  document: 'document',
+  listing: 'listing',
+  manual: 'manual',
+} as const;
+
+export interface EvidenceRef {
+  confidence?: number;
+  created_at?: string;
+  evidence?: unknown;
+  id?: string;
+  kind: EvidenceRefKind;
+  observed_at?: string;
+  projection_version?: string;
+  scope?: string;
+  source_field?: string;
+  source_id?: string;
+  source_reliability?: number;
+  source_table?: string;
+}
+
+export interface ResolvedValue {
+  confidence: number;
+  conflict_status: string;
+  dimension_key: string;
+  /** @nullable */
+  rejected_claim_ids?: string[] | null;
+  resolved_at: string;
+  selected_evidence?: EvidenceRef;
+  selected_reason: string;
+  /** @nullable */
+  supporting_claim_ids?: string[] | null;
+  target: CanonicalTargetRef;
+  unit?: string;
+  value: unknown;
+  value_kind: string;
+}
+
+export interface CanonicalTargetResource {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  details: BuildingDetails;
-  id: string;
-  insights?: BuildingInsights;
-  metadata?: BuildingMetadata;
-  related?: RelatedListings;
-  site?: SiteDetails;
   /** @nullable */
-  source_records: ListingSource[] | null;
-  texts?: TextSections;
-}
-
-export interface CanonicalOffering {
-  housing_company_id?: string;
-  merge_decision_count?: number;
-  merged_from?: string[];
-  offering_id: string;
-  primary_source_listing_id?: string;
-  source_count?: number;
-  unit_id?: string;
-}
-
-export interface Charges {
-  electricity?: string;
-  heating?: string;
-  maintenance_monthly?: number;
-  notes?: string;
-  parking?: number;
-  sauna?: number;
-  total_monthly?: number;
-  water?: number;
-}
-
-export type CommercialDetailsLeadOptions = {[key: string]: boolean};
-
-export interface PriceTransactionMatch {
-  area_m2?: number;
-  build_year?: number;
-  category?: string;
-  city?: string;
-  condition?: string;
-  description?: string;
-  elevator?: boolean;
-  energy_class?: string;
-  first_seen_at?: string;
-  floor?: string;
-  id: string;
-  match_confidence?: string;
-  match_score?: number;
-  match_status?: string;
-  neighborhood?: string;
-  period_identifier?: string;
-  plot?: string;
-  plot_owned?: boolean;
-  postal_code?: string;
-  price?: number;
-  price_per_m2?: number;
-  type?: string;
-  updated_at?: string;
-}
-
-export interface CommercialDetails {
-  asking_price?: number;
-  available_from?: string;
-  booking_status?: string;
-  can_receive_leads?: boolean;
-  charges?: Charges;
-  days_on_market?: number;
-  debt_free_price?: number;
-  debt_share_additional_info?: string;
-  debt_share_amount?: number;
-  development_phase?: string;
-  fees_info?: string;
-  financing_fee_interest_only_end_date?: string;
-  financing_fee_interest_only_period?: string;
-  financing_fee_interest_only_start_date?: string;
-  first_seen_at?: string;
-  fixed_term?: boolean;
-  furnished?: boolean;
-  is_company_announcement?: boolean;
-  last_seen_at?: string;
-  lead_options?: CommercialDetailsLeadOptions;
-  main_image_hidden?: boolean;
-  map_visible?: boolean;
-  matched_transaction?: PriceTransactionMatch;
-  minimum_term_months?: number;
-  new_development?: boolean;
-  notify_price_changed?: boolean;
-  open_bidding_in_use?: boolean;
-  open_bidding_latest_offer?: number;
-  open_bidding_starting_debt_free_price?: number;
-  open_bidding_starting_selling_price?: number;
-  open_bidding_target_url?: string;
-  other_terms?: string;
-  ownership_type?: string;
-  pets_allowed?: boolean;
-  previous_asking_price?: number;
-  previous_debt_free_price?: number;
-  price_per_m2?: number;
-  published_at?: string;
-  rent?: number;
-  rent_period?: string;
-  security_deposit?: string;
-  show_bidding_indicators?: boolean;
-  status?: string;
-  unpublished_at?: string;
-}
-
-export interface Contact {
-  email?: string;
-  name?: string;
-  office_name?: string;
-  phone?: string;
-  title?: string;
+  documents?: PropertyDocumentSummary[] | null;
+  overview?: TargetOverview;
+  /** @nullable */
+  renovation_events?: RenovationEvent[] | null;
+  /** @nullable */
+  resolved_values: ResolvedValue[] | null;
+  target: CanonicalTargetRef;
 }
 
 export interface DetailFieldOutput {
@@ -512,108 +367,11 @@ export interface ErrorModel {
   type?: string;
 }
 
-export interface Link {
-  title?: string;
-  type?: string;
-  url: string;
-}
-
-export interface ListingInsights {
-  /** @nullable */
-  items?: Insight[] | null;
-}
-
-export interface Media {
-  /** @nullable */
-  images?: Image[] | null;
-  main_image?: Image;
-}
-
-export interface OfferingSourceRecord {
-  first_seen_at?: string;
-  headline?: string;
-  id: string;
-  kind: string;
-  last_seen_at?: string;
-  link_method: string;
-  link_score: number;
-  link_status: string;
-  native_id: string;
-  provider: string;
-  url?: string;
-}
-
-export interface UnitDetails {
-  /** @nullable */
-  appliances?: string[] | null;
-  area_m2?: number;
-  availability?: string;
-  balcony?: boolean;
-  balcony_description?: string;
-  bathroom_description?: string;
-  bedrooms_count?: number;
-  condition?: string;
-  /** @nullable */
-  features?: string[] | null;
-  floor_level?: number;
-  floor_materials_description?: string;
-  kitchen_description?: string;
-  living_area_m2?: number;
-  location: Location;
-  other_area_m2?: number;
-  parking?: string;
-  property_subtype?: string;
-  property_type?: string;
-  room_layout?: string;
-  rooms_count?: number;
-  sauna?: boolean;
-  sauna_description?: string;
-  storage_description?: string;
-  total_area_m2?: number;
-  views_description?: string;
-  wall_materials_description?: string;
-}
-
-export interface RentalSummary {
-  building: BuildingDetails;
-  commercial: CommercialDetails;
-  headline: string;
-  id: string;
-  media?: Media;
-  site?: SiteDetails;
-  source: ListingSource;
-  unit: UnitDetails;
-}
-
-export interface PageRentalSummary {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  page: number;
-  page_size: number;
-  /** @nullable */
-  rows: RentalSummary[] | null;
-  total: number;
-}
-
-export interface SaleListingSummary {
-  building: BuildingDetails;
-  commercial: CommercialDetails;
-  headline: string;
-  id: string;
-  media?: Media;
-  site?: SiteDetails;
-  source: ListingSource;
-  unit: UnitDetails;
-}
-
-export interface PageSaleListingSummary {
-  /** A URL to the JSON Schema for this object. */
-  readonly $schema?: string;
-  page: number;
-  page_size: number;
-  /** @nullable */
-  rows: SaleListingSummary[] | null;
-  total: number;
+export interface FormFile {
+  ContentType: string;
+  Filename: string;
+  IsSet: boolean;
+  Size: number;
 }
 
 export interface PasskeyAuthInputBody {
@@ -697,6 +455,9 @@ export interface PricesTransaction {
   energy_class?: string;
   floor?: string;
   id: string;
+  is_matched: boolean;
+  matched_listing_count: number;
+  matched_offering_count: number;
   municipality_id: string;
   municipality_name_fi: string;
   neighborhood_id: string;
@@ -719,31 +480,65 @@ export interface PricesTransactionsOutputBody {
   transactions: PricesTransaction[] | null;
 }
 
-export interface Showing {
-  end_at?: string;
-  info?: string;
-  start_at?: string;
-}
-
-export interface Rental {
+export interface PropertyDocumentAttachModelInputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  building: BuildingDetails;
-  commercial: CommercialDetails;
+  /** New target. Omit or null to detach. */
+  target?: CanonicalTargetRef;
+}
+
+export interface QueuedCanonicalJob {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  job_id: string;
+  queued: boolean;
+}
+
+export interface PropertyDocumentAttachOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  document: PropertyDocumentSummary;
+  job: QueuedCanonicalJob;
+}
+
+export interface PropertyTargetMapOffering {
+  area_m2?: number;
+  headline?: string;
+  last_seen_at?: string;
+  price_eur?: number;
+  room_layout?: string;
+  target: CanonicalTargetRef;
+  unit_target: CanonicalTargetRef;
+}
+
+export interface PropertyTargetMapMarker {
+  address?: string;
+  build_year?: number;
+  city?: string;
+  lat: number;
+  lng: number;
+  name?: string;
+  offering_count: number;
   /** @nullable */
-  contacts?: Contact[] | null;
-  headline: string;
-  id: string;
-  insights?: ListingInsights;
+  offerings: PropertyTargetMapOffering[] | null;
+  postal?: string;
+  target: CanonicalTargetRef;
+  unit_count: number;
+}
+
+export interface PropertyTargetMap {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
   /** @nullable */
-  links?: Link[] | null;
-  media?: Media;
+  markers: PropertyTargetMapMarker[] | null;
+}
+
+export interface RenovationEventsOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
   /** @nullable */
-  showings?: Showing[] | null;
-  site?: SiteDetails;
-  source: ListingSource;
-  texts?: TextSections;
-  unit: UnitDetails;
+  events: RenovationEvent[] | null;
+  target: CanonicalTargetRef;
 }
 
 export interface ResolveCanonicalIDOutputBody {
@@ -755,28 +550,12 @@ export interface ResolveCanonicalIDOutputBody {
   source: string;
 }
 
-export interface SaleListing {
+export interface ResolvedValuesOutputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
-  building: BuildingDetails;
-  canonical: CanonicalOffering;
-  commercial: CommercialDetails;
+  target: CanonicalTargetRef;
   /** @nullable */
-  contacts?: Contact[] | null;
-  headline: string;
-  id: string;
-  insights?: ListingInsights;
-  /** @nullable */
-  links?: Link[] | null;
-  media?: Media;
-  /** @nullable */
-  showings?: Showing[] | null;
-  site?: SiteDetails;
-  source: ListingSource;
-  /** @nullable */
-  source_records?: OfferingSourceRecord[] | null;
-  texts?: TextSections;
-  unit: UnitDetails;
+  values: ResolvedValue[] | null;
 }
 
 export interface SearchResultRow {
@@ -804,92 +583,42 @@ export interface SearchOutputBody {
   total: number;
 }
 
-export interface TransactionMatchListingCandidate {
-  area_m2?: number;
-  asking_price?: number;
-  build_year?: number;
-  canonical_id: string;
-  city?: string;
-  condition?: string;
-  condition_match_code?: string;
-  elevator?: boolean;
-  energy_label?: string;
-  energy_match_code?: string;
-  first_seen_at?: string;
-  floor_level?: number;
-  headline?: string;
+export interface SourceClaim {
+  claim_scope: string;
+  confidence: number;
+  created_at: string;
+  dimension_key: string;
+  evidence?: unknown;
   id: string;
-  last_seen_at?: string;
-  plot_owned?: boolean;
-  plot_ownership_raw?: string;
-  postal?: string;
-  price_per_m2?: number;
-  room_layout?: string;
-  source_provider: string;
-  street_address?: string;
-  total_floors?: number;
-  url?: string;
+  observed_at?: string;
+  projection_version: string;
+  source_field?: string;
+  source_id: string;
+  source_reliability: number;
+  source_table: string;
+  target: CanonicalTargetRef;
+  unit?: string;
+  updated_at: string;
+  valid_from?: string;
+  valid_until?: string;
+  value: unknown;
+  value_kind: string;
 }
 
-export interface TransactionMatchTransaction {
-  area_m2: number;
-  build_year?: number;
-  category?: string;
-  condition?: string;
-  condition_match_code?: string;
-  created_at?: string;
-  description?: string;
-  elevator: boolean;
-  energy_class?: string;
-  energy_match_code?: string;
-  floor?: string;
-  id: string;
-  period_identifier?: string;
-  plot?: string;
-  plot_owned?: boolean;
-  price: number;
-  price_per_m2: number;
-  type?: string;
-}
-
-export interface TransactionMatchCandidate {
-  confidence: string;
-  created_at?: string;
-  id: string;
-  listing: TransactionMatchListingCandidate;
-  price_delta_percent?: number;
-  reasons?: unknown;
-  score: number;
-  status: string;
-  transaction: TransactionMatchTransaction;
-}
-
-export interface TransactionMatchCandidatesOutputBody {
+export interface SourceClaimsOutputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** @nullable */
-  candidates: TransactionMatchCandidate[] | null;
+  claims: SourceClaim[] | null;
+  target: CanonicalTargetRef;
 }
 
-export interface TransactionMatchPostalSummary {
-  ambiguous_count: number;
-  candidate_count: number;
-  high_count: number;
-  latest_at?: string;
-  listing_count: number;
-  low_count: number;
-  medium_count: number;
-  municipality_name?: string;
-  name_fi?: string;
-  postal: string;
-  transaction_count: number;
-}
-
-export interface TransactionMatchPostalsOutputBody {
+export interface TargetDocumentsOutputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** @nullable */
-  postals: TransactionMatchPostalSummary[] | null;
+  documents: PropertyDocumentSummary[] | null;
+  target: CanonicalTargetRef;
 }
 
 export interface WebSessionRefreshOutputBody {
@@ -949,84 +678,46 @@ max_area?: number;
 limit?: number;
 };
 
-export type RentalsSearchParams = {
+export type PropertyDocumentsManagerCertificatesUploadParams = {
 /**
- * Free text search
+ * Optional target type: offering, unit, building, housing_company
+ */
+target_type?: string;
+/**
+ * Optional target UUID
+ */
+target_id?: string;
+};
+
+export type PropertyDocumentsManagerCertificatesUploadBody = {
+  file: Blob;
+};
+
+export type PropertyTargetsMapParams = {
+/**
+ * Minimum latitude for visible map bounds, 0 = no bounds
+ */
+min_lat?: number;
+/**
+ * Minimum longitude for visible map bounds, 0 = no bounds
+ */
+min_lng?: number;
+/**
+ * Maximum latitude for visible map bounds, 0 = no bounds
+ */
+max_lat?: number;
+/**
+ * Maximum longitude for visible map bounds, 0 = no bounds
+ */
+max_lng?: number;
+/**
+ * Search by housing company name, address, city, or postal code
  */
 q?: string;
 /**
- * Source filter: shortcut, frontdoor, or all
+ * Maximum number of housing company markers
  */
-source?: string;
-/**
- * City / municipality filter
- */
-city?: string;
-/**
- * Postal code prefix filter
- */
-postal?: string;
-/**
- * Minimum price (EUR, 0 = no minimum)
- */
-min_price?: number;
-/**
- * Maximum price (EUR, 0 = no maximum)
- */
-max_price?: number;
-/**
- * Minimum area (m², 0 = no minimum)
- */
-min_area?: number;
-/**
- * Maximum area (m², 0 = no maximum)
- */
-max_area?: number;
-/**
- * Minimum price per square meter (EUR/m², 0 = no minimum)
- */
-min_price_per_m2?: number;
-/**
- * Maximum price per square meter (EUR/m², 0 = no maximum)
- */
-max_price_per_m2?: number;
-/**
- * Exact room count (0 = no filter)
- */
-rooms?: number;
-/**
- * Exact floor level (0 = no filter)
- */
-floor?: number;
-/**
- * Minimum build year (0 = no minimum)
- */
-min_build_year?: number;
-/**
- * Maximum build year (0 = no maximum)
- */
-max_build_year?: number;
-/**
- * Condition text filter
- */
-condition?: string;
-/**
- * Energy class text filter
- */
-energy_class?: string;
-/**
- * Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc
- */
-sort?: string;
-/**
- * Page number (1-based)
- * @minimum 1
- */
-page?: number;
-/**
- * Results per page: 25, 50, or 100
- */
-page_size?: number;
+limit?: number;
 };
 
 export type ResolveCanonicalIdParams = {
@@ -1034,116 +725,6 @@ export type ResolveCanonicalIdParams = {
  * Source URL
  */
 url: string;
-};
-
-export type SaleListingsSearchParams = {
-/**
- * Free text search
- */
-q?: string;
-/**
- * Source filter: shortcut, frontdoor, or all
- */
-source?: string;
-/**
- * Listing kind filter: full, announcement, or all
- */
-kind?: string;
-/**
- * City / municipality filter
- */
-city?: string;
-/**
- * Postal code prefix filter
- */
-postal?: string;
-/**
- * Minimum price (EUR, 0 = no minimum)
- */
-min_price?: number;
-/**
- * Maximum price (EUR, 0 = no maximum)
- */
-max_price?: number;
-/**
- * Minimum area (m², 0 = no minimum)
- */
-min_area?: number;
-/**
- * Maximum area (m², 0 = no maximum)
- */
-max_area?: number;
-/**
- * Minimum price per square meter (EUR/m², 0 = no minimum)
- */
-min_price_per_m2?: number;
-/**
- * Maximum price per square meter (EUR/m², 0 = no maximum)
- */
-max_price_per_m2?: number;
-/**
- * Exact room count (0 = no filter)
- */
-rooms?: number;
-/**
- * Exact floor level (0 = no filter)
- */
-floor?: number;
-/**
- * Minimum build year (0 = no minimum)
- */
-min_build_year?: number;
-/**
- * Maximum build year (0 = no maximum)
- */
-max_build_year?: number;
-/**
- * Condition text filter
- */
-condition?: string;
-/**
- * Energy class text filter
- */
-energy_class?: string;
-/**
- * Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc
- */
-sort?: string;
-/**
- * Page number (1-based)
- * @minimum 1
- */
-page?: number;
-/**
- * Results per page: 25, 50, or 100
- */
-page_size?: number;
-};
-
-export type SaleListingsTransactionMatchCandidatesParams = {
-/**
- * Postal code filter
- */
-postal?: string;
-/**
- * Candidate status filter: candidate or ambiguous
- */
-status?: string;
-/**
- * Prices transaction UUID filter
- */
-transaction?: string;
-/**
- * Maximum candidates to return
- */
-limit?: number;
-};
-
-export type SaleListingsTransactionMatchPostalsParams = {
-/**
- * Maximum postal codes to return
- */
-limit?: number;
 };
 
 export type SearchParams = {
@@ -1676,125 +1257,6 @@ export function useAvailabilityTypes<TData = Awaited<ReturnType<typeof availabil
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAvailabilityTypesQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Fetch housing company details by public ID, canonical ID, or source URL
- * @summary Get housing company detail
- */
-export type housingCompaniesDetailResponse200 = {
-  data: Building
-  status: 200
-}
-
-export type housingCompaniesDetailResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type housingCompaniesDetailResponseSuccess = (housingCompaniesDetailResponse200) & {
-  headers: Headers;
-};
-export type housingCompaniesDetailResponseError = (housingCompaniesDetailResponseDefault) & {
-  headers: Headers;
-};
-
-export type housingCompaniesDetailResponse = (housingCompaniesDetailResponseSuccess | housingCompaniesDetailResponseError)
-
-export const getHousingCompaniesDetailUrl = (id: string,) => {
-
-
-
-
-  return `/api/v1/housing-companies/${id}`
-}
-
-export const housingCompaniesDetail = async (id: string, options?: RequestInit): Promise<housingCompaniesDetailResponse> => {
-
-  return customInstance<housingCompaniesDetailResponse>(getHousingCompaniesDetailUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getHousingCompaniesDetailQueryKey = (id: string,) => {
-    return [
-    `/api/v1/housing-companies/${id}`
-    ] as const;
-    }
-
-
-export const getHousingCompaniesDetailQueryOptions = <TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getHousingCompaniesDetailQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof housingCompaniesDetail>>> = ({ signal }) => housingCompaniesDetail(id, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type HousingCompaniesDetailQueryResult = NonNullable<Awaited<ReturnType<typeof housingCompaniesDetail>>>
-export type HousingCompaniesDetailQueryError = ErrorType<ErrorModel>
-
-
-export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof housingCompaniesDetail>>,
-          TError,
-          Awaited<ReturnType<typeof housingCompaniesDetail>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof housingCompaniesDetail>>,
-          TError,
-          Awaited<ReturnType<typeof housingCompaniesDetail>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get housing company detail
- */
-
-export function useHousingCompaniesDetail<TData = Awaited<ReturnType<typeof housingCompaniesDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof housingCompaniesDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getHousingCompaniesDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2391,29 +1853,29 @@ export function usePricesTransactionsFiltered<TData = Awaited<ReturnType<typeof 
 
 
 /**
- * Search rentals using the shared provider-neutral rental model
- * @summary Search rentals
+ * Stores a manager certificate PDF, optionally attaches it to a canonical target, and queues extraction.
+ * @summary Upload manager certificate
  */
-export type rentalsSearchResponse200 = {
-  data: PageRentalSummary
+export type propertyDocumentsManagerCertificatesUploadResponse200 = {
+  data: PropertyDocumentAttachOutputBody
   status: 200
 }
 
-export type rentalsSearchResponseDefault = {
+export type propertyDocumentsManagerCertificatesUploadResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type rentalsSearchResponseSuccess = (rentalsSearchResponse200) & {
+export type propertyDocumentsManagerCertificatesUploadResponseSuccess = (propertyDocumentsManagerCertificatesUploadResponse200) & {
   headers: Headers;
 };
-export type rentalsSearchResponseError = (rentalsSearchResponseDefault) & {
+export type propertyDocumentsManagerCertificatesUploadResponseError = (propertyDocumentsManagerCertificatesUploadResponseDefault) & {
   headers: Headers;
 };
 
-export type rentalsSearchResponse = (rentalsSearchResponseSuccess | rentalsSearchResponseError)
+export type propertyDocumentsManagerCertificatesUploadResponse = (propertyDocumentsManagerCertificatesUploadResponseSuccess | propertyDocumentsManagerCertificatesUploadResponseError)
 
-export const getRentalsSearchUrl = (params?: RentalsSearchParams,) => {
+export const getPropertyDocumentsManagerCertificatesUploadUrl = (params?: PropertyDocumentsManagerCertificatesUploadParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -2425,12 +1887,106 @@ export const getRentalsSearchUrl = (params?: RentalsSearchParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/v1/rentals?${stringifiedParams}` : `/api/v1/rentals`
+  return stringifiedParams.length > 0 ? `/api/v1/property-documents/manager-certificates?${stringifiedParams}` : `/api/v1/property-documents/manager-certificates`
 }
 
-export const rentalsSearch = async (params?: RentalsSearchParams, options?: RequestInit): Promise<rentalsSearchResponse> => {
+export const propertyDocumentsManagerCertificatesUpload = async (propertyDocumentsManagerCertificatesUploadBody: PropertyDocumentsManagerCertificatesUploadBody,
+    params?: PropertyDocumentsManagerCertificatesUploadParams, options?: RequestInit): Promise<propertyDocumentsManagerCertificatesUploadResponse> => {
+    const formData = new FormData();
+formData.append(`file`, propertyDocumentsManagerCertificatesUploadBody.file);
 
-  return customInstance<rentalsSearchResponse>(getRentalsSearchUrl(params),
+  return customInstance<propertyDocumentsManagerCertificatesUploadResponse>(getPropertyDocumentsManagerCertificatesUploadUrl(params),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPropertyDocumentsManagerCertificatesUploadMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>, TError,{data: BodyType<PropertyDocumentsManagerCertificatesUploadBody>;params?: PropertyDocumentsManagerCertificatesUploadParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>, TError,{data: BodyType<PropertyDocumentsManagerCertificatesUploadBody>;params?: PropertyDocumentsManagerCertificatesUploadParams}, TContext> => {
+
+const mutationKey = ['propertyDocumentsManagerCertificatesUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>, {data: BodyType<PropertyDocumentsManagerCertificatesUploadBody>;params?: PropertyDocumentsManagerCertificatesUploadParams}> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  propertyDocumentsManagerCertificatesUpload(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PropertyDocumentsManagerCertificatesUploadMutationResult = NonNullable<Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>>
+    export type PropertyDocumentsManagerCertificatesUploadMutationBody = BodyType<PropertyDocumentsManagerCertificatesUploadBody>
+    export type PropertyDocumentsManagerCertificatesUploadMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Upload manager certificate
+ */
+export const usePropertyDocumentsManagerCertificatesUpload = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>, TError,{data: BodyType<PropertyDocumentsManagerCertificatesUploadBody>;params?: PropertyDocumentsManagerCertificatesUploadParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof propertyDocumentsManagerCertificatesUpload>>,
+        TError,
+        {data: BodyType<PropertyDocumentsManagerCertificatesUploadBody>;params?: PropertyDocumentsManagerCertificatesUploadParams},
+        TContext
+      > => {
+      return useMutation(getPropertyDocumentsManagerCertificatesUploadMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns document metadata and its current target attachment.
+ * @summary Get property document
+ */
+export type propertyDocumentsDetailResponse200 = {
+  data: PropertyDocumentSummary
+  status: 200
+}
+
+export type propertyDocumentsDetailResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyDocumentsDetailResponseSuccess = (propertyDocumentsDetailResponse200) & {
+  headers: Headers;
+};
+export type propertyDocumentsDetailResponseError = (propertyDocumentsDetailResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyDocumentsDetailResponse = (propertyDocumentsDetailResponseSuccess | propertyDocumentsDetailResponseError)
+
+export const getPropertyDocumentsDetailUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/property-documents/${id}`
+}
+
+export const propertyDocumentsDetail = async (id: string, options?: RequestInit): Promise<propertyDocumentsDetailResponse> => {
+
+  return customInstance<propertyDocumentsDetailResponse>(getPropertyDocumentsDetailUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2443,69 +1999,69 @@ export const rentalsSearch = async (params?: RentalsSearchParams, options?: Requ
 
 
 
-export const getRentalsSearchQueryKey = (params?: RentalsSearchParams,) => {
+export const getPropertyDocumentsDetailQueryKey = (id: string,) => {
     return [
-    `/api/v1/rentals`, ...(params ? [params] : [])
+    `/api/v1/property-documents/${id}`
     ] as const;
     }
 
 
-export const getRentalsSearchQueryOptions = <TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getPropertyDocumentsDetailQueryOptions = <TData = Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getRentalsSearchQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getPropertyDocumentsDetailQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsSearch>>> = ({ signal }) => rentalsSearch(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyDocumentsDetail>>> = ({ signal }) => propertyDocumentsDetail(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type RentalsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof rentalsSearch>>>
-export type RentalsSearchQueryError = ErrorType<ErrorModel>
+export type PropertyDocumentsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof propertyDocumentsDetail>>>
+export type PropertyDocumentsDetailQueryError = ErrorType<ErrorModel>
 
 
-export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
- params: undefined |  RentalsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>> & Pick<
+export function usePropertyDocumentsDetail<TData = Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rentalsSearch>>,
+          Awaited<ReturnType<typeof propertyDocumentsDetail>>,
           TError,
-          Awaited<ReturnType<typeof rentalsSearch>>
+          Awaited<ReturnType<typeof propertyDocumentsDetail>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>> & Pick<
+export function usePropertyDocumentsDetail<TData = Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rentalsSearch>>,
+          Awaited<ReturnType<typeof propertyDocumentsDetail>>,
           TError,
-          Awaited<ReturnType<typeof rentalsSearch>>
+          Awaited<ReturnType<typeof propertyDocumentsDetail>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function usePropertyDocumentsDetail<TData = Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Search rentals
+ * @summary Get property document
  */
 
-export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: RentalsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function usePropertyDocumentsDetail<TData = Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getRentalsSearchQueryOptions(params,options)
+  const queryOptions = getPropertyDocumentsDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2517,39 +2073,131 @@ export function useRentalsSearch<TData = Awaited<ReturnType<typeof rentalsSearch
 
 
 /**
- * Fetch a rental by public ID, canonical ID, or source URL
- * @summary Get rental detail
+ * Moves a document to a canonical target, or detaches it, and queues projection.
+ * @summary Attach property document
  */
-export type rentalsDetailResponse200 = {
-  data: Rental
+export type propertyDocumentsAttachmentSetResponse200 = {
+  data: PropertyDocumentAttachOutputBody
   status: 200
 }
 
-export type rentalsDetailResponseDefault = {
+export type propertyDocumentsAttachmentSetResponseDefault = {
   data: ErrorModel
   status: Exclude<HTTPStatusCodes, 200>
 }
 
-export type rentalsDetailResponseSuccess = (rentalsDetailResponse200) & {
+export type propertyDocumentsAttachmentSetResponseSuccess = (propertyDocumentsAttachmentSetResponse200) & {
   headers: Headers;
 };
-export type rentalsDetailResponseError = (rentalsDetailResponseDefault) & {
+export type propertyDocumentsAttachmentSetResponseError = (propertyDocumentsAttachmentSetResponseDefault) & {
   headers: Headers;
 };
 
-export type rentalsDetailResponse = (rentalsDetailResponseSuccess | rentalsDetailResponseError)
+export type propertyDocumentsAttachmentSetResponse = (propertyDocumentsAttachmentSetResponseSuccess | propertyDocumentsAttachmentSetResponseError)
 
-export const getRentalsDetailUrl = (id: string,) => {
-
-
+export const getPropertyDocumentsAttachmentSetUrl = (id: string,) => {
 
 
-  return `/api/v1/rentals/${id}`
+
+
+  return `/api/v1/property-documents/${id}/attachment`
 }
 
-export const rentalsDetail = async (id: string, options?: RequestInit): Promise<rentalsDetailResponse> => {
+export const propertyDocumentsAttachmentSet = async (id: string,
+    propertyDocumentAttachModelInputBody: NonReadonly<PropertyDocumentAttachModelInputBody>, options?: RequestInit): Promise<propertyDocumentsAttachmentSetResponse> => {
 
-  return customInstance<rentalsDetailResponse>(getRentalsDetailUrl(id),
+  return customInstance<propertyDocumentsAttachmentSetResponse>(getPropertyDocumentsAttachmentSetUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      propertyDocumentAttachModelInputBody,)
+  }
+);}
+
+
+
+
+export const getPropertyDocumentsAttachmentSetMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>, TError,{id: string;data: BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>, TError,{id: string;data: BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>}, TContext> => {
+
+const mutationKey = ['propertyDocumentsAttachmentSet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>, {id: string;data: BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  propertyDocumentsAttachmentSet(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PropertyDocumentsAttachmentSetMutationResult = NonNullable<Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>>
+    export type PropertyDocumentsAttachmentSetMutationBody = BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>
+    export type PropertyDocumentsAttachmentSetMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Attach property document
+ */
+export const usePropertyDocumentsAttachmentSet = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>, TError,{id: string;data: BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof propertyDocumentsAttachmentSet>>,
+        TError,
+        {id: string;data: BodyType<NonReadonly<PropertyDocumentAttachModelInputBody>>},
+        TContext
+      > => {
+      return useMutation(getPropertyDocumentsAttachmentSetMutationOptions(options), queryClient);
+    }
+
+/**
+ * Downloads the original stored property document bytes
+ * @summary Download property document
+ */
+export type propertyDocumentsDownloadResponse200 = {
+  data: string
+  status: 200
+}
+
+export type propertyDocumentsDownloadResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyDocumentsDownloadResponseSuccess = (propertyDocumentsDownloadResponse200) & {
+  headers: Headers;
+};
+export type propertyDocumentsDownloadResponseError = (propertyDocumentsDownloadResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyDocumentsDownloadResponse = (propertyDocumentsDownloadResponseSuccess | propertyDocumentsDownloadResponseError)
+
+export const getPropertyDocumentsDownloadUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/property-documents/${id}/download`
+}
+
+export const propertyDocumentsDownload = async (id: string, options?: RequestInit): Promise<propertyDocumentsDownloadResponse> => {
+
+  return customInstance<propertyDocumentsDownloadResponse>(getPropertyDocumentsDownloadUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2562,69 +2210,922 @@ export const rentalsDetail = async (id: string, options?: RequestInit): Promise<
 
 
 
-export const getRentalsDetailQueryKey = (id: string,) => {
+export const getPropertyDocumentsDownloadQueryKey = (id: string,) => {
     return [
-    `/api/v1/rentals/${id}`
+    `/api/v1/property-documents/${id}/download`
     ] as const;
     }
 
 
-export const getRentalsDetailQueryOptions = <TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getPropertyDocumentsDownloadQueryOptions = <TData = Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getRentalsDetailQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getPropertyDocumentsDownloadQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof rentalsDetail>>> = ({ signal }) => rentalsDetail(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyDocumentsDownload>>> = ({ signal }) => propertyDocumentsDownload(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type RentalsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof rentalsDetail>>>
-export type RentalsDetailQueryError = ErrorType<ErrorModel>
+export type PropertyDocumentsDownloadQueryResult = NonNullable<Awaited<ReturnType<typeof propertyDocumentsDownload>>>
+export type PropertyDocumentsDownloadQueryError = ErrorType<ErrorModel>
 
 
-export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+export function usePropertyDocumentsDownload<TData = Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError = ErrorType<ErrorModel>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rentalsDetail>>,
+          Awaited<ReturnType<typeof propertyDocumentsDownload>>,
           TError,
-          Awaited<ReturnType<typeof rentalsDetail>>
+          Awaited<ReturnType<typeof propertyDocumentsDownload>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>> & Pick<
+export function usePropertyDocumentsDownload<TData = Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rentalsDetail>>,
+          Awaited<ReturnType<typeof propertyDocumentsDownload>>,
           TError,
-          Awaited<ReturnType<typeof rentalsDetail>>
+          Awaited<ReturnType<typeof propertyDocumentsDownload>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function usePropertyDocumentsDownload<TData = Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get rental detail
+ * @summary Download property document
  */
 
-export function useRentalsDetail<TData = Awaited<ReturnType<typeof rentalsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof rentalsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function usePropertyDocumentsDownload<TData = Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError = ErrorType<ErrorModel>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyDocumentsDownload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getRentalsDetailQueryOptions(id,options)
+  const queryOptions = getPropertyDocumentsDownloadQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns canonical housing company markers with linked units and offerings.
+ * @summary Map canonical property targets
+ */
+export type propertyTargetsMapResponse200 = {
+  data: PropertyTargetMap
+  status: 200
+}
+
+export type propertyTargetsMapResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsMapResponseSuccess = (propertyTargetsMapResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsMapResponseError = (propertyTargetsMapResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsMapResponse = (propertyTargetsMapResponseSuccess | propertyTargetsMapResponseError)
+
+export const getPropertyTargetsMapUrl = (params?: PropertyTargetsMapParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/property-targets/map?${stringifiedParams}` : `/api/v1/property-targets/map`
+}
+
+export const propertyTargetsMap = async (params?: PropertyTargetsMapParams, options?: RequestInit): Promise<propertyTargetsMapResponse> => {
+
+  return customInstance<propertyTargetsMapResponse>(getPropertyTargetsMapUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsMapQueryKey = (params?: PropertyTargetsMapParams,) => {
+    return [
+    `/api/v1/property-targets/map`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getPropertyTargetsMapQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsMap>>, TError = ErrorType<ErrorModel>>(params?: PropertyTargetsMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsMapQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsMap>>> = ({ signal }) => propertyTargetsMap(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsMapQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsMap>>>
+export type PropertyTargetsMapQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsMap<TData = Awaited<ReturnType<typeof propertyTargetsMap>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  PropertyTargetsMapParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsMap>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsMap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsMap<TData = Awaited<ReturnType<typeof propertyTargetsMap>>, TError = ErrorType<ErrorModel>>(
+ params?: PropertyTargetsMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsMap>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsMap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsMap<TData = Awaited<ReturnType<typeof propertyTargetsMap>>, TError = ErrorType<ErrorModel>>(
+ params?: PropertyTargetsMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Map canonical property targets
+ */
+
+export function usePropertyTargetsMap<TData = Awaited<ReturnType<typeof propertyTargetsMap>>, TError = ErrorType<ErrorModel>>(
+ params?: PropertyTargetsMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsMap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsMapQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns a canonical target with resolved values, renovation events, and attached documents.
+ * @summary Get canonical property target
+ */
+export type propertyTargetsDetailResponse200 = {
+  data: CanonicalTargetResource
+  status: 200
+}
+
+export type propertyTargetsDetailResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsDetailResponseSuccess = (propertyTargetsDetailResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsDetailResponseError = (propertyTargetsDetailResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsDetailResponse = (propertyTargetsDetailResponseSuccess | propertyTargetsDetailResponseError)
+
+export const getPropertyTargetsDetailUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}`
+}
+
+export const propertyTargetsDetail = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsDetailResponse> => {
+
+  return customInstance<propertyTargetsDetailResponse>(getPropertyTargetsDetailUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsDetailQueryKey = (targetType: string,
+    targetID: string,) => {
+    return [
+    `/api/v1/property-targets/${targetType}/${targetID}`
+    ] as const;
+    }
+
+
+export const getPropertyTargetsDetailQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsDetail>>, TError = ErrorType<ErrorModel>>(targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsDetailQueryKey(targetType,targetID);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsDetail>>> = ({ signal }) => propertyTargetsDetail(targetType,targetID, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(targetType && targetID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsDetail>>>
+export type PropertyTargetsDetailQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsDetail<TData = Awaited<ReturnType<typeof propertyTargetsDetail>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsDetail<TData = Awaited<ReturnType<typeof propertyTargetsDetail>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsDetail<TData = Awaited<ReturnType<typeof propertyTargetsDetail>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get canonical property target
+ */
+
+export function usePropertyTargetsDetail<TData = Awaited<ReturnType<typeof propertyTargetsDetail>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsDetailQueryOptions(targetType,targetID,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns source and manual claims attached to the target.
+ * @summary List source claims
+ */
+export type propertyTargetsClaimsResponse200 = {
+  data: SourceClaimsOutputBody
+  status: 200
+}
+
+export type propertyTargetsClaimsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsClaimsResponseSuccess = (propertyTargetsClaimsResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsClaimsResponseError = (propertyTargetsClaimsResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsClaimsResponse = (propertyTargetsClaimsResponseSuccess | propertyTargetsClaimsResponseError)
+
+export const getPropertyTargetsClaimsUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}/claims`
+}
+
+export const propertyTargetsClaims = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsClaimsResponse> => {
+
+  return customInstance<propertyTargetsClaimsResponse>(getPropertyTargetsClaimsUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsClaimsQueryKey = (targetType: string,
+    targetID: string,) => {
+    return [
+    `/api/v1/property-targets/${targetType}/${targetID}/claims`
+    ] as const;
+    }
+
+
+export const getPropertyTargetsClaimsQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsClaims>>, TError = ErrorType<ErrorModel>>(targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsClaimsQueryKey(targetType,targetID);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsClaims>>> = ({ signal }) => propertyTargetsClaims(targetType,targetID, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(targetType && targetID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsClaimsQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsClaims>>>
+export type PropertyTargetsClaimsQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsClaims<TData = Awaited<ReturnType<typeof propertyTargetsClaims>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsClaims>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsClaims>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsClaims<TData = Awaited<ReturnType<typeof propertyTargetsClaims>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsClaims>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsClaims>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsClaims<TData = Awaited<ReturnType<typeof propertyTargetsClaims>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List source claims
+ */
+
+export function usePropertyTargetsClaims<TData = Awaited<ReturnType<typeof propertyTargetsClaims>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsClaims>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsClaimsQueryOptions(targetType,targetID,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns documents attached to the target.
+ * @summary List target documents
+ */
+export type propertyTargetsDocumentsResponse200 = {
+  data: TargetDocumentsOutputBody
+  status: 200
+}
+
+export type propertyTargetsDocumentsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsDocumentsResponseSuccess = (propertyTargetsDocumentsResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsDocumentsResponseError = (propertyTargetsDocumentsResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsDocumentsResponse = (propertyTargetsDocumentsResponseSuccess | propertyTargetsDocumentsResponseError)
+
+export const getPropertyTargetsDocumentsUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}/documents`
+}
+
+export const propertyTargetsDocuments = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsDocumentsResponse> => {
+
+  return customInstance<propertyTargetsDocumentsResponse>(getPropertyTargetsDocumentsUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsDocumentsQueryKey = (targetType: string,
+    targetID: string,) => {
+    return [
+    `/api/v1/property-targets/${targetType}/${targetID}/documents`
+    ] as const;
+    }
+
+
+export const getPropertyTargetsDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError = ErrorType<ErrorModel>>(targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsDocumentsQueryKey(targetType,targetID);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsDocuments>>> = ({ signal }) => propertyTargetsDocuments(targetType,targetID, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(targetType && targetID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsDocumentsQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsDocuments>>>
+export type PropertyTargetsDocumentsQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsDocuments<TData = Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsDocuments<TData = Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsDocuments<TData = Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List target documents
+ */
+
+export function usePropertyTargetsDocuments<TData = Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsDocuments>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsDocumentsQueryOptions(targetType,targetID,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Returns typed source and manual renovation events attached to the target.
+ * @summary List renovation events
+ */
+export type propertyTargetsRenovationEventsResponse200 = {
+  data: RenovationEventsOutputBody
+  status: 200
+}
+
+export type propertyTargetsRenovationEventsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsRenovationEventsResponseSuccess = (propertyTargetsRenovationEventsResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsRenovationEventsResponseError = (propertyTargetsRenovationEventsResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsRenovationEventsResponse = (propertyTargetsRenovationEventsResponseSuccess | propertyTargetsRenovationEventsResponseError)
+
+export const getPropertyTargetsRenovationEventsUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}/renovation-events`
+}
+
+export const propertyTargetsRenovationEvents = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsRenovationEventsResponse> => {
+
+  return customInstance<propertyTargetsRenovationEventsResponse>(getPropertyTargetsRenovationEventsUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsRenovationEventsQueryKey = (targetType: string,
+    targetID: string,) => {
+    return [
+    `/api/v1/property-targets/${targetType}/${targetID}/renovation-events`
+    ] as const;
+    }
+
+
+export const getPropertyTargetsRenovationEventsQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError = ErrorType<ErrorModel>>(targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsRenovationEventsQueryKey(targetType,targetID);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>> = ({ signal }) => propertyTargetsRenovationEvents(targetType,targetID, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(targetType && targetID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsRenovationEventsQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>>
+export type PropertyTargetsRenovationEventsQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsRenovationEvents<TData = Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsRenovationEvents<TData = Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsRenovationEvents<TData = Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List renovation events
+ */
+
+export function usePropertyTargetsRenovationEvents<TData = Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsRenovationEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsRenovationEventsQueryOptions(targetType,targetID,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+/**
+ * Queues resolution and profile projection for one canonical target.
+ * @summary Queue target resolution
+ */
+export type propertyTargetsResolveResponse200 = {
+  data: QueuedCanonicalJob
+  status: 200
+}
+
+export type propertyTargetsResolveResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsResolveResponseSuccess = (propertyTargetsResolveResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsResolveResponseError = (propertyTargetsResolveResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsResolveResponse = (propertyTargetsResolveResponseSuccess | propertyTargetsResolveResponseError)
+
+export const getPropertyTargetsResolveUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}/resolve`
+}
+
+export const propertyTargetsResolve = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsResolveResponse> => {
+
+  return customInstance<propertyTargetsResolveResponse>(getPropertyTargetsResolveUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPropertyTargetsResolveMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyTargetsResolve>>, TError,{targetType: string;targetID: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof propertyTargetsResolve>>, TError,{targetType: string;targetID: string}, TContext> => {
+
+const mutationKey = ['propertyTargetsResolve'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof propertyTargetsResolve>>, {targetType: string;targetID: string}> = (props) => {
+          const {targetType,targetID} = props ?? {};
+
+          return  propertyTargetsResolve(targetType,targetID,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PropertyTargetsResolveMutationResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsResolve>>>
+
+    export type PropertyTargetsResolveMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Queue target resolution
+ */
+export const usePropertyTargetsResolve = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof propertyTargetsResolve>>, TError,{targetType: string;targetID: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof propertyTargetsResolve>>,
+        TError,
+        {targetType: string;targetID: string},
+        TContext
+      > => {
+      return useMutation(getPropertyTargetsResolveMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns resolved dimension values with selected evidence and conflict metadata.
+ * @summary List resolved values
+ */
+export type propertyTargetsResolvedValuesResponse200 = {
+  data: ResolvedValuesOutputBody
+  status: 200
+}
+
+export type propertyTargetsResolvedValuesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type propertyTargetsResolvedValuesResponseSuccess = (propertyTargetsResolvedValuesResponse200) & {
+  headers: Headers;
+};
+export type propertyTargetsResolvedValuesResponseError = (propertyTargetsResolvedValuesResponseDefault) & {
+  headers: Headers;
+};
+
+export type propertyTargetsResolvedValuesResponse = (propertyTargetsResolvedValuesResponseSuccess | propertyTargetsResolvedValuesResponseError)
+
+export const getPropertyTargetsResolvedValuesUrl = (targetType: string,
+    targetID: string,) => {
+
+
+
+
+  return `/api/v1/property-targets/${targetType}/${targetID}/resolved-values`
+}
+
+export const propertyTargetsResolvedValues = async (targetType: string,
+    targetID: string, options?: RequestInit): Promise<propertyTargetsResolvedValuesResponse> => {
+
+  return customInstance<propertyTargetsResolvedValuesResponse>(getPropertyTargetsResolvedValuesUrl(targetType,targetID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPropertyTargetsResolvedValuesQueryKey = (targetType: string,
+    targetID: string,) => {
+    return [
+    `/api/v1/property-targets/${targetType}/${targetID}/resolved-values`
+    ] as const;
+    }
+
+
+export const getPropertyTargetsResolvedValuesQueryOptions = <TData = Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError = ErrorType<ErrorModel>>(targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPropertyTargetsResolvedValuesQueryKey(targetType,targetID);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>> = ({ signal }) => propertyTargetsResolvedValues(targetType,targetID, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(targetType && targetID), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PropertyTargetsResolvedValuesQueryResult = NonNullable<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>>
+export type PropertyTargetsResolvedValuesQueryError = ErrorType<ErrorModel>
+
+
+export function usePropertyTargetsResolvedValues<TData = Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsResolvedValues>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsResolvedValues>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsResolvedValues<TData = Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof propertyTargetsResolvedValues>>,
+          TError,
+          Awaited<ReturnType<typeof propertyTargetsResolvedValues>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePropertyTargetsResolvedValues<TData = Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List resolved values
+ */
+
+export function usePropertyTargetsResolvedValues<TData = Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError = ErrorType<ErrorModel>>(
+ targetType: string,
+    targetID: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof propertyTargetsResolvedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPropertyTargetsResolvedValuesQueryOptions(targetType,targetID,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2751,503 +3252,6 @@ export function useResolveCanonicalId<TData = Awaited<ReturnType<typeof resolveC
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getResolveCanonicalIdQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Search sale listings using the shared provider-neutral sale listing model
- * @summary Search sale listings
- */
-export type saleListingsSearchResponse200 = {
-  data: PageSaleListingSummary
-  status: 200
-}
-
-export type saleListingsSearchResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type saleListingsSearchResponseSuccess = (saleListingsSearchResponse200) & {
-  headers: Headers;
-};
-export type saleListingsSearchResponseError = (saleListingsSearchResponseDefault) & {
-  headers: Headers;
-};
-
-export type saleListingsSearchResponse = (saleListingsSearchResponseSuccess | saleListingsSearchResponseError)
-
-export const getSaleListingsSearchUrl = (params?: SaleListingsSearchParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/v1/sale-listings?${stringifiedParams}` : `/api/v1/sale-listings`
-}
-
-export const saleListingsSearch = async (params?: SaleListingsSearchParams, options?: RequestInit): Promise<saleListingsSearchResponse> => {
-
-  return customInstance<saleListingsSearchResponse>(getSaleListingsSearchUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getSaleListingsSearchQueryKey = (params?: SaleListingsSearchParams,) => {
-    return [
-    `/api/v1/sale-listings`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getSaleListingsSearchQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getSaleListingsSearchQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsSearch>>> = ({ signal }) => saleListingsSearch(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type SaleListingsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsSearch>>>
-export type SaleListingsSearchQueryError = ErrorType<ErrorModel>
-
-
-export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
- params: undefined |  SaleListingsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsSearch>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsSearch>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Search sale listings
- */
-
-export function useSaleListingsSearch<TData = Awaited<ReturnType<typeof saleListingsSearch>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getSaleListingsSearchQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code
- * @summary List potential transaction matches
- */
-export type saleListingsTransactionMatchCandidatesResponse200 = {
-  data: TransactionMatchCandidatesOutputBody
-  status: 200
-}
-
-export type saleListingsTransactionMatchCandidatesResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type saleListingsTransactionMatchCandidatesResponseSuccess = (saleListingsTransactionMatchCandidatesResponse200) & {
-  headers: Headers;
-};
-export type saleListingsTransactionMatchCandidatesResponseError = (saleListingsTransactionMatchCandidatesResponseDefault) & {
-  headers: Headers;
-};
-
-export type saleListingsTransactionMatchCandidatesResponse = (saleListingsTransactionMatchCandidatesResponseSuccess | saleListingsTransactionMatchCandidatesResponseError)
-
-export const getSaleListingsTransactionMatchCandidatesUrl = (params?: SaleListingsTransactionMatchCandidatesParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/v1/sale-listings/transaction-match-candidates?${stringifiedParams}` : `/api/v1/sale-listings/transaction-match-candidates`
-}
-
-export const saleListingsTransactionMatchCandidates = async (params?: SaleListingsTransactionMatchCandidatesParams, options?: RequestInit): Promise<saleListingsTransactionMatchCandidatesResponse> => {
-
-  return customInstance<saleListingsTransactionMatchCandidatesResponse>(getSaleListingsTransactionMatchCandidatesUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getSaleListingsTransactionMatchCandidatesQueryKey = (params?: SaleListingsTransactionMatchCandidatesParams,) => {
-    return [
-    `/api/v1/sale-listings/transaction-match-candidates`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getSaleListingsTransactionMatchCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getSaleListingsTransactionMatchCandidatesQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>> = ({ signal }) => saleListingsTransactionMatchCandidates(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type SaleListingsTransactionMatchCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>>
-export type SaleListingsTransactionMatchCandidatesQueryError = ErrorType<ErrorModel>
-
-
-export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
- params: undefined |  SaleListingsTransactionMatchCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List potential transaction matches
- */
-
-export function useSaleListingsTransactionMatchCandidates<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getSaleListingsTransactionMatchCandidatesQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Returns postal codes where unresolved sale listing to price transaction candidates exist
- * @summary List postal codes with potential transaction matches
- */
-export type saleListingsTransactionMatchPostalsResponse200 = {
-  data: TransactionMatchPostalsOutputBody
-  status: 200
-}
-
-export type saleListingsTransactionMatchPostalsResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type saleListingsTransactionMatchPostalsResponseSuccess = (saleListingsTransactionMatchPostalsResponse200) & {
-  headers: Headers;
-};
-export type saleListingsTransactionMatchPostalsResponseError = (saleListingsTransactionMatchPostalsResponseDefault) & {
-  headers: Headers;
-};
-
-export type saleListingsTransactionMatchPostalsResponse = (saleListingsTransactionMatchPostalsResponseSuccess | saleListingsTransactionMatchPostalsResponseError)
-
-export const getSaleListingsTransactionMatchPostalsUrl = (params?: SaleListingsTransactionMatchPostalsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/v1/sale-listings/transaction-match-postals?${stringifiedParams}` : `/api/v1/sale-listings/transaction-match-postals`
-}
-
-export const saleListingsTransactionMatchPostals = async (params?: SaleListingsTransactionMatchPostalsParams, options?: RequestInit): Promise<saleListingsTransactionMatchPostalsResponse> => {
-
-  return customInstance<saleListingsTransactionMatchPostalsResponse>(getSaleListingsTransactionMatchPostalsUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getSaleListingsTransactionMatchPostalsQueryKey = (params?: SaleListingsTransactionMatchPostalsParams,) => {
-    return [
-    `/api/v1/sale-listings/transaction-match-postals`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getSaleListingsTransactionMatchPostalsQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getSaleListingsTransactionMatchPostalsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>> = ({ signal }) => saleListingsTransactionMatchPostals(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type SaleListingsTransactionMatchPostalsQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>>
-export type SaleListingsTransactionMatchPostalsQueryError = ErrorType<ErrorModel>
-
-
-export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
- params: undefined |  SaleListingsTransactionMatchPostalsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List postal codes with potential transaction matches
- */
-
-export function useSaleListingsTransactionMatchPostals<TData = Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError = ErrorType<ErrorModel>>(
- params?: SaleListingsTransactionMatchPostalsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsTransactionMatchPostals>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getSaleListingsTransactionMatchPostalsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-/**
- * Fetch a canonical sale offering by UUID
- * @summary Get sale listing detail
- */
-export type saleListingsDetailResponse200 = {
-  data: SaleListing
-  status: 200
-}
-
-export type saleListingsDetailResponseDefault = {
-  data: ErrorModel
-  status: Exclude<HTTPStatusCodes, 200>
-}
-
-export type saleListingsDetailResponseSuccess = (saleListingsDetailResponse200) & {
-  headers: Headers;
-};
-export type saleListingsDetailResponseError = (saleListingsDetailResponseDefault) & {
-  headers: Headers;
-};
-
-export type saleListingsDetailResponse = (saleListingsDetailResponseSuccess | saleListingsDetailResponseError)
-
-export const getSaleListingsDetailUrl = (id: string,) => {
-
-
-
-
-  return `/api/v1/sale-listings/${id}`
-}
-
-export const saleListingsDetail = async (id: string, options?: RequestInit): Promise<saleListingsDetailResponse> => {
-
-  return customInstance<saleListingsDetailResponse>(getSaleListingsDetailUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getSaleListingsDetailQueryKey = (id: string,) => {
-    return [
-    `/api/v1/sale-listings/${id}`
-    ] as const;
-    }
-
-
-export const getSaleListingsDetailQueryOptions = <TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getSaleListingsDetailQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof saleListingsDetail>>> = ({ signal }) => saleListingsDetail(id, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type SaleListingsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof saleListingsDetail>>>
-export type SaleListingsDetailQueryError = ErrorType<ErrorModel>
-
-
-export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsDetail>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsDetail>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof saleListingsDetail>>,
-          TError,
-          Awaited<ReturnType<typeof saleListingsDetail>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get sale listing detail
- */
-
-export function useSaleListingsDetail<TData = Awaited<ReturnType<typeof saleListingsDetail>>, TError = ErrorType<ErrorModel>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof saleListingsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getSaleListingsDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4198,84 +4202,3 @@ export const useAuthSessionSignOut = <TError = ErrorType<ErrorModel>,
       > => {
       return useMutation(getAuthSessionSignOutMutationOptions(options), queryClient);
     }
-
-export type OAuthHandoffResolveRequest = {
-  handoff_token?: string;
-  user_code?: string;
-};
-
-export type OAuthHandoffDecisionRequest = {
-  handoff_id: string;
-};
-
-export type OAuthHandoffResolveSuccessResponse = {
-  client_display_name: string;
-  client_id: string;
-  expires_at_unix: number;
-  handoff_id: string;
-  redirect_host: string;
-  scopes: string[];
-};
-
-export type OAuthHandoffApproveSuccessResponse = {
-  ok: boolean;
-  redirect_url: string;
-};
-
-export type OAuthHandoffDenySuccessResponse = {
-  ok: boolean;
-};
-
-export type oauthAuthorizeHandoffResolveResponse = {
-  data: OAuthHandoffResolveSuccessResponse;
-  status: 200;
-  headers: Headers;
-};
-
-export type oauthAuthorizeHandoffApproveResponse = {
-  data: OAuthHandoffApproveSuccessResponse;
-  status: 200;
-  headers: Headers;
-};
-
-export type oauthAuthorizeHandoffDenyResponse = {
-  data: OAuthHandoffDenySuccessResponse;
-  status: 200;
-  headers: Headers;
-};
-
-export const oauthAuthorizeHandoffResolve = async (
-  body: BodyType<OAuthHandoffResolveRequest>,
-  options?: RequestInit,
-): Promise<oauthAuthorizeHandoffResolveResponse> => {
-  return customInstance<oauthAuthorizeHandoffResolveResponse>('/oauth/authorize/handoff/resolve', {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(body),
-  });
-};
-
-export const oauthAuthorizeHandoffApprove = async (
-  body: BodyType<OAuthHandoffDecisionRequest>,
-  options?: RequestInit,
-): Promise<oauthAuthorizeHandoffApproveResponse> => {
-  return customInstance<oauthAuthorizeHandoffApproveResponse>('/oauth/authorize/handoff/approve', {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(body),
-  });
-};
-
-export const oauthAuthorizeHandoffDeny = async (
-  body: BodyType<OAuthHandoffDecisionRequest>,
-  options?: RequestInit,
-): Promise<oauthAuthorizeHandoffDenyResponse> => {
-  return customInstance<oauthAuthorizeHandoffDenyResponse>('/oauth/authorize/handoff/deny', {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(body),
-  });
-};

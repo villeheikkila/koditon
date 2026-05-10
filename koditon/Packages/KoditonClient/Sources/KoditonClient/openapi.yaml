@@ -160,356 +160,60 @@ components:
       required:
         - types
       type: object
-    Building:
+    CanonicalTargetRef:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        type:
+          enum:
+            - offering
+            - unit
+            - building
+            - housing_company
+            - listing
+            - document
+            - transaction
+          type: string
+      required:
+        - type
+        - id
+      type: object
+    CanonicalTargetResource:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/Building.json
+            - https://example.com/schemas/CanonicalTargetResource.json
           format: uri
           readOnly: true
           type: string
-        details:
-          $ref: "#/components/schemas/BuildingDetails"
-        id:
-          type: string
-        insights:
-          $ref: "#/components/schemas/BuildingInsights"
-        metadata:
-          additionalProperties: {}
-          type: object
-        related:
-          $ref: "#/components/schemas/RelatedListings"
-        site:
-          $ref: "#/components/schemas/SiteDetails"
-        source_records:
+        documents:
           items:
-            $ref: "#/components/schemas/ListingSource"
+            $ref: "#/components/schemas/PropertyDocumentSummary"
           type:
             - array
             - "null"
-        texts:
-          $ref: "#/components/schemas/TextSections"
-      required:
-        - id
-        - details
-        - source_records
-      type: object
-    BuildingDetails:
-      additionalProperties: false
-      properties:
-        apartment_count:
-          format: int32
-          type: integer
-        build_year:
-          format: int32
-          type: integer
-        building_material:
-          type: string
-        building_subtype:
-          type: string
-        building_type:
-          type: string
-        business_id:
-          type: string
-        business_premise_count:
-          format: int32
-          type: integer
-        car_storage:
-          type: string
-        common_areas:
-          type: string
-        connectivity:
-          type: string
-        construction_year:
-          format: int32
-          type: integer
-        elevator:
-          type: boolean
-        energy_class:
-          type: string
-        energy_efficiency_label:
-          type: string
-        floor_count:
-          format: int32
-          type: integer
-        frame_construction_method:
-          type: string
-        heating:
-          type: string
-        heating_description:
-          type: string
-        heating_fuel:
-          type: string
-        housing_company:
-          type: string
-        identity:
-          $ref: "#/components/schemas/BuildingIdentity"
-        location:
-          $ref: "#/components/schemas/Location"
-        maintenance_responsibility:
-          type: string
-        management_method:
-          type: string
-        other_info:
-          type: string
-        property_manager:
-          type: string
-        renovations:
+        overview:
+          $ref: "#/components/schemas/TargetOverview"
+        renovation_events:
           items:
-            $ref: "#/components/schemas/BuildingRenovation"
+            $ref: "#/components/schemas/RenovationEvent"
           type:
             - array
             - "null"
-        roof_material:
-          type: string
-        roof_type:
-          type: string
-        sauna:
-          type: boolean
-        wall_structure:
-          type: string
-      required:
-        - identity
-        - location
-      type: object
-    BuildingIdentity:
-      additionalProperties: false
-      properties:
-        confidence:
-          format: double
-          type: number
-        inputs:
-          additionalProperties:
-            type: string
-          type: object
-        key:
-          type: string
-        sources:
+        resolved_values:
           items:
-            $ref: "#/components/schemas/BuildingSourceID"
+            $ref: "#/components/schemas/ResolvedValue"
           type:
             - array
             - "null"
-        strategy:
-          type: string
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
       required:
-        - key
-        - strategy
-        - confidence
-      type: object
-    BuildingInsights:
-      additionalProperties: false
-      properties:
-        items:
-          items:
-            $ref: "#/components/schemas/Insight"
-          type:
-            - array
-            - "null"
-      type: object
-    BuildingRenovation:
-      additionalProperties: false
-      properties:
-        done:
-          type: boolean
-        kind:
-          type: string
-        year:
-          format: int32
-          type: integer
-      required:
-        - kind
-      type: object
-    BuildingSourceID:
-      additionalProperties: false
-      properties:
-        external_id:
-          type: string
-        kind:
-          type: string
-        native_id:
-          type: string
-        provider:
-          type: string
-      required:
-        - provider
-        - kind
-        - native_id
-      type: object
-    CanonicalOffering:
-      additionalProperties: false
-      properties:
-        housing_company_id:
-          type: string
-        offering_id:
-          type: string
-        primary_source_listing_id:
-          type: string
-        merge_decision_count:
-          format: int32
-          type: integer
-        merged_from:
-          items:
-            type: string
-          type: array
-        source_count:
-          format: int32
-          type: integer
-        unit_id:
-          type: string
-      required:
-        - offering_id
-      type: object
-    Charges:
-      additionalProperties: false
-      properties:
-        electricity:
-          type: string
-        heating:
-          type: string
-        maintenance_monthly:
-          format: double
-          type: number
-        notes:
-          type: string
-        parking:
-          format: double
-          type: number
-        sauna:
-          format: double
-          type: number
-        total_monthly:
-          format: double
-          type: number
-        water:
-          format: double
-          type: number
-      type: object
-    CommercialDetails:
-      additionalProperties: false
-      properties:
-        asking_price:
-          format: int64
-          type: integer
-        available_from:
-          type: string
-        booking_status:
-          type: string
-        can_receive_leads:
-          type: boolean
-        charges:
-          $ref: "#/components/schemas/Charges"
-        days_on_market:
-          format: int32
-          type: integer
-        debt_free_price:
-          format: int64
-          type: integer
-        debt_share_additional_info:
-          type: string
-        debt_share_amount:
-          format: int64
-          type: integer
-        development_phase:
-          type: string
-        fees_info:
-          type: string
-        financing_fee_interest_only_end_date:
-          type: string
-        financing_fee_interest_only_period:
-          type: string
-        financing_fee_interest_only_start_date:
-          type: string
-        first_seen_at:
-          format: date-time
-          type: string
-        fixed_term:
-          type: boolean
-        furnished:
-          type: boolean
-        is_company_announcement:
-          type: boolean
-        last_seen_at:
-          format: date-time
-          type: string
-        lead_options:
-          additionalProperties:
-            type: boolean
-          type: object
-        main_image_hidden:
-          type: boolean
-        map_visible:
-          type: boolean
-        matched_transaction:
-          $ref: "#/components/schemas/PriceTransactionMatch"
-        minimum_term_months:
-          format: int32
-          type: integer
-        new_development:
-          type: boolean
-        notify_price_changed:
-          type: boolean
-        open_bidding_in_use:
-          type: boolean
-        open_bidding_latest_offer:
-          format: int64
-          type: integer
-        open_bidding_starting_debt_free_price:
-          format: int64
-          type: integer
-        open_bidding_starting_selling_price:
-          format: int64
-          type: integer
-        open_bidding_target_url:
-          type: string
-        other_terms:
-          type: string
-        ownership_type:
-          type: string
-        pets_allowed:
-          type: boolean
-        previous_asking_price:
-          format: int64
-          type: integer
-        previous_debt_free_price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: double
-          type: number
-        published_at:
-          format: date-time
-          type: string
-        rent:
-          format: int64
-          type: integer
-        rent_period:
-          type: string
-        security_deposit:
-          type: string
-        show_bidding_indicators:
-          type: boolean
-        status:
-          type: string
-        unpublished_at:
-          format: date-time
-          type: string
-      type: object
-    Contact:
-      additionalProperties: false
-      properties:
-        email:
-          type: string
-        name:
-          type: string
-        office_name:
-          type: string
-        phone:
-          type: string
-        title:
-          type: string
+        - target
+        - resolved_values
       type: object
     DetailFieldOutput:
       additionalProperties: false
@@ -743,243 +447,62 @@ components:
           format: uri
           type: string
       type: object
-    Image:
-      additionalProperties: false
-      properties:
-        description:
-          type: string
-        id:
-          type: string
-        ordinal:
-          format: int32
-          type: integer
-        provider:
-          type: string
-        provider_id:
-          type: string
-        role:
-          type: string
-        tags:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        url:
-          type: string
-        variants:
-          additionalProperties:
-            type: string
-          type: object
-      required:
-        - url
-      type: object
-    Insight:
+    EvidenceRef:
       additionalProperties: false
       properties:
         confidence:
           format: double
           type: number
-        key:
-          type: string
-        source:
-          type: string
-        value:
-          type: string
-      required:
-        - key
-        - value
-      type: object
-    Link:
-      additionalProperties: false
-      properties:
-        title:
-          type: string
-        type:
-          type: string
-        url:
-          type: string
-      required:
-        - url
-      type: object
-    ListingInsights:
-      additionalProperties: false
-      properties:
-        items:
-          items:
-            $ref: "#/components/schemas/Insight"
-          type:
-            - array
-            - "null"
-      type: object
-    ListingSource:
-      additionalProperties: false
-      properties:
-        external_id:
-          type: string
-        first_seen_at:
+        created_at:
           format: date-time
           type: string
-        flags:
-          additionalProperties:
-            type: boolean
-          type: object
-        friendly_id:
-          type: string
-        kind:
-          type: string
-        last_seen_at:
-          format: date-time
-          type: string
-        metadata:
-          additionalProperties: {}
-          type: object
-        native_id:
-          type: string
-        original_url:
-          type: string
-        provider:
-          type: string
-        published_at:
-          format: date-time
-          type: string
-        status:
-          type: string
-        url:
-          type: string
-      required:
-        - provider
-        - kind
-        - native_id
-      type: object
-    Location:
-      additionalProperties: false
-      properties:
-        city:
-          type: string
-        district:
-          type: string
-        latitude:
-          format: double
-          type: number
-        longitude:
-          format: double
-          type: number
-        postal:
-          type: string
-        street_address:
-          type: string
-      type: object
-    Media:
-      additionalProperties: false
-      properties:
-        images:
-          items:
-            $ref: "#/components/schemas/Image"
-          type:
-            - array
-            - "null"
-        main_image:
-          $ref: "#/components/schemas/Image"
-      type: object
-    OfferingSourceRecord:
-      additionalProperties: false
-      properties:
-        first_seen_at:
-          format: date-time
-          type: string
-        headline:
-          type: string
+        evidence: {}
         id:
           type: string
         kind:
+          enum:
+            - claim
+            - renovation_event
+            - document
+            - listing
+            - manual
           type: string
-        last_seen_at:
+        observed_at:
           format: date-time
           type: string
-        link_method:
+        projection_version:
           type: string
-        link_score:
-          format: int32
-          type: integer
-        link_status:
+        scope:
           type: string
-        native_id:
+        source_field:
           type: string
-        provider:
+        source_id:
           type: string
-        url:
+        source_reliability:
+          format: double
+          type: number
+        source_table:
           type: string
       required:
-        - id
-        - provider
         - kind
-        - native_id
-        - link_status
-        - link_method
-        - link_score
       type: object
-    PageRentalSummary:
+    FormFile:
       additionalProperties: false
       properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/PageRentalSummary.json
-          format: uri
-          readOnly: true
+        ContentType:
           type: string
-        page:
-          format: int32
-          type: integer
-        page_size:
-          format: int32
-          type: integer
-        rows:
-          items:
-            $ref: "#/components/schemas/RentalSummary"
-          type:
-            - array
-            - "null"
-        total:
+        Filename:
+          type: string
+        IsSet:
+          type: boolean
+        Size:
           format: int64
           type: integer
       required:
-        - rows
-        - total
-        - page
-        - page_size
-      type: object
-    PageSaleListingSummary:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/PageSaleListingSummary.json
-          format: uri
-          readOnly: true
-          type: string
-        page:
-          format: int32
-          type: integer
-        page_size:
-          format: int32
-          type: integer
-        rows:
-          items:
-            $ref: "#/components/schemas/SaleListingSummary"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - rows
-        - total
-        - page
-        - page_size
+        - ContentType
+        - IsSet
+        - Size
+        - Filename
       type: object
     PasskeyAuthInputBody:
       additionalProperties: false
@@ -1156,49 +679,6 @@ components:
         - code
         - name_fi
       type: object
-    PriceTransactionMatch:
-      additionalProperties: false
-      properties:
-        area_m2:
-          format: double
-          type: number
-        build_year:
-          format: int32
-          type: integer
-        condition:
-          type: string
-        description:
-          type: string
-        elevator:
-          type: boolean
-        energy_class:
-          type: string
-        floor:
-          type: string
-        id:
-          type: string
-        match_confidence:
-          type: string
-        match_score:
-          format: int32
-          type: integer
-        match_status:
-          type: string
-        period_identifier:
-          type: string
-        plot:
-          type: string
-        price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: int64
-          type: integer
-        type:
-          type: string
-      required:
-        - id
-      type: object
     PricesTransaction:
       additionalProperties: false
       properties:
@@ -1224,6 +704,14 @@ components:
           type: string
         id:
           type: string
+        is_matched:
+          type: boolean
+        matched_listing_count:
+          format: int32
+          type: integer
+        matched_offering_count:
+          format: int32
+          type: integer
         municipality_id:
           type: string
         municipality_name_fi:
@@ -1265,6 +753,9 @@ components:
         - created_at
         - updated_at
         - category
+        - is_matched
+        - matched_listing_count
+        - matched_offering_count
         - neighborhood_id
         - postal_code_id
         - postal_code_code
@@ -1291,147 +782,284 @@ components:
       required:
         - transactions
       type: object
-    RelatedListing:
-      additionalProperties: false
-      properties:
-        address:
-          type: string
-        area_m2:
-          format: double
-          type: number
-        build_year:
-          format: int32
-          type: integer
-        friendly_id:
-          type: string
-        id:
-          type: string
-        kind:
-          type: string
-        kinds:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        last_seen_at:
-          format: date-time
-          type: string
-        main_image:
-          $ref: "#/components/schemas/Image"
-        price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: double
-          type: number
-        providers:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        published:
-          type: boolean
-        rent_period:
-          type: string
-        room_layout:
-          type: string
-      required:
-        - id
-      type: object
-    RelatedListings:
-      additionalProperties: false
-      properties:
-        items:
-          items:
-            $ref: "#/components/schemas/RelatedListing"
-          type:
-            - array
-            - "null"
-      type: object
-    Rental:
+    PropertyDocumentAttachModelInputBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/Rental.json
+            - https://example.com/schemas/PropertyDocumentAttachModelInputBody.json
           format: uri
           readOnly: true
           type: string
-        building:
-          $ref: "#/components/schemas/BuildingDetails"
-        commercial:
-          $ref: "#/components/schemas/CommercialDetails"
-        contacts:
-          items:
-            $ref: "#/components/schemas/Contact"
-          type:
-            - array
-            - "null"
-        headline:
-          type: string
-        id:
-          type: string
-        insights:
-          $ref: "#/components/schemas/ListingInsights"
-        links:
-          items:
-            $ref: "#/components/schemas/Link"
-          type:
-            - array
-            - "null"
-        media:
-          $ref: "#/components/schemas/Media"
-        showings:
-          items:
-            $ref: "#/components/schemas/Showing"
-          type:
-            - array
-            - "null"
-        site:
-          $ref: "#/components/schemas/SiteDetails"
-        source:
-          $ref: "#/components/schemas/ListingSource"
-        texts:
-          $ref: "#/components/schemas/TextSections"
-        unit:
-          $ref: "#/components/schemas/UnitDetails"
-      required:
-        - id
-        - source
-        - headline
-        - unit
-        - building
-        - commercial
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+          description: New target. Omit or null to detach.
       type: object
-    RentalSummary:
+    PropertyDocumentAttachOutputBody:
       additionalProperties: false
       properties:
-        building:
-          $ref: "#/components/schemas/BuildingDetails"
-        commercial:
-          $ref: "#/components/schemas/CommercialDetails"
-        headline:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PropertyDocumentAttachOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        document:
+          $ref: "#/components/schemas/PropertyDocumentSummary"
+        job:
+          $ref: "#/components/schemas/QueuedCanonicalJob"
+      required:
+        - document
+        - job
+      type: object
+    PropertyDocumentSummary:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PropertyDocumentSummary.json
+          format: uri
+          readOnly: true
+          type: string
+        download_url:
+          type: string
+        extracted_at:
+          type: string
+        extraction_error:
+          type: string
+        extraction_status:
+          type: string
+        filename:
+          type: string
+        housing_company_id:
           type: string
         id:
           type: string
-        media:
-          $ref: "#/components/schemas/Media"
-        site:
-          $ref: "#/components/schemas/SiteDetails"
-        source:
-          $ref: "#/components/schemas/ListingSource"
-        unit:
-          $ref: "#/components/schemas/UnitDetails"
+        mime_type:
+          type: string
+        offering_id:
+          type: string
+        physical_building_id:
+          type: string
+        sha256:
+          type: string
+        size_bytes:
+          format: int64
+          type: integer
+        type:
+          type: string
+        unit_id:
+          type: string
+        uploaded_at:
+          type: string
       required:
         - id
-        - source
-        - headline
-        - unit
-        - building
-        - commercial
+        - offering_id
+        - type
+        - filename
+        - mime_type
+        - size_bytes
+        - sha256
+        - extraction_status
+        - uploaded_at
+        - download_url
+      type: object
+    PropertyTargetMap:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PropertyTargetMap.json
+          format: uri
+          readOnly: true
+          type: string
+        markers:
+          items:
+            $ref: "#/components/schemas/PropertyTargetMapMarker"
+          type:
+            - array
+            - "null"
+      required:
+        - markers
+      type: object
+    PropertyTargetMapMarker:
+      additionalProperties: false
+      properties:
+        address:
+          type: string
+        build_year:
+          format: int32
+          type: integer
+        city:
+          type: string
+        lat:
+          format: double
+          type: number
+        lng:
+          format: double
+          type: number
+        name:
+          type: string
+        offering_count:
+          format: int64
+          type: integer
+        offerings:
+          items:
+            $ref: "#/components/schemas/PropertyTargetMapOffering"
+          type:
+            - array
+            - "null"
+        postal:
+          type: string
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        unit_count:
+          format: int64
+          type: integer
+      required:
+        - target
+        - lat
+        - lng
+        - unit_count
+        - offering_count
+        - offerings
+      type: object
+    PropertyTargetMapOffering:
+      additionalProperties: false
+      properties:
+        area_m2:
+          format: double
+          type: number
+        headline:
+          type: string
+        last_seen_at:
+          format: date-time
+          type: string
+        price_eur:
+          format: int64
+          type: integer
+        room_layout:
+          type: string
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        unit_target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+      required:
+        - target
+        - unit_target
+      type: object
+    QueuedCanonicalJob:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/QueuedCanonicalJob.json
+          format: uri
+          readOnly: true
+          type: string
+        job_id:
+          type: string
+        queued:
+          type: boolean
+      required:
+        - job_id
+        - queued
+      type: object
+    RenovationEvent:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        component:
+          type: string
+        confidence:
+          format: double
+          type: number
+        cost_estimate_eur:
+          format: int64
+          type: integer
+        created_at:
+          format: date-time
+          type: string
+        end_year:
+          format: int32
+          type: integer
+        event_scope:
+          type: string
+        evidence: {}
+        id:
+          type: string
+        observed_at:
+          format: date-time
+          type: string
+        projection_version:
+          type: string
+        responsibility:
+          type: string
+        scope:
+          type: string
+        source_field:
+          type: string
+        source_id:
+          type: string
+        source_reliability:
+          format: double
+          type: number
+        source_table:
+          type: string
+        stage:
+          type: string
+        start_year:
+          format: int32
+          type: integer
+        status:
+          type: string
+        summary:
+          type: string
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        year:
+          format: int32
+          type: integer
+      required:
+        - id
+        - target
+        - scope
+        - source_table
+        - source_id
+        - projection_version
+        - category
+        - status
+        - confidence
+        - source_reliability
+        - created_at
+      type: object
+    RenovationEventsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RenovationEventsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        events:
+          items:
+            $ref: "#/components/schemas/RenovationEvent"
+          type:
+            - array
+            - "null"
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+      required:
+        - target
+        - events
       type: object
     ResolveCanonicalIDOutputBody:
       additionalProperties: false
@@ -1457,97 +1085,73 @@ components:
         - kind
         - native_id
       type: object
-    SaleListing:
+    ResolvedValue:
+      additionalProperties: false
+      properties:
+        confidence:
+          format: double
+          type: number
+        conflict_status:
+          type: string
+        dimension_key:
+          type: string
+        rejected_claim_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        resolved_at:
+          format: date-time
+          type: string
+        selected_evidence:
+          $ref: "#/components/schemas/EvidenceRef"
+        selected_reason:
+          type: string
+        supporting_claim_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        unit:
+          type: string
+        value: {}
+        value_kind:
+          type: string
+      required:
+        - target
+        - dimension_key
+        - value
+        - value_kind
+        - confidence
+        - selected_reason
+        - conflict_status
+        - resolved_at
+      type: object
+    ResolvedValuesOutputBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/SaleListing.json
+            - https://example.com/schemas/ResolvedValuesOutputBody.json
           format: uri
           readOnly: true
           type: string
-        building:
-          $ref: "#/components/schemas/BuildingDetails"
-        canonical:
-          $ref: "#/components/schemas/CanonicalOffering"
-        commercial:
-          $ref: "#/components/schemas/CommercialDetails"
-        contacts:
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        values:
           items:
-            $ref: "#/components/schemas/Contact"
+            $ref: "#/components/schemas/ResolvedValue"
           type:
             - array
             - "null"
-        headline:
-          type: string
-        id:
-          type: string
-        insights:
-          $ref: "#/components/schemas/ListingInsights"
-        links:
-          items:
-            $ref: "#/components/schemas/Link"
-          type:
-            - array
-            - "null"
-        media:
-          $ref: "#/components/schemas/Media"
-        showings:
-          items:
-            $ref: "#/components/schemas/Showing"
-          type:
-            - array
-            - "null"
-        site:
-          $ref: "#/components/schemas/SiteDetails"
-        source:
-          $ref: "#/components/schemas/ListingSource"
-        source_records:
-          items:
-            $ref: "#/components/schemas/OfferingSourceRecord"
-          type:
-            - array
-            - "null"
-        texts:
-          $ref: "#/components/schemas/TextSections"
-        unit:
-          $ref: "#/components/schemas/UnitDetails"
       required:
-        - id
-        - canonical
-        - source
-        - headline
-        - unit
-        - building
-        - commercial
-      type: object
-    SaleListingSummary:
-      additionalProperties: false
-      properties:
-        building:
-          $ref: "#/components/schemas/BuildingDetails"
-        commercial:
-          $ref: "#/components/schemas/CommercialDetails"
-        headline:
-          type: string
-        id:
-          type: string
-        media:
-          $ref: "#/components/schemas/Media"
-        site:
-          $ref: "#/components/schemas/SiteDetails"
-        source:
-          $ref: "#/components/schemas/ListingSource"
-        unit:
-          $ref: "#/components/schemas/UnitDetails"
-      required:
-        - id
-        - source
-        - headline
-        - unit
-        - building
-        - commercial
+        - target
+        - values
       type: object
     SearchOutputBody:
       additionalProperties: false
@@ -1615,310 +1219,185 @@ components:
         - source
         - kind
       type: object
-    Showing:
+    SourceClaim:
       additionalProperties: false
       properties:
-        end_at:
-          format: date-time
+        claim_scope:
           type: string
-        info:
-          type: string
-        start_at:
-          format: date-time
-          type: string
-      type: object
-    SiteDetails:
-      additionalProperties: false
-      properties:
-        driving_directions:
-          type: string
-        lot_redemption_info:
-          type: string
-        lot_rental_agreement:
-          type: string
-        plot_area_m2:
+        confidence:
           format: double
           type: number
-        plot_ownership_type:
-          type: string
-        plot_type:
-          type: string
-        road_access:
-          type: string
-        services:
-          type: string
-        sewer:
-          type: string
-        shore:
-          type: string
-        transport:
-          type: string
-        water_supply:
-          type: string
-        water_supply_types:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        yard:
-          type: string
-        zoning:
-          type: string
-      type: object
-    TextSections:
-      additionalProperties: false
-      properties:
-        additional_info:
-          type: string
-        amenities:
-          type: string
-        area:
-          type: string
-        availability:
-          type: string
-        bathroom:
-          type: string
-        building:
-          type: string
-        charges:
-          type: string
-        description:
-          type: string
-        kitchen:
-          type: string
-        materials:
-          type: string
-        renovations_done:
-          type: string
-        renovations_planned:
-          type: string
-        storage:
-          type: string
-        transport:
-          type: string
-      type: object
-    TransactionMatchCandidate:
-      additionalProperties: false
-      properties:
-        confidence:
-          type: string
         created_at:
+          format: date-time
           type: string
+        dimension_key:
+          type: string
+        evidence: {}
         id:
           type: string
-        listing:
-          $ref: "#/components/schemas/TransactionMatchListingCandidate"
-        price_delta_percent:
+        observed_at:
+          format: date-time
+          type: string
+        projection_version:
+          type: string
+        source_field:
+          type: string
+        source_id:
+          type: string
+        source_reliability:
           format: double
           type: number
-        reasons: {}
-        score:
-          format: int32
-          type: integer
-        status:
+        source_table:
           type: string
-        transaction:
-          $ref: "#/components/schemas/TransactionMatchTransaction"
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        unit:
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        valid_from:
+          type: string
+        valid_until:
+          type: string
+        value: {}
+        value_kind:
+          type: string
       required:
         - id
-        - status
-        - score
+        - target
+        - dimension_key
+        - value
+        - value_kind
+        - claim_scope
+        - source_table
+        - source_id
+        - projection_version
         - confidence
-        - listing
-        - transaction
+        - source_reliability
+        - created_at
+        - updated_at
       type: object
-    TransactionMatchCandidatesOutputBody:
+    SourceClaimsOutputBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/TransactionMatchCandidatesOutputBody.json
+            - https://example.com/schemas/SourceClaimsOutputBody.json
           format: uri
           readOnly: true
           type: string
-        candidates:
+        claims:
           items:
-            $ref: "#/components/schemas/TransactionMatchCandidate"
+            $ref: "#/components/schemas/SourceClaim"
           type:
             - array
             - "null"
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
       required:
-        - candidates
+        - target
+        - claims
       type: object
-    TransactionMatchListingCandidate:
+    TargetDocumentsOutputBody:
       additionalProperties: false
       properties:
-        area_m2:
-          format: double
-          type: number
-        asking_price:
-          format: int64
-          type: integer
-        build_year:
-          format: int32
-          type: integer
-        canonical_id:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/TargetDocumentsOutputBody.json
+          format: uri
+          readOnly: true
           type: string
-        city:
+        documents:
+          items:
+            $ref: "#/components/schemas/PropertyDocumentSummary"
+          type:
+            - array
+            - "null"
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+      required:
+        - target
+        - documents
+      type: object
+    TargetOverview:
+      additionalProperties: false
+      properties:
+        fields:
+          items:
+            $ref: "#/components/schemas/TargetOverviewField"
+          type:
+            - array
+            - "null"
+        related:
+          items:
+            $ref: "#/components/schemas/TargetOverviewRelated"
+          type:
+            - array
+            - "null"
+        sources:
+          items:
+            $ref: "#/components/schemas/TargetSourceLink"
+          type:
+            - array
+            - "null"
+        subtitle:
           type: string
-        condition:
+        title:
           type: string
-        condition_match_code:
+      required:
+        - title
+      type: object
+    TargetOverviewField:
+      additionalProperties: false
+      properties:
+        label:
           type: string
-        elevator:
-          type: boolean
-        energy_label:
+        value:
           type: string
-        energy_match_code:
+      required:
+        - label
+        - value
+      type: object
+    TargetOverviewRelated:
+      additionalProperties: false
+      properties:
+        label:
           type: string
-        first_seen_at:
+        target:
+          $ref: "#/components/schemas/CanonicalTargetRef"
+        title:
           type: string
-        floor_level:
-          format: int32
-          type: integer
-        headline:
+      required:
+        - label
+        - title
+        - target
+      type: object
+    TargetSourceLink:
+      additionalProperties: false
+      properties:
+        kind:
           type: string
-        id:
+        label:
           type: string
         last_seen_at:
+          format: date-time
           type: string
-        plot_owned:
-          type: boolean
-        plot_ownership_raw:
+        provider:
           type: string
-        postal:
+        source_id:
           type: string
-        price_per_m2:
-          format: double
-          type: number
-        room_layout:
+        title:
           type: string
-        source_provider:
-          type: string
-        street_address:
-          type: string
-        total_floors:
-          format: int32
-          type: integer
         url:
           type: string
       required:
-        - id
-        - canonical_id
-        - source_provider
-      type: object
-    TransactionMatchPostalSummary:
-      additionalProperties: false
-      properties:
-        ambiguous_count:
-          format: int64
-          type: integer
-        candidate_count:
-          format: int64
-          type: integer
-        high_count:
-          format: int64
-          type: integer
-        latest_at:
-          type: string
-        listing_count:
-          format: int64
-          type: integer
-        low_count:
-          format: int64
-          type: integer
-        medium_count:
-          format: int64
-          type: integer
-        municipality_name:
-          type: string
-        name_fi:
-          type: string
-        postal:
-          type: string
-        transaction_count:
-          format: int64
-          type: integer
-      required:
-        - postal
-        - candidate_count
-        - listing_count
-        - transaction_count
-        - high_count
-        - medium_count
-        - low_count
-        - ambiguous_count
-      type: object
-    TransactionMatchPostalsOutputBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/TransactionMatchPostalsOutputBody.json
-          format: uri
-          readOnly: true
-          type: string
-        postals:
-          items:
-            $ref: "#/components/schemas/TransactionMatchPostalSummary"
-          type:
-            - array
-            - "null"
-      required:
-        - postals
-      type: object
-    TransactionMatchTransaction:
-      additionalProperties: false
-      properties:
-        area_m2:
-          format: double
-          type: number
-        build_year:
-          format: int32
-          type: integer
-        category:
-          type: string
-        condition:
-          type: string
-        condition_match_code:
-          type: string
-        created_at:
-          type: string
-        description:
-          type: string
-        elevator:
-          type: boolean
-        energy_class:
-          type: string
-        energy_match_code:
-          type: string
-        floor:
-          type: string
-        id:
-          type: string
-        period_identifier:
-          type: string
-        plot:
-          type: string
-        plot_owned:
-          type: boolean
-        price:
-          format: int64
-          type: integer
-        price_per_m2:
-          format: int64
-          type: integer
-        type:
-          type: string
-      required:
-        - id
-        - area_m2
-        - price
-        - price_per_m2
-        - elevator
+        - label
+        - provider
+        - kind
+        - title
       type: object
     TranslatedValue:
       additionalProperties: false
@@ -1930,79 +1409,6 @@ components:
       required:
         - value
         - translation
-      type: object
-    UnitDetails:
-      additionalProperties: false
-      properties:
-        appliances:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        area_m2:
-          format: double
-          type: number
-        availability:
-          type: string
-        balcony:
-          type: boolean
-        balcony_description:
-          type: string
-        bathroom_description:
-          type: string
-        bedrooms_count:
-          format: int32
-          type: integer
-        condition:
-          type: string
-        features:
-          items:
-            type: string
-          type:
-            - array
-            - "null"
-        floor_level:
-          format: int32
-          type: integer
-        floor_materials_description:
-          type: string
-        kitchen_description:
-          type: string
-        living_area_m2:
-          format: double
-          type: number
-        location:
-          $ref: "#/components/schemas/Location"
-        other_area_m2:
-          format: double
-          type: number
-        parking:
-          type: string
-        property_subtype:
-          type: string
-        property_type:
-          type: string
-        room_layout:
-          type: string
-        rooms_count:
-          format: int32
-          type: integer
-        sauna:
-          type: boolean
-        sauna_description:
-          type: string
-        storage_description:
-          type: string
-        total_area_m2:
-          format: double
-          type: number
-        views_description:
-          type: string
-        wall_materials_description:
-          type: string
-      required:
-        - location
       type: object
     WebSessionRefreshOutputBody:
       additionalProperties: false
@@ -2041,19 +1447,6 @@ components:
       required:
         - ok
       type: object
-  securitySchemes:
-    bearer:
-      description: OAuth 2.0 access token
-      flows:
-        authorizationCode:
-          authorizationUrl: /oauth/authorize
-          scopes:
-            core:read: core:read
-            mcp:core:read: mcp:core:read
-            profile:read: profile:read
-            profile:write: profile:write
-          tokenUrl: /oauth/token
-      type: oauth2
 info:
   title: Koditon API
   version: 0.1.0
@@ -2151,34 +1544,6 @@ paths:
       summary: List available apartment types
       x-koditon-scopes:
         - core:read
-  /api/v1/housing-companies/{id}:
-    get:
-      description: Fetch housing company details by public ID, canonical ID, or source URL
-      operationId: housing-companies-detail
-      parameters:
-        - description: Canonical offering UUID
-          in: path
-          name: id
-          required: true
-          schema:
-            description: Canonical offering UUID
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Building"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Get housing company detail
-      tags:
-        - Housing Companies
   /api/v1/entity:
     get:
       description: Fetch canonical detail for an ad or housing company by canonical ID or source URL
@@ -2369,163 +1734,47 @@ paths:
       summary: List price transactions with advanced filters
       x-koditon-scopes:
         - core:read
-  /api/v1/rentals:
-    get:
-      description: Search rentals using the shared provider-neutral rental model
-      operationId: rentals-search
+  /api/v1/property-documents/manager-certificates:
+    post:
+      description: Stores a manager certificate PDF, optionally attaches it to a canonical target, and queues extraction.
+      operationId: property-documents-manager-certificates-upload
       parameters:
-        - description: Free text search
+        - description: "Optional target type: offering, unit, building, housing_company"
           explode: false
           in: query
-          name: q
+          name: target_type
           schema:
-            description: Free text search
+            description: "Optional target type: offering, unit, building, housing_company"
             type: string
-        - description: "Source filter: shortcut, frontdoor, or all"
+        - description: Optional target UUID
           explode: false
           in: query
-          name: source
+          name: target_id
           schema:
-            description: "Source filter: shortcut, frontdoor, or all"
+            description: Optional target UUID
             type: string
-        - description: City / municipality filter
-          explode: false
-          in: query
-          name: city
-          schema:
-            description: City / municipality filter
-            type: string
-        - description: Postal code prefix filter
-          explode: false
-          in: query
-          name: postal
-          schema:
-            description: Postal code prefix filter
-            type: string
-        - description: Minimum price (EUR, 0 = no minimum)
-          explode: false
-          in: query
-          name: min_price
-          schema:
-            description: Minimum price (EUR, 0 = no minimum)
-            format: int64
-            type: integer
-        - description: Maximum price (EUR, 0 = no maximum)
-          explode: false
-          in: query
-          name: max_price
-          schema:
-            description: Maximum price (EUR, 0 = no maximum)
-            format: int64
-            type: integer
-        - description: Minimum area (m², 0 = no minimum)
-          explode: false
-          in: query
-          name: min_area
-          schema:
-            description: Minimum area (m², 0 = no minimum)
-            format: double
-            type: number
-        - description: Maximum area (m², 0 = no maximum)
-          explode: false
-          in: query
-          name: max_area
-          schema:
-            description: Maximum area (m², 0 = no maximum)
-            format: double
-            type: number
-        - description: Minimum price per square meter (EUR/m², 0 = no minimum)
-          explode: false
-          in: query
-          name: min_price_per_m2
-          schema:
-            description: Minimum price per square meter (EUR/m², 0 = no minimum)
-            format: double
-            type: number
-        - description: Maximum price per square meter (EUR/m², 0 = no maximum)
-          explode: false
-          in: query
-          name: max_price_per_m2
-          schema:
-            description: Maximum price per square meter (EUR/m², 0 = no maximum)
-            format: double
-            type: number
-        - description: Exact room count (0 = no filter)
-          explode: false
-          in: query
-          name: rooms
-          schema:
-            description: Exact room count (0 = no filter)
-            format: int32
-            type: integer
-        - description: Exact floor level (0 = no filter)
-          explode: false
-          in: query
-          name: floor
-          schema:
-            description: Exact floor level (0 = no filter)
-            format: int32
-            type: integer
-        - description: Minimum build year (0 = no minimum)
-          explode: false
-          in: query
-          name: min_build_year
-          schema:
-            description: Minimum build year (0 = no minimum)
-            format: int32
-            type: integer
-        - description: Maximum build year (0 = no maximum)
-          explode: false
-          in: query
-          name: max_build_year
-          schema:
-            description: Maximum build year (0 = no maximum)
-            format: int32
-            type: integer
-        - description: Condition text filter
-          explode: false
-          in: query
-          name: condition
-          schema:
-            description: Condition text filter
-            type: string
-        - description: Energy class text filter
-          explode: false
-          in: query
-          name: energy_class
-          schema:
-            description: Energy class text filter
-            type: string
-        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
-          explode: false
-          in: query
-          name: sort
-          schema:
-            description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
-            type: string
-        - description: Page number (1-based)
-          explode: false
-          in: query
-          name: page
-          schema:
-            description: Page number (1-based)
-            format: int32
-            minimum: 1
-            type: integer
-        - description: "Results per page: 25, 50, or 100"
-          explode: false
-          in: query
-          name: page_size
-          schema:
-            description: "Results per page: 25, 50, or 100"
-            format: int32
-            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            encoding:
+              file:
+                contentType: application/pdf
+            schema:
+              properties:
+                file:
+                  contentEncoding: binary
+                  contentMediaType: application/octet-stream
+                  format: binary
+                  type: string
+              required:
+                - file
+              type: object
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PageRentalSummary"
+                $ref: "#/components/schemas/PropertyDocumentAttachOutputBody"
           description: OK
         default:
           content:
@@ -2533,27 +1782,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Search rentals
+      security:
+        - bearer:
+            - profile:write
+      summary: Upload manager certificate
       tags:
-        - Rentals
-  /api/v1/rentals/{id}:
+        - Property Documents
+      x-koditon-scopes:
+        - profile:write
+  /api/v1/property-documents/{id}:
     get:
-      description: Fetch a rental by public ID, canonical ID, or source URL
-      operationId: rentals-detail
+      description: Returns document metadata and its current target attachment.
+      operationId: property-documents-detail
       parameters:
-        - description: Canonical offering UUID
+        - description: Property document UUID
           in: path
           name: id
           required: true
           schema:
-            description: Canonical offering UUID
+            description: Property document UUID
             type: string
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Rental"
+                $ref: "#/components/schemas/PropertyDocumentSummary"
           description: OK
         default:
           content:
@@ -2561,9 +1815,381 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Get rental detail
+      security:
+        - bearer:
+            - core:read
+      summary: Get property document
       tags:
-        - Rentals
+        - Property Documents
+      x-koditon-scopes:
+        - core:read
+  /api/v1/property-documents/{id}/attachment:
+    put:
+      description: Moves a document to a canonical target, or detaches it, and queues projection.
+      operationId: property-documents-attachment-set
+      parameters:
+        - description: Property document UUID
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Property document UUID
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyDocumentAttachModelInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyDocumentAttachOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer:
+            - profile:write
+      summary: Attach property document
+      tags:
+        - Property Documents
+      x-koditon-scopes:
+        - profile:write
+  /api/v1/property-documents/{id}/download:
+    get:
+      description: Downloads the original stored property document bytes
+      operationId: property-documents-download
+      parameters:
+        - description: Property document UUID
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Property document UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                contentEncoding: base64
+                type: string
+          description: OK
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                format: int64
+                type: integer
+            Content-Type:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer:
+            - core:read
+      summary: Download property document
+      tags:
+        - Property Documents
+      x-koditon-scopes:
+        - core:read
+  /api/v1/property-targets/map:
+    get:
+      description: Returns canonical housing company markers with linked units and offerings.
+      operationId: property-targets-map
+      parameters:
+        - description: Minimum latitude for visible map bounds, 0 = no bounds
+          explode: false
+          in: query
+          name: min_lat
+          schema:
+            description: Minimum latitude for visible map bounds, 0 = no bounds
+            format: double
+            type: number
+        - description: Minimum longitude for visible map bounds, 0 = no bounds
+          explode: false
+          in: query
+          name: min_lng
+          schema:
+            description: Minimum longitude for visible map bounds, 0 = no bounds
+            format: double
+            type: number
+        - description: Maximum latitude for visible map bounds, 0 = no bounds
+          explode: false
+          in: query
+          name: max_lat
+          schema:
+            description: Maximum latitude for visible map bounds, 0 = no bounds
+            format: double
+            type: number
+        - description: Maximum longitude for visible map bounds, 0 = no bounds
+          explode: false
+          in: query
+          name: max_lng
+          schema:
+            description: Maximum longitude for visible map bounds, 0 = no bounds
+            format: double
+            type: number
+        - description: Search by housing company name, address, city, or postal code
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Search by housing company name, address, city, or postal code
+            type: string
+        - description: Maximum number of housing company markers
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Maximum number of housing company markers
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyTargetMap"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Map canonical property targets
+      tags:
+        - Property Model
+  /api/v1/property-targets/{targetType}/{targetID}:
+    get:
+      description: Returns a canonical target with resolved values, renovation events, and attached documents.
+      operationId: property-targets-detail
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanonicalTargetResource"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get canonical property target
+      tags:
+        - Property Model
+  /api/v1/property-targets/{targetType}/{targetID}/claims:
+    get:
+      description: Returns source and manual claims attached to the target.
+      operationId: property-targets-claims
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceClaimsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List source claims
+      tags:
+        - Property Model
+  /api/v1/property-targets/{targetType}/{targetID}/documents:
+    get:
+      description: Returns documents attached to the target.
+      operationId: property-targets-documents
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetDocumentsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List target documents
+      tags:
+        - Property Model
+  /api/v1/property-targets/{targetType}/{targetID}/renovation-events:
+    get:
+      description: Returns typed source and manual renovation events attached to the target.
+      operationId: property-targets-renovation-events
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenovationEventsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List renovation events
+      tags:
+        - Property Model
+  /api/v1/property-targets/{targetType}/{targetID}/resolve:
+    post:
+      description: Queues resolution and profile projection for one canonical target.
+      operationId: property-targets-resolve
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedCanonicalJob"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer:
+            - profile:write
+      summary: Queue target resolution
+      tags:
+        - Property Model
+      x-koditon-scopes:
+        - profile:write
+  /api/v1/property-targets/{targetType}/{targetID}/resolved-values:
+    get:
+      description: Returns resolved dimension values with selected evidence and conflict metadata.
+      operationId: property-targets-resolved-values
+      parameters:
+        - description: "Canonical target type: offering, unit, building, housing_company"
+          in: path
+          name: targetType
+          required: true
+          schema:
+            description: "Canonical target type: offering, unit, building, housing_company"
+            type: string
+        - description: Canonical target UUID
+          in: path
+          name: targetID
+          required: true
+          schema:
+            description: Canonical target UUID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolvedValuesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List resolved values
+      tags:
+        - Property Model
   /api/v1/resolve:
     get:
       description: Resolve a source URL into a canonical ID for use with detail endpoints
@@ -2593,290 +2219,6 @@ paths:
       summary: Resolve source URL
       tags:
         - Entity
-  /api/v1/sale-listings:
-    get:
-      description: Search sale listings using the shared provider-neutral sale listing model
-      operationId: sale-listings-search
-      parameters:
-        - description: Free text search
-          explode: false
-          in: query
-          name: q
-          schema:
-            description: Free text search
-            type: string
-        - description: "Source filter: shortcut, frontdoor, or all"
-          explode: false
-          in: query
-          name: source
-          schema:
-            description: "Source filter: shortcut, frontdoor, or all"
-            type: string
-        - description: City / municipality filter
-          explode: false
-          in: query
-          name: city
-          schema:
-            description: City / municipality filter
-            type: string
-        - description: Postal code prefix filter
-          explode: false
-          in: query
-          name: postal
-          schema:
-            description: Postal code prefix filter
-            type: string
-        - description: Minimum price (EUR, 0 = no minimum)
-          explode: false
-          in: query
-          name: min_price
-          schema:
-            description: Minimum price (EUR, 0 = no minimum)
-            format: int64
-            type: integer
-        - description: Maximum price (EUR, 0 = no maximum)
-          explode: false
-          in: query
-          name: max_price
-          schema:
-            description: Maximum price (EUR, 0 = no maximum)
-            format: int64
-            type: integer
-        - description: Minimum area (m², 0 = no minimum)
-          explode: false
-          in: query
-          name: min_area
-          schema:
-            description: Minimum area (m², 0 = no minimum)
-            format: double
-            type: number
-        - description: Maximum area (m², 0 = no maximum)
-          explode: false
-          in: query
-          name: max_area
-          schema:
-            description: Maximum area (m², 0 = no maximum)
-            format: double
-            type: number
-        - description: Minimum price per square meter (EUR/m², 0 = no minimum)
-          explode: false
-          in: query
-          name: min_price_per_m2
-          schema:
-            description: Minimum price per square meter (EUR/m², 0 = no minimum)
-            format: double
-            type: number
-        - description: Maximum price per square meter (EUR/m², 0 = no maximum)
-          explode: false
-          in: query
-          name: max_price_per_m2
-          schema:
-            description: Maximum price per square meter (EUR/m², 0 = no maximum)
-            format: double
-            type: number
-        - description: Exact room count (0 = no filter)
-          explode: false
-          in: query
-          name: rooms
-          schema:
-            description: Exact room count (0 = no filter)
-            format: int32
-            type: integer
-        - description: Exact floor level (0 = no filter)
-          explode: false
-          in: query
-          name: floor
-          schema:
-            description: Exact floor level (0 = no filter)
-            format: int32
-            type: integer
-        - description: Minimum build year (0 = no minimum)
-          explode: false
-          in: query
-          name: min_build_year
-          schema:
-            description: Minimum build year (0 = no minimum)
-            format: int32
-            type: integer
-        - description: Maximum build year (0 = no maximum)
-          explode: false
-          in: query
-          name: max_build_year
-          schema:
-            description: Maximum build year (0 = no maximum)
-            format: int32
-            type: integer
-        - description: Condition text filter
-          explode: false
-          in: query
-          name: condition
-          schema:
-            description: Condition text filter
-            type: string
-        - description: Energy class text filter
-          explode: false
-          in: query
-          name: energy_class
-          schema:
-            description: Energy class text filter
-            type: string
-        - description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
-          explode: false
-          in: query
-          name: sort
-          schema:
-            description: "Sort order: price_asc, price_desc, area_asc, area_desc, price_m2_asc, price_m2_desc, build_year_desc, seen_desc"
-            type: string
-        - description: Page number (1-based)
-          explode: false
-          in: query
-          name: page
-          schema:
-            description: Page number (1-based)
-            format: int32
-            minimum: 1
-            type: integer
-        - description: "Results per page: 25, 50, or 100"
-          explode: false
-          in: query
-          name: page_size
-          schema:
-            description: "Results per page: 25, 50, or 100"
-            format: int32
-            type: integer
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageSaleListingSummary"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Search sale listings
-      tags:
-        - Sale Listings
-  /api/v1/sale-listings/transaction-match-candidates:
-    get:
-      description: Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code
-      operationId: sale-listings-transaction-match-candidates
-      parameters:
-        - description: Postal code filter
-          explode: false
-          in: query
-          name: postal
-          schema:
-            description: Postal code filter
-            type: string
-        - description: "Candidate status filter: candidate or ambiguous"
-          explode: false
-          in: query
-          name: status
-          schema:
-            description: "Candidate status filter: candidate or ambiguous"
-            type: string
-        - description: Prices transaction UUID filter
-          explode: false
-          in: query
-          name: transaction
-          schema:
-            description: Prices transaction UUID filter
-            type: string
-        - description: Maximum candidates to return
-          explode: false
-          in: query
-          name: limit
-          schema:
-            description: Maximum candidates to return
-            format: int32
-            type: integer
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TransactionMatchCandidatesOutputBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      security:
-        - bearer:
-            - core:read
-      summary: List potential transaction matches
-      tags:
-        - Sale Listings
-      x-koditon-scopes:
-        - core:read
-  /api/v1/sale-listings/transaction-match-postals:
-    get:
-      description: Returns postal codes where unresolved sale listing to price transaction candidates exist
-      operationId: sale-listings-transaction-match-postals
-      parameters:
-        - description: Maximum postal codes to return
-          explode: false
-          in: query
-          name: limit
-          schema:
-            description: Maximum postal codes to return
-            format: int32
-            type: integer
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TransactionMatchPostalsOutputBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      security:
-        - bearer:
-            - core:read
-      summary: List postal codes with potential transaction matches
-      tags:
-        - Sale Listings
-      x-koditon-scopes:
-        - core:read
-  /api/v1/sale-listings/{id}:
-    get:
-      description: Fetch a canonical sale offering by UUID
-      operationId: sale-listings-detail
-      parameters:
-        - description: Canonical offering UUID
-          in: path
-          name: id
-          required: true
-          schema:
-            description: Canonical offering UUID
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SaleListing"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Get sale listing detail
-      tags:
-        - Sale Listings
   /api/v1/search:
     get:
       description: Search ads and housing companies by free text, address, city, postal code, price, and area

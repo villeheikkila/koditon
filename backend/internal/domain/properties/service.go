@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -355,6 +357,82 @@ WHERE sl.sale_listing_id = $1`, saleListingID).Scan(&provider, &kind, &shortcutD
 
 func (s *Service) enrichSaleListingRenovations(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
 	rows, err := s.db.Query(ctx, `
+WITH target AS (
+    SELECT
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
+        pu.physical_building_id
+    FROM public.property_offering_sources pos
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE pos.sale_listing_id = $1
+        AND pos.property_offering_source_link_status <> 'rejected'
+    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    LIMIT 1
+)
+SELECT
+    event.category,
+    event.status,
+    event.year,
+    COALESCE(event.component, ''),
+    COALESCE(event.scope, ''),
+    COALESCE(event.stage, ''),
+    COALESCE(event.responsibility, ''),
+    event.cost_estimate_eur,
+    COALESCE(event.summary, ''),
+    round(COALESCE(event.confidence, 0.5) * 100)::integer,
+    COALESCE(event.source_field, event.source_table),
+    event.source_table,
+    COALESCE(event.evidence #>> '{evidence_level}', ''),
+    event.source_observed_at,
+    COALESCE(event.confidence, 0.5),
+    COALESCE(event.source_reliability, 0.5)
+FROM target
+JOIN public.property_renovation_events event
+    ON event.event_scope = 'source'
+    AND (
+        (event.target_type = 'housing_company' AND event.target_id = target.housing_company_id)
+        OR (event.target_type = 'building' AND event.target_id = target.physical_building_id)
+    )`, saleListingID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	evidence := make([]renovationDisplayEvidence, 0)
+	for rows.Next() {
+		var category, status, component, scope, stage, responsibility, text, source, sourceTable, evidenceLevel string
+		var year *int32
+		var confidence *int32
+		var costEstimateEUR *int64
+		var sourceObservedAt *time.Time
+		var confidenceScore, sourceReliability float64
+		if err := rows.Scan(&category, &status, &year, &component, &scope, &stage, &responsibility, &costEstimateEUR, &text, &confidence, &source, &sourceTable, &evidenceLevel, &sourceObservedAt, &confidenceScore, &sourceReliability); err != nil {
+			return err
+		}
+		evidence = append(evidence, renovationDisplayEvidence{Renovation: renovationFromEvidence(category, status, year, component, scope, stage, responsibility, costEstimateEUR, text, confidence, source), Status: status, SourceTable: sourceTable, EvidenceLevel: evidenceLevel, SourceObservedAt: sourceObservedAt, Confidence: confidenceScore, Reliability: sourceReliability})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(evidence) == 0 {
+		return s.enrichSaleListingRenovationsFromFallbackRows(ctx, listing, saleListingID)
+	}
+	listing.Building.Renovations = compactRenovations(append(listing.Building.Renovations, resolveRenovationDisplayEvidence(evidence, time.Now())...))
+	return nil
+}
+
+type renovationDisplayEvidence struct {
+	Renovation       BuildingRenovation
+	Status           string
+	SourceTable      string
+	EvidenceLevel    string
+	SourceObservedAt *time.Time
+	Confidence       float64
+	Reliability      float64
+}
+
+func (s *Service) enrichSaleListingRenovationsFromFallbackRows(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
+	rows, err := s.db.Query(ctx, `
 SELECT
     property_source_offering_renovation_category,
     property_source_offering_renovation_status,
@@ -382,29 +460,97 @@ ORDER BY property_source_offering_renovation_category, property_source_offering_
 		if err := rows.Scan(&category, &status, &year, &component, &scope, &stage, &responsibility, &costEstimateEUR, &text, &confidence, &source); err != nil {
 			return err
 		}
-		var done *bool
-		switch status {
-		case "done":
-			done = ptrBool(true)
-		case "planned":
-			done = ptrBool(false)
-		}
-		renovation := buildingRenovation(category, done, year)
-		renovation.Component = component
-		renovation.Scope = firstNonEmpty(scope, inferRenovationScope(category+" "+component+" "+text))
-		renovation.Stage = firstNonEmpty(stage, inferRenovationStage(text))
-		renovation.Responsibility = firstNonEmpty(responsibility, inferRenovationResponsibility(text))
-		renovation.CostEstimateEUR = costEstimateEUR
-		renovation.Text = cleanDisplayString(text)
-		renovation.Confidence = confidence
-		renovation.Source = source
-		listing.Building.Renovations = append(listing.Building.Renovations, renovation)
+		listing.Building.Renovations = append(listing.Building.Renovations, renovationFromEvidence(category, status, year, component, scope, stage, responsibility, costEstimateEUR, text, confidence, source))
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	listing.Building.Renovations = compactRenovations(listing.Building.Renovations)
 	return nil
+}
+
+func renovationFromEvidence(category string, status string, year *int32, component string, scope string, stage string, responsibility string, costEstimateEUR *int64, text string, confidence *int32, source string) BuildingRenovation {
+	var done *bool
+	switch status {
+	case "done":
+		done = ptrBool(true)
+	case "planned":
+		done = ptrBool(false)
+	}
+	renovation := buildingRenovation(category, done, year)
+	renovation.Component = component
+	renovation.Scope = firstNonEmpty(scope, inferRenovationScope(category+" "+component+" "+text))
+	renovation.Stage = firstNonEmpty(stage, inferRenovationStage(text))
+	renovation.Responsibility = firstNonEmpty(responsibility, inferRenovationResponsibility(text))
+	renovation.CostEstimateEUR = costEstimateEUR
+	renovation.Text = cleanDisplayString(text)
+	renovation.Confidence = confidence
+	renovation.Source = source
+	return renovation
+}
+
+func resolveRenovationDisplayEvidence(rows []renovationDisplayEvidence, now time.Time) []BuildingRenovation {
+	type selectedEvidence struct {
+		row   renovationDisplayEvidence
+		score float64
+	}
+	selected := map[string]selectedEvidence{}
+	for _, row := range rows {
+		key := fmt.Sprintf("%s:%s:%d:%s", row.Renovation.Kind, row.Status, ptrInt32Value(row.Renovation.Year), row.Renovation.Component)
+		score := renovationEvidenceScore(row, now)
+		if current, ok := selected[key]; !ok || score > current.score || score == current.score && renovationObservedAfter(row.SourceObservedAt, current.row.SourceObservedAt) {
+			selected[key] = selectedEvidence{row: row, score: score}
+		}
+	}
+	out := make([]BuildingRenovation, 0, len(selected))
+	for _, item := range selected {
+		out = append(out, item.row.Renovation)
+	}
+	sort.Slice(out, func(i int, j int) bool {
+		if out[i].Kind != out[j].Kind {
+			return out[i].Kind < out[j].Kind
+		}
+		if ptrInt32Value(out[i].Year) != ptrInt32Value(out[j].Year) {
+			if out[i].Year == nil {
+				return false
+			}
+			if out[j].Year == nil {
+				return true
+			}
+			return *out[i].Year < *out[j].Year
+		}
+		return out[i].Source < out[j].Source
+	})
+	return out
+}
+
+func renovationEvidenceScore(row renovationDisplayEvidence, now time.Time) float64 {
+	base := 60.0
+	switch {
+	case row.EvidenceLevel == "manager_certificate":
+		base = 120
+	case row.SourceTable == "property_source_offerings":
+		base = 80
+	}
+	decay := 1.0
+	if (row.Status == "planned" || row.Status == "suspected" || row.Status == "forecast") && row.SourceObservedAt != nil {
+		ageDays := now.Sub(*row.SourceObservedAt).Hours() / 24
+		if ageDays < 0 {
+			ageDays = 0
+		}
+		decay = math.Pow(0.5, ageDays/365)
+	}
+	return base * row.Confidence * row.Reliability * decay
+}
+
+func renovationObservedAfter(left *time.Time, right *time.Time) bool {
+	if left == nil {
+		return false
+	}
+	if right == nil {
+		return true
+	}
+	return left.After(*right)
 }
 
 func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (Rental, error) {

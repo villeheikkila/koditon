@@ -68,98 +68,62 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search ads and housing companies by free text, address, city, postal code, price, and area"
 		op.Tags = []string{"Entity"}
 	})
-	huma.Get(api, "/api/v1/sale-listings", a.saleListingsSearchHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-search"
-		op.Summary = "Search sale listings"
-		op.Description = "Search sale listings using the shared provider-neutral sale listing model"
-		op.Tags = []string{"Sale Listings"}
+	huma.Get(api, "/api/v1/property-targets/map", a.propertyTargetsMapHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-map"
+		op.Summary = "Map canonical property targets"
+		op.Description = "Returns canonical housing company markers with linked units and offerings."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/map", a.saleListingsMapHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-map"
-		op.Summary = "Map sale listing locations"
-		op.Description = "Return grouped map markers for canonical sale offerings by exact housing company location"
-		op.Tags = []string{"Sale Listings"}
+	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}", a.canonicalTargetHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-detail"
+		op.Summary = "Get canonical property target"
+		op.Description = "Returns a canonical target with resolved values, renovation events, and attached documents."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/map-filter-options", a.saleListingsMapFilterOptionsHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-map-filter-options"
-		op.Summary = "List map filter options"
-		op.Description = "Return distinct city and postal values available in sale listing map filters"
-		op.Tags = []string{"Sale Listings"}
+	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}/resolved-values", a.resolvedValuesHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-resolved-values"
+		op.Summary = "List resolved values"
+		op.Description = "Returns resolved dimension values with selected evidence and conflict metadata."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-transaction-match-postals"
-		op.Summary = "List postal codes with potential transaction matches"
-		op.Description = "Returns postal codes where unresolved sale listing to price transaction candidates exist"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-transaction-match-postals"))
+	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}/claims", a.sourceClaimsHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-claims"
+		op.Summary = "List source claims"
+		op.Description = "Returns source and manual claims attached to the target."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/transaction-match-candidates", a.transactionMatchCandidatesHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-transaction-match-candidates"
-		op.Summary = "List potential transaction matches"
-		op.Description = "Returns unresolved sale listing to price transaction candidate rows, optionally filtered by postal code"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-transaction-match-candidates"))
+	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}/renovation-events", a.renovationEventsHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-renovation-events"
+		op.Summary = "List renovation events"
+		op.Description = "Returns typed source and manual renovation events attached to the target."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/{id}", a.saleListingDetailHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-detail"
-		op.Summary = "Get sale listing detail"
-		op.Description = "Fetch a canonical sale offering by UUID"
-		op.Tags = []string{"Sale Listings"}
+	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}/documents", a.targetDocumentsHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-documents"
+		op.Summary = "List target documents"
+		op.Description = "Returns documents attached to the target."
+		op.Tags = []string{"Property Model"}
 	})
-	huma.Get(api, "/api/v1/sale-listings/{id}/source-records/{sourceID}/raw", a.saleListingSourceRawHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-source-raw"
-		op.Summary = "Get sale listing source raw payload"
-		op.Description = "Fetch the original provider JSON payload for a source row linked to a canonical sale offering"
-		op.Tags = []string{"Sale Listings"}
+	huma.Post(api, "/api/v1/property-targets/{targetType}/{targetID}/resolve", a.resolveTargetHandler, func(op *huma.Operation) {
+		op.OperationID = "property-targets-resolve"
+		op.Summary = "Queue target resolution"
+		op.Description = "Queues resolution and profile projection for one canonical target."
+		op.Tags = []string{"Property Model"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-targets-resolve"))
 	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/renovations/extract", a.saleListingRenovationExtractHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-renovations-extract"
-		op.Summary = "Extract structured sale listing renovations"
-		op.Description = "Uses the configured Fantasy/OpenRouter model to extract structured renovation rows from listing renovation text"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-renovations-extract"))
-	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/description/extract", a.saleListingDescriptionExtractHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-description-extract"
-		op.Summary = "Extract structured sale listing description signals"
-		op.Description = "Uses the configured Fantasy/OpenRouter model to extract offer-relevant signals from listing description text"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-description-extract"))
-	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/valuation-inputs/extract", a.saleListingValuationInputsExtractHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-valuation-inputs-extract"
-		op.Summary = "Extract canonical sale listing valuation inputs"
-		op.Description = "Uses the configured Fantasy/OpenRouter model to parse layout and listing text into structured valuation facts"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-valuation-inputs-extract"))
-	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/canonical-profile/project", a.saleListingCanonicalProfileProjectHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-canonical-profile-project"
-		op.Summary = "Project canonical sale listing profile"
-		op.Description = "Projects provider fields, extracted property claims, and typed renovation rows into the canonical apartment, building, housing-company, and quality-score tables"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-canonical-profile-project"))
-	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/house-overview/generate", a.saleListingHouseOverviewGenerateHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-house-overview-generate"
-		op.Summary = "Generate sale listing house overview"
-		op.Description = "Uses the configured Fantasy/OpenRouter model to summarize the building and renovation situation from already structured listing facts"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-house-overview-generate"))
-	})
-	huma.Post(api, "/api/v1/sale-listings/{id}/documents/manager-certificate", a.saleListingManagerCertificateUploadHandler, func(op *huma.Operation) {
-		op.OperationID = "sale-listings-manager-certificate-upload"
-		op.Summary = "Upload manager certificate PDF"
-		op.Description = "Stores an isännöitsijäntodistus PDF for a canonical sale offering and queues extraction"
-		op.Tags = []string{"Sale Listings"}
-		applyAuth(op, makeMiddleware, resolveScopes("sale-listings-manager-certificate-upload"))
-	})
-	huma.Post(api, "/api/v1/property-documents/manager-certificate", a.managerCertificateUploadHandler, func(op *huma.Operation) {
-		op.OperationID = "property-documents-manager-certificate-upload"
-		op.Summary = "Upload manager certificate PDF"
-		op.Description = "Stores an isännöitsijäntodistus PDF with an optional canonical offering target and queues extraction"
+	huma.Post(api, "/api/v1/property-documents/manager-certificates", a.modelManagerCertificateUploadHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-manager-certificates-upload"
+		op.Summary = "Upload manager certificate"
+		op.Description = "Stores a manager certificate PDF, optionally attaches it to a canonical target, and queues extraction."
 		op.Tags = []string{"Property Documents"}
-		applyAuth(op, makeMiddleware, resolveScopes("property-documents-manager-certificate-upload"))
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-manager-certificates-upload"))
+	})
+	huma.Get(api, "/api/v1/property-documents/{id}", a.propertyDocumentSummaryHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-detail"
+		op.Summary = "Get property document"
+		op.Description = "Returns document metadata and its current target attachment."
+		op.Tags = []string{"Property Documents"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-detail"))
 	})
 	huma.Get(api, "/api/v1/property-documents/{id}/download", a.propertyDocumentDownloadHandler, func(op *huma.Operation) {
 		op.OperationID = "property-documents-download"
@@ -168,37 +132,12 @@ func addRoutes(a *API, api huma.API) {
 		op.Tags = []string{"Property Documents"}
 		applyAuth(op, makeMiddleware, resolveScopes("property-documents-download"))
 	})
-	huma.Post(api, "/api/v1/property-documents/{id}/extract", a.propertyDocumentExtractHandler, func(op *huma.Operation) {
-		op.OperationID = "property-documents-extract"
-		op.Summary = "Queue property document extraction"
-		op.Description = "Queues OpenAI manager-certificate extraction and claim projection for the stored PDF"
-		op.Tags = []string{"Property Documents"}
-		applyAuth(op, makeMiddleware, resolveScopes("property-documents-extract"))
-	})
-	huma.Post(api, "/api/v1/property-documents/{id}/attach", a.propertyDocumentAttachHandler, func(op *huma.Operation) {
-		op.OperationID = "property-documents-attach"
+	huma.Put(api, "/api/v1/property-documents/{id}/attachment", a.propertyDocumentAttachModelHandler, func(op *huma.Operation) {
+		op.OperationID = "property-documents-attachment-set"
 		op.Summary = "Attach property document"
-		op.Description = "Moves a property document to another canonical offering and queues claim projection"
+		op.Description = "Moves a document to a canonical target, or detaches it, and queues projection."
 		op.Tags = []string{"Property Documents"}
-		applyAuth(op, makeMiddleware, resolveScopes("property-documents-attach"))
-	})
-	huma.Get(api, "/api/v1/rentals", a.rentalsSearchHandler, func(op *huma.Operation) {
-		op.OperationID = "rentals-search"
-		op.Summary = "Search rentals"
-		op.Description = "Search rentals using the shared provider-neutral rental model"
-		op.Tags = []string{"Rentals"}
-	})
-	huma.Get(api, "/api/v1/rentals/{id}", a.rentalDetailHandler, func(op *huma.Operation) {
-		op.OperationID = "rentals-detail"
-		op.Summary = "Get rental detail"
-		op.Description = "Fetch a rental by public ID, canonical ID, or source URL"
-		op.Tags = []string{"Rentals"}
-	})
-	huma.Get(api, "/api/v1/housing-companies/{id}", a.housingCompanyDetailHandler, func(op *huma.Operation) {
-		op.OperationID = "housing-companies-detail"
-		op.Summary = "Get housing company detail"
-		op.Description = "Fetch housing company details by UUID, canonical ID, or source URL"
-		op.Tags = []string{"Housing Companies"}
+		applyAuth(op, makeMiddleware, resolveScopes("property-documents-attachment-set"))
 	})
 	huma.Get(api, "/api/v1/resolve", a.resolveCanonicalIDHandler, func(op *huma.Operation) {
 		op.OperationID = "resolve-canonical-id"

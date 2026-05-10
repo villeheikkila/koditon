@@ -3013,11 +3013,11 @@ WITH run AS (
 ),
 payload AS (
     SELECT
-        public.fnc__legacy_property_dimension_target_type($8::text) AS target_type,
-        public.fnc__legacy_property_dimension_claim_scope($8::text) AS claim_scope,
-        public.fnc__legacy_property_dimension_key($9::text, $10::text) AS dimension_key,
-        public.fnc__legacy_property_dimension_value_kind($11::text, $12::jsonb) AS value_kind,
-        public.fnc__legacy_property_dimension_value($11::text, NULLIF($13, ''), $14::double precision, $15::boolean, $12::jsonb) AS value
+        public.fnc__legacy_property_dimension_target_type($9::text) AS target_type,
+        public.fnc__legacy_property_dimension_claim_scope($9::text) AS claim_scope,
+        public.fnc__legacy_property_dimension_key($10::text, $11::text) AS dimension_key,
+        public.fnc__legacy_property_dimension_value_kind($12::text, $13::jsonb) AS value_kind,
+        public.fnc__legacy_property_dimension_value($12::text, NULLIF($14, ''), $15::double precision, $16::boolean, $13::jsonb) AS value
 )
 INSERT INTO public.property_dimension_claims (
     property_dimension_projection_run_id,
@@ -3052,11 +3052,11 @@ SELECT
     'property_documents',
     $3,
     NULLIF($4, ''),
-    now(),
-    GREATEST(0, LEAST(1, $5::double precision / 100)),
+    COALESCE($5::timestamptz, now()),
+    GREATEST(0, LEAST(1, $6::double precision / 100)),
     0.9,
-    jsonb_build_object('text', NULLIF($6, '')),
-    NULLIF($7, ''),
+    jsonb_build_object('text', NULLIF($7, '')),
+    NULLIF($8, ''),
     NULLIF($1, '')
 FROM run
 CROSS JOIN payload
@@ -3089,6 +3089,7 @@ type InsertDocumentPropertyClaimParams struct {
 	EntityID           uuid.UUID       `json:"entity_id"`
 	PropertyDocumentID uuid.UUID       `json:"property_document_id"`
 	SourceField        interface{}     `json:"source_field"`
+	SourceObservedAt   *time.Time      `json:"source_observed_at"`
 	Confidence         float64         `json:"confidence"`
 	EvidenceText       interface{}     `json:"evidence_text"`
 	Model              interface{}     `json:"model"`
@@ -3108,6 +3109,7 @@ func (q *Queries) InsertDocumentPropertyClaim(ctx context.Context, arg InsertDoc
 		arg.EntityID,
 		arg.PropertyDocumentID,
 		arg.SourceField,
+		arg.SourceObservedAt,
 		arg.Confidence,
 		arg.EvidenceText,
 		arg.Model,

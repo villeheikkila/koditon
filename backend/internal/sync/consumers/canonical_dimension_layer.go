@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"koditon/internal/db"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
 	syncjobs "koditon/internal/sync/jobs"
@@ -293,6 +294,9 @@ LIMIT $2`, cursor, limit)
 func (c *Consumer) rebuildDimensionLayerForListing(ctx context.Context, saleListingID uuid.UUID, expectedDirtyAt *time.Time) (json.RawMessage, error) {
 	if err := c.queries.EnsurePhysicalBuildingForSaleListing(ctx, saleListingID); err != nil {
 		return nil, fmt.Errorf("ensure physical building: %w", err)
+	}
+	if err := properties.ProjectListingRenovationEvents(ctx, c.pool, saleListingID); err != nil {
+		return nil, err
 	}
 	var result json.RawMessage
 	var err error

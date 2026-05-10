@@ -436,7 +436,8 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 	if err := queries.DeleteLLMPropertyClaimsForDocument(ctx, document.PropertyDocumentID); err != nil {
 		return 0, fmt.Errorf("delete previous document claims: %w", err)
 	}
-	claimWriter := managerCertificateClaimWriter{ctx: ctx, queries: queries, documentID: document.PropertyDocumentID, model: modelName, promptVersion: promptVersion}
+	observedAt := managerCertificateObservedAt(extracted)
+	claimWriter := managerCertificateClaimWriter{ctx: ctx, queries: queries, documentID: document.PropertyDocumentID, model: modelName, promptVersion: promptVersion, observedAt: observedAt}
 	claimWriter.writeJSON("document", document.PropertyDocumentID, "document", "raw_extraction", rawJSON, "document", managerCertificateClaimConfidence, "Complete structured LLM extraction")
 	claimWriter.writeText("document", document.PropertyDocumentID, "document", "document_date", extracted.Document.DocumentDate, "document.document_date", managerCertificateClaimConfidence, evidenceText(extracted.Document.Evidence))
 	claimWriter.writeText("document", document.PropertyDocumentID, "document", "issuer", extracted.Document.Issuer, "document.issuer", managerCertificateClaimConfidence, evidenceText(extracted.Document.Evidence))
@@ -459,7 +460,7 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "loans", extracted.Finances.Loans, "finances.loans", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
 		claimWriter.writeAnyJSON("housing_company", *document.HousingCompanyID, "finances", "charges", extracted.Finances.Charges, "finances.charges", managerCertificateClaimConfidence, evidenceText(extracted.Finances.Evidence))
 		if document.PropertyOfferingID != nil {
-			if err := replaceManagerCertificateRenovations(ctx, tx, *document.HousingCompanyID, *document.PropertyOfferingID, extracted.Renovations); err != nil {
+			if err := replaceManagerCertificateRenovations(ctx, tx, document.PropertyDocumentID, *document.HousingCompanyID, *document.PropertyOfferingID, observedAt, extracted.Renovations); err != nil {
 				return 0, err
 			}
 		} else {
@@ -509,6 +510,7 @@ type managerCertificateClaimWriter struct {
 	documentID    uuid.UUID
 	model         string
 	promptVersion string
+	observedAt    *time.Time
 	count         int
 	err           error
 }
@@ -590,23 +592,13 @@ func (w *managerCertificateClaimWriter) insert(entityType string, entityID uuid.
 	if confidence > 100 {
 		confidence = 100
 	}
-	w.err = w.queries.InsertDocumentPropertyClaim(w.ctx, db.InsertDocumentPropertyClaimParams{EntityType: entityType, EntityID: entityID, Section: section, Key: key, ValueKind: valueKind, ValueText: valueText, ValueNumber: valueNumber, ValueBool: valueBool, ValueJson: valueJSON, PropertyDocumentID: w.documentID, SourceField: sourceField, EvidenceText: cleanDisplayString(evidence), Confidence: float64(confidence), Model: w.model, PromptVersion: w.promptVersion})
+	w.err = w.queries.InsertDocumentPropertyClaim(w.ctx, db.InsertDocumentPropertyClaimParams{EntityType: entityType, EntityID: entityID, Section: section, Key: key, ValueKind: valueKind, ValueText: valueText, ValueNumber: valueNumber, ValueBool: valueBool, ValueJson: valueJSON, PropertyDocumentID: w.documentID, SourceField: sourceField, SourceObservedAt: w.observedAt, EvidenceText: cleanDisplayString(evidence), Confidence: float64(confidence), Model: w.model, PromptVersion: w.promptVersion})
 	if w.err == nil {
 		w.count++
 	}
 }
 
-func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, housingCompanyID uuid.UUID, offeringID uuid.UUID, items []managerCertificateRenovationObject) error {
-	var saleListingID uuid.UUID
-	if err := tx.QueryRow(ctx, `
-SELECT pos.sale_listing_id
-FROM public.property_offering_sources pos
-WHERE pos.property_offering_id = $1
-    AND pos.property_offering_source_link_status <> 'rejected'
-ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
-LIMIT 1`, offeringID).Scan(&saleListingID); err != nil {
-		return mapNotFound(err)
-	}
+func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, documentID uuid.UUID, housingCompanyID uuid.UUID, offeringID uuid.UUID, observedAt *time.Time, items []managerCertificateRenovationObject) error {
 	var runID uuid.UUID
 	if err := tx.QueryRow(ctx, `
 INSERT INTO public.property_dimension_projection_runs (
@@ -619,12 +611,12 @@ INSERT INTO public.property_dimension_projection_runs (
 ) VALUES (
     'renovation_events',
     'manager-certificate-renovations-v1',
-    'property_offerings',
+    'property_documents',
     $1,
     'succeeded',
     now()
 )
-RETURNING property_dimension_projection_run_id`, offeringID).Scan(&runID); err != nil {
+RETURNING property_dimension_projection_run_id`, documentID).Scan(&runID); err != nil {
 		return fmt.Errorf("create manager certificate renovation projection run: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -632,9 +624,9 @@ DELETE FROM public.property_renovation_events
 WHERE event_scope = 'source'
     AND target_type = 'housing_company'
     AND target_id = $1
-    AND source_table = 'property_offerings'
+    AND source_table = 'property_documents'
     AND source_id = $2
-    AND projection_version = 'manager-certificate-renovations-v1'`, housingCompanyID, offeringID); err != nil {
+    AND projection_version = 'manager-certificate-renovations-v1'`, housingCompanyID, documentID); err != nil {
 		return fmt.Errorf("delete previous manager certificate renovations: %w", err)
 	}
 	for _, item := range items {
@@ -670,8 +662,9 @@ INSERT INTO public.property_renovation_events (
     summary,
     evidence,
     confidence,
-    source_reliability
-) VALUES ($1, 'manager-certificate-renovations-v1', 'source', 'housing_company', $2, 'property_offerings', $3, 'manager_certificate', $4, NULL, $5, $6, $7, $8, $9, $10, $11, $12, $13, jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF($14, ''), 'action', NULLIF($15, ''), 'evidence', NULLIF($16, '')), 0.9, 0.9)
+    source_reliability,
+    source_observed_at
+) VALUES ($1, 'manager-certificate-renovations-v1', 'source', 'housing_company', $2, 'property_documents', $3, 'manager_certificate', $4, NULL, $5, $6, $7, $8, $9, $10, $11, $12, $13, jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF($14, ''), 'action', NULLIF($15, ''), 'evidence', NULLIF($16, '')), 0.9, 0.9, $17)
 ON CONFLICT (
     event_scope,
     target_type,
@@ -694,9 +687,13 @@ ON CONFLICT (
     end_year = EXCLUDED.end_year,
     cost_estimate_eur = EXCLUDED.cost_estimate_eur,
     confidence = EXCLUDED.confidence,
-    evidence = EXCLUDED.evidence`, runID, housingCompanyID, offeringID, category, status, stage, scope, responsibility, item.Year, item.StartYear, item.EndYear, item.CostEstimateEUR, summary, cleanDisplayString(item.SourceLabel), normalizeManagerCertificateRenovationAction(item.Action), evidenceText(item.Evidence)); err != nil {
+    source_observed_at = EXCLUDED.source_observed_at,
+    evidence = EXCLUDED.evidence`, runID, housingCompanyID, documentID, category, status, stage, scope, responsibility, item.Year, item.StartYear, item.EndYear, item.CostEstimateEUR, summary, cleanDisplayString(item.SourceLabel), normalizeManagerCertificateRenovationAction(item.Action), evidenceText(item.Evidence), observedAt); err != nil {
 			return fmt.Errorf("insert manager certificate renovation: %w", err)
 		}
+	}
+	if _, err := tx.Exec(ctx, `SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1, $2)`, offeringID, "document_renovation_events_changed"); err != nil {
+		return fmt.Errorf("mark dimension targets dirty from document renovations: %w", err)
 	}
 	return nil
 }
@@ -765,6 +762,19 @@ func managerCertificateOfferingHeadline(extracted managerCertificateObject) stri
 		return "Manager certificate offering"
 	}
 	return strings.Join(parts, " ")
+}
+
+func managerCertificateObservedAt(extracted managerCertificateObject) *time.Time {
+	value := cleanDisplayString(extracted.Document.DocumentDate)
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return nil
+	}
+	observed := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 12, 0, 0, 0, time.UTC)
+	return &observed
 }
 
 func normalizeRiskLevel(value string) string {

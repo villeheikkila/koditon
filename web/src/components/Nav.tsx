@@ -16,7 +16,7 @@ export default function Nav({ actions }: NavProps) {
           to="/search"
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
         >
-          Search
+          Targets
         </NavLink>
         <NavLink
           to="/map"
@@ -34,7 +34,7 @@ export default function Nav({ actions }: NavProps) {
           to="/matches"
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
         >
-          Matches
+          Linking
         </NavLink>
       </nav>
       {actions && <div className="nav-actions">{actions}</div>}

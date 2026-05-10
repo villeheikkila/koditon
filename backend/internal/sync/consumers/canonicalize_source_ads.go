@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
 	syncjobs "koditon/internal/sync/jobs"
@@ -149,6 +150,9 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 	}
 	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, saleListingID); err != nil {
 		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
+	}
+	if err := properties.ProjectListingRenovationEvents(ctx, c.pool, saleListingID); err != nil {
+		return err
 	}
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "source_listing_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty for source offering: %w", err)

@@ -162,6 +162,9 @@ INSERT INTO public.property_source_offering_renovations (
 			return fmt.Errorf("insert llm renovation row: %w", err)
 		}
 	}
+	if err := ProjectListingRenovationEvents(ctx, tx, saleListingID); err != nil {
+		return err
+	}
 	queries := db.New(tx)
 	if _, err := queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "renovation_events_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty after extraction: %w", err)

@@ -910,6 +910,7 @@ create table public.property_renovation_events (
   confidence double precision default 0.5 not null,
   source_reliability double precision default 0.5 not null,
   created_at timestamp with time zone default now() not null,
+  source_observed_at timestamp with time zone,
   constraint property_renovation_events_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
   constraint property_renovation_events_event_scope_check CHECK ((event_scope = ANY (ARRAY['source'::text, 'manual'::text]))),
   constraint property_renovation_events_source_reliability_check CHECK (((source_reliability >= (0)::double precision) AND (source_reliability <= (1)::double precision))),
@@ -919,6 +920,7 @@ create table public.property_renovation_events (
 CREATE INDEX idx_property_renovation_events_source ON public.property_renovation_events USING btree (source_table, source_id, projection_version);
 CREATE INDEX idx_property_renovation_events_source_event ON public.property_renovation_events USING btree (source_event_id);
 CREATE INDEX idx_property_renovation_events_target ON public.property_renovation_events USING btree (event_scope, target_type, target_id, category, status);
+CREATE INDEX idx_property_renovation_events_target_observed ON public.property_renovation_events USING btree (event_scope, target_type, target_id, category, status, source_observed_at DESC);
 CREATE UNIQUE INDEX idx_property_renovation_events_unique_source ON public.property_renovation_events USING btree (event_scope, target_type, target_id, source_table, source_id, COALESCE(source_field, ''::text), category, status, COALESCE(stage, ''::text), COALESCE(scope, ''::text), COALESCE(year, '-1'::integer), COALESCE(start_year, '-1'::integer), COALESCE(end_year, '-1'::integer), md5(COALESCE(summary, ''::text)), projection_version);
 
 create table public.property_source_offering_insights (

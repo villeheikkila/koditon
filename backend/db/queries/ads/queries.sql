@@ -1276,7 +1276,7 @@ SELECT
     'property_documents',
     sqlc.arg(property_document_id),
     NULLIF(sqlc.arg(source_field), ''),
-    now(),
+    COALESCE(sqlc.narg(source_observed_at)::timestamptz, now()),
     GREATEST(0, LEAST(1, sqlc.arg(confidence)::double precision / 100)),
     0.9,
     jsonb_build_object('text', NULLIF(sqlc.arg(evidence_text), '')),

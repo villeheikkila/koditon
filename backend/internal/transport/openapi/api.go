@@ -101,6 +101,11 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 	}
 }
 
+// NewForOpenAPIDump creates route metadata without runtime dependencies.
+func NewForOpenAPIDump(logger *slog.Logger) *API {
+	return &API{logger: logger}
+}
+
 func (a *API) AddRoutes(humaAPI huma.API) {
 	addRoutes(a, humaAPI)
 }
