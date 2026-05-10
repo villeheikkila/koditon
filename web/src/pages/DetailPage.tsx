@@ -163,18 +163,13 @@ type PropertyDocumentSummary = {
   extracted_at?: string
   download_url: string
 }
-type PropertyDocumentResponse = {
-  data: PropertyDocumentSummary
-  status: number
-  headers: Headers
-}
-type ManagerCertificateExtractionResult = {
+type PropertyDocumentJobResult = {
   document: PropertyDocumentSummary
-  model: string
-  claims: number
+  job_id: string
+  queued: boolean
 }
-type ManagerCertificateExtractionResponse = {
-  data: ManagerCertificateExtractionResult
+type PropertyDocumentJobResponse = {
+  data: PropertyDocumentJobResult
   status: number
   headers: Headers
 }
@@ -385,7 +380,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const [canonicalProfileProjectionResult, setCanonicalProfileProjectionResult] = useState<CanonicalProfileProjectionResult | null>(null)
   const [houseOverviewResult, setHouseOverviewResult] = useState<HouseOverviewGenerationResult | null>(null)
   const [managerCertificateFile, setManagerCertificateFile] = useState<File | null>(null)
-  const [managerCertificateExtractionResult, setManagerCertificateExtractionResult] = useState<ManagerCertificateExtractionResult | null>(null)
+  const [managerCertificateJobResult, setManagerCertificateJobResult] = useState<PropertyDocumentJobResult | null>(null)
   const unit = d.unit
   const building = d.building
   const commercial = d.commercial
@@ -526,7 +521,8 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
       if (!managerCertificateFile) throw new Error('Choose a PDF first')
       return uploadSaleListingManagerCertificate(saleDetail.id, managerCertificateFile)
     },
-    onSuccess: async () => {
+    onSuccess: async response => {
+      setManagerCertificateJobResult(response.data)
       setManagerCertificateFile(null)
       await onRefresh?.()
     },
@@ -534,7 +530,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const extractManagerCertificate = useMutation({
     mutationFn: async (documentId: string) => extractPropertyDocument(documentId),
     onSuccess: async response => {
-      setManagerCertificateExtractionResult(response.data)
+      setManagerCertificateJobResult(response.data)
       await onRefresh?.()
     },
   })
@@ -595,9 +591,9 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
   const documentMessage = uploadManagerCertificate.isError
     ? (uploadManagerCertificate.error as Error)?.message ?? 'Upload failed'
     : extractManagerCertificate.isError
-      ? (extractManagerCertificate.error as Error)?.message ?? 'Extraction failed'
-      : managerCertificateExtractionResult
-        ? `${managerCertificateExtractionResult.claims} document claims · ${managerCertificateExtractionResult.model}`
+      ? (extractManagerCertificate.error as Error)?.message ?? 'Queueing failed'
+      : managerCertificateJobResult
+        ? `${managerCertificateJobResult.queued ? 'Queued' : 'Already queued'} · ${shortID(managerCertificateJobResult.job_id)}`
         : managerCertificateFile
           ? managerCertificateFile.name
           : undefined
@@ -723,7 +719,7 @@ function ListingView({ detail: d, kind, onRefresh }: { detail: ListingDetail; ki
                       <div className="document-card-actions">
                         <a className="listing-action-button" href={document.download_url}>Download</a>
                         <button type="button" className="listing-action-button" onClick={() => extractManagerCertificate.mutate(document.id)} disabled={extractManagerCertificate.isPending}>
-                          {extractManagerCertificate.isPending ? 'Extracting…' : document.extraction_status === 'extracted' ? 'Re-extract' : 'Extract'}
+                          {extractManagerCertificate.isPending ? 'Queueing…' : document.extraction_status === 'extracted' ? 'Requeue' : 'Queue'}
                         </button>
                       </div>
                     </div>
@@ -1513,18 +1509,18 @@ function generateSaleListingHouseOverview(id: string): Promise<HouseOverviewGene
   )
 }
 
-function uploadSaleListingManagerCertificate(id: string, file: File): Promise<PropertyDocumentResponse> {
+function uploadSaleListingManagerCertificate(id: string, file: File): Promise<PropertyDocumentJobResponse> {
   const form = new FormData()
   form.append('file', file)
-  return customInstance<PropertyDocumentResponse>(
+  return customInstance<PropertyDocumentJobResponse>(
     `/api/v1/sale-listings/${encodeURIComponent(id)}/documents/manager-certificate`,
     { method: 'POST', body: form },
   )
 }
 
-function extractPropertyDocument(id: string): Promise<ManagerCertificateExtractionResponse> {
-  return customInstance<ManagerCertificateExtractionResponse>(
-    `/api/v1/property-documents/${encodeURIComponent(id)}/extract?model=${encodeURIComponent(RENOVATION_EXTRACTION_MODEL)}`,
+function extractPropertyDocument(id: string): Promise<PropertyDocumentJobResponse> {
+  return customInstance<PropertyDocumentJobResponse>(
+    `/api/v1/property-documents/${encodeURIComponent(id)}/extract`,
     { method: 'POST' },
   )
 }
@@ -1920,6 +1916,10 @@ function fmtBytes(value: number): string {
   if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`
   if (value >= 1024) return `${Math.round(value / 1024)} KB`
   return `${value} B`
+}
+
+function shortID(value: string): string {
+  return value.length > 8 ? value.slice(0, 8) : value
 }
 
 function fmtDate(value: string): string {
