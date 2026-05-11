@@ -446,6 +446,7 @@ create table public.physical_buildings (
 );
 
 CREATE INDEX idx_physical_buildings_housing_company ON public.physical_buildings USING btree (housing_company_id);
+CREATE INDEX idx_physical_buildings_lat_lng ON public.physical_buildings USING btree (physical_building_latitude, physical_building_longitude) WHERE ((physical_building_latitude IS NOT NULL) AND (physical_building_longitude IS NOT NULL));
 
 create table public.postal_ad_areas (
   postal_ad_area_id uuid default uuid_generate_v4() not null constraint postal_ad_areas_pkey primary key,
@@ -1137,6 +1138,33 @@ create table public.property_system_profiles (
 );
 
 CREATE INDEX idx_property_system_profiles_target ON public.property_system_profiles USING btree (target_type, target_id);
+
+create table public.property_target_sources (
+  property_target_source_id uuid default gen_random_uuid() not null constraint property_target_sources_pkey primary key,
+  target_type text not null,
+  target_id uuid not null,
+  source_provider text not null,
+  source_kind text not null,
+  source_table text not null,
+  source_id uuid,
+  source_id_value text not null,
+  source_external_id text,
+  source_url text,
+  link_status text default 'confirmed'::text not null,
+  link_method text not null,
+  link_score integer default 100 not null,
+  link_reasons jsonb default '{}'::jsonb not null,
+  first_seen_at timestamp with time zone,
+  last_seen_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint property_target_sources_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text]))),
+  constraint property_target_sources_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'document'::text, 'transaction'::text])))
+);
+
+CREATE INDEX idx_property_target_sources_source ON public.property_target_sources USING btree (source_table, source_id_value, link_status);
+CREATE INDEX idx_property_target_sources_target ON public.property_target_sources USING btree (target_type, target_id, link_status);
+CREATE UNIQUE INDEX idx_property_target_sources_unique_source ON public.property_target_sources USING btree (target_type, target_id, source_provider, source_kind, source_table, source_id_value);
 
 create table public.property_units (
   property_unit_id uuid default gen_random_uuid() not null constraint property_units_pkey primary key,

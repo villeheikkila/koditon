@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Nav from '../components/Nav'
@@ -10,6 +10,13 @@ type MapBounds = {
   min_lng: number
   max_lat: number
   max_lng: number
+}
+
+type MapMarker = PropertyTargetMapMarker & {
+  title?: string
+  building_count?: number
+  source_count?: number
+  document_count?: number
 }
 
 const MAP_STYLE: maplibregl.StyleSpecification = {
@@ -37,11 +44,12 @@ const MAP_STYLE: maplibregl.StyleSpecification = {
 }
 
 export default function MapPage() {
+  const navigate = useNavigate()
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const renderedMarkersRef = useRef<maplibregl.Marker[]>([])
-  const [bounds, setBounds] = useState<MapBounds | undefined>()
-  const [selectedID, setSelectedID] = useState<string>('')
+  const [bounds, setBounds] = useState<MapBounds>()
+  const [selectedTargetKey, setSelectedTargetKey] = useState('')
   const [query, setQuery] = useState('')
   const normalizedQuery = query.trim()
   const params = useMemo<PropertyTargetsMapParams>(() => {
@@ -49,9 +57,9 @@ export default function MapPage() {
     return { ...(bounds ?? {}), limit: 500 }
   }, [bounds, normalizedQuery])
   const mapQuery = usePropertyTargetsMap(params, { query: { staleTime: 30_000 } })
-  const body = mapQuery.data?.data as { markers?: PropertyTargetMapMarker[] | null } | undefined
+  const body = mapQuery.data?.data as { markers?: MapMarker[] | null } | undefined
   const markers = body?.markers ?? []
-  const selected = markers.find(marker => marker.target.id === selectedID) ?? markers[0]
+  const selected = markers.find(marker => markerKey(marker) === selectedTargetKey) ?? markers[0]
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
     const map = new maplibregl.Map({
@@ -84,9 +92,9 @@ export default function MapPage() {
     renderedMarkersRef.current = markers.map(marker => {
       const element = document.createElement('button')
       element.type = 'button'
-      element.className = `canonical-marker${marker.target.id === selectedID ? ' canonical-marker--selected' : ''}`
-      element.textContent = String(Math.max(marker.offering_count, marker.unit_count, 1))
-      element.addEventListener('click', () => setSelectedID(marker.target.id))
+      element.className = `canonical-marker${markerKey(marker) === selectedTargetKey ? ' canonical-marker--selected' : ''}`
+      element.textContent = marker.target.type === 'building' ? 'B' : String(Math.max(marker.offering_count, marker.unit_count, 1))
+      element.addEventListener('click', () => setSelectedTargetKey(markerKey(marker)))
       const popup = new maplibregl.Popup({ offset: 16 }).setHTML(markerPopup(marker))
       return new maplibregl.Marker({ element }).setLngLat([marker.lng, marker.lat]).setPopup(popup).addTo(map)
     })
@@ -94,20 +102,20 @@ export default function MapPage() {
       renderedMarkersRef.current.forEach(marker => marker.remove())
       renderedMarkersRef.current = []
     }
-  }, [markers, selectedID])
+  }, [markers, selectedTargetKey])
   useEffect(() => {
     if (!normalizedQuery || markers.length === 0) return
     const map = mapInstanceRef.current
     if (!map) return
     if (markers.length === 1) {
       map.flyTo({ center: [markers[0].lng, markers[0].lat], zoom: 15 })
-      setSelectedID(markers[0].target.id)
+      setSelectedTargetKey(markerKey(markers[0]))
       return
     }
     const bounds = new maplibregl.LngLatBounds()
     markers.forEach(marker => bounds.extend([marker.lng, marker.lat]))
     map.fitBounds(bounds, { padding: { top: 80, right: 430, bottom: 80, left: 80 }, maxZoom: 15 })
-    setSelectedID(current => current && markers.some(marker => marker.target.id === current) ? current : markers[0].target.id)
+    setSelectedTargetKey(current => current && markers.some(marker => markerKey(marker) === current) ? current : markerKey(markers[0]))
   }, [markers, normalizedQuery])
   return (
     <main className="model-page">
@@ -137,13 +145,13 @@ export default function MapPage() {
           <aside className="canonical-map-sidebar">
             <MapSelection marker={selected} count={markers.length} />
             <div className="canonical-map-list-head">
-              <span>{normalizedQuery ? 'Search results' : 'Visible companies'}</span>
+              <span>{normalizedQuery ? 'Search results' : 'Visible targets'}</span>
               <strong>{markers.length}</strong>
             </div>
             <div className="canonical-map-list">
               {markers.map(marker => (
-                <button key={marker.target.id} type="button" className={`canonical-map-row${marker.target.id === selected?.target.id ? ' canonical-map-row--selected' : ''}`} onClick={() => selectMarker(marker)}>
-                  <span>{marker.name || marker.address || 'Housing company'}</span>
+                <button key={markerKey(marker)} type="button" className={`canonical-map-row${markerKey(marker) === (selected ? markerKey(selected) : '') ? ' canonical-map-row--selected' : ''}`} onClick={() => selectMarker(marker)} onDoubleClick={() => openMarker(marker)}>
+                  <span>{markerTitle(marker)}</span>
                   <strong>{marker.offering_count}</strong>
                   <small>{formatLocation(marker)}</small>
                 </button>
@@ -156,16 +164,20 @@ export default function MapPage() {
   )
 
   function selectMarker(marker: PropertyTargetMapMarker) {
-    setSelectedID(marker.target.id)
+    setSelectedTargetKey(markerKey(marker))
     mapInstanceRef.current?.flyTo({ center: [marker.lng, marker.lat], zoom: Math.max(mapInstanceRef.current.getZoom(), 14) })
+  }
+
+  function openMarker(marker: PropertyTargetMapMarker) {
+    navigate(targetPath(marker))
   }
 }
 
-function MapSelection({ marker, count }: { marker?: PropertyTargetMapMarker; count: number }) {
+function MapSelection({ marker, count }: { marker?: MapMarker; count: number }) {
   if (!marker) {
     return (
       <section className="canonical-map-detail">
-        <h2>Housing companies</h2>
+        <h2>Property targets</h2>
         <p className="model-empty">No canonical targets in this map area.</p>
       </section>
     )
@@ -174,16 +186,16 @@ function MapSelection({ marker, count }: { marker?: PropertyTargetMapMarker; cou
     <section className="canonical-map-detail">
       <div className="canonical-map-detail-head">
         <div>
-          <h2>{marker.name || marker.address || 'Housing company'}</h2>
+          <h2>{markerTitle(marker)}</h2>
           <p>{formatLocation(marker)}</p>
         </div>
-        <Link to={`/target/${marker.target.type}/${marker.target.id}`}>Open</Link>
+        <Link to={targetPath(marker)}>Open</Link>
       </div>
       <dl className="canonical-map-facts">
         <div><dt>Visible</dt><dd>{count}</dd></div>
+        <div><dt>Buildings</dt><dd>{marker.building_count}</dd></div>
         <div><dt>Units</dt><dd>{marker.unit_count}</dd></div>
         <div><dt>Offerings</dt><dd>{marker.offering_count}</dd></div>
-        <div><dt>Built</dt><dd>{marker.build_year ?? '-'}</dd></div>
       </dl>
       <div className="canonical-map-offerings">
         {(marker.offerings ?? []).map(offering => (
@@ -198,14 +210,30 @@ function MapSelection({ marker, count }: { marker?: PropertyTargetMapMarker; cou
   )
 }
 
-function markerPopup(marker: PropertyTargetMapMarker) {
-  const title = escapeHTML(marker.name || marker.address || 'Housing company')
+function markerPopup(marker: MapMarker) {
+  const title = escapeHTML(markerTitle(marker))
   const location = escapeHTML(formatLocation(marker))
-  const url = `/target/${marker.target.type}/${marker.target.id}`
+  const url = targetPath(marker)
   return `<div class="canonical-popup"><strong>${title}</strong><span>${location}</span><a href="${url}">Open target</a></div>`
 }
 
-function formatLocation(marker: PropertyTargetMapMarker) {
+function markerKey(marker: MapMarker) {
+  return `${marker.target.type}:${marker.target.id}`
+}
+
+function markerTitle(marker: MapMarker) {
+  return marker.title || marker.name || marker.address || labelTarget(marker.target.type)
+}
+
+function targetPath(marker: MapMarker) {
+  return `/target/${encodeURIComponent(marker.target.type)}/${encodeURIComponent(marker.target.id)}`
+}
+
+function labelTarget(type: string) {
+  return type === 'building' ? 'Building' : 'Housing company'
+}
+
+function formatLocation(marker: MapMarker) {
   return [marker.address, marker.postal, marker.city].filter(Boolean).join(' ')
 }
 
