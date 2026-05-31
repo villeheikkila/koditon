@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 )
 
 type canonicalTargetInput struct {
-	TargetType string `path:"targetType" required:"true" doc:"Canonical target type: offering, unit, building, housing_company"`
+	TargetType string `path:"targetType" required:"true" doc:"Canonical target type: offering, unit, building, housing_company, house"`
 	TargetID   string `path:"targetID"   required:"true" doc:"Canonical target UUID"`
 }
 
@@ -77,7 +78,7 @@ type resolveTargetOutput struct {
 }
 
 type modelManagerCertificateUploadInput struct {
-	TargetType string `query:"target_type" doc:"Optional target type: offering, unit, building, housing_company"`
+	TargetType string `query:"target_type" doc:"Optional target type: offering, unit, building, housing_company, house"`
 	TargetID   string `query:"target_id"   doc:"Optional target UUID"`
 	RawBody    huma.MultipartFormFiles[struct {
 		File huma.FormFile `form:"file" contentType:"application/pdf" required:"true"`
@@ -107,7 +108,7 @@ type propertyDocumentAttachModelInput struct {
 }
 
 type CanonicalTargetRef struct {
-	Type string `json:"type" enum:"offering,unit,building,housing_company,listing,document,transaction"`
+	Type string `json:"type" enum:"offering,unit,building,housing_company,house,listing,document,transaction"`
 	ID   string `json:"id"`
 }
 
@@ -281,7 +282,40 @@ type PropertyTargetMap struct {
 	Markers []PropertyTargetMapMarker `json:"markers"`
 }
 
+func (*PropertyTargetMap) TransformSchema(r huma.Registry, s *huma.Schema) *huma.Schema {
+	markers, ok := s.Properties["markers"]
+	if !ok || markers.Items == nil {
+		return s
+	}
+	base := r.Schema(reflect.TypeFor[PropertyTargetMapMarker](), true, "")
+	markers.Items = &huma.Schema{
+		OneOf: []*huma.Schema{
+			propertyTargetMapMarkerVariantSchema(base, "house"),
+			propertyTargetMapMarkerVariantSchema(base, "building"),
+			propertyTargetMapMarkerVariantSchema(base, "housing_company"),
+		},
+		Discriminator: &huma.Discriminator{PropertyName: "target_type"},
+	}
+	return s
+}
+
+func propertyTargetMapMarkerVariantSchema(base *huma.Schema, targetType string) *huma.Schema {
+	return &huma.Schema{
+		AllOf: []*huma.Schema{
+			base,
+			{
+				Type:     huma.TypeObject,
+				Required: []string{"target_type"},
+				Properties: map[string]*huma.Schema{
+					"target_type": {Type: huma.TypeString, Enum: []any{targetType}},
+				},
+			},
+		},
+	}
+}
+
 type PropertyTargetMapMarker struct {
+	TargetType     string                      `json:"target_type" enum:"house,building,housing_company"`
 	Target         CanonicalTargetRef          `json:"target"`
 	FallbackTarget *CanonicalTargetRef         `json:"fallback_target,omitempty"`
 	Title          string                      `json:"title,omitempty"`
@@ -533,11 +567,12 @@ WITH building_markers AS (
         COALESCE(source_counts.source_count, 0) AS source_count,
         COALESCE(document_counts.document_count, 0) AS document_count,
         COALESCE(hc.housing_company_name, '') AS housing_company_name,
-        max(po.property_offering_last_seen_at) AS last_seen_at
+        COALESCE(map_offerings.offerings_json, '[]'::jsonb) AS offerings_json,
+        counts.last_seen_at
     FROM public.physical_buildings pb
     LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pb.housing_company_id
     LEFT JOIN LATERAL (
-        SELECT count(DISTINCT pu.property_unit_id)::bigint AS unit_count, count(DISTINCT po.property_offering_id)::bigint AS offering_count
+        SELECT count(DISTINCT pu.property_unit_id)::bigint AS unit_count, count(DISTINCT po.property_offering_id)::bigint AS offering_count, max(po.property_offering_last_seen_at) AS last_seen_at
         FROM public.property_units pu
         LEFT JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
         WHERE pu.physical_building_id = pb.physical_building_id
@@ -554,10 +589,28 @@ WITH building_markers AS (
         FROM public.property_documents pd
         WHERE pd.physical_building_id = pb.physical_building_id
     ) document_counts ON true
-    LEFT JOIN public.property_units pu ON pu.physical_building_id = pb.physical_building_id
-    LEFT JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'offering_id', ranked.property_offering_id,
+            'unit_id', ranked.property_unit_id,
+            'headline', ranked.property_offering_headline,
+            'room_layout', ranked.property_unit_room_layout,
+            'area_m2', ranked.property_unit_area_value,
+            'price_eur', ranked.property_offering_asking_price,
+            'last_seen_at', ranked.property_offering_last_seen_at
+        ) ORDER BY ranked.property_offering_last_seen_at DESC NULLS LAST) AS offerings_json
+        FROM (
+            SELECT po.property_offering_id, pu.property_unit_id, po.property_offering_headline, pu.property_unit_room_layout, pu.property_unit_area_value, po.property_offering_asking_price, po.property_offering_last_seen_at
+            FROM public.property_units pu
+            JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+            WHERE pu.physical_building_id = pb.physical_building_id
+            ORDER BY po.property_offering_last_seen_at DESC NULLS LAST
+            LIMIT 20
+        ) ranked
+    ) map_offerings ON true
     WHERE pb.physical_building_latitude IS NOT NULL
         AND pb.physical_building_longitude IS NOT NULL
+        AND COALESCE(counts.offering_count, 0) > 0
         AND ($1::double precision IS NULL OR (
             pb.physical_building_latitude BETWEEN $1::double precision AND $3::double precision
             AND pb.physical_building_longitude BETWEEN $2::double precision AND $4::double precision
@@ -574,7 +627,6 @@ WITH building_markers AS (
                     AND lower(concat_ws(' ', pts.source_id_value, pts.source_external_id, pts.source_url)) LIKE ('%' || lower($6::text) || '%')
             )
         )
-    GROUP BY pb.physical_building_id, hc.housing_company_id, counts.unit_count, counts.offering_count, source_counts.source_count, document_counts.document_count
 ),
 company_markers AS (
     SELECT
@@ -593,6 +645,7 @@ company_markers AS (
         COALESCE(source_counts.source_count, 0) AS source_count,
         COALESCE(document_counts.document_count, 0) AS document_count,
         COALESCE(hc.housing_company_name, '') AS housing_company_name,
+        COALESCE(map_offerings.offerings_json, '[]'::jsonb) AS offerings_json,
         counts.last_seen_at
     FROM public.housing_companies hc
     LEFT JOIN LATERAL (
@@ -614,7 +667,27 @@ company_markers AS (
         FROM public.property_documents pd
         WHERE pd.housing_company_id = hc.housing_company_id
     ) document_counts ON true
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'offering_id', ranked.property_offering_id,
+            'unit_id', ranked.property_unit_id,
+            'headline', ranked.property_offering_headline,
+            'room_layout', ranked.property_unit_room_layout,
+            'area_m2', ranked.property_unit_area_value,
+            'price_eur', ranked.property_offering_asking_price,
+            'last_seen_at', ranked.property_offering_last_seen_at
+        ) ORDER BY ranked.property_offering_last_seen_at DESC NULLS LAST) AS offerings_json
+        FROM (
+            SELECT po.property_offering_id, pu.property_unit_id, po.property_offering_headline, pu.property_unit_room_layout, pu.property_unit_area_value, po.property_offering_asking_price, po.property_offering_last_seen_at
+            FROM public.property_units pu
+            JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+            WHERE pu.housing_company_id = hc.housing_company_id
+            ORDER BY po.property_offering_last_seen_at DESC NULLS LAST
+            LIMIT 20
+        ) ranked
+    ) map_offerings ON true
     WHERE hc.housing_company_geom IS NOT NULL
+        AND COALESCE(counts.offering_count, 0) > 0
         AND (
             $1::double precision IS NULL
             OR postgis.ST_Intersects(
@@ -642,7 +715,79 @@ company_markers AS (
                 AND pb.physical_building_longitude IS NOT NULL
         )
 ),
+house_markers AS (
+    SELECT
+        'house'::text AS target_type,
+        ph.property_house_id AS target_id,
+        NULL::uuid AS housing_company_id,
+        COALESCE(ph.property_house_address_norm, '') AS address,
+        COALESCE(ph.property_house_city_norm, '') AS city,
+        COALESCE(ph.property_house_postal_norm, '') AS postal,
+        ph.property_house_build_year AS build_year,
+        ph.property_house_latitude AS lat,
+        ph.property_house_longitude AS lng,
+        1::bigint AS building_count,
+        0::bigint AS unit_count,
+        COALESCE(counts.offering_count, 0) AS offering_count,
+        COALESCE(source_counts.source_count, 0) AS source_count,
+        0::bigint AS document_count,
+        ''::text AS housing_company_name,
+        COALESCE(map_offerings.offerings_json, '[]'::jsonb) AS offerings_json,
+        counts.last_seen_at
+    FROM public.property_houses ph
+    LEFT JOIN LATERAL (
+        SELECT count(DISTINCT po.property_offering_id)::bigint AS offering_count, max(po.property_offering_last_seen_at) AS last_seen_at
+        FROM public.property_offerings po
+        WHERE po.property_house_id = ph.property_house_id
+    ) counts ON true
+    LEFT JOIN LATERAL (
+        SELECT count(*)::bigint AS source_count
+        FROM public.property_target_sources pts
+        WHERE pts.target_type = 'house'
+            AND pts.target_id = ph.property_house_id
+            AND pts.link_status <> 'rejected'
+    ) source_counts ON true
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'offering_id', ranked.property_offering_id,
+            'unit_id', NULL,
+            'headline', ranked.property_offering_headline,
+            'room_layout', ranked.property_offering_headline,
+            'area_m2', ranked.property_house_area_value,
+            'price_eur', ranked.property_offering_asking_price,
+            'last_seen_at', ranked.property_offering_last_seen_at
+        ) ORDER BY ranked.property_offering_last_seen_at DESC NULLS LAST) AS offerings_json
+        FROM (
+            SELECT po.property_offering_id, po.property_offering_headline, po.property_offering_asking_price, po.property_offering_last_seen_at, ph.property_house_area_value
+            FROM public.property_offerings po
+            WHERE po.property_house_id = ph.property_house_id
+            ORDER BY po.property_offering_last_seen_at DESC NULLS LAST
+            LIMIT 20
+        ) ranked
+    ) map_offerings ON true
+    WHERE ph.property_house_latitude IS NOT NULL
+        AND ph.property_house_longitude IS NOT NULL
+        AND COALESCE(counts.offering_count, 0) > 0
+        AND ($1::double precision IS NULL OR (
+            ph.property_house_latitude BETWEEN $1::double precision AND $3::double precision
+            AND ph.property_house_longitude BETWEEN $2::double precision AND $4::double precision
+        ))
+        AND (
+            $6::text = ''
+            OR lower(concat_ws(' ', ph.property_house_address_norm, ph.property_house_city_norm, ph.property_house_postal_norm)) LIKE ('%' || lower($6::text) || '%')
+            OR EXISTS (
+                SELECT 1
+                FROM public.property_target_sources pts
+                WHERE pts.target_type = 'house'
+                    AND pts.target_id = ph.property_house_id
+                    AND pts.link_status <> 'rejected'
+                    AND lower(concat_ws(' ', pts.source_id_value, pts.source_external_id, pts.source_url)) LIKE ('%' || lower($6::text) || '%')
+            )
+        )
+),
 visible AS (
+    SELECT * FROM house_markers
+    UNION ALL
     SELECT * FROM building_markers
     UNION ALL
     SELECT * FROM company_markers
@@ -662,7 +807,8 @@ SELECT
     visible.unit_count,
     visible.offering_count,
     visible.source_count,
-    visible.document_count
+    visible.document_count,
+    visible.offerings_json
 FROM visible
 ORDER BY visible.last_seen_at DESC NULLS LAST, visible.offering_count DESC, visible.housing_company_name, visible.address
 LIMIT $5::int`, minLat, minLng, maxLat, maxLng, limit, query)
@@ -673,17 +819,26 @@ LIMIT $5::int`, minLat, minLng, maxLat, maxLng, limit, query)
 	markers := []PropertyTargetMapMarker{}
 	for rows.Next() {
 		var marker PropertyTargetMapMarker
-		var targetID, housingCompanyID uuid.UUID
+		var targetID uuid.UUID
+		var housingCompanyID *uuid.UUID
 		var targetType string
-		if err := rows.Scan(&targetType, &targetID, &housingCompanyID, &marker.Name, &marker.Address, &marker.City, &marker.Postal, &marker.BuildYear, &marker.Lat, &marker.Lng, &marker.BuildingCount, &marker.UnitCount, &marker.OfferingCount, &marker.SourceCount, &marker.DocumentCount); err != nil {
+		var offeringsData []byte
+		if err := rows.Scan(&targetType, &targetID, &housingCompanyID, &marker.Name, &marker.Address, &marker.City, &marker.Postal, &marker.BuildYear, &marker.Lat, &marker.Lng, &marker.BuildingCount, &marker.UnitCount, &marker.OfferingCount, &marker.SourceCount, &marker.DocumentCount, &offeringsData); err != nil {
 			return nil, err
 		}
+		marker.TargetType = targetType
 		marker.Target = CanonicalTargetRef{Type: targetType, ID: targetID.String()}
 		marker.Title = firstNonEmpty(marker.Name, marker.Address, targetID.String())
-		if targetType == "building" {
+		if targetType == "building" && housingCompanyID != nil {
 			marker.FallbackTarget = &CanonicalTargetRef{Type: "housing_company", ID: housingCompanyID.String()}
 		}
-		marker.Offerings = []PropertyTargetMapOffering{}
+		if len(offeringsData) > 0 {
+			if err := decodeMapOfferings(offeringsData, &marker.Offerings); err != nil {
+				return nil, err
+			}
+		} else {
+			marker.Offerings = []PropertyTargetMapOffering{}
+		}
 		markers = append(markers, marker)
 	}
 	return markers, rows.Err()
@@ -699,7 +854,7 @@ func nullableBounds(minLat float64, minLng float64, maxLat float64, maxLng float
 func decodeMapOfferings(data []byte, out *[]PropertyTargetMapOffering) error {
 	var rows []struct {
 		OfferingID string     `json:"offering_id"`
-		UnitID     string     `json:"unit_id"`
+		UnitID     *string    `json:"unit_id"`
 		Headline   string     `json:"headline"`
 		RoomLayout string     `json:"room_layout"`
 		AreaM2     *float64   `json:"area_m2"`
@@ -711,6 +866,10 @@ func decodeMapOfferings(data []byte, out *[]PropertyTargetMapOffering) error {
 	}
 	offerings := make([]PropertyTargetMapOffering, 0, len(rows))
 	for _, row := range rows {
+		unitID := ""
+		if row.UnitID != nil {
+			unitID = *row.UnitID
+		}
 		offerings = append(offerings, PropertyTargetMapOffering{
 			Target: CanonicalTargetRef{
 				Type: "offering",
@@ -718,7 +877,7 @@ func decodeMapOfferings(data []byte, out *[]PropertyTargetMapOffering) error {
 			},
 			UnitTarget: CanonicalTargetRef{
 				Type: "unit",
-				ID:   row.UnitID,
+				ID:   unitID,
 			},
 			Headline:   row.Headline,
 			RoomLayout: row.RoomLayout,
@@ -745,6 +904,8 @@ func (a *API) getTargetOverview(ctx context.Context, target CanonicalTargetRef) 
 		return a.getBuildingOverview(ctx, targetID)
 	case "housing_company":
 		return a.getHousingCompanyOverview(ctx, targetID)
+	case "house":
+		return a.getHouseOverview(ctx, targetID)
 	default:
 		return nil, nil
 	}
@@ -752,7 +913,7 @@ func (a *API) getTargetOverview(ctx context.Context, target CanonicalTargetRef) 
 
 func (a *API) getOfferingOverview(ctx context.Context, id uuid.UUID) (*TargetOverview, error) {
 	var offeringID, unitID uuid.UUID
-	var housingCompanyID *uuid.UUID
+	var housingCompanyID, houseID *uuid.UUID
 	var headline, roomLayout, companyName, address, city, postal string
 	var askingPrice, debtFreePrice *int64
 	var areaM2 *float64
@@ -764,18 +925,20 @@ SELECT
     po.property_offering_asking_price,
     po.property_offering_debt_free_price,
     po.property_offering_last_seen_at,
-    pu.property_unit_id,
+    COALESCE(pu.property_unit_id, '00000000-0000-0000-0000-000000000000'::uuid),
     COALESCE(pu.property_unit_room_layout, ''),
-    pu.property_unit_area_value,
+    COALESCE(pu.property_unit_area_value, ph.property_house_area_value),
     pu.housing_company_id,
+    ph.property_house_id,
     COALESCE(hc.housing_company_name, ''),
-    COALESCE(hc.housing_company_address_norm, ''),
-    COALESCE(hc.housing_company_city_norm, ''),
-    COALESCE(hc.housing_company_postal_norm, '')
+    COALESCE(hc.housing_company_address_norm, ph.property_house_address_norm, ''),
+    COALESCE(hc.housing_company_city_norm, ph.property_house_city_norm, ''),
+    COALESCE(hc.housing_company_postal_norm, ph.property_house_postal_norm, '')
 FROM public.property_offerings po
-JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
 LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPrice, &debtFreePrice, &lastSeenAt, &unitID, &roomLayout, &areaM2, &housingCompanyID, &companyName, &address, &city, &postal)
+WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPrice, &debtFreePrice, &lastSeenAt, &unitID, &roomLayout, &areaM2, &housingCompanyID, &houseID, &companyName, &address, &city, &postal)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -792,12 +955,16 @@ WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPri
 			{Label: "Layout", Value: roomLayout},
 			{Label: "Last seen", Value: formatOptionalTime(lastSeenAt)},
 		},
-		Related: []TargetOverviewRelated{
-			{Label: "Unit", Title: firstNonEmpty(roomLayout, unitID.String()), Target: CanonicalTargetRef{Type: "unit", ID: unitID.String()}},
-		},
+		Related: []TargetOverviewRelated{},
+	}
+	if unitID != uuid.Nil {
+		overview.Related = append(overview.Related, TargetOverviewRelated{Label: "Unit", Title: firstNonEmpty(roomLayout, unitID.String()), Target: CanonicalTargetRef{Type: "unit", ID: unitID.String()}})
 	}
 	if housingCompanyID != nil {
 		overview.Related = append(overview.Related, TargetOverviewRelated{Label: "Housing company", Title: firstNonEmpty(companyName, address, housingCompanyID.String()), Target: CanonicalTargetRef{Type: "housing_company", ID: housingCompanyID.String()}})
+	}
+	if houseID != nil {
+		overview.Related = append(overview.Related, TargetOverviewRelated{Label: "House", Title: firstNonEmpty(address, houseID.String()), Target: CanonicalTargetRef{Type: "house", ID: houseID.String()}})
 	}
 	if err := a.appendTargetSourceLinks(ctx, overview, CanonicalTargetRef{Type: "offering", ID: id.String()}); err != nil {
 		return nil, err
@@ -938,6 +1105,52 @@ WHERE housing_company_id = $1`, id).Scan(&companyID, &name, &address, &city, &po
 	return overview, nil
 }
 
+func (a *API) getHouseOverview(ctx context.Context, id uuid.UUID) (*TargetOverview, error) {
+	var houseID uuid.UUID
+	var address, city, postal string
+	var buildYear, roomsCount *int32
+	var areaM2, plotAreaM2, lat, lng *float64
+	err := a.pool.QueryRow(ctx, `
+SELECT
+    property_house_id,
+    COALESCE(property_house_address_norm, ''),
+    COALESCE(property_house_city_norm, ''),
+    COALESCE(property_house_postal_norm, ''),
+    property_house_build_year,
+    property_house_area_value,
+    property_house_plot_area_value,
+    property_house_rooms_count,
+    property_house_latitude,
+    property_house_longitude
+FROM public.property_houses
+WHERE property_house_id = $1`, id).Scan(&houseID, &address, &city, &postal, &buildYear, &areaM2, &plotAreaM2, &roomsCount, &lat, &lng)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	overview := &TargetOverview{
+		Title:    firstNonEmpty(address, "House"),
+		Subtitle: strings.TrimSpace(strings.Join(nonEmpty(postal, city), " ")),
+		Fields: []TargetOverviewField{
+			{Label: "Build year", Value: formatOptionalInt32(buildYear, "")},
+			{Label: "Area", Value: formatOptionalFloat(areaM2, " m2")},
+			{Label: "Plot", Value: formatOptionalFloat(plotAreaM2, " m2")},
+			{Label: "Rooms", Value: formatOptionalInt32(roomsCount, "")},
+			{Label: "Latitude", Value: formatOptionalFloat(lat, "")},
+			{Label: "Longitude", Value: formatOptionalFloat(lng, "")},
+		},
+	}
+	if err := a.appendTargetSourceLinks(ctx, overview, CanonicalTargetRef{Type: "house", ID: id.String()}); err != nil {
+		return nil, err
+	}
+	if err := a.appendHouseCanonicalOfferings(ctx, overview, id); err != nil {
+		return nil, err
+	}
+	return overview, nil
+}
+
 func (a *API) appendHousingCompanyCanonicalOfferings(ctx context.Context, overview *TargetOverview, housingCompanyID uuid.UUID) error {
 	rows, err := a.pool.Query(ctx, `
 SELECT
@@ -1003,6 +1216,42 @@ LIMIT 200`, buildingID)
 			return err
 		}
 		details := strings.Join(nonEmpty(roomLayout, formatOptionalFloat(areaM2, " m2"), formatOptionalInt(askingPrice, " EUR"), formatOptionalTime(lastSeenAt)), " / ")
+		overview.Related = append(overview.Related, TargetOverviewRelated{
+			Label:  "Canonical listing",
+			Title:  firstNonEmpty(title, details, offeringID.String()),
+			Target: CanonicalTargetRef{Type: "offering", ID: offeringID.String()},
+		})
+	}
+	return rows.Err()
+}
+
+func (a *API) appendHouseCanonicalOfferings(ctx context.Context, overview *TargetOverview, houseID uuid.UUID) error {
+	rows, err := a.pool.Query(ctx, `
+SELECT
+    po.property_offering_id,
+    COALESCE(po.property_offering_headline, ph.property_house_address_norm, po.property_offering_id::text) AS title,
+    ph.property_house_area_value,
+    po.property_offering_asking_price,
+    po.property_offering_last_seen_at
+FROM public.property_houses ph
+JOIN public.property_offerings po ON po.property_house_id = ph.property_house_id
+WHERE ph.property_house_id = $1
+ORDER BY po.property_offering_last_seen_at DESC NULLS LAST, po.property_offering_asking_price ASC NULLS LAST, title
+LIMIT 200`, houseID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var offeringID uuid.UUID
+		var title string
+		var areaM2 *float64
+		var askingPrice *int64
+		var lastSeenAt *time.Time
+		if err := rows.Scan(&offeringID, &title, &areaM2, &askingPrice, &lastSeenAt); err != nil {
+			return err
+		}
+		details := strings.Join(nonEmpty(formatOptionalFloat(areaM2, " m2"), formatOptionalInt(askingPrice, " EUR"), formatOptionalTime(lastSeenAt)), " / ")
 		overview.Related = append(overview.Related, TargetOverviewRelated{
 			Label:  "Canonical listing",
 			Title:  firstNonEmpty(title, details, offeringID.String()),
@@ -1149,7 +1398,7 @@ LIMIT 500`, housingCompanyID)
 func parseCanonicalTarget(targetType string, targetID string) (CanonicalTargetRef, error) {
 	targetType = strings.TrimSpace(targetType)
 	switch targetType {
-	case "offering", "unit", "building", "housing_company", "listing", "document", "transaction":
+	case "offering", "unit", "building", "housing_company", "house", "listing", "document", "transaction":
 	default:
 		return CanonicalTargetRef{}, fmt.Errorf("unsupported target_type %q", targetType)
 	}
@@ -1689,6 +1938,8 @@ func documentTargetColumn(targetType string) (string, error) {
 		return "physical_building_id", nil
 	case "housing_company":
 		return "housing_company_id", nil
+	case "house":
+		return "", fmt.Errorf("documents cannot be attached directly to houses yet")
 	default:
 		return "", fmt.Errorf("unsupported document target type")
 	}

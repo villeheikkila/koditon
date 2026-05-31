@@ -398,7 +398,7 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 		return document, fmt.Errorf("ensure manager certificate property unit: %w", err)
 	}
 	offeringID, err := queries.EnsureManagerCertificatePropertyOffering(ctx, db.EnsureManagerCertificatePropertyOfferingParams{
-		PropertyUnitID:     unitID,
+		PropertyUnitID:     &unitID,
 		IdentityKey:        "manager_certificate_document:" + documentKey + ":offering",
 		Headline:           managerCertificateOfferingHeadline(extracted),
 		PropertyDocumentID: documentKey,

@@ -126,6 +126,7 @@ export const CanonicalTargetRefType = {
   unit: 'unit',
   building: 'building',
   housing_company: 'housing_company',
+  house: 'house',
   listing: 'listing',
   document: 'document',
   transaction: 'transaction',
@@ -134,6 +135,20 @@ export const CanonicalTargetRefType = {
 export interface CanonicalTargetRef {
   id: string;
   type: CanonicalTargetRefType;
+}
+
+export interface TargetBuildingSummary {
+  address?: string;
+  build_year?: number;
+  city?: string;
+  housing_target?: CanonicalTargetRef;
+  lat?: number;
+  lng?: number;
+  offering_count: number;
+  postal?: string;
+  target: CanonicalTargetRef;
+  title: string;
+  unit_count: number;
 }
 
 export interface PropertyDocumentSummary {
@@ -156,6 +171,18 @@ export interface PropertyDocumentSummary {
   uploaded_at: string;
 }
 
+export interface TargetOfferingSummary {
+  area_m2?: number;
+  asking_price_eur?: number;
+  building_target?: CanonicalTargetRef;
+  housing_target?: CanonicalTargetRef;
+  last_seen_at?: string;
+  layout?: string;
+  target: CanonicalTargetRef;
+  title: string;
+  unit_target: CanonicalTargetRef;
+}
+
 export interface TargetOverviewField {
   label: string;
   value: string;
@@ -168,11 +195,15 @@ export interface TargetOverviewRelated {
 }
 
 export interface TargetSourceLink {
+  external_id?: string;
   kind: string;
   label: string;
   last_seen_at?: string;
+  link_status?: string;
   provider: string;
   source_id?: string;
+  source_id_value?: string;
+  source_table?: string;
   title: string;
   url?: string;
 }
@@ -257,17 +288,37 @@ export interface ResolvedValue {
   value_kind: string;
 }
 
+export interface TargetUnitSummary {
+  address?: string;
+  area_m2?: number;
+  building_target?: CanonicalTargetRef;
+  floor?: string;
+  housing_target?: CanonicalTargetRef;
+  layout?: string;
+  offering_count: number;
+  target: CanonicalTargetRef;
+  title: string;
+}
+
 export interface CanonicalTargetResource {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** @nullable */
+  buildings?: TargetBuildingSummary[] | null;
+  /** @nullable */
   documents?: PropertyDocumentSummary[] | null;
+  /** @nullable */
+  offerings?: TargetOfferingSummary[] | null;
   overview?: TargetOverview;
   /** @nullable */
   renovation_events?: RenovationEvent[] | null;
   /** @nullable */
   resolved_values: ResolvedValue[] | null;
+  /** @nullable */
+  sources?: TargetSourceLink[] | null;
   target: CanonicalTargetRef;
+  /** @nullable */
+  units?: TargetUnitSummary[] | null;
 }
 
 export interface DetailFieldOutput {
@@ -511,10 +562,22 @@ export interface PropertyTargetMapOffering {
   unit_target: CanonicalTargetRef;
 }
 
+export type PropertyTargetMapMarkerTargetType = typeof PropertyTargetMapMarkerTargetType[keyof typeof PropertyTargetMapMarkerTargetType];
+
+
+export const PropertyTargetMapMarkerTargetType = {
+  house: 'house',
+  building: 'building',
+  housing_company: 'housing_company',
+} as const;
+
 export interface PropertyTargetMapMarker {
   address?: string;
   build_year?: number;
+  building_count: number;
   city?: string;
+  document_count: number;
+  fallback_target?: CanonicalTargetRef;
   lat: number;
   lng: number;
   name?: string;
@@ -522,15 +585,26 @@ export interface PropertyTargetMapMarker {
   /** @nullable */
   offerings: PropertyTargetMapOffering[] | null;
   postal?: string;
+  source_count: number;
   target: CanonicalTargetRef;
+  target_type: PropertyTargetMapMarkerTargetType;
+  title?: string;
   unit_count: number;
 }
+
+export type PropertyTargetMapMarkersItem = PropertyTargetMapMarker & {
+  target_type: 'house';
+} | PropertyTargetMapMarker & {
+  target_type: 'building';
+} | PropertyTargetMapMarker & {
+  target_type: 'housing_company';
+};
 
 export interface PropertyTargetMap {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
   /** @nullable */
-  markers: PropertyTargetMapMarker[] | null;
+  markers: PropertyTargetMapMarkersItem[] | null;
 }
 
 export interface RenovationEventsOutputBody {
@@ -680,7 +754,7 @@ limit?: number;
 
 export type PropertyDocumentsManagerCertificatesUploadParams = {
 /**
- * Optional target type: offering, unit, building, housing_company
+ * Optional target type: offering, unit, building, housing_company, house
  */
 target_type?: string;
 /**
@@ -2284,7 +2358,7 @@ export function usePropertyDocumentsDownload<TData = Awaited<ReturnType<typeof p
 
 
 /**
- * Returns canonical housing company markers with linked units and offerings.
+ * Returns canonical house, physical building, and housing company markers with linked offerings.
  * @summary Map canonical property targets
  */
 export type propertyTargetsMapResponse200 = {

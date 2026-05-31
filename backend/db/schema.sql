@@ -555,7 +555,7 @@ create table public.property_dimension_catalog (
   promoted_to_valuation boolean default false not null,
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null,
-  constraint property_dimension_catalog_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text]))),
+  constraint property_dimension_catalog_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
   constraint property_dimension_catalog_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
 );
 
@@ -587,7 +587,7 @@ create table public.property_dimension_claims (
   constraint property_dimension_claims_claim_scope_check CHECK ((claim_scope = ANY (ARRAY['source'::text, 'manual'::text]))),
   constraint property_dimension_claims_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
   constraint property_dimension_claims_source_reliability_check CHECK (((source_reliability >= (0)::double precision) AND (source_reliability <= (1)::double precision))),
-  constraint property_dimension_claims_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'transaction'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text]))),
+  constraint property_dimension_claims_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
   constraint property_dimension_claims_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
 );
 
@@ -606,7 +606,7 @@ create table public.property_dimension_dirty_targets (
   queued_at timestamp with time zone,
   resolved_at timestamp with time zone,
   constraint property_dimension_dirty_targets_pkey PRIMARY KEY (target_type, target_id),
-  constraint property_dimension_dirty_targets_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'transaction'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text])))
+  constraint property_dimension_dirty_targets_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'transaction'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
 );
 
 CREATE INDEX idx_property_dimension_dirty_targets_queue ON public.property_dimension_dirty_targets USING btree (dirty_at) WHERE ((resolved_at IS NULL) OR (resolved_at < dirty_at));
@@ -625,7 +625,7 @@ create table public.property_dimension_manual_overrides (
   valid_until date,
   created_at timestamp with time zone default now() not null,
   revoked_at timestamp with time zone,
-  constraint property_dimension_manual_overrides_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text]))),
+  constraint property_dimension_manual_overrides_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
   constraint property_dimension_manual_overrides_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
 );
 
@@ -639,7 +639,7 @@ create table public.property_dimension_profiles (
   conflicts jsonb default '{}'::jsonb not null,
   resolved_at timestamp with time zone default now() not null,
   constraint property_dimension_profiles_pkey PRIMARY KEY (target_type, target_id),
-  constraint property_dimension_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text])))
+  constraint property_dimension_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
 );
 
 CREATE INDEX idx_building_dimension_profiles_build_year ON public.property_dimension_profiles USING btree ((((dimensions #>> '{building,build_year}'::text[]))::integer)) WHERE (target_type = 'building'::text);
@@ -702,7 +702,7 @@ create table public.property_dimension_values (
   constraint property_dimension_values_pkey PRIMARY KEY (target_type, target_id, dimension_key),
   constraint property_dimension_values_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
   constraint property_dimension_values_conflict_status_check CHECK ((conflict_status = ANY (ARRAY['none'::text, 'compatible'::text, 'conflicting'::text, 'manual_override'::text]))),
-  constraint property_dimension_values_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text]))),
+  constraint property_dimension_values_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
   constraint property_dimension_values_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
 );
 
@@ -774,6 +774,27 @@ CREATE UNIQUE INDEX idx_property_documents_detached_type_hash ON public.property
 CREATE INDEX idx_property_documents_housing_company ON public.property_documents USING btree (housing_company_id, property_document_type) WHERE (housing_company_id IS NOT NULL);
 CREATE INDEX idx_property_documents_offering ON public.property_documents USING btree (property_offering_id, property_document_type, property_document_uploaded_at DESC);
 CREATE UNIQUE INDEX idx_property_documents_offering_type_hash ON public.property_documents USING btree (property_offering_id, property_document_type, property_document_sha256);
+
+create table public.property_houses (
+  property_house_id uuid default gen_random_uuid() not null constraint property_houses_pkey primary key,
+  property_house_identity_key text not null constraint property_houses_property_house_identity_key_key unique,
+  property_house_address_norm text,
+  property_house_postal_norm text,
+  property_house_city_norm text,
+  property_house_build_year integer,
+  property_house_area_value double precision,
+  property_house_plot_area_value double precision,
+  property_house_rooms_count integer,
+  property_house_latitude double precision,
+  property_house_longitude double precision,
+  property_house_match_reasons jsonb default '{}'::jsonb not null,
+  primary_sale_listing_id uuid constraint property_houses_primary_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE SET NULL,
+  property_house_created_at timestamp with time zone default now() not null,
+  property_house_updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_property_houses_address ON public.property_houses USING btree (property_house_postal_norm, property_house_city_norm, property_house_address_norm);
+CREATE INDEX idx_property_houses_lat_lng ON public.property_houses USING btree (property_house_latitude, property_house_longitude) WHERE ((property_house_latitude IS NOT NULL) AND (property_house_longitude IS NOT NULL));
 
 create table public.property_offering_merge_decisions (
   property_offering_merge_decision_id uuid default gen_random_uuid() not null constraint property_offering_merge_decisions_pkey primary key,
@@ -865,7 +886,7 @@ create table public.property_offering_transactions (
 
 create table public.property_offerings (
   property_offering_id uuid default gen_random_uuid() not null constraint property_offerings_pkey primary key,
-  property_unit_id uuid not null constraint property_offerings_property_unit_id_fkey references property_units(property_unit_id) ON DELETE CASCADE,
+  property_unit_id uuid constraint property_offerings_property_unit_id_fkey references property_units(property_unit_id) ON DELETE CASCADE,
   property_offering_identity_key text not null constraint property_offerings_property_offering_identity_key_key unique,
   property_offering_type text not null,
   property_offering_headline text not null,
@@ -879,9 +900,12 @@ create table public.property_offerings (
   property_offering_match_reasons jsonb default '{}'::jsonb not null,
   property_offering_created_at timestamp with time zone default now() not null,
   property_offering_updated_at timestamp with time zone default now() not null,
+  property_house_id uuid constraint property_offerings_property_house_id_fkey references property_houses(property_house_id) ON DELETE CASCADE,
+  constraint property_offerings_parent_check CHECK (((((property_unit_id IS NOT NULL))::integer + ((property_house_id IS NOT NULL))::integer) = 1)),
   constraint property_offerings_type_check CHECK ((property_offering_type = ANY (ARRAY['sale'::text])))
 );
 
+CREATE INDEX idx_property_offerings_house ON public.property_offerings USING btree (property_house_id) WHERE (property_house_id IS NOT NULL);
 CREATE INDEX idx_property_offerings_primary_sale_listing ON public.property_offerings USING btree (primary_sale_listing_id);
 CREATE INDEX idx_property_offerings_unit ON public.property_offerings USING btree (property_unit_id);
 
@@ -915,7 +939,7 @@ create table public.property_renovation_events (
   constraint property_renovation_events_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
   constraint property_renovation_events_event_scope_check CHECK ((event_scope = ANY (ARRAY['source'::text, 'manual'::text]))),
   constraint property_renovation_events_source_reliability_check CHECK (((source_reliability >= (0)::double precision) AND (source_reliability <= (1)::double precision))),
-  constraint property_renovation_events_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text])))
+  constraint property_renovation_events_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
 );
 
 CREATE INDEX idx_property_renovation_events_source ON public.property_renovation_events USING btree (source_table, source_id, projection_version);
@@ -1134,7 +1158,7 @@ create table public.property_system_profiles (
   updated_at timestamp with time zone default now() not null,
   constraint property_system_profiles_pkey PRIMARY KEY (target_type, target_id, system_type),
   constraint property_system_profiles_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
-  constraint property_system_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['unit'::text, 'building'::text, 'housing_company'::text])))
+  constraint property_system_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
 );
 
 CREATE INDEX idx_property_system_profiles_target ON public.property_system_profiles USING btree (target_type, target_id);
@@ -1159,7 +1183,7 @@ create table public.property_target_sources (
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null,
   constraint property_target_sources_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text]))),
-  constraint property_target_sources_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'document'::text, 'transaction'::text])))
+  constraint property_target_sources_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text, 'document'::text, 'transaction'::text])))
 );
 
 CREATE INDEX idx_property_target_sources_source ON public.property_target_sources USING btree (source_table, source_id_value, link_status);

@@ -26,6 +26,7 @@ const (
 	TaskTypeCanonicalBackfillTargetSources         = "canonical_backfill_target_sources"
 	TaskTypeCanonicalBackfillBuildingCoordinates   = "canonical_backfill_building_coordinates"
 	TaskTypeCanonicalRebuildSpatialReadModel       = "canonical_rebuild_spatial_read_model"
+	TaskTypeCanonicalBackfillDetachedHouses        = "canonical_backfill_detached_houses"
 )
 
 func (c *Consumer) handleCanonicalTask(ctx context.Context, msg taskqueue.Message) error {
@@ -66,6 +67,8 @@ func (c *Consumer) runCanonicalSyncJob(ctx context.Context, logger *slog.Logger,
 		return c.handleCanonicalBackfillBuildingCoordinates(ctx, logger, job)
 	case TaskTypeCanonicalRebuildSpatialReadModel:
 		return c.handleCanonicalRebuildSpatialReadModel(ctx, logger, job)
+	case TaskTypeCanonicalBackfillDetachedHouses:
+		return c.handleCanonicalBackfillDetachedHouses(ctx, logger, job)
 	default:
 		return taskqueue.NewPermanentError(fmt.Errorf("unknown canonical sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
 	}
@@ -90,6 +93,10 @@ type dimensionLayerListingPayload struct {
 
 type dirtyDimensionTargetsPayload struct {
 	Limit int32 `json:"limit,omitempty"`
+}
+
+type detachedHouseBackfillPayload struct {
+	BatchSize int32 `json:"batch_size,omitempty"`
 }
 
 type dirtyDimensionTargetPayload struct {
@@ -244,6 +251,30 @@ WHERE pb.physical_building_id = coordinates.physical_building_id
 func (c *Consumer) handleCanonicalRebuildSpatialReadModel(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.rebuild_spatial_read_model"))
 	logger.InfoContext(ctx, "spatial read model is served by direct SQL", "outcome", logging.OutcomeSuccess)
+	return nil
+}
+
+func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+	logger = logging.With(logger, logging.Op("consumer.canonical.backfill_detached_houses"))
+	payload := detachedHouseBackfillPayload{BatchSize: 1000}
+	if len(job.SyncJobPayload) > 0 {
+		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
+			return taskqueue.NewPermanentError(fmt.Errorf("decode detached house backfill payload: %w", err), "invalid payload")
+		}
+	}
+	if payload.BatchSize <= 0 || payload.BatchSize > 5000 {
+		payload.BatchSize = 1000
+	}
+	count, err := c.queries.BackfillDetachedPropertyHouses(ctx, payload.BatchSize)
+	if err != nil {
+		return fmt.Errorf("backfill detached property houses: %w", err)
+	}
+	if count == payload.BatchSize {
+		if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize, time.Now().Add(30*time.Second)); err != nil {
+			return err
+		}
+	}
+	logger.InfoContext(ctx, "detached houses backfilled", "count", count, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
@@ -476,6 +507,23 @@ func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleL
 		Provider:    "canonical",
 		Kind:        TaskTypeCanonicalRebuildDimensionLayerBackfill,
 		EntityID:    fmt.Sprintf("dimension_layer_backfill:%s", afterSaleListingID),
+		Priority:    int32(taskqueue.PriorityLow),
+		MaxAttempts: 3,
+		RunAfter:    runAfter,
+		Payload:     payload,
+	})
+	return err
+}
+
+func (c *Consumer) enqueueDetachedHouseBackfill(ctx context.Context, batchSize int32, runAfter time.Time) error {
+	payload, err := json.Marshal(detachedHouseBackfillPayload{BatchSize: batchSize})
+	if err != nil {
+		return fmt.Errorf("marshal detached house backfill payload: %w", err)
+	}
+	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
+		Provider:    "canonical",
+		Kind:        TaskTypeCanonicalBackfillDetachedHouses,
+		EntityID:    fmt.Sprintf("detached_house_backfill:%d", runAfter.UnixNano()),
 		Priority:    int32(taskqueue.PriorityLow),
 		MaxAttempts: 3,
 		RunAfter:    runAfter,

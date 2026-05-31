@@ -138,6 +138,34 @@ func (q *Queries) AttachPropertyDocumentToOffering(ctx context.Context, arg Atta
 	return i, err
 }
 
+const backfillDetachedPropertyHouses = `-- name: BackfillDetachedPropertyHouses :one
+WITH candidates AS (
+    SELECT sl.sale_listing_id
+    FROM public.property_source_offerings sl
+    JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    WHERE sl.sale_listing_property_type_code = 'detached_house'
+        AND po.property_house_id IS NULL
+    ORDER BY sl.sale_listing_updated_at DESC NULLS LAST, sl.sale_listing_id
+    LIMIT $1::int
+),
+synced AS (
+    SELECT public.fnc__sync_property_house_for_sale_listing(sale_listing_id, 'regroup_v2_backfill') AS property_house_id
+    FROM candidates
+)
+SELECT count(*)::integer
+FROM synced
+WHERE property_house_id IS NOT NULL
+`
+
+func (q *Queries) BackfillDetachedPropertyHouses(ctx context.Context, batchSize int32) (int32, error) {
+	row := q.db.QueryRow(ctx, backfillDetachedPropertyHouses, batchSize)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const canonicalizeFrontdoorAdSaleListing = `-- name: CanonicalizeFrontdoorAdSaleListing :one
 INSERT INTO public.property_source_offerings (
     frontdoor_ad_id,
@@ -1410,10 +1438,10 @@ RETURNING property_offering_id
 `
 
 type EnsureManagerCertificatePropertyOfferingParams struct {
-	PropertyUnitID     uuid.UUID `json:"property_unit_id"`
-	IdentityKey        string    `json:"identity_key"`
-	Headline           string    `json:"headline"`
-	PropertyDocumentID string    `json:"property_document_id"`
+	PropertyUnitID     *uuid.UUID `json:"property_unit_id"`
+	IdentityKey        string     `json:"identity_key"`
+	Headline           string     `json:"headline"`
+	PropertyDocumentID string     `json:"property_document_id"`
 }
 
 func (q *Queries) EnsureManagerCertificatePropertyOffering(ctx context.Context, arg EnsureManagerCertificatePropertyOfferingParams) (uuid.UUID, error) {
@@ -4413,6 +4441,22 @@ func (q *Queries) SetVT(ctx context.Context, arg SetVTParams) ([]SetVTRow, error
 		return nil, err
 	}
 	return items, nil
+}
+
+const syncPropertyHouseForSaleListing = `-- name: SyncPropertyHouseForSaleListing :one
+SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing($1::uuid, $2::text), '00000000-0000-0000-0000-000000000000'::uuid)::uuid
+`
+
+type SyncPropertyHouseForSaleListingParams struct {
+	SaleListingID uuid.UUID `json:"sale_listing_id"`
+	LinkMethod    string    `json:"link_method"`
+}
+
+func (q *Queries) SyncPropertyHouseForSaleListing(ctx context.Context, arg SyncPropertyHouseForSaleListingParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, syncPropertyHouseForSaleListing, arg.SaleListingID, arg.LinkMethod)
+	var column_1 uuid.UUID
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const updatePropertyDocumentExtractionStatus = `-- name: UpdatePropertyDocumentExtractionStatus :exec

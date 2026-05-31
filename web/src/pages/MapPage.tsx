@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Nav from '../components/Nav'
-import { usePropertyTargetsMap, type PropertyTargetMapMarker, type PropertyTargetsMapParams } from '../api/koditon'
+import { usePropertyTargetsMap, type PropertyTargetMapMarkersItem, type PropertyTargetsMapParams } from '../api/koditon'
 
 type MapBounds = {
   min_lat: number
@@ -12,7 +12,7 @@ type MapBounds = {
   max_lng: number
 }
 
-type MapMarker = PropertyTargetMapMarker & {
+type MapMarker = PropertyTargetMapMarkersItem & {
   title?: string
   building_count?: number
   source_count?: number
@@ -93,7 +93,7 @@ export default function MapPage() {
       const element = document.createElement('button')
       element.type = 'button'
       element.className = `canonical-marker${markerKey(marker) === selectedTargetKey ? ' canonical-marker--selected' : ''}`
-      element.textContent = marker.target.type === 'building' ? 'B' : String(Math.max(marker.offering_count, marker.unit_count, 1))
+      element.textContent = markerLabel(marker)
       element.addEventListener('click', () => setSelectedTargetKey(markerKey(marker)))
       const popup = new maplibregl.Popup({ offset: 16 }).setHTML(markerPopup(marker))
       return new maplibregl.Marker({ element }).setLngLat([marker.lng, marker.lat]).setPopup(popup).addTo(map)
@@ -124,7 +124,7 @@ export default function MapPage() {
         <header className="model-header canonical-map-header">
           <div>
             <h1>Map</h1>
-            <p>Canonical housing companies with linked units, offerings, and certificates.</p>
+            <p>Canonical houses, buildings, and housing companies with linked offerings.</p>
           </div>
           <Link className="model-upload" to="/search">Targets</Link>
         </header>
@@ -136,7 +136,7 @@ export default function MapPage() {
                 type="search"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder="Search housing company, address, city, postal"
+                placeholder="Search target, address, city, postal"
               />
               {query && <button type="button" onClick={() => setQuery('')}>Clear</button>}
             </div>
@@ -163,12 +163,12 @@ export default function MapPage() {
     </main>
   )
 
-  function selectMarker(marker: PropertyTargetMapMarker) {
+  function selectMarker(marker: PropertyTargetMapMarkersItem) {
     setSelectedTargetKey(markerKey(marker))
     mapInstanceRef.current?.flyTo({ center: [marker.lng, marker.lat], zoom: Math.max(mapInstanceRef.current.getZoom(), 14) })
   }
 
-  function openMarker(marker: PropertyTargetMapMarker) {
+  function openMarker(marker: PropertyTargetMapMarkersItem) {
     navigate(targetPath(marker))
   }
 }
@@ -225,12 +225,20 @@ function markerTitle(marker: MapMarker) {
   return marker.title || marker.name || marker.address || labelTarget(marker.target.type)
 }
 
+function markerLabel(marker: MapMarker) {
+  if (marker.target_type === 'house') return 'H'
+  if (marker.target_type === 'building') return 'B'
+  return String(Math.max(marker.offering_count, marker.unit_count, 1))
+}
+
 function targetPath(marker: MapMarker) {
   return `/target/${encodeURIComponent(marker.target.type)}/${encodeURIComponent(marker.target.id)}`
 }
 
 function labelTarget(type: string) {
-  return type === 'building' ? 'Building' : 'Housing company'
+  if (type === 'house') return 'House'
+  if (type === 'building') return 'Building'
+  return 'Housing company'
 }
 
 function formatLocation(marker: MapMarker) {

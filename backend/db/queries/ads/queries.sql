@@ -743,6 +743,29 @@ SET physical_building_id = inserted.physical_building_id,
 FROM listing, inserted
 WHERE pu.property_unit_id = listing.property_unit_id;
 
+-- name: SyncPropertyHouseForSaleListing :one
+SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid)::uuid;
+
+-- name: BackfillDetachedPropertyHouses :one
+WITH candidates AS (
+    SELECT sl.sale_listing_id
+    FROM public.property_source_offerings sl
+    JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    WHERE sl.sale_listing_property_type_code = 'detached_house'
+        AND po.property_house_id IS NULL
+    ORDER BY sl.sale_listing_updated_at DESC NULLS LAST, sl.sale_listing_id
+    LIMIT sqlc.arg(batch_size)::int
+),
+synced AS (
+    SELECT public.fnc__sync_property_house_for_sale_listing(sale_listing_id, 'regroup_v2_backfill') AS property_house_id
+    FROM candidates
+)
+SELECT count(*)::integer
+FROM synced
+WHERE property_house_id IS NOT NULL;
+
 -- name: GetPropertySourceOfferingDescriptionTexts :one
 SELECT
     COALESCE(sale_listing_description_text, '') AS description_text,

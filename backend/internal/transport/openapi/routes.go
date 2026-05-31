@@ -71,7 +71,7 @@ func addRoutes(a *API, api huma.API) {
 	huma.Get(api, "/api/v1/property-targets/map", a.propertyTargetsMapHandler, func(op *huma.Operation) {
 		op.OperationID = "property-targets-map"
 		op.Summary = "Map canonical property targets"
-		op.Description = "Returns canonical housing company markers with linked units and offerings."
+		op.Description = "Returns canonical house, physical building, and housing company markers with linked offerings."
 		op.Tags = []string{"Property Model"}
 	})
 	huma.Get(api, "/api/v1/property-targets/{targetType}/{targetID}", a.canonicalTargetHandler, func(op *huma.Operation) {

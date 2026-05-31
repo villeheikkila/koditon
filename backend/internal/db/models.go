@@ -626,9 +626,27 @@ type PropertyDocumentExtractionRun struct {
 	PropertyDocumentExtractionRunFinishedAt    *time.Time      `json:"property_document_extraction_run_finished_at"`
 }
 
+type PropertyHouse struct {
+	PropertyHouseID            uuid.UUID       `json:"property_house_id"`
+	PropertyHouseIdentityKey   string          `json:"property_house_identity_key"`
+	PropertyHouseAddressNorm   *string         `json:"property_house_address_norm"`
+	PropertyHousePostalNorm    *string         `json:"property_house_postal_norm"`
+	PropertyHouseCityNorm      *string         `json:"property_house_city_norm"`
+	PropertyHouseBuildYear     *int32          `json:"property_house_build_year"`
+	PropertyHouseAreaValue     *float64        `json:"property_house_area_value"`
+	PropertyHousePlotAreaValue *float64        `json:"property_house_plot_area_value"`
+	PropertyHouseRoomsCount    *int32          `json:"property_house_rooms_count"`
+	PropertyHouseLatitude      *float64        `json:"property_house_latitude"`
+	PropertyHouseLongitude     *float64        `json:"property_house_longitude"`
+	PropertyHouseMatchReasons  json.RawMessage `json:"property_house_match_reasons"`
+	PrimarySaleListingID       *uuid.UUID      `json:"primary_sale_listing_id"`
+	PropertyHouseCreatedAt     time.Time       `json:"property_house_created_at"`
+	PropertyHouseUpdatedAt     time.Time       `json:"property_house_updated_at"`
+}
+
 type PropertyOffering struct {
 	PropertyOfferingID            uuid.UUID       `json:"property_offering_id"`
-	PropertyUnitID                uuid.UUID       `json:"property_unit_id"`
+	PropertyUnitID                *uuid.UUID      `json:"property_unit_id"`
 	PropertyOfferingIdentityKey   string          `json:"property_offering_identity_key"`
 	PropertyOfferingType          string          `json:"property_offering_type"`
 	PropertyOfferingHeadline      string          `json:"property_offering_headline"`
@@ -642,6 +660,7 @@ type PropertyOffering struct {
 	PropertyOfferingMatchReasons  json.RawMessage `json:"property_offering_match_reasons"`
 	PropertyOfferingCreatedAt     time.Time       `json:"property_offering_created_at"`
 	PropertyOfferingUpdatedAt     time.Time       `json:"property_offering_updated_at"`
+	PropertyHouseID               *uuid.UUID      `json:"property_house_id"`
 }
 
 type PropertyOfferingMergeDecision struct {
@@ -735,6 +754,7 @@ type PropertyRenovationEvent struct {
 	Confidence                       float64         `json:"confidence"`
 	SourceReliability                float64         `json:"source_reliability"`
 	CreatedAt                        time.Time       `json:"created_at"`
+	SourceObservedAt                 *time.Time      `json:"source_observed_at"`
 }
 
 type PropertySourceOffering struct {
@@ -902,6 +922,27 @@ type PropertySystemProfile struct {
 	SelectedRenovationEventIds []uuid.UUID     `json:"selected_renovation_event_ids"`
 	Metadata                   json.RawMessage `json:"metadata"`
 	UpdatedAt                  time.Time       `json:"updated_at"`
+}
+
+type PropertyTargetSource struct {
+	PropertyTargetSourceID uuid.UUID       `json:"property_target_source_id"`
+	TargetType             string          `json:"target_type"`
+	TargetID               uuid.UUID       `json:"target_id"`
+	SourceProvider         string          `json:"source_provider"`
+	SourceKind             string          `json:"source_kind"`
+	SourceTable            string          `json:"source_table"`
+	SourceID               *uuid.UUID      `json:"source_id"`
+	SourceIDValue          string          `json:"source_id_value"`
+	SourceExternalID       *string         `json:"source_external_id"`
+	SourceUrl              *string         `json:"source_url"`
+	LinkStatus             string          `json:"link_status"`
+	LinkMethod             string          `json:"link_method"`
+	LinkScore              int32           `json:"link_score"`
+	LinkReasons            json.RawMessage `json:"link_reasons"`
+	FirstSeenAt            *time.Time      `json:"first_seen_at"`
+	LastSeenAt             *time.Time      `json:"last_seen_at"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
 }
 
 type PropertyUnit struct {

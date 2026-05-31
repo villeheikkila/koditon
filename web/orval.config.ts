@@ -3,7 +3,7 @@ import { defineConfig } from 'orval'
 export default defineConfig({
   koditon: {
     input: {
-      target: '../koditon/Packages/KoditonClient/Sources/KoditonClient/openapi.yaml',
+      target: 'http://localhost:8080/openapi.yaml',
     },
     output: {
       mode: 'single',
