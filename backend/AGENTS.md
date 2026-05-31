@@ -6,6 +6,10 @@ Go backend service using pgx, Huma v2 for HTTP API, sqlc for type-safe database 
 
 ## Build, Test, and Development Commands
 
+### Agent Tooling
+- Use Chrome DevTools MCP for browser testing and web flow verification.
+- Use the PostgreSQL MCP connection for database inspection and SQL queries.
+
 ### Development
 - `mise run dev`: run server with file watching and auto-reload (from `backend/`)
 - `go run ./cmd`: start the application once without watching
@@ -29,7 +33,6 @@ Run from `backend/` (see root AGENTS.md for details):
 - `mise run db:migrate`: apply pending migrations
 - `mise run db:status`: show current migration state
 - `mise run db:generate`: regenerate sqlc code from queries
-- `QUERY="SELECT ..." mise run db:query`: run SQL query
 
 ## Project Structure
 

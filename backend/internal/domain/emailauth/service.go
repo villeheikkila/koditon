@@ -90,6 +90,14 @@ func (e AuthenticatedEmail) IsZero() bool {
 	return e.address == ""
 }
 
+func NewAuthenticatedEmail(raw string) (AuthenticatedEmail, error) {
+	address, err := emailaddr.Parse(raw)
+	if err != nil {
+		return AuthenticatedEmail{}, ErrInvalidEmail
+	}
+	return AuthenticatedEmail{address: address}, nil
+}
+
 func (s *Service) RequestAuthentication(ctx context.Context, rawEmail string) error {
 	if s.queries == nil {
 		return fmt.Errorf("queries not configured")

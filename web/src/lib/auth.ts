@@ -132,8 +132,29 @@ export async function confirmEmailSignIn(token: string): Promise<void> {
   setSession(tokenRes.data as WebSession)
 }
 
+export async function devWebSignIn(email = 'agent@koditon.local'): Promise<void> {
+  const response = await fetch('/auth/dev/web', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-ID': getOrCreateDeviceId(),
+    },
+    body: JSON.stringify({ email }),
+  })
+  if (!response.ok) throw new Error(await authErrorMessage(response, 'Development sign in failed'))
+  setSession(await response.json() as WebSession)
+}
+
 export function isAppleSignInConfigured(): boolean {
   return !!(import.meta.env.VITE_APPLE_SERVICE_ID && import.meta.env.VITE_APPLE_REDIRECT_URI)
+}
+
+async function authErrorMessage(response: Response, fallback: string): Promise<string> {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('json')) return fallback
+  const data = await response.json().catch(() => null) as { detail?: unknown } | null
+  return typeof data?.detail === 'string' ? data.detail : fallback
 }
 
 // WebAuthn helpers — decode base64url strings from server to ArrayBuffer

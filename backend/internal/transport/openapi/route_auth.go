@@ -157,6 +157,54 @@ func (a *API) emailAuthConfirmHandler(ctx context.Context, input *emailAuthConfi
 	return a.webAuthTokenOutput(tokens), nil
 }
 
+type devWebAuthInput struct {
+	Body struct {
+		Email string `json:"email" required:"true" format:"email"`
+	}
+	RawDeviceID string `header:"X-Device-ID"`
+	webAuthHeaders
+}
+
+type devWebAuthOutput = authTokenOutput
+
+func (a *API) devWebAuthHandler(ctx context.Context, input *devWebAuthInput) (*devWebAuthOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.auth.dev_web"))
+	if !a.cfg.Environment.IsDevelopment() {
+		return nil, huma.Error404NotFound("not found")
+	}
+	if err := a.validateWebAuthOrigin(input.webAuthHeaders); err != nil {
+		return nil, err
+	}
+	var deviceID uuid.UUID
+	if input.RawDeviceID != "" {
+		deviceID, _ = uuid.Parse(input.RawDeviceID)
+	}
+	confirmedEmail, err := emailauth.NewAuthenticatedEmail(input.Body.Email)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity("email must be valid")
+	}
+	signResp, err := a.authService.SignInWithEmail(ctx, auth.SignInWithEmailRequest{
+		ConfirmedEmail: confirmedEmail,
+		DeviceID:       deviceID,
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "development web sign in failed", "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error401Unauthorized("sign in failed")
+	}
+	tokens, err := a.authService.IssueOAuthTokensForUser(ctx, auth.OAuthIssueTokensForUserRequest{
+		ClientID:  webOAuthClientID,
+		UserID:    signResp.UserID,
+		Scopes:    []string{auth.ScopeCoreRead},
+		SessionID: signResp.SessionID,
+		Audience:  auth.CanonicalAPIAudience(a.cfg.APIPublicBaseURL),
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "token issuance failed after development web auth", "error", err, "user_id", signResp.UserID, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("failed to issue tokens")
+	}
+	return a.webAuthTokenOutput(tokens), nil
+}
+
 // --- passkey authenticate ---
 
 type passkeyAuthInput struct {

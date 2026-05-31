@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { passkeySignIn, appleSignIn, isAppleSignInConfigured, requestEmailSignIn } from '../lib/auth'
+import { passkeySignIn, appleSignIn, isAppleSignInConfigured, requestEmailSignIn, devWebSignIn } from '../lib/auth'
 
 interface Props {
   onSignIn: () => void
@@ -9,9 +9,11 @@ export default function SignInPage({ onSignIn }: Props) {
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [appleState, setAppleState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [emailState, setEmailState] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
+  const [devState, setDevState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const appleConfigured = isAppleSignInConfigured()
+  const devSignInEnabled = isLocalDevelopmentHost()
 
   async function handleAppleSignIn() {
     setAppleState('loading')
@@ -53,9 +55,23 @@ export default function SignInPage({ onSignIn }: Props) {
     }
   }
 
+  async function handleDevSignIn() {
+    setDevState('loading')
+    setError(null)
+    try {
+      await devWebSignIn()
+      onSignIn()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Development sign in failed'
+      setError(msg)
+      setDevState('error')
+    }
+  }
+
   const isLoading = state === 'loading'
   const isAppleLoading = appleState === 'loading'
   const isEmailLoading = emailState === 'loading'
+  const isDevLoading = devState === 'loading'
 
   return (
     <div className="signin-layout">
@@ -130,6 +146,24 @@ export default function SignInPage({ onSignIn }: Props) {
           </button>
         )}
 
+        {devSignInEnabled && (
+          <button
+            className="passkey-btn"
+            onClick={handleDevSignIn}
+            disabled={isDevLoading}
+            data-agent-login="true"
+          >
+            {isDevLoading ? (
+              <>
+                <div className="spinner" style={{ width: 14, height: 14 }} />
+                Signing in…
+              </>
+            ) : (
+              'Agent sign in'
+            )}
+          </button>
+        )}
+
         {error && (
           <p className="signin-error">{error}</p>
         )}
@@ -159,4 +193,8 @@ function PasskeyIcon() {
       <path d="M2 20s1-4 6-4 6 4 6 4" />
     </svg>
   )
+}
+
+function isLocalDevelopmentHost(): boolean {
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
 }

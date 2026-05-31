@@ -163,6 +163,14 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Exchange an email sign-in token for access tokens"
 		op.Tags = []string{"Authentication"}
 	})
+	if a.cfg.Environment.IsDevelopment() {
+		huma.Post(api, "/auth/dev/web", a.devWebAuthHandler, func(op *huma.Operation) {
+			op.OperationID = "auth-dev-web"
+			op.Summary = "Development web sign-in"
+			op.Description = "Create a web session for a development-only email identity"
+			op.Tags = []string{"Authentication"}
+		})
+	}
 	huma.Post(api, "/auth/passkey/authenticate/options", a.passkeyAuthOptionsHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-passkey-authenticate-options"
 		op.Summary = "Begin passkey authentication"

@@ -10,6 +10,11 @@ This repository contains multiple sub-projects with their own agent guidelines.
 - **When comments are needed**: Split code sections with short, descriptive comments that explain *why*, not *what*.
 - **Modern Go patterns**: Keep the codebase up to date with latest Go idioms and best practices. This includes proper error handling (e.g., checking `resp.Body.Close()` errors), using contemporary standard library features, and following current Go conventions.
 
+## Agent Tooling
+
+- Use Chrome DevTools MCP for browser testing and web flow verification.
+- Use the PostgreSQL MCP connection for database inspection and SQL queries.
+
 ## Backend
 
 For guidelines on working with the Go backend, see [backend/AGENTS.md](./backend/AGENTS.md).
@@ -37,8 +42,6 @@ Run from project root using `backend:` prefix, or from `backend/` without prefix
 - `mise run backend:db:migrate`: applies pending database migrations
 - `mise run backend:db:status`: shows current migration state
 - `mise run backend:db:generate`: regenerates `internal/*/db` from `db/schema` and package-level `queries.sql` files
-- `QUERY="SELECT ..." mise run db:query`: runs a SQL query directly (from `backend/`)
-- `FILE=path/to/file.sql mise run db:query`: runs a SQL file (from `backend/`)
 
 ### Web (run from anywhere)
 - `mise run web:dev`: starts the Vite dev server
