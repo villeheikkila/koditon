@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import { useTransactionMatchCandidates, type TransactionMatchCandidate } from '../api/koditon'
+import { sourceEntityPath } from '../lib/address-lookup'
 
 export default function MatchesPage() {
   const [params] = useSearchParams()
@@ -41,6 +42,7 @@ export default function MatchesPage() {
 }
 
 function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
+  const detailPath = sourceEntityPath({ canonicalId: candidate.listing.canonical_id })
   return (
     <article className="matches-card">
       <header className="matches-card-header">
@@ -99,7 +101,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
         </section>
       </div>
       <div className="address-listing-actions">
-        <Link to={`/listing/${encodeURIComponent(candidate.listing.canonical_id)}`}>Source detail</Link>
+        {detailPath && <Link to={detailPath}>Source detail</Link>}
         {candidate.listing.external_url_available && candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Source page</a>}
       </div>
     </article>
