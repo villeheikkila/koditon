@@ -1,12 +1,13 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import { useTransactionMatchCandidates, type TransactionMatchCandidate } from '../api/koditon'
-import { sourceEntityPath } from '../lib/address-lookup'
+import { buildAddressLookupPath, sourceEntityPath } from '../lib/address-lookup'
 
 export default function MatchesPage() {
   const [params] = useSearchParams()
   const transaction = params.get('transaction')?.trim() ?? ''
   const postal = params.get('postal')?.trim() ?? ''
+  const addressBackPath = buildAddressLookupPath({ address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal') }) || '/address'
   const query = useTransactionMatchCandidates(
     { transaction: transaction || undefined, postal: transaction ? undefined : postal || undefined, limit: transaction ? 50 : 100 },
     { query: { enabled: Boolean(transaction || postal), placeholderData: previous => previous } },
@@ -19,7 +20,7 @@ export default function MatchesPage() {
       <section className="matches-shell">
         <header className="matches-header">
           <div>
-            <Link className="model-back" to="/address">Address lookup</Link>
+            <Link className="model-back" to={addressBackPath}>Address lookup</Link>
             <h1>Prices match review</h1>
             <p>{transaction ? `Transaction ${transaction}` : postal ? `Postal ${postal}` : 'Open a prices review link from address lookup.'}</p>
           </div>

@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import { useAddressLookup, type AddressListing, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
-import { sourceEntityPath } from '../lib/address-lookup'
+import { sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
 
 const sources = [
   ['all', 'All sources'],
@@ -24,6 +24,7 @@ export default function AddressLookupPage() {
   const candidateCount = listings.reduce((count, listing) => count + (listing.transactions ?? []).filter(transaction => !isLinkedTransaction(transaction)).length, 0)
   const sourceCandidateCount = listings.reduce((count, listing) => count + (listing.source_candidates?.length ?? 0), 0)
   const offeringCount = new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
+  const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal } : undefined
   return (
     <main className="address-lookup-page">
       <Nav />
@@ -54,10 +55,10 @@ export default function AddressLookupPage() {
           {body && listings.length === 0 && <EmptyState title="No listings found" text="Try the street address without apartment letters, or add city and postal filters." />}
           {listings.length > 0 && (
             <div className={`address-listing-list${lookup.isFetching ? ' address-listing-list--loading' : ''}`}>
-              {listings.map(listing => <ListingCard key={listing.listing_id} listing={listing} />)}
+              {listings.map(listing => <ListingCard key={listing.listing_id} listing={listing} lookup={reviewLookup} />)}
             </div>
           )}
-          {body && <RawTransactionPanel transactions={rawTransactions} />}
+          {body && <RawTransactionPanel transactions={rawTransactions} lookup={reviewLookup} />}
         </section>
       </div>
     </main>
@@ -109,7 +110,7 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
   )
 }
 
-function RawTransactionPanel({ transactions }: { transactions: AddressRawTransaction[] }) {
+function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRawTransaction[]; lookup?: AddressLookupInput }) {
   return (
     <section className="address-raw-transactions">
       <header>
@@ -135,7 +136,7 @@ function RawTransactionPanel({ transactions }: { transactions: AddressRawTransac
               <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
               <RawTransactionMatches transaction={transaction} />
             </div>
-            <Link className="address-transaction-review" to={transactionMatchURL(transaction)}>Review</Link>
+            <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review</Link>
           </div>
         ))}
       </div>
@@ -143,7 +144,7 @@ function RawTransactionPanel({ transactions }: { transactions: AddressRawTransac
   )
 }
 
-function ListingCard({ listing }: { listing: AddressListing }) {
+function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: AddressLookupInput }) {
   const transactions = listing.transactions ?? []
   const linkedTransactions = transactions.filter(isLinkedTransaction)
   const candidateTransactions = transactions.filter(transaction => !isLinkedTransaction(transaction))
@@ -187,8 +188,8 @@ function ListingCard({ listing }: { listing: AddressListing }) {
         {sourcePath && <Link to={sourcePath}>Source detail</Link>}
         {listing.external_url_available && listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Source page</a>}
       </div>
-      {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} />}
-      {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} variant="candidate" />}
+      {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} lookup={lookup} />}
+      {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} lookup={lookup} variant="candidate" />}
       {transactions.length === 0 && <div className="address-no-transaction">No connected prices transaction or saved match candidate for this listing.</div>}
     </article>
   )
@@ -293,7 +294,7 @@ function SourceTexts({ texts, compact = false }: { texts?: AddressListing['texts
   )
 }
 
-function TransactionTable({ title, transactions, sourceRecords, variant = 'linked' }: { title: string; transactions: AddressTransactionLink[]; sourceRecords: Map<string, AddressSourceRecord>; variant?: 'linked' | 'candidate' }) {
+function TransactionTable({ title, transactions, sourceRecords, lookup, variant = 'linked' }: { title: string; transactions: AddressTransactionLink[]; sourceRecords: Map<string, AddressSourceRecord>; lookup?: AddressLookupInput; variant?: 'linked' | 'candidate' }) {
   return (
     <div className={`address-transaction-table address-transaction-table--${variant}`}>
       <div className="address-transaction-title">{title}</div>
@@ -312,7 +313,7 @@ function TransactionTable({ title, transactions, sourceRecords, variant = 'linke
             <div>
               <strong>{transaction.link_type}</strong>
               <span>{[transaction.link_status, transaction.confidence, formatScore(transaction.score), formatPercent(transaction.price_delta_percent)].filter(Boolean).join(' / ')}</span>
-              <Link className="address-transaction-review" to={transactionMatchURL(transaction)}>Review match</Link>
+              <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review match</Link>
             </div>
             {evidence.length > 0 && (
               <div className="address-transaction-evidence">
@@ -441,10 +442,13 @@ function formatPercent(value?: number | null) {
   return `${new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 1 }).format(percent)}% delta`
 }
 
-function transactionMatchURL(transaction: { transaction_id: string; postal?: string | null }) {
+function transactionMatchURL(transaction: { transaction_id: string; postal?: string | null }, lookup?: AddressLookupInput) {
   const params = new URLSearchParams()
   if (transaction.postal) params.set('postal', transaction.postal)
   params.set('transaction', transaction.transaction_id)
+  if (lookup?.address?.trim()) params.set('lookup_address', lookup.address.trim())
+  if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
+  if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
   return `/matches?${params.toString()}`
 }
 
