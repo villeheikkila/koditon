@@ -163,6 +163,7 @@ type AddressSourceCandidate struct {
 	Confidence           string          `json:"confidence"`
 	PriceDeltaPercent    *float64        `json:"price_delta_percent,omitempty"`
 	Reasons              json.RawMessage `json:"reasons,omitempty"`
+	ReasonsSummary       []string        `json:"reasons_summary,omitempty"`
 	CreatedAt            *time.Time      `json:"created_at,omitempty"`
 }
 
@@ -175,6 +176,7 @@ type AddressTransactionLink struct {
 	Confidence          string          `json:"confidence,omitempty"`
 	PriceDeltaPercent   *float64        `json:"price_delta_percent,omitempty"`
 	Reasons             json.RawMessage `json:"reasons,omitempty"`
+	ReasonsSummary      []string        `json:"reasons_summary,omitempty"`
 	Description         string          `json:"description"`
 	Type                string          `json:"type,omitempty"`
 	Category            string          `json:"category,omitempty"`
@@ -741,7 +743,7 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 			continue
 		}
 		seenTransactions[key] = struct{}{}
-		result.Listings[listingIndex].Transactions = append(result.Listings[listingIndex].Transactions, AddressTransactionLink{TransactionID: row.TransactionID.String(), LinkType: row.LinkType, LinkStatus: row.LinkStatus, LinkMethod: row.LinkMethod, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, Description: row.TransactionDescription, Type: row.TransactionType, Category: row.TransactionCategory, Area: row.TransactionArea, Price: row.TransactionPrice, PricePerSquareMeter: row.TransactionPricePerM2, BuildYear: row.TransactionBuildYear, Floor: row.TransactionFloor, Elevator: row.TransactionElevator, Condition: row.TransactionCondition, Plot: row.TransactionPlot, EnergyClass: row.TransactionEnergyClass, PeriodIdentifier: row.TransactionPeriodIdentifier, City: row.TransactionCity, Neighborhood: row.TransactionNeighborhood, Postal: row.TransactionPostal, CreatedAt: row.TransactionCreatedAt, UpdatedAt: row.TransactionUpdatedAt})
+		result.Listings[listingIndex].Transactions = append(result.Listings[listingIndex].Transactions, AddressTransactionLink{TransactionID: row.TransactionID.String(), LinkType: row.LinkType, LinkStatus: row.LinkStatus, LinkMethod: row.LinkMethod, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, ReasonsSummary: addressMatchReasonSummary(row.Reasons), Description: row.TransactionDescription, Type: row.TransactionType, Category: row.TransactionCategory, Area: row.TransactionArea, Price: row.TransactionPrice, PricePerSquareMeter: row.TransactionPricePerM2, BuildYear: row.TransactionBuildYear, Floor: row.TransactionFloor, Elevator: row.TransactionElevator, Condition: row.TransactionCondition, Plot: row.TransactionPlot, EnergyClass: row.TransactionEnergyClass, PeriodIdentifier: row.TransactionPeriodIdentifier, City: row.TransactionCity, Neighborhood: row.TransactionNeighborhood, Postal: row.TransactionPostal, CreatedAt: row.TransactionCreatedAt, UpdatedAt: row.TransactionUpdatedAt})
 	}
 	for i := range result.Listings {
 		offeringID, err := uuid.Parse(result.Listings[i].OfferingID)
@@ -801,7 +803,7 @@ func appendAddressSourceCandidateRows(result *AddressLookupResult, index map[uui
 			continue
 		}
 		seen[key] = struct{}{}
-		result.Listings[listingIndex].SourceCandidates = append(result.Listings[listingIndex].SourceCandidates, AddressSourceCandidate{ListingID: row.CandidateListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, SelectedOfferingID: row.SelectedOfferingID.String(), CandidateOfferingID: row.CandidateOfferingID.String(), Direction: row.Direction, Status: row.Status, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, CreatedAt: row.CreatedAt})
+		result.Listings[listingIndex].SourceCandidates = append(result.Listings[listingIndex].SourceCandidates, AddressSourceCandidate{ListingID: row.CandidateListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, SelectedOfferingID: row.SelectedOfferingID.String(), CandidateOfferingID: row.CandidateOfferingID.String(), Direction: row.Direction, Status: row.Status, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, ReasonsSummary: addressMatchReasonSummary(row.Reasons), CreatedAt: row.CreatedAt})
 	}
 }
 
@@ -846,6 +848,143 @@ func decodeRawTransactionMatches(raw json.RawMessage) ([]AddressRawTransactionMa
 		return []AddressRawTransactionMatch{}, nil
 	}
 	return matches, nil
+}
+
+func addressMatchReasonSummary(raw json.RawMessage) []string {
+	if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("{}")) || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil
+	}
+	var reasons map[string]any
+	if err := json.Unmarshal(raw, &reasons); err != nil {
+		return nil
+	}
+	summary := []string{}
+	if value, ok := stringReasonValue(reasons["matched_by"]); ok {
+		summary = append(summary, "Matched by "+value)
+	}
+	if value, ok := stringReasonValue(reasons["postal"]); ok {
+		summary = append(summary, "Postal "+value)
+	}
+	if value, ok := reasonPairSummary("Area", reasons["area"]); ok {
+		summary = append(summary, value)
+	}
+	if value, ok := layoutReasonSummary(reasons["layout"]); ok {
+		summary = append(summary, value)
+	}
+	if value, ok := boolReasonValue(reasons["layout_prefix"]); ok && value {
+		summary = append(summary, "Layout prefix matched")
+	}
+	if value, ok := stringReasonValue(reasons["property_type"]); ok {
+		summary = append(summary, "Type "+value)
+	}
+	for _, item := range []struct {
+		key   string
+		label string
+	}{{"floor_level", "Floor"}, {"total_floors", "Total floors"}, {"energy", "Energy"}, {"build_year", "Build year"}, {"room_category", "Rooms"}, {"elevator", "Elevator"}, {"condition", "Condition"}, {"plot", "Plot"}, {"plot_owned", "Plot owned"}} {
+		if value, ok := reasonPairSummary(item.label, reasons[item.key]); ok {
+			summary = append(summary, value)
+		}
+	}
+	if value, ok := stringReasonValue(reasons["transaction_period_month"]); ok {
+		summary = append(summary, "Transaction month "+value)
+	}
+	if value, ok := reasonScoreSummary(reasons["score"]); ok {
+		summary = append(summary, value)
+	}
+	return summary
+}
+
+func reasonPairSummary(label string, value any) (string, bool) {
+	object, ok := value.(map[string]any)
+	if !ok {
+		text, textOK := reasonValueString(value)
+		if !textOK {
+			return "", false
+		}
+		return label + " " + text, true
+	}
+	listing, listingOK := reasonValueString(object["listing"])
+	transaction, transactionOK := reasonValueString(object["transaction"])
+	if !listingOK && !transactionOK {
+		return "", false
+	}
+	if !listingOK {
+		listing = "n/a"
+	}
+	if !transactionOK {
+		transaction = "n/a"
+	}
+	return label + " " + listing + " / " + transaction, true
+}
+
+func layoutReasonSummary(value any) (string, bool) {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return reasonPairSummary("Layout", value)
+	}
+	listing, listingOK := reasonValueString(object["listing"])
+	transaction, transactionOK := reasonValueString(object["transaction"])
+	code, codeOK := stringReasonValue(object["code"])
+	if !listingOK && !transactionOK && !codeOK {
+		return "", false
+	}
+	prefix := "Layout"
+	if codeOK {
+		prefix += " " + code
+	}
+	if !listingOK {
+		listing = "n/a"
+	}
+	if !transactionOK {
+		transaction = "n/a"
+	}
+	return prefix + " " + listing + " / " + transaction, true
+}
+
+func reasonScoreSummary(value any) (string, bool) {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	total, ok := reasonValueString(object["total"])
+	if !ok {
+		return "", false
+	}
+	return "Score total " + total, true
+}
+
+func stringReasonValue(value any) (string, bool) {
+	text, ok := value.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return "", false
+	}
+	return strings.TrimSpace(text), true
+}
+
+func boolReasonValue(value any) (bool, bool) {
+	result, ok := value.(bool)
+	return result, ok
+}
+
+func reasonValueString(value any) (string, bool) {
+	switch typed := value.(type) {
+	case nil:
+		return "", false
+	case string:
+		text := strings.TrimSpace(typed)
+		return text, text != ""
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(typed), true
+	default:
+		encoded, err := json.Marshal(typed)
+		if err != nil {
+			return "", false
+		}
+		text := strings.TrimSpace(string(encoded))
+		return text, text != "" && text != "null"
+	}
 }
 
 func rawTransactionLocation(result AddressLookupResult) (string, string) {

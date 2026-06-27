@@ -229,6 +229,11 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
               <span>{[candidate.status, candidate.confidence, formatScore(candidate.score), formatPercent(candidate.price_delta_percent)].filter(Boolean).join(' / ')}</span>
               <span>{candidate.direction}</span>
             </div>
+            {candidate.reasons_summary && candidate.reasons_summary.length > 0 && (
+              <div className="address-transaction-evidence">
+                {candidate.reasons_summary.map(item => <span key={item}>{item}</span>)}
+              </div>
+            )}
             <div className="address-source-record-actions">
               {candidate.candidate_offering_id && <Link to={`/target/offering/${candidate.candidate_offering_id}`}>Candidate offering</Link>}
               {sourcePath && <Link to={sourcePath}>Source detail</Link>}
@@ -292,7 +297,7 @@ function TransactionTable({ title, transactions, sourceRecords, variant = 'linke
     <div className={`address-transaction-table address-transaction-table--${variant}`}>
       <div className="address-transaction-title">{title}</div>
       {transactions.map(transaction => {
-        const evidence = transactionEvidence(transaction, sourceRecords)
+        const evidence = transaction.reasons_summary?.length ? transaction.reasons_summary : transactionEvidence(transaction, sourceRecords)
         return (
           <div className="address-transaction-row" key={`${transaction.transaction_id}:${transaction.link_type}`}>
             <div>

@@ -106,6 +106,8 @@ export interface AddressSourceCandidate {
   postal?: string;
   price_delta_percent?: number;
   reasons?: unknown;
+  /** @nullable */
+  reasons_summary?: string[] | null;
   room_layout?: string;
   score: number;
   selected_offering_id?: string;
@@ -137,6 +139,8 @@ export interface AddressTransactionLink {
   price_delta_percent?: number;
   price_per_square_meter?: number;
   reasons?: unknown;
+  /** @nullable */
+  reasons_summary?: string[] | null;
   score?: number;
   transaction_id: string;
   type?: string;

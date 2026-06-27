@@ -79,6 +79,19 @@ func TestDecodeRawTransactionMatches(t *testing.T) {
 	}
 }
 
+func TestAddressMatchReasonSummaryFormatsCommonReasons(t *testing.T) {
+	summary := addressMatchReasonSummary(json.RawMessage(`{"postal":"22100","area":{"listing":54.5,"transaction":55},"layout":{"code":"exact","listing":"2h+k","transaction":"2h+k"},"score":{"total":128},"layout_prefix":true}`))
+	expected := []string{"Postal 22100", "Area 54.5 / 55", "Layout exact 2h+k / 2h+k", "Layout prefix matched", "Score total 128"}
+	if len(summary) != len(expected) {
+		t.Fatalf("expected %d summary items, got %d: %+v", len(expected), len(summary), summary)
+	}
+	for i, item := range expected {
+		if summary[i] != item {
+			t.Fatalf("expected summary[%d] %q, got %q", i, item, summary[i])
+		}
+	}
+}
+
 func TestNormalizeAddressLookupInputPreservesExplicitFilters(t *testing.T) {
 	_, city, postal := normalizeAddressLookupInput("Askvagen 4, 22100 Maarianhamina", "Mariehamn", "22101")
 	if city != "Mariehamn" {
@@ -97,8 +110,8 @@ func TestBuildAddressLookupResultGroupsListingsAndDeduplicatesTransactions(t *te
 	previousPrice := int64(145000)
 	score := int32(128)
 	rows := []addressLookupRow{
-		{ListingID: listingID, CanonicalID: "frontdoor:ad:21531967", Source: "frontdoor", Kind: "ad", NativeID: "21531967", Headline: "Askvägen 4", Address: "Askvägen 4", City: "Maarianhamina", Postal: "22100", PreviousAskingPrice: &previousPrice, PriceMatchStatus: "auto_linked", SourceMatchStatus: "auto_linked", OfferingID: &offeringID, RenovationsDoneText: "Roof 2020", TransactionID: &transactionID, LinkType: "direct", LinkStatus: "auto_linked", LinkMethod: "source_listing", Score: &score, Confidence: "high", TransactionDescription: "3 r, k", TransactionPrice: &price},
-		{ListingID: listingID, CanonicalID: "frontdoor:ad:21531967", Source: "frontdoor", Kind: "ad", NativeID: "21531967", Headline: "Askvägen 4", Address: "Askvägen 4", City: "Maarianhamina", Postal: "22100", PreviousAskingPrice: &previousPrice, PriceMatchStatus: "auto_linked", SourceMatchStatus: "auto_linked", OfferingID: &offeringID, RenovationsDoneText: "Roof 2020", TransactionID: &transactionID, LinkType: "direct", LinkStatus: "auto_linked", LinkMethod: "source_listing", Score: &score, Confidence: "high", TransactionDescription: "3 r, k", TransactionPrice: &price},
+		{ListingID: listingID, CanonicalID: "frontdoor:ad:21531967", Source: "frontdoor", Kind: "ad", NativeID: "21531967", Headline: "Askvägen 4", Address: "Askvägen 4", City: "Maarianhamina", Postal: "22100", PreviousAskingPrice: &previousPrice, PriceMatchStatus: "auto_linked", SourceMatchStatus: "auto_linked", OfferingID: &offeringID, RenovationsDoneText: "Roof 2020", TransactionID: &transactionID, LinkType: "direct", LinkStatus: "auto_linked", LinkMethod: "source_listing", Score: &score, Confidence: "high", PriceDeltaPercent: nil, Reasons: []byte(`{"postal":"22100"}`), TransactionDescription: "3 r, k", TransactionPrice: &price},
+		{ListingID: listingID, CanonicalID: "frontdoor:ad:21531967", Source: "frontdoor", Kind: "ad", NativeID: "21531967", Headline: "Askvägen 4", Address: "Askvägen 4", City: "Maarianhamina", Postal: "22100", PreviousAskingPrice: &previousPrice, PriceMatchStatus: "auto_linked", SourceMatchStatus: "auto_linked", OfferingID: &offeringID, RenovationsDoneText: "Roof 2020", TransactionID: &transactionID, LinkType: "direct", LinkStatus: "auto_linked", LinkMethod: "source_listing", Score: &score, Confidence: "high", PriceDeltaPercent: nil, Reasons: []byte(`{"postal":"22100"}`), TransactionDescription: "3 r, k", TransactionPrice: &price},
 	}
 	result := buildAddressLookupResult("Askvägen 4", "Maarianhamina", "22100", "all", rows)
 	if len(result.Listings) != 1 {
@@ -129,6 +142,9 @@ func TestBuildAddressLookupResultGroupsListingsAndDeduplicatesTransactions(t *te
 	}
 	if transaction.LinkType != "direct" || transaction.LinkStatus != "auto_linked" || transaction.Confidence != "high" {
 		t.Fatalf("unexpected transaction link: %+v", transaction)
+	}
+	if transaction.ReasonsSummary == nil {
+		t.Fatal("expected transaction reasons summary")
 	}
 }
 
@@ -259,6 +275,9 @@ func TestAppendAddressSourceCandidateRowsDeduplicatesCandidates(t *testing.T) {
 	}
 	if candidate.PriceDeltaPercent == nil || *candidate.PriceDeltaPercent != priceDelta {
 		t.Fatalf("expected price delta %v, got %v", priceDelta, candidate.PriceDeltaPercent)
+	}
+	if len(candidate.ReasonsSummary) != 1 || candidate.ReasonsSummary[0] != "Postal 22100" {
+		t.Fatalf("unexpected candidate reason summary: %+v", candidate.ReasonsSummary)
 	}
 	if candidate.CreatedAt == nil || !candidate.CreatedAt.Equal(createdAt) {
 		t.Fatalf("expected created at %v, got %v", createdAt, candidate.CreatedAt)
