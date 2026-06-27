@@ -24,7 +24,7 @@ export function buildAddressLookupPath(input: AddressLookupInput) {
 export function sourceEntityPath(input: SourceEntityInput) {
   const canonicalId = input.canonicalId?.trim()
   if (!canonicalId) return ''
-  const kind = input.kind?.trim().toLowerCase()
+  const kind = input.kind?.trim().toLowerCase() || canonicalKind(canonicalId)
   const route = kind === 'announcement' || kind === 'building' ? 'housing-company' : 'listing'
   return `/${route}/${encodeURIComponent(canonicalId)}`
 }
@@ -50,4 +50,9 @@ function overviewFieldValue(fields: TargetOverviewField[], ...labels: string[]) 
 
 function normalizeFieldLabel(value: string) {
   return value.trim().toLowerCase().replaceAll('_', ' ')
+}
+
+function canonicalKind(canonicalId: string) {
+  const parts = canonicalId.split(':')
+  return parts.length >= 3 ? parts[1]?.trim().toLowerCase() : ''
 }

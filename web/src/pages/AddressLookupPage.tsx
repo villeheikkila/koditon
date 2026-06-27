@@ -461,7 +461,7 @@ function RawTransactionMatches({ transaction }: { transaction: AddressRawTransac
       {matches.map(match => {
         const label = rawTransactionMatchLabel(match)
         const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
-        const path = sourceEntityPath({ canonicalId: match.canonical_id, kind: 'ad' })
+        const path = sourceEntityPath({ canonicalId: match.canonical_id })
         const text = status ? `${label} (${status})` : label
         return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
       })}
