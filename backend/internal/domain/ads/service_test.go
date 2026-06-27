@@ -369,3 +369,21 @@ func TestLinkedTransactionIDsDeduplicatesLookupLinks(t *testing.T) {
 		t.Fatalf("expected linked transaction id %s, got %s", transactionID, ids[0])
 	}
 }
+
+func TestCandidateTransactionIDsDeduplicatesLookupCandidates(t *testing.T) {
+	transactionID := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	result := AddressLookupResult{
+		Listings: []AddressListing{
+			{Transactions: []AddressTransactionLink{{TransactionID: transactionID, LinkType: "candidate"}, {TransactionID: transactionID, LinkType: "candidate"}}},
+			{Transactions: []AddressTransactionLink{{TransactionID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", LinkType: "direct"}}},
+			{Transactions: []AddressTransactionLink{{TransactionID: "not-a-uuid", LinkType: "candidate"}}},
+		},
+	}
+	ids := candidateTransactionIDs(result)
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 candidate transaction id, got %d", len(ids))
+	}
+	if ids[0].String() != transactionID {
+		t.Fatalf("expected candidate transaction id %s, got %s", transactionID, ids[0])
+	}
+}

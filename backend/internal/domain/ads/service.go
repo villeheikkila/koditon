@@ -219,6 +219,7 @@ type AddressRawTransaction struct {
 	UpdatedAt            *time.Time                   `json:"updated_at,omitempty"`
 	IsMatched            bool                         `json:"is_matched"`
 	LinkedToLookup       bool                         `json:"linked_to_lookup"`
+	CandidateToLookup    bool                         `json:"candidate_to_lookup"`
 	MatchedListingCount  int32                        `json:"matched_listing_count"`
 	MatchedOfferingCount int32                        `json:"matched_offering_count"`
 	Matches              []AddressRawTransactionMatch `json:"matches"`
@@ -671,6 +672,7 @@ type addressRawTransactionRow struct {
 	UpdatedAt            *time.Time
 	IsMatched            bool
 	LinkedToLookup       bool
+	CandidateToLookup    bool
 	MatchedListingCount  int32
 	MatchedOfferingCount int32
 	Matches              json.RawMessage
@@ -813,7 +815,8 @@ func (s *Service) lookupAddressRawTransactions(ctx context.Context, result Addre
 		return []AddressRawTransaction{}, nil
 	}
 	linkedTransactionIDs := linkedTransactionIDs(result)
-	rows, err := s.db.Query(ctx, addressRawTransactionsSQL, city, postal, linkedTransactionIDs, limit)
+	candidateTransactionIDs := candidateTransactionIDs(result)
+	rows, err := s.db.Query(ctx, addressRawTransactionsSQL, city, postal, linkedTransactionIDs, candidateTransactionIDs, limit)
 	if err != nil {
 		return nil, fmt.Errorf("lookup address raw transactions: %w", err)
 	}
@@ -821,14 +824,14 @@ func (s *Service) lookupAddressRawTransactions(ctx context.Context, result Addre
 	transactions := []AddressRawTransaction{}
 	for rows.Next() {
 		var row addressRawTransactionRow
-		if err := rows.Scan(&row.TransactionID, &row.Description, &row.Type, &row.Category, &row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear, &row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass, &row.PeriodIdentifier, &row.City, &row.Neighborhood, &row.Postal, &row.CreatedAt, &row.UpdatedAt, &row.IsMatched, &row.LinkedToLookup, &row.MatchedListingCount, &row.MatchedOfferingCount, &row.Matches); err != nil {
+		if err := rows.Scan(&row.TransactionID, &row.Description, &row.Type, &row.Category, &row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear, &row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass, &row.PeriodIdentifier, &row.City, &row.Neighborhood, &row.Postal, &row.CreatedAt, &row.UpdatedAt, &row.IsMatched, &row.LinkedToLookup, &row.CandidateToLookup, &row.MatchedListingCount, &row.MatchedOfferingCount, &row.Matches); err != nil {
 			return nil, fmt.Errorf("scan address raw transaction: %w", err)
 		}
 		matches, err := decodeRawTransactionMatches(row.Matches)
 		if err != nil {
 			return nil, fmt.Errorf("decode address raw transaction matches: %w", err)
 		}
-		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount, Matches: matches})
+		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, CandidateToLookup: row.CandidateToLookup, MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount, Matches: matches})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate address raw transactions: %w", err)
@@ -1091,6 +1094,28 @@ func linkedTransactionIDs(result AddressLookupResult) []uuid.UUID {
 	for _, listing := range result.Listings {
 		for _, transaction := range listing.Transactions {
 			if !isLinkedAddressTransaction(transaction) {
+				continue
+			}
+			id, err := uuid.Parse(transaction.TransactionID)
+			if err != nil {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func candidateTransactionIDs(result AddressLookupResult) []uuid.UUID {
+	seen := map[uuid.UUID]struct{}{}
+	ids := []uuid.UUID{}
+	for _, listing := range result.Listings {
+		for _, transaction := range listing.Transactions {
+			if isLinkedAddressTransaction(transaction) {
 				continue
 			}
 			id, err := uuid.Parse(transaction.TransactionID)
@@ -1584,6 +1609,7 @@ SELECT
         )
     ) AS is_matched,
     pt.prices_transaction_id = ANY($3::uuid[]) AS linked_to_lookup,
+    pt.prices_transaction_id = ANY($4::uuid[]) AS candidate_to_lookup,
     (
         SELECT count(*)::integer
         FROM public.property_source_offerings sl
@@ -1664,8 +1690,8 @@ LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_id = pn.price
 LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(COALESCE(pc.prices_city_name, pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
     AND (trim($2::text) = '' OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code, '') = public.fnc__normalize_postal($2::text))
-ORDER BY linked_to_lookup DESC, pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC
-LIMIT $4::int`
+ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC
+LIMIT $5::int`
 
 // shortcutAdPrefixes are URL path prefixes that identify shortcut ad pages.
 var shortcutAdPrefixes = []string{

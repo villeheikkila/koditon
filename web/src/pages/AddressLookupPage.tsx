@@ -116,14 +116,15 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
 
 function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRawTransaction[]; lookup?: AddressLookupInput }) {
   const linkedHere = transactions.filter(transaction => transaction.linked_to_lookup).length
+  const candidateHere = transactions.filter(transaction => transaction.candidate_to_lookup).length
   const matchedElsewhere = transactions.filter(transaction => !transaction.linked_to_lookup && transaction.is_matched).length
-  const unlinked = transactions.filter(transaction => !transaction.is_matched).length
+  const unlinked = transactions.filter(transaction => !transaction.is_matched && !transaction.candidate_to_lookup).length
   return (
     <section className="address-raw-transactions">
       <header>
         <div>
           <h2>Prices history</h2>
-          <span>{linkedHere} linked here / {matchedElsewhere} matched elsewhere / {unlinked} unlinked</span>
+          <span>{linkedHere} linked here / {candidateHere} candidates here / {matchedElsewhere} matched elsewhere / {unlinked} unlinked</span>
         </div>
       </header>
       {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
@@ -131,7 +132,7 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
         {transactions.map(transaction => {
           const facts = priceTransactionFacts(transaction)
           return (
-            <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>
+            <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : transaction.candidate_to_lookup ? ' address-raw-transaction--candidate' : ''}`} key={transaction.transaction_id}>
               <div>
                 <strong>{transaction.description || transaction.transaction_id}</strong>
                 <span>{pricesTransactionIdentity(transaction.transaction_id)}</span>
@@ -496,6 +497,7 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
 
 function rawTransactionStatus(transaction: AddressRawTransaction) {
   if (transaction.linked_to_lookup) return 'Linked here'
+  if (transaction.candidate_to_lookup) return 'Candidate here'
   if (transaction.is_matched) return [
     countLabel(transaction.matched_listing_count, 'source link'),
     countLabel(transaction.matched_offering_count, 'offering link'),

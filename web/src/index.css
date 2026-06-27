@@ -4463,6 +4463,10 @@ td.dim { color: var(--text-3); font-size: 12px; }
   background: color-mix(in srgb, var(--success) 7%, transparent);
 }
 
+.address-raw-transaction--candidate {
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
 .address-raw-transaction strong {
   color: var(--text-1);
   display: block;
