@@ -931,13 +931,14 @@ SELECT
     pu.housing_company_id,
     ph.property_house_id,
     COALESCE(hc.housing_company_name, ''),
-    COALESCE(hc.housing_company_address_norm, ph.property_house_address_norm, ''),
-    COALESCE(hc.housing_company_city_norm, ph.property_house_city_norm, ''),
-    COALESCE(hc.housing_company_postal_norm, ph.property_house_postal_norm, '')
+    COALESCE(primary_listing.sale_listing_street_address, hc.housing_company_address_norm, ph.property_house_address_norm, ''),
+    COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, ''),
+    COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')
 FROM public.property_offerings po
 LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
 LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
 WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPrice, &debtFreePrice, &lastSeenAt, &unitID, &roomLayout, &areaM2, &housingCompanyID, &houseID, &companyName, &address, &city, &postal)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -949,6 +950,9 @@ WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPri
 		Title:    firstNonEmpty(headline, roomLayout, "Offering"),
 		Subtitle: strings.TrimSpace(strings.Join(nonEmpty(address, postal, city), " ")),
 		Fields: []TargetOverviewField{
+			{Label: "Address", Value: address},
+			{Label: "Postal", Value: postal},
+			{Label: "City", Value: city},
 			{Label: "Asking price", Value: formatOptionalInt(askingPrice, " EUR")},
 			{Label: "Debt-free price", Value: formatOptionalInt(debtFreePrice, " EUR")},
 			{Label: "Area", Value: formatOptionalFloat(areaM2, " m2")},
