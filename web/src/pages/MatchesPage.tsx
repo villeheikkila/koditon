@@ -52,6 +52,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
           <div className="search-card-badges">
             <span className="address-candidate-badge">{candidate.status}</span>
             <span className="search-badge search-badge--kind">{candidate.confidence}</span>
+            <span className={`search-badge search-badge--${sourceBadgeClass(candidate.listing.source_provider)}`}>{sourceLabel(candidate.listing.source_provider)}</span>
             <span className="search-badge search-badge--kind">{candidate.listing.offering_id ? 'Aggregated' : 'Unaggregated'}</span>
           </div>
           <h2>{candidate.listing.headline || candidate.listing.street_address || candidate.listing.canonical_id}</h2>
@@ -73,8 +74,11 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
             ['Price/m2', formatPricePerM2(candidate.listing.price_per_m2)],
             ['Build year', candidate.listing.build_year],
             ['Floor', formatFloor(candidate.listing.floor_level, candidate.listing.total_floors)],
+            ['Elevator', formatBool(candidate.listing.elevator)],
             ['Condition', candidate.listing.condition],
             ['Energy', candidate.listing.energy_label],
+            ['Plot', formatPlot(candidate.listing.plot_ownership_raw, candidate.listing.plot_owned)],
+            ['Seen', formatDateRange(candidate.listing.first_seen_at, candidate.listing.last_seen_at)],
           ]} />
         </section>
         <section>
@@ -87,9 +91,12 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
             ['Price/m2', formatPricePerM2(candidate.transaction.price_per_m2)],
             ['Build year', candidate.transaction.build_year],
             ['Floor', candidate.transaction.floor],
+            ['Elevator', formatBool(candidate.transaction.elevator)],
             ['Condition', candidate.transaction.condition],
             ['Energy', candidate.transaction.energy_class],
+            ['Plot', formatPlot(candidate.transaction.plot, candidate.transaction.plot_owned)],
             ['Period', candidate.transaction.period_identifier],
+            ['Stored', formatDate(candidate.transaction.created_at)],
           ]} />
         </section>
         <section>
@@ -155,6 +162,19 @@ function formatPricePerM2(value?: number) {
 function formatFloor(level?: number, total?: number) {
   if (level == null && total == null) return ''
   return [level, total].filter(value => value != null).join(' / ')
+}
+
+function formatBool(value?: boolean) {
+  if (value == null) return ''
+  return value ? 'Yes' : 'No'
+}
+
+function formatPlot(label?: string, owned?: boolean) {
+  return [label, formatBool(owned)].filter(Boolean).join(' / ')
+}
+
+function formatDateRange(start?: string, end?: string) {
+  return [formatDate(start), formatDate(end)].filter(Boolean).join(' - ')
 }
 
 function formatPercent(value?: number) {
@@ -263,4 +283,16 @@ function reasonScalar(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   if (typeof value === 'boolean') return String(value)
   return ''
+}
+
+function sourceLabel(source?: string) {
+  if (source === 'shortcut') return 'Shortcut'
+  if (source === 'frontdoor') return 'Frontdoor'
+  return source || 'Source'
+}
+
+function sourceBadgeClass(source?: string) {
+  if (source === 'shortcut') return 'shortcut'
+  if (source === 'frontdoor') return 'frontdoor'
+  return 'kind'
 }
