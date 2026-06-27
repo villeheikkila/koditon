@@ -112,9 +112,9 @@ func (a *API) entityDetailHandler(ctx context.Context, input *entityDetailInput)
 		b.LastSeenAt = &t
 	}
 
-	b.StreetAddress = n.StreetAddress
-	b.City = n.City
-	b.Postal = n.Postal
+	b.StreetAddress = firstNonEmpty(n.StreetAddress, detail.Canonical.Address)
+	b.City = firstNonEmpty(n.City, detail.Canonical.City)
+	b.Postal = firstNonEmpty(n.Postal, detail.Canonical.Postal)
 
 	b.AskingPrice = n.AskingPrice
 	b.DebtFreePrice = n.DebtFreePrice
