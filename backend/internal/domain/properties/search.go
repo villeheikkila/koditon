@@ -16,8 +16,8 @@ SELECT
     COALESCE(sl.sale_listing_url, ''),
     COALESCE(sl.sale_listing_headline, ''),
     COALESCE(sl.sale_listing_street_address, ''),
-    COALESCE(sl.sale_listing_city, ''),
-    COALESCE(sl.sale_listing_postal, ''),
+    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, ''),
+    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, ''),
     sl.sale_listing_asking_price,
     dims.area_value,
     COALESCE(dims.room_layout, ''),
@@ -85,8 +85,8 @@ WHERE EXISTS (
     )
   )
   AND ($5::text IS NULL OR trim($5::text) = '' OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text)) LIKE ('%' || lower(trim($5::text)) || '%'))
-  AND ($6::text IS NULL OR trim($6::text) = '' OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($6::text)) || '%'))
-  AND ($7::text IS NULL OR trim($7::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
+  AND ($6::text IS NULL OR trim($6::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($6::text)) || '%'))
+  AND ($7::text IS NULL OR trim($7::text) = '' OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
   AND ($8::bigint IS NULL OR sl.sale_listing_asking_price >= $8::bigint)
   AND ($9::bigint IS NULL OR sl.sale_listing_asking_price <= $9::bigint)
   AND ($10::float8 IS NULL OR dims.area_value >= $10::float8)
@@ -195,8 +195,8 @@ WHERE EXISTS (
     )
   )
   AND ($2::text IS NULL OR trim($2::text) = '' OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text)) LIKE ('%' || lower(trim($2::text)) || '%'))
-  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
-  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(sl.sale_listing_postal, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
+  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
   AND ($5::bigint IS NULL OR sl.sale_listing_asking_price >= $5::bigint)
   AND ($6::bigint IS NULL OR sl.sale_listing_asking_price <= $6::bigint)
   AND ($7::float8 IS NULL OR dims.area_value >= $7::float8)
