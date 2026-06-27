@@ -1114,7 +1114,7 @@ selected_listings AS (
         COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
         COALESCE(sl.sale_listing_url, '') AS url,
         CASE
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
             WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
             ELSE false
         END AS external_url_available,
@@ -1180,7 +1180,7 @@ offering_source_records AS (
         COALESCE(sr.sale_listing_room_layout, '') AS room_layout,
         COALESCE(sr.sale_listing_url, '') AS url,
         CASE
-            WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+            WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
             WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
             ELSE false
         END AS external_url_available,
@@ -1448,7 +1448,7 @@ SELECT
     COALESCE(candidate.sale_listing_room_layout, '') AS room_layout,
     COALESCE(candidate.sale_listing_url, '') AS url,
     CASE
-        WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+        WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
         WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
         ELSE false
     END AS external_url_available,

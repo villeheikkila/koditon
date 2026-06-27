@@ -1431,7 +1431,7 @@ SELECT
     COALESCE(pts.source_external_id, ''),
     COALESCE(pts.source_url, ''),
     CASE
-        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
         ELSE false
     END AS external_url_available,
