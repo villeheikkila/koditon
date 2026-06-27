@@ -454,7 +454,7 @@ function rawTransactionStatus(transaction: AddressRawTransaction) {
 }
 
 function RawTransactionMatches({ transaction }: { transaction: AddressRawTransaction }) {
-  const matches = (transaction.matches ?? []).slice(0, 3)
+  const matches = transaction.matches ?? []
   if (matches.length === 0) return null
   return (
     <span className="address-raw-transaction-matches">
