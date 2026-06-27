@@ -22,7 +22,7 @@ export default function HomePage() {
     try {
       const response = await entityDetail({ id: trimmed })
       if (response.status === 200 && response.data.street_address) {
-        navigate(buildAddressLookupPath({ address: response.data.street_address, city: response.data.city, postal: response.data.postal }))
+        navigate(buildAddressLookupPath({ address: response.data.street_address, city: response.data.city, postal: response.data.postal, source: response.data.source }))
         return
       }
       setError('No address found for that listing.')
