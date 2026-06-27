@@ -862,8 +862,21 @@ func addressMatchReasonSummary(raw json.RawMessage) []string {
 	if value, ok := stringReasonValue(reasons["matched_by"]); ok {
 		summary = append(summary, "Matched by "+value)
 	}
+	if value, ok := providerReasonSummary(reasons["source_provider"], reasons["target_provider"]); ok {
+		summary = append(summary, value)
+	}
 	if value, ok := stringReasonValue(reasons["postal"]); ok {
 		summary = append(summary, "Postal "+value)
+	} else if value, ok := sourceTargetReasonSummary("Postal", reasons["postal"]); ok {
+		summary = append(summary, value)
+	}
+	for _, item := range []struct {
+		key   string
+		label string
+	}{{"address", "Address"}, {"street_name", "Street"}, {"street_match_key", "Street key"}, {"building_match_key", "Building key"}, {"unit_match_key", "Unit key"}, {"prices_transaction_id", "Prices transaction"}} {
+		if value, ok := sourceTargetReasonSummary(item.label, reasons[item.key]); ok {
+			summary = append(summary, value)
+		}
 	}
 	if value, ok := reasonPairSummary("Area", reasons["area"]); ok {
 		summary = append(summary, value)
@@ -906,7 +919,7 @@ func reasonPairSummary(label string, value any) (string, bool) {
 	listing, listingOK := reasonValueString(object["listing"])
 	transaction, transactionOK := reasonValueString(object["transaction"])
 	if !listingOK && !transactionOK {
-		return "", false
+		return sourceTargetReasonSummary(label, object)
 	}
 	if !listingOK {
 		listing = "n/a"
@@ -926,7 +939,7 @@ func layoutReasonSummary(value any) (string, bool) {
 	transaction, transactionOK := reasonValueString(object["transaction"])
 	code, codeOK := stringReasonValue(object["code"])
 	if !listingOK && !transactionOK && !codeOK {
-		return "", false
+		return sourceTargetReasonSummary("Layout", object)
 	}
 	prefix := "Layout"
 	if codeOK {
@@ -947,10 +960,78 @@ func reasonScoreSummary(value any) (string, bool) {
 		return "", false
 	}
 	total, ok := reasonValueString(object["total"])
+	if ok {
+		return "Score total " + total, true
+	}
+	parts := []string{}
+	for _, item := range []string{"address", "unit", "building", "street", "street_area_layout", "street_area_floor_price", "area", "layout", "floor", "build_year", "elevator", "plot", "energy", "condition", "price", "temporal", "transaction", "postal", "city"} {
+		score, scoreOK := positiveReasonScore(object[item])
+		if scoreOK {
+			parts = append(parts, strings.ReplaceAll(item, "_", " ")+" "+score)
+		}
+		if len(parts) == 4 {
+			break
+		}
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	return "Score " + strings.Join(parts, ", "), true
+}
+
+func providerReasonSummary(source any, target any) (string, bool) {
+	sourceText, sourceOK := reasonValueString(source)
+	targetText, targetOK := reasonValueString(target)
+	if !sourceOK && !targetOK {
+		return "", false
+	}
+	if !sourceOK {
+		sourceText = "n/a"
+	}
+	if !targetOK {
+		targetText = "n/a"
+	}
+	return "Sources " + sourceText + " / " + targetText, true
+}
+
+func sourceTargetReasonSummary(label string, value any) (string, bool) {
+	object, ok := value.(map[string]any)
 	if !ok {
 		return "", false
 	}
-	return "Score total " + total, true
+	source, sourceOK := reasonValueString(object["source"])
+	target, targetOK := reasonValueString(object["target"])
+	if !sourceOK && !targetOK {
+		return "", false
+	}
+	if !sourceOK {
+		source = "n/a"
+	}
+	if !targetOK {
+		target = "n/a"
+	}
+	return label + " " + source + " / " + target, true
+}
+
+func positiveReasonScore(value any) (string, bool) {
+	switch typed := value.(type) {
+	case float64:
+		if typed <= 0 {
+			return "", false
+		}
+		return strconv.FormatFloat(typed, 'f', -1, 64), true
+	case int:
+		if typed <= 0 {
+			return "", false
+		}
+		return strconv.Itoa(typed), true
+	default:
+		text, ok := reasonValueString(value)
+		if !ok || text == "0" {
+			return "", false
+		}
+		return text, true
+	}
 }
 
 func stringReasonValue(value any) (string, bool) {

@@ -96,6 +96,19 @@ func TestAddressMatchReasonSummaryFormatsCommonReasons(t *testing.T) {
 	}
 }
 
+func TestAddressMatchReasonSummaryFormatsSourceReasons(t *testing.T) {
+	summary := addressMatchReasonSummary(json.RawMessage(`{"source_provider":"shortcut","target_provider":"frontdoor","postal":{"source":"22100","target":"22100"},"address":{"source":"askvagen 4","target":"askvagen 4"},"unit_match_key":{"source":"4:g","target":"4:g"},"area":{"source":54.5,"target":55},"layout":{"source":"2h+k","target":"2h+k"},"score":{"postal":10,"address":25,"unit":35,"area":8,"layout":6,"price":0}}`))
+	expected := []string{"Sources shortcut / frontdoor", "Postal 22100 / 22100", "Address askvagen 4 / askvagen 4", "Unit key 4:g / 4:g", "Area 54.5 / 55", "Layout 2h+k / 2h+k", "Score address 25, unit 35, area 8, layout 6"}
+	if len(summary) != len(expected) {
+		t.Fatalf("expected %d summary items, got %d: %+v", len(expected), len(summary), summary)
+	}
+	for i, item := range expected {
+		if summary[i] != item {
+			t.Fatalf("expected summary[%d] %q, got %q", i, item, summary[i])
+		}
+	}
+}
+
 func TestNormalizeAddressLookupInputPreservesExplicitFilters(t *testing.T) {
 	_, city, postal := normalizeAddressLookupInput("Askvagen 4, 22100 Maarianhamina", "Mariehamn", "22101")
 	if city != "Mariehamn" {
