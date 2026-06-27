@@ -461,7 +461,7 @@ function RawTransactionMatches({ transaction }: { transaction: AddressRawTransac
       {matches.map(match => {
         const label = rawTransactionMatchLabel(match)
         const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
-        const path = sourceEntityPath({ canonicalId: match.canonical_id })
+        const path = rawTransactionMatchPath(match)
         const text = status ? `${label} (${status})` : label
         return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
       })}
@@ -470,8 +470,13 @@ function RawTransactionMatches({ transaction }: { transaction: AddressRawTransac
 }
 
 function rawTransactionMatchLabel(match: NonNullable<AddressRawTransaction['matches']>[number]) {
-    const target = [sourceLabel(match.source), match.native_id].filter(Boolean).join(' ')
-    return match.headline || match.address || target || match.id.slice(0, 8)
+  const target = [sourceLabel(match.source), match.native_id].filter(Boolean).join(' ')
+  return match.headline || match.address || target || match.id.slice(0, 8)
+}
+
+function rawTransactionMatchPath(match: NonNullable<AddressRawTransaction['matches']>[number]) {
+  if (match.type === 'offering' && match.id) return `/target/offering/${match.id}`
+  return sourceEntityPath({ canonicalId: match.canonical_id })
 }
 
 function transactionEvidence(transaction: AddressTransactionLink, sourceRecords: Map<string, AddressSourceRecord>) {
