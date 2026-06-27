@@ -1149,7 +1149,7 @@ WITH lookup_input AS (
         substring(translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') from '\s[0-9]+\s*([[:alpha:]])\s*$') AS building_letter_ascii_norm,
         public.fnc__normalize_postal($3::text) AS postal_norm
 ),
-selected_listing_ids AS (
+selected_listing_matches AS (
     SELECT
         sl.sale_listing_id,
         pos.property_offering_id
@@ -1202,6 +1202,13 @@ selected_listing_ids AS (
             OR translate(COALESCE(sl.sale_listing_building_letter_norm, ''), 'åäö', 'aao') = li.building_letter_ascii_norm
         )
         AND (trim($2::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($2::text)) || '%'))
+),
+selected_listing_ids AS (
+    SELECT DISTINCT ON (sale_listing_id)
+        sale_listing_id,
+        property_offering_id
+    FROM selected_listing_matches
+    ORDER BY sale_listing_id, property_offering_id NULLS LAST
 ),
 selected_listings AS (
     SELECT
