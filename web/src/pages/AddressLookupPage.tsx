@@ -125,24 +125,28 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
       </header>
       {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
       <div className="address-raw-transaction-list">
-        {transactions.map(transaction => (
-          <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>
-            <div>
-              <strong>{transaction.description || transaction.transaction_id}</strong>
-              <span>{[transaction.category, transaction.type, transaction.period_identifier].filter(Boolean).join(' / ')}</span>
+        {transactions.map(transaction => {
+          const facts = rawTransactionFacts(transaction)
+          return (
+            <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>
+              <div>
+                <strong>{transaction.description || transaction.transaction_id}</strong>
+                <span>{[transaction.category, transaction.type, transaction.period_identifier].filter(Boolean).join(' / ')}</span>
+                {facts && <span>{facts}</span>}
+              </div>
+              <div>
+                <strong>{formatEUR(transaction.price)}</strong>
+                <span>{[formatArea(transaction.area), formatPricePerM2(transaction.price_per_square_meter)].filter(Boolean).join(' / ')}</span>
+              </div>
+              <div>
+                <strong>{rawTransactionStatus(transaction)}</strong>
+                <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
+                <RawTransactionMatches transaction={transaction} />
+              </div>
+              <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review</Link>
             </div>
-            <div>
-              <strong>{formatEUR(transaction.price)}</strong>
-              <span>{[formatArea(transaction.area), formatPricePerM2(transaction.price_per_square_meter)].filter(Boolean).join(' / ')}</span>
-            </div>
-            <div>
-              <strong>{rawTransactionStatus(transaction)}</strong>
-              <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
-              <RawTransactionMatches transaction={transaction} />
-            </div>
-            <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review</Link>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )
@@ -394,6 +398,22 @@ function formatShortDate(value?: string | null) {
 function formatScore(value?: number | null) {
   if (value == null) return ''
   return `score ${value}`
+}
+
+function formatBool(value?: boolean | null) {
+  if (value == null) return ''
+  return value ? 'Yes' : 'No'
+}
+
+function rawTransactionFacts(transaction: AddressRawTransaction) {
+  return [
+    transaction.build_year ? `Built ${transaction.build_year}` : '',
+    transaction.floor ? `Floor ${transaction.floor}` : '',
+    formatBool(transaction.elevator) ? `Elevator ${formatBool(transaction.elevator)}` : '',
+    transaction.condition,
+    transaction.plot,
+    transaction.energy_class ? `Energy ${transaction.energy_class}` : '',
+  ].filter(Boolean).join(' / ')
 }
 
 function sourceRecordTimeline(record: AddressSourceRecord) {
