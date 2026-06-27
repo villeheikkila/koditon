@@ -119,8 +119,8 @@ func addRoutes(a *API, api huma.API) {
 	})
 	huma.Get(api, "/api/v1/property-model/transaction-match-candidates", a.transactionMatchCandidatesHandler, func(op *huma.Operation) {
 		op.OperationID = "transaction-match-candidates"
-		op.Summary = "List prices match candidates"
-		op.Description = "Returns source listing to prices transaction match candidates, optionally filtered by postal code or transaction."
+		op.Summary = "Review prices matches"
+		op.Description = "Returns source listing to prices transaction match candidates for postal review, and candidate plus linked rows for a specific transaction."
 		op.Tags = []string{"Property Model"}
 		applyAuth(op, makeMiddleware, resolveScopes("transaction-match-candidates"))
 	})
