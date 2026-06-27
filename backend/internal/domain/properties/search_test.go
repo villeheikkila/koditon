@@ -1,6 +1,7 @@
 package properties
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -19,5 +20,22 @@ func TestSaleListingSearchUsesNormalizedLocationFallbacks(t *testing.T) {
 	}
 	if !strings.Contains(searchSaleListingsSQL, "COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')") {
 		t.Fatal("expected search rows to expose normalized postal fallback")
+	}
+}
+
+func TestPropertySearchSQLAvoidsRawOnlyListingLocation(t *testing.T) {
+	source, err := os.ReadFile("search.go")
+	if err != nil {
+		t.Fatalf("read search source: %v", err)
+	}
+	text := string(source)
+	for _, rawOnly := range []string{
+		"COALESCE(sl.sale_listing_city, '')",
+		"COALESCE(sl.sale_listing_postal, '')",
+		"COALESCE(sl.sale_listing_postal, pb.housing_company_postal_norm",
+	} {
+		if strings.Contains(text, rawOnly) {
+			t.Fatalf("expected property search SQL to avoid raw-only location expression %q", rawOnly)
+		}
 	}
 }

@@ -343,8 +343,8 @@ WITH visible_base AS (
         COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class) AS building_energy_class,
         po.property_offering_last_seen_at,
         sl.sale_listing_street_address,
-        sl.sale_listing_city,
-        sl.sale_listing_postal,
+        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm) AS sale_listing_city,
+        COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm) AS sale_listing_postal,
         sl.sale_listing_source_provider,
         sl.sale_listing_source_kind,
         row_number() OVER (
@@ -377,9 +377,9 @@ WITH visible_base AS (
         AND (
             $9::text IS NULL
             OR lower(COALESCE(pb.housing_company_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%')
-            OR lower(COALESCE(sl.sale_listing_city, '')) LIKE ('%' || lower(trim($9::text)) || '%')
+            OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%')
         )
-        AND ($10::text IS NULL OR public.fnc__normalize_postal(COALESCE(sl.sale_listing_postal, pb.housing_company_postal_norm, '')) = public.fnc__normalize_postal($10::text))
+        AND ($10::text IS NULL OR public.fnc__normalize_postal(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, pb.housing_company_postal_norm, '')) = public.fnc__normalize_postal($10::text))
         AND ($11::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) >= $11::bigint)
         AND ($12::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) <= $12::bigint)
         AND ($13::double precision IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) >= $13::double precision)
