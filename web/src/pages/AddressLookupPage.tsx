@@ -181,6 +181,8 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
         </div>
       </header>
       <div className="address-listing-meta">
+        <span>{sourceLabel(listing.source)} {listing.native_id}</span>
+        <span>{listing.offering_id ? `Offering ${shortID(listing.offering_id)}` : 'Unaggregated source listing'}</span>
         <span>{listing.room_layout || 'No room layout'}</span>
         <span>{formatDate(listing.last_seen_at)}</span>
         {listing.price_match_status && <span>{listing.price_match_status}</span>}
@@ -400,6 +402,10 @@ function formatShortDate(value?: string | null) {
 function formatScore(value?: number | null) {
   if (value == null) return ''
   return `score ${value}`
+}
+
+function shortID(value: string) {
+  return value.slice(0, 8)
 }
 
 function formatBool(value?: boolean | null) {
