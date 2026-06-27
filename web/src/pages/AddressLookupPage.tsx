@@ -117,7 +117,7 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
 function RawTransactionPanel({ transactions, listings, lookup }: { transactions: AddressRawTransaction[]; listings: AddressListing[]; lookup?: AddressLookupInput }) {
   const linkedHere = transactions.filter(transaction => transaction.linked_to_lookup).length
   const candidateHere = transactions.filter(transaction => transaction.candidate_to_lookup).length
-  const matchedElsewhere = transactions.filter(transaction => !transaction.linked_to_lookup && transaction.is_matched).length
+  const matchedElsewhere = transactions.filter(transaction => !transaction.linked_to_lookup && !transaction.candidate_to_lookup && transaction.is_matched).length
   const unlinked = transactions.filter(transaction => !transaction.is_matched && !transaction.candidate_to_lookup).length
   return (
     <section className="address-raw-transactions">
