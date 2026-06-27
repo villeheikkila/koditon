@@ -859,6 +859,7 @@ WITH lookup_input AS (
         substring(public.fnc__normalize_address_token($1::text) from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_norm,
         substring(translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_ascii_norm,
         substring(public.fnc__normalize_address_token($1::text) from '\s([0-9]+)(\s*[[:alpha:]])?\s*$') AS street_number_norm,
+        substring(translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') from '\s[0-9]+\s*([[:alpha:]])\s*$') AS building_letter_ascii_norm,
         public.fnc__normalize_postal($3::text) AS postal_norm
 ),
 selected_listing_ids AS (
@@ -881,6 +882,10 @@ selected_listing_ids AS (
             OR (
                 sl.sale_listing_street_name_norm IS NOT NULL
                 AND sl.sale_listing_street_number_norm IS NOT NULL
+                AND (
+                    li.building_letter_ascii_norm IS NULL
+                    OR translate(COALESCE(sl.sale_listing_building_letter_norm, ''), 'åäö', 'aao') = li.building_letter_ascii_norm
+                )
                 AND (
                     (' ' || li.address_norm || ' ')
                         LIKE ('% ' || sl.sale_listing_street_name_norm || ' ' || sl.sale_listing_street_number_norm || ' %')
@@ -905,6 +910,10 @@ selected_listing_ids AS (
         AND li.street_number_norm IS NOT NULL
         AND translate(sl.sale_listing_street_name_norm, 'åäö', 'aao') = li.street_name_ascii_norm
         AND sl.sale_listing_street_number_norm = li.street_number_norm
+        AND (
+            li.building_letter_ascii_norm IS NULL
+            OR translate(COALESCE(sl.sale_listing_building_letter_norm, ''), 'åäö', 'aao') = li.building_letter_ascii_norm
+        )
         AND (trim($2::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($2::text)) || '%'))
 ),
 selected_listings AS (
