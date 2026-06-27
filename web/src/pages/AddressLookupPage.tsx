@@ -126,7 +126,7 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
       {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
       <div className="address-raw-transaction-list">
         {transactions.map(transaction => {
-          const facts = rawTransactionFacts(transaction)
+          const facts = priceTransactionFacts(transaction)
           return (
             <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>
               <div>
@@ -308,11 +308,13 @@ function TransactionTable({ title, transactions, sourceRecords, lookup, variant 
       <div className="address-transaction-title">{title}</div>
       {transactions.map(transaction => {
         const evidence = transaction.reasons_summary?.length ? transaction.reasons_summary : transactionEvidence(transaction, sourceRecords)
+        const facts = priceTransactionFacts(transaction)
         return (
           <div className="address-transaction-row" key={`${transaction.transaction_id}:${transaction.link_type}`}>
             <div>
               <strong>{transaction.description || transaction.transaction_id}</strong>
               <span>{[transaction.category, transaction.type, transaction.period_identifier].filter(Boolean).join(' / ')}</span>
+              {facts && <span>{facts}</span>}
             </div>
             <div>
               <strong>{formatEUR(transaction.price)}</strong>
@@ -405,7 +407,7 @@ function formatBool(value?: boolean | null) {
   return value ? 'Yes' : 'No'
 }
 
-function rawTransactionFacts(transaction: AddressRawTransaction) {
+function priceTransactionFacts(transaction: AddressRawTransaction | AddressTransactionLink) {
   return [
     transaction.build_year ? `Built ${transaction.build_year}` : '',
     transaction.floor ? `Floor ${transaction.floor}` : '',
