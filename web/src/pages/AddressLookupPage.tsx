@@ -270,29 +270,34 @@ function SourceRecordList({ records }: { records: AddressSourceRecord[] }) {
   return (
     <div className="address-source-records">
       <span className="address-source-records-title">Same offering source records</span>
-      {records.map(record => (
-        <div className="address-source-record" key={record.listing_id}>
-          <div>
-            <strong>{record.headline || record.address || record.native_id}</strong>
-            <span>{[record.address, record.city, record.postal].filter(Boolean).join(' / ')}</span>
+      {records.map(record => {
+        const lookupPath = buildAddressLookupPath({ address: record.address, city: record.city, postal: record.postal, source: record.source })
+        const sourcePath = sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind })
+        return (
+          <div className="address-source-record" key={record.listing_id}>
+            <div>
+              <strong>{record.headline || record.address || record.native_id}</strong>
+              <span>{[record.address, record.city, record.postal].filter(Boolean).join(' / ')}</span>
+            </div>
+            <div>
+              <strong>{formatEUR(record.asking_price)}</strong>
+              <span>{[formatArea(record.area), record.room_layout].filter(Boolean).join(' / ')}</span>
+            </div>
+            <div>
+              <strong>{sourceLabel(record.source)} {record.native_id}</strong>
+              <span>{sourceRecordTimeline(record)}</span>
+              {sourceRecordLink(record) && <span>{sourceRecordLink(record)}</span>}
+            </div>
+            <div className="address-source-record-actions">
+              {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
+              {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
+              {sourcePath && <Link to={sourcePath}>Source detail</Link>}
+              {record.external_url_available && record.url && <a href={record.url} target="_blank" rel="noreferrer">Live source page</a>}
+            </div>
+            <SourceTexts texts={record.texts} compact />
           </div>
-          <div>
-            <strong>{formatEUR(record.asking_price)}</strong>
-            <span>{[formatArea(record.area), record.room_layout].filter(Boolean).join(' / ')}</span>
-          </div>
-          <div>
-            <strong>{sourceLabel(record.source)} {record.native_id}</strong>
-            <span>{sourceRecordTimeline(record)}</span>
-            {sourceRecordLink(record) && <span>{sourceRecordLink(record)}</span>}
-          </div>
-          <div className="address-source-record-actions">
-            {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
-            {sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind }) && <Link to={sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind })}>Source detail</Link>}
-            {record.external_url_available && record.url && <a href={record.url} target="_blank" rel="noreferrer">Live source page</a>}
-          </div>
-          <SourceTexts texts={record.texts} compact />
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
