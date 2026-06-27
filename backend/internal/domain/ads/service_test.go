@@ -57,6 +57,19 @@ func TestNormalizeAddressLookupInputParsesPastedAddress(t *testing.T) {
 	}
 }
 
+func TestNormalizeAddressLookupInputParsesCommaSeparatedPostalCity(t *testing.T) {
+	address, city, postal := normalizeAddressLookupInput("Askvagen 4, Maarianhamina, 22100", "", "")
+	if address != "Askvagen 4" {
+		t.Fatalf("expected street address, got %s", address)
+	}
+	if city != "Maarianhamina" {
+		t.Fatalf("expected city Maarianhamina, got %s", city)
+	}
+	if postal != "22100" {
+		t.Fatalf("expected postal 22100, got %s", postal)
+	}
+}
+
 func TestDecodeRawTransactionMatches(t *testing.T) {
 	score := int32(128)
 	matches, err := decodeRawTransactionMatches(json.RawMessage(`[{"type":"listing","id":"11111111-1111-1111-1111-111111111111","canonical_id":"frontdoor:ad:1","source":"frontdoor","native_id":"1","headline":"Askvägen 4","status":"auto_linked","score":128},{"type":"offering","id":"22222222-2222-2222-2222-222222222222","canonical_id":"shortcut:ad:2","source":"shortcut","native_id":"2","headline":"Askvägen 4 B","status":"auto_linked","method":"offering_source_listing","score":91}]`))

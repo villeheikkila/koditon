@@ -424,7 +424,7 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	if err := rows.Err(); err != nil {
 		return AddressLookupResult{}, fmt.Errorf("iterate address listings: %w", err)
 	}
-	result := buildAddressLookupResult(address, city, postal, source, lookupRows)
+	result := buildAddressLookupResult(queryAddress, city, postal, source, lookupRows)
 	if err := s.attachAddressSourceCandidates(ctx, &result); err != nil {
 		return AddressLookupResult{}, err
 	}
@@ -1764,6 +1764,7 @@ func normalizeSearchParams(params SearchParams) SearchParams {
 var (
 	pastedAddressPostalCityRE = regexp.MustCompile(`^(.+?)\s+(\d{5})\s+(.+)$`)
 	pastedPostalCityRE        = regexp.MustCompile(`^(\d{5})\s+(.+)$`)
+	pastedCityPostalRE        = regexp.MustCompile(`^(.+?)\s+(\d{5})$`)
 )
 
 func normalizeAddressLookupInput(address, city, postal string) (string, string, string) {
@@ -1773,18 +1774,11 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 	if strings.Contains(queryAddress, ",") {
 		parts := strings.SplitN(queryAddress, ",", 2)
 		street := strings.TrimSpace(parts[0])
-		rest := strings.TrimSpace(parts[1])
+		rest := strings.TrimSpace(strings.ReplaceAll(parts[1], ",", " "))
 		if street != "" {
 			queryAddress = street
 		}
-		if matches := pastedPostalCityRE.FindStringSubmatch(rest); matches != nil {
-			if queryPostal == "" {
-				queryPostal = strings.TrimSpace(matches[1])
-			}
-			if queryCity == "" {
-				queryCity = strings.TrimSpace(matches[2])
-			}
-		}
+		queryCity, queryPostal = applyPastedPostalCity(rest, queryCity, queryPostal)
 		return queryAddress, queryCity, queryPostal
 	}
 	if matches := pastedAddressPostalCityRE.FindStringSubmatch(queryAddress); matches != nil {
@@ -1799,6 +1793,31 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 		}
 	}
 	return queryAddress, queryCity, queryPostal
+}
+
+func applyPastedPostalCity(value, city, postal string) (string, string) {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return city, postal
+	}
+	if matches := pastedPostalCityRE.FindStringSubmatch(text); matches != nil {
+		if postal == "" {
+			postal = strings.TrimSpace(matches[1])
+		}
+		if city == "" {
+			city = strings.TrimSpace(matches[2])
+		}
+		return city, postal
+	}
+	if matches := pastedCityPostalRE.FindStringSubmatch(text); matches != nil {
+		if city == "" {
+			city = strings.TrimSpace(matches[1])
+		}
+		if postal == "" {
+			postal = strings.TrimSpace(matches[2])
+		}
+	}
+	return city, postal
 }
 
 func normalizeSource(source string) string {
