@@ -16,7 +16,7 @@ export default function SourceEntityPage({ kind }: { kind: SourceEntityKind }) {
       <div className="model-shell">
         <header className="model-header">
           <div>
-            <Link className="model-back" to="/address">Address lookup</Link>
+            <Link className="model-back" to={lookupPath || '/address'}>Address lookup</Link>
             <h1>{labelKind(kind)}</h1>
             <p>{id}</p>
           </div>
