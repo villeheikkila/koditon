@@ -115,12 +115,15 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
 }
 
 function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRawTransaction[]; lookup?: AddressLookupInput }) {
+  const linkedHere = transactions.filter(transaction => transaction.linked_to_lookup).length
+  const matchedElsewhere = transactions.filter(transaction => !transaction.linked_to_lookup && transaction.is_matched).length
+  const unlinked = transactions.filter(transaction => !transaction.is_matched).length
   return (
     <section className="address-raw-transactions">
       <header>
         <div>
           <h2>Prices history</h2>
-          <span>{transactions.filter(transaction => transaction.linked_to_lookup).length} linked here / {transactions.filter(transaction => !transaction.is_matched).length} unlinked</span>
+          <span>{linkedHere} linked here / {matchedElsewhere} matched elsewhere / {unlinked} unlinked</span>
         </div>
       </header>
       {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
