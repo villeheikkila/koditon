@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/properties"
@@ -547,6 +548,11 @@ func (a *API) transactionMatchPostalsHandler(ctx context.Context, input *transac
 }
 
 func (a *API) transactionMatchCandidatesHandler(ctx context.Context, input *transactionMatchCandidatesInput) (*transactionMatchCandidatesOutput, error) {
+	if strings.TrimSpace(input.Transaction) != "" {
+		if _, err := uuid.Parse(strings.TrimSpace(input.Transaction)); err != nil {
+			return nil, huma.Error400BadRequest("transaction must be a valid UUID")
+		}
+	}
 	candidates, err := a.propertiesService.TransactionMatchCandidates(ctx, input.Postal, input.Status, input.Transaction, input.Limit)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "transaction match candidate list failed", "postal", input.Postal, "status", input.Status, "error", err, "outcome", logging.OutcomeError)

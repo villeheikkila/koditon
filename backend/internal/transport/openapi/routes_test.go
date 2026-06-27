@@ -86,3 +86,19 @@ func TestAddressLookupRequiresAddress(t *testing.T) {
 		t.Fatalf("expected address validation error, got %s", rec.Body.String())
 	}
 }
+
+func TestTransactionMatchCandidatesRejectsInvalidTransactionID(t *testing.T) {
+	mux := http.NewServeMux()
+	api := humago.New(mux, NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/property-model/transaction-match-candidates?transaction=not-a-uuid", nil)
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "transaction must be a valid UUID") {
+		t.Fatalf("expected transaction validation error, got %s", rec.Body.String())
+	}
+}
