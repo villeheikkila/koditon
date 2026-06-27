@@ -9,7 +9,7 @@ export default function SourceEntityPage({ kind }: { kind: SourceEntityKind }) {
   const { id = '' } = useParams()
   const detailQuery = useEntityDetail({ id }, { query: { enabled: Boolean(id) } })
   const detail = detailQuery.data?.status === 200 ? detailQuery.data.data : undefined
-  const lookupPath = detail ? buildAddressLookupPath({ address: detail.street_address, city: detail.city, postal: detail.postal }) : ''
+  const lookupPath = detail ? buildAddressLookupPath({ address: detail.street_address, city: detail.city, postal: detail.postal, source: detail.source }) : ''
   return (
     <main className="model-page">
       <Nav />
@@ -53,6 +53,9 @@ function SourceEntityDetail({ detail }: { detail: EntityDetailOutputBody }) {
     ['Build year', detail.build_year],
     ['Condition', detail.condition],
     ['Energy class', detail.energy_class],
+    ['Plot', detail.plot_type],
+    ['Elevator', formatBool(detail.elevator)],
+    ['Sauna', formatBool(detail.sauna)],
   ]
   const priceRows: Array<[string, string | number | undefined]> = [
     ['Asking price', formatCurrency(detail.asking_price)],
@@ -168,6 +171,11 @@ function formatNumber(value?: number, unit?: string) {
 function formatDate(value?: string) {
   if (!value) return ''
   return new Intl.DateTimeFormat('fi-FI').format(new Date(value))
+}
+
+function formatBool(value?: boolean) {
+  if (value == null) return ''
+  return value ? 'Yes' : 'No'
 }
 
 function formatBytes(value?: number) {
