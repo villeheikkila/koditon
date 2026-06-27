@@ -64,7 +64,7 @@ func TestAddRoutesIncludesTransactionMatchReview(t *testing.T) {
 		t.Fatalf("marshal openapi: %v", err)
 	}
 	doc := string(data)
-	for _, want := range []string{"/api/v1/property-model/transaction-match-candidates", "transaction-match-candidates", "price_delta_percent", "listing", "transaction", "canonical_id", "external_url_available"} {
+	for _, want := range []string{"/api/v1/property-model/transaction-match-candidates", "transaction-match-candidates", "price_delta_percent", "listing", "transaction", "canonical_id", "offering_id", "external_url_available"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("expected transaction match OpenAPI schema to include %q", want)
 		}

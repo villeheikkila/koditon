@@ -379,6 +379,7 @@ type TransactionMatchCandidate struct {
 
 type TransactionMatchListingCandidate struct {
 	ID                   string   `json:"id"`
+	OfferingID           string   `json:"offering_id,omitempty"`
 	CanonicalID          string   `json:"canonical_id"`
 	SourceProvider       string   `json:"source_provider"`
 	URL                  string   `json:"url,omitempty"`

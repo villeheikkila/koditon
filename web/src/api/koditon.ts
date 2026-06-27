@@ -239,6 +239,7 @@ export interface TransactionMatchCandidate {
 
 export interface TransactionMatchListingCandidate {
   id: string;
+  offering_id?: string;
   canonical_id: string;
   source_provider: string;
   url?: string;
