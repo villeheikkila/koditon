@@ -22,6 +22,8 @@ var operationIDScopes = map[string][]string{
 	"property-targets-claims":                        {},
 	"property-targets-renovation-events":             {},
 	"property-targets-documents":                     {},
+	"transaction-match-postals":                      {auth.ScopeCoreRead},
+	"transaction-match-candidates":                  {auth.ScopeCoreRead},
 	"property-targets-resolve":                       {auth.ScopeProfileWrite},
 	"property-documents-manager-certificates-upload": {auth.ScopeProfileWrite},
 	"property-documents-detail":                      {auth.ScopeCoreRead},

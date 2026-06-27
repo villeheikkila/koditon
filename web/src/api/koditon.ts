@@ -218,6 +218,71 @@ export interface AddressRawTransactionMatch {
   type: string;
 }
 
+export interface TransactionMatchCandidate {
+  id: string;
+  status: string;
+  score: number;
+  confidence: string;
+  price_delta_percent?: number;
+  reasons?: unknown;
+  created_at?: string;
+  listing: TransactionMatchListingCandidate;
+  transaction: TransactionMatchTransaction;
+}
+
+export interface TransactionMatchListingCandidate {
+  id: string;
+  canonical_id: string;
+  source_provider: string;
+  url?: string;
+  headline?: string;
+  street_address?: string;
+  city?: string;
+  postal?: string;
+  room_layout?: string;
+  condition?: string;
+  condition_match_code?: string;
+  area_m2?: number;
+  asking_price?: number;
+  price_per_m2?: number;
+  build_year?: number;
+  floor_level?: number;
+  total_floors?: number;
+  elevator?: boolean;
+  energy_match_code?: string;
+  energy_label?: string;
+  plot_ownership_raw?: string;
+  plot_owned?: boolean;
+  first_seen_at?: string;
+  last_seen_at?: string;
+}
+
+export interface TransactionMatchTransaction {
+  id: string;
+  description?: string;
+  type?: string;
+  category?: string;
+  area_m2: number;
+  price: number;
+  price_per_m2: number;
+  build_year?: number;
+  floor?: string;
+  elevator: boolean;
+  condition?: string;
+  condition_match_code?: string;
+  plot?: string;
+  plot_owned?: boolean;
+  energy_class?: string;
+  energy_match_code?: string;
+  period_identifier?: string;
+  created_at?: string;
+}
+
+export interface TransactionMatchCandidatesOutputBody {
+  /** @nullable */
+  candidates: TransactionMatchCandidate[] | null;
+}
+
 export interface AddressLookupResult {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
@@ -1067,6 +1132,25 @@ page?: number;
 page_size?: number;
 };
 
+export type TransactionMatchCandidatesParams = {
+/**
+ * Postal code filter
+ */
+postal?: string;
+/**
+ * Candidate status filter: candidate or ambiguous
+ */
+status?: string;
+/**
+ * Prices transaction UUID filter
+ */
+transaction?: string;
+/**
+ * Maximum candidates to return
+ */
+limit?: number;
+};
+
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
@@ -1195,6 +1279,79 @@ export function useAddressLookup<TData = Awaited<ReturnType<typeof addressLookup
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAddressLookupQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export type transactionMatchCandidatesResponse200 = {
+  data: TransactionMatchCandidatesOutputBody
+  status: 200
+}
+
+export type transactionMatchCandidatesResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type transactionMatchCandidatesResponseSuccess = (transactionMatchCandidatesResponse200) & {
+  headers: Headers;
+};
+export type transactionMatchCandidatesResponseError = (transactionMatchCandidatesResponseDefault) & {
+  headers: Headers;
+};
+
+export type transactionMatchCandidatesResponse = (transactionMatchCandidatesResponseSuccess | transactionMatchCandidatesResponseError)
+
+export const getTransactionMatchCandidatesUrl = (params?: TransactionMatchCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/property-model/transaction-match-candidates?${stringifiedParams}` : `/api/v1/property-model/transaction-match-candidates`
+}
+
+export const transactionMatchCandidates = async (params?: TransactionMatchCandidatesParams, options?: RequestInit): Promise<transactionMatchCandidatesResponse> => {
+  return customInstance<transactionMatchCandidatesResponse>(getTransactionMatchCandidatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+  }
+);}
+
+export const getTransactionMatchCandidatesQueryKey = (params?: TransactionMatchCandidatesParams,) => {
+  return [
+    `/api/v1/property-model/transaction-match-candidates`, ...(params ? [params] : [])
+  ] as const;
+}
+
+export const getTransactionMatchCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof transactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(params?: TransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof transactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTransactionMatchCandidatesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof transactionMatchCandidates>>> = ({ signal }) => transactionMatchCandidates(params, { signal, ...requestOptions });
+
+  return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof transactionMatchCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TransactionMatchCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof transactionMatchCandidates>>>
+export type TransactionMatchCandidatesQueryError = ErrorType<ErrorModel>
+
+export function useTransactionMatchCandidates<TData = Awaited<ReturnType<typeof transactionMatchCandidates>>, TError = ErrorType<ErrorModel>>(
+ params?: TransactionMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof transactionMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTransactionMatchCandidatesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

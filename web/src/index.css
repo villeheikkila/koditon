@@ -5299,6 +5299,19 @@ td.dim { color: var(--text-3); font-size: 12px; }
   gap: 14px;
 }
 
+.matches-page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-1);
+}
+
+.matches-shell {
+  padding: 28px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .matches-header {
   display: flex;
   align-items: flex-end;
@@ -5328,6 +5341,68 @@ td.dim { color: var(--text-3); font-size: 12px; }
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+.matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.matches-list--loading {
+  opacity: 0.62;
+}
+
+.matches-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.matches-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.matches-card-header h2 {
+  margin: 8px 0 4px;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.matches-card-header p {
+  margin: 0;
+  color: var(--text-3);
+}
+
+.matches-comparison {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+}
+
+.matches-comparison section {
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid var(--border);
+}
+
+.matches-comparison section:last-child {
+  border-right: 0;
+}
+
+.matches-column-title {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .matches-stats {
@@ -5583,6 +5658,11 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .map-panel { border-left: 0; border-top: 1px solid var(--border); max-height: 320px; }
   .matches-sidebar { display: none; }
   .matches-header { align-items: flex-start; flex-direction: column; }
+  .matches-shell { padding: 20px 16px 36px; }
+  .matches-card-header { flex-direction: column; }
+  .matches-comparison { grid-template-columns: 1fr; }
+  .matches-comparison section { border-right: 0; border-bottom: 1px solid var(--border); }
+  .matches-comparison section:last-child { border-bottom: 0; }
   .match-card-grid { grid-template-columns: 1fr; }
   .match-card-head { flex-direction: column; }
   .match-card-prices { justify-content: flex-start; }

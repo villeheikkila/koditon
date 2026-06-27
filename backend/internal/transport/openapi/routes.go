@@ -110,6 +110,20 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Returns documents attached to the target."
 		op.Tags = []string{"Property Model"}
 	})
+	huma.Get(api, "/api/v1/property-model/transaction-match-postals", a.transactionMatchPostalsHandler, func(op *huma.Operation) {
+		op.OperationID = "transaction-match-postals"
+		op.Summary = "List postal codes with prices match candidates"
+		op.Description = "Returns postal-code summaries for source listing to prices transaction match candidates."
+		op.Tags = []string{"Property Model"}
+		applyAuth(op, makeMiddleware, resolveScopes("transaction-match-postals"))
+	})
+	huma.Get(api, "/api/v1/property-model/transaction-match-candidates", a.transactionMatchCandidatesHandler, func(op *huma.Operation) {
+		op.OperationID = "transaction-match-candidates"
+		op.Summary = "List prices match candidates"
+		op.Description = "Returns source listing to prices transaction match candidates, optionally filtered by postal code or transaction."
+		op.Tags = []string{"Property Model"}
+		applyAuth(op, makeMiddleware, resolveScopes("transaction-match-candidates"))
+	})
 	huma.Post(api, "/api/v1/property-targets/{targetType}/{targetID}/resolve", a.resolveTargetHandler, func(op *huma.Operation) {
 		op.OperationID = "property-targets-resolve"
 		op.Summary = "Queue target resolution"

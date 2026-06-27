@@ -55,6 +55,22 @@ func TestAddRoutesIncludesEntityRawPayload(t *testing.T) {
 	}
 }
 
+func TestAddRoutesIncludesTransactionMatchReview(t *testing.T) {
+	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	data, err := json.Marshal(api.OpenAPI())
+	if err != nil {
+		t.Fatalf("marshal openapi: %v", err)
+	}
+	doc := string(data)
+	for _, want := range []string{"/api/v1/property-model/transaction-match-candidates", "transaction-match-candidates", "price_delta_percent", "listing", "transaction"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected transaction match OpenAPI schema to include %q", want)
+		}
+	}
+}
+
 func TestAddressLookupRequiresAddress(t *testing.T) {
 	mux := http.NewServeMux()
 	api := humago.New(mux, NewConfig("Koditon API", "test"))
