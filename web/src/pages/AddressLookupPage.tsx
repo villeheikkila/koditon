@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import { useAddressLookup, type AddressListing, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
-import { sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
+import { buildAddressLookupPath, sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
 
 const sources = [
   ['all', 'All sources'],
@@ -232,6 +232,7 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
       <span className="address-source-records-title">Candidate source matches</span>
       {candidates.map(candidate => {
         const sourcePath = sourceEntityPath({ canonicalId: candidate.canonical_id, kind: candidate.kind })
+        const lookupPath = buildAddressLookupPath({ address: candidate.address, city: candidate.city, postal: candidate.postal, source: candidate.source })
         return (
           <div className="address-source-record" key={`${candidate.listing_id}:${candidate.candidate_offering_id}`}>
             <div>
@@ -253,6 +254,7 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
               </div>
             )}
             <div className="address-source-record-actions">
+              {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
               {candidate.candidate_offering_id && <Link to={`/target/offering/${candidate.candidate_offering_id}`}>Candidate offering</Link>}
               {sourcePath && <Link to={sourcePath}>Source detail</Link>}
               {candidate.external_url_available && candidate.url && <a href={candidate.url} target="_blank" rel="noreferrer">Live source page</a>}
