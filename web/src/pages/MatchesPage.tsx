@@ -44,7 +44,7 @@ export default function MatchesPage() {
 
 function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
   const detailPath = sourceEntityPath({ canonicalId: candidate.listing.canonical_id })
-  const lookupPath = buildAddressLookupPath({ address: candidate.listing.street_address, city: candidate.listing.city, postal: candidate.listing.postal })
+  const lookupPath = buildAddressLookupPath({ address: candidate.listing.street_address, city: candidate.listing.city, postal: candidate.listing.postal, source: candidate.listing.source_provider })
   return (
     <article className="matches-card">
       <header className="matches-card-header">
