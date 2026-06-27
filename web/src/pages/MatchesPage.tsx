@@ -7,7 +7,7 @@ export default function MatchesPage() {
   const [params] = useSearchParams()
   const transaction = params.get('transaction')?.trim() ?? ''
   const postal = params.get('postal')?.trim() ?? ''
-  const addressBackPath = buildAddressLookupPath({ address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal') }) || '/address'
+  const addressBackPath = buildAddressLookupPath({ address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal'), source: params.get('lookup_source') }) || '/address'
   const query = useTransactionMatchCandidates(
     { transaction: transaction || undefined, postal: transaction ? undefined : postal || undefined, limit: transaction ? 50 : 100 },
     { query: { enabled: Boolean(transaction || postal), placeholderData: previous => previous } },

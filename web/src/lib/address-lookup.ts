@@ -4,6 +4,7 @@ export type AddressLookupInput = {
   address?: string | null
   city?: string | null
   postal?: string | null
+  source?: string | null
 }
 
 export type SourceEntityInput = {
@@ -18,6 +19,8 @@ export function buildAddressLookupPath(input: AddressLookupInput) {
   params.set('address', address)
   if (input.city?.trim()) params.set('city', input.city.trim())
   if (input.postal?.trim()) params.set('postal', input.postal.trim())
+  const source = input.source?.trim()
+  if (source && source !== 'all') params.set('source', source)
   return `/address?${params.toString()}`
 }
 

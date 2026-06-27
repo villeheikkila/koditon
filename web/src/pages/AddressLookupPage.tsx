@@ -24,7 +24,7 @@ export default function AddressLookupPage() {
   const candidateCount = listings.reduce((count, listing) => count + (listing.transactions ?? []).filter(transaction => !isLinkedTransaction(transaction)).length, 0)
   const sourceCandidateCount = listings.reduce((count, listing) => count + (listing.source_candidates?.length ?? 0), 0)
   const offeringCount = new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
-  const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal } : undefined
+  const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source } : undefined
   return (
     <main className="address-lookup-page">
       <Nav />
@@ -449,6 +449,7 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
   if (lookup?.address?.trim()) params.set('lookup_address', lookup.address.trim())
   if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
   if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
+  if (lookup?.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
   return `/matches?${params.toString()}`
 }
 
