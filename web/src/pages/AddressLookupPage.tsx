@@ -132,7 +132,7 @@ function RawTransactionPanel({ transactions }: { transactions: AddressRawTransac
             <div>
               <strong>{rawTransactionStatus(transaction)}</strong>
               <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
-              {rawTransactionMatches(transaction).length > 0 && <span>{rawTransactionMatches(transaction).join(' / ')}</span>}
+              <RawTransactionMatches transaction={transaction} />
             </div>
             <Link className="address-transaction-review" to={transactionMatchURL(transaction)}>Review</Link>
           </div>
@@ -453,13 +453,25 @@ function rawTransactionStatus(transaction: AddressRawTransaction) {
   return 'Unlinked'
 }
 
-function rawTransactionMatches(transaction: AddressRawTransaction) {
-  return (transaction.matches ?? []).slice(0, 3).map(match => {
+function RawTransactionMatches({ transaction }: { transaction: AddressRawTransaction }) {
+  const matches = (transaction.matches ?? []).slice(0, 3)
+  if (matches.length === 0) return null
+  return (
+    <span className="address-raw-transaction-matches">
+      {matches.map(match => {
+        const label = rawTransactionMatchLabel(match)
+        const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
+        const path = sourceEntityPath({ canonicalId: match.canonical_id, kind: 'ad' })
+        const text = status ? `${label} (${status})` : label
+        return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
+      })}
+    </span>
+  )
+}
+
+function rawTransactionMatchLabel(match: NonNullable<AddressRawTransaction['matches']>[number]) {
     const target = [sourceLabel(match.source), match.native_id].filter(Boolean).join(' ')
-    const label = match.headline || match.address || target || match.id.slice(0, 8)
-    const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
-    return status ? `${label} (${status})` : label
-  })
+    return match.headline || match.address || target || match.id.slice(0, 8)
 }
 
 function transactionEvidence(transaction: AddressTransactionLink, sourceRecords: Map<string, AddressSourceRecord>) {

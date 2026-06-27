@@ -4468,6 +4468,30 @@ td.dim { color: var(--text-3); font-size: 12px; }
   overflow-wrap: anywhere;
 }
 
+.address-raw-transaction-matches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.address-raw-transaction-matches a,
+.address-raw-transaction-matches span {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  display: inline-flex;
+  font-size: 11px;
+  margin-top: 2px;
+  padding: 2px 5px;
+  text-decoration: none;
+}
+
+.address-raw-transaction-matches a:hover {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+
 .address-listing-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
