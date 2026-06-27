@@ -62,7 +62,7 @@ export default function AddressLookupPage() {
               {listings.map(listing => <ListingCard key={listing.listing_id} listing={listing} lookup={reviewLookup} />)}
             </div>
           )}
-          {body && <RawTransactionPanel transactions={rawTransactions} lookup={reviewLookup} />}
+          {body && <RawTransactionPanel transactions={rawTransactions} listings={listings} lookup={reviewLookup} />}
         </section>
       </div>
     </main>
@@ -114,7 +114,7 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
   )
 }
 
-function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRawTransaction[]; lookup?: AddressLookupInput }) {
+function RawTransactionPanel({ transactions, listings, lookup }: { transactions: AddressRawTransaction[]; listings: AddressListing[]; lookup?: AddressLookupInput }) {
   const linkedHere = transactions.filter(transaction => transaction.linked_to_lookup).length
   const candidateHere = transactions.filter(transaction => transaction.candidate_to_lookup).length
   const matchedElsewhere = transactions.filter(transaction => !transaction.linked_to_lookup && transaction.is_matched).length
@@ -131,6 +131,7 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
       <div className="address-raw-transaction-list">
         {transactions.map(transaction => {
           const facts = priceTransactionFacts(transaction)
+          const candidateMatches = candidateRawTransactionMatches(transaction, listings)
           return (
             <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : transaction.candidate_to_lookup ? ' address-raw-transaction--candidate' : ''}`} key={transaction.transaction_id}>
               <div>
@@ -146,7 +147,7 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
               <div>
                 <strong>{rawTransactionStatus(transaction)}</strong>
                 <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
-                <RawTransactionMatches transaction={transaction} />
+                <RawTransactionMatches transaction={transaction} candidateMatches={candidateMatches} />
               </div>
               <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review</Link>
             </div>
@@ -510,9 +511,16 @@ function countLabel(count: number, label: string) {
   return `${count} ${label}${count === 1 ? '' : 's'}`
 }
 
-function RawTransactionMatches({ transaction }: { transaction: AddressRawTransaction }) {
+type CandidateRawTransactionMatch = {
+  id: string
+  label: string
+  path: string
+  status: string
+}
+
+function RawTransactionMatches({ transaction, candidateMatches }: { transaction: AddressRawTransaction; candidateMatches: CandidateRawTransactionMatch[] }) {
   const matches = transaction.matches ?? []
-  if (matches.length === 0) return null
+  if (matches.length === 0 && candidateMatches.length === 0) return null
   return (
     <span className="address-raw-transaction-matches">
       {matches.map(match => {
@@ -522,8 +530,26 @@ function RawTransactionMatches({ transaction }: { transaction: AddressRawTransac
         const text = status ? `${label} (${status})` : label
         return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
       })}
+      {candidateMatches.map(match => {
+        const text = match.status ? `${match.label} (${match.status})` : match.label
+        return match.path ? <Link key={match.id} to={match.path}>{text}</Link> : <span key={match.id}>{text}</span>
+      })}
     </span>
   )
+}
+
+function candidateRawTransactionMatches(transaction: AddressRawTransaction, listings: AddressListing[]) {
+  return listings.flatMap(listing => {
+    const candidate = (listing.transactions ?? []).find(item => !isLinkedTransaction(item) && item.transaction_id === transaction.transaction_id)
+    if (!candidate) return []
+    const label = listing.headline || listing.address || [sourceLabel(listing.source), listing.native_id].filter(Boolean).join(' ') || listing.listing_id.slice(0, 8)
+    return [{
+      id: `candidate:${listing.listing_id}:${transaction.transaction_id}`,
+      label,
+      path: sourceEntityPath({ canonicalId: listing.canonical_id, kind: listing.kind }),
+      status: ['candidate', candidate.confidence, formatScore(candidate.score), formatPercent(candidate.price_delta_percent)].filter(Boolean).join(' / '),
+    }]
+  })
 }
 
 function rawTransactionMatchLabel(match: NonNullable<AddressRawTransaction['matches']>[number]) {
