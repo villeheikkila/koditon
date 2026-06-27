@@ -114,7 +114,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
         {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
         {candidate.listing.offering_id && <Link to={`/target/offering/${candidate.listing.offering_id}`}>Canonical offering</Link>}
         {detailPath && <Link to={detailPath}>Source detail</Link>}
-        {candidate.listing.external_url_available && candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Source page</a>}
+        {candidate.listing.external_url_available && candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Live source page</a>}
       </div>
     </article>
   )
