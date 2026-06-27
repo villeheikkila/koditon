@@ -32,7 +32,7 @@ func TestAddRoutesIncludesAddressLookup(t *testing.T) {
 	if !strings.Contains(doc, "address-lookup") {
 		t.Fatal("expected address lookup operation id in OpenAPI document")
 	}
-	for _, want := range []string{"raw_transactions", "linked_to_lookup", "candidate_to_lookup", "is_matched", "matched_listing_count", "source_records", "source_candidates", "candidate_offering_id", "transactions", "link_type", "external_url_available", "reasons_summary", "canonical_id"} {
+	for _, want := range []string{"raw_transactions", "linked_to_lookup", "candidate_to_lookup", "scope", "is_matched", "matched_listing_count", "source_records", "source_candidates", "candidate_offering_id", "transactions", "link_type", "external_url_available", "reasons_summary", "canonical_id"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("expected address lookup OpenAPI schema to include %q", want)
 		}

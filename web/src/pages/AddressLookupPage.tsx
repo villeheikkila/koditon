@@ -504,13 +504,13 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
 }
 
 function rawTransactionStatus(transaction: AddressRawTransaction) {
-  if (transaction.linked_to_lookup) return 'Linked here'
-  if (transaction.candidate_to_lookup) return 'Candidate here'
-  if (transaction.is_matched) return [
+  if (transaction.scope === 'linked_here') return 'Linked here'
+  if (transaction.scope === 'candidate_here') return 'Candidate here'
+  if (transaction.scope === 'matched_elsewhere') return [
     countLabel(transaction.matched_listing_count, 'source link'),
     countLabel(transaction.matched_offering_count, 'offering link'),
   ].filter(Boolean).join(' / ')
-  return 'Unlinked'
+  return 'Postal history'
 }
 
 function countLabel(count: number, label: string) {

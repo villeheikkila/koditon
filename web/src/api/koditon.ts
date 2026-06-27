@@ -196,6 +196,7 @@ export interface AddressRawTransaction {
   is_matched: boolean;
   linked_to_lookup: boolean;
   candidate_to_lookup: boolean;
+  scope: string;
   matched_listing_count: number;
   matched_offering_count: number;
   /** @nullable */

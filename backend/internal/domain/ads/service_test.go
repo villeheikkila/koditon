@@ -387,3 +387,26 @@ func TestCandidateTransactionIDsDeduplicatesLookupCandidates(t *testing.T) {
 		t.Fatalf("expected candidate transaction id %s, got %s", transactionID, ids[0])
 	}
 }
+
+func TestRawTransactionScope(t *testing.T) {
+	cases := []struct {
+		name              string
+		linkedToLookup    bool
+		candidateToLookup bool
+		isMatched         bool
+		want              string
+	}{
+		{name: "linked", linkedToLookup: true, candidateToLookup: true, isMatched: true, want: "linked_here"},
+		{name: "candidate", candidateToLookup: true, isMatched: true, want: "candidate_here"},
+		{name: "matched elsewhere", isMatched: true, want: "matched_elsewhere"},
+		{name: "postal history", want: "postal_history"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := rawTransactionScope(tt.linkedToLookup, tt.candidateToLookup, tt.isMatched)
+			if got != tt.want {
+				t.Fatalf("expected scope %s, got %s", tt.want, got)
+			}
+		})
+	}
+}

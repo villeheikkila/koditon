@@ -220,6 +220,7 @@ type AddressRawTransaction struct {
 	IsMatched            bool                         `json:"is_matched"`
 	LinkedToLookup       bool                         `json:"linked_to_lookup"`
 	CandidateToLookup    bool                         `json:"candidate_to_lookup"`
+	Scope                string                       `json:"scope"`
 	MatchedListingCount  int32                        `json:"matched_listing_count"`
 	MatchedOfferingCount int32                        `json:"matched_offering_count"`
 	Matches              []AddressRawTransactionMatch `json:"matches"`
@@ -831,12 +832,25 @@ func (s *Service) lookupAddressRawTransactions(ctx context.Context, result Addre
 		if err != nil {
 			return nil, fmt.Errorf("decode address raw transaction matches: %w", err)
 		}
-		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, CandidateToLookup: row.CandidateToLookup, MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount, Matches: matches})
+		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, CandidateToLookup: row.CandidateToLookup, Scope: rawTransactionScope(row.LinkedToLookup, row.CandidateToLookup, row.IsMatched), MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount, Matches: matches})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate address raw transactions: %w", err)
 	}
 	return transactions, nil
+}
+
+func rawTransactionScope(linkedToLookup bool, candidateToLookup bool, isMatched bool) string {
+	if linkedToLookup {
+		return "linked_here"
+	}
+	if candidateToLookup {
+		return "candidate_here"
+	}
+	if isMatched {
+		return "matched_elsewhere"
+	}
+	return "postal_history"
 }
 
 func decodeRawTransactionMatches(raw json.RawMessage) ([]AddressRawTransactionMatch, error) {
