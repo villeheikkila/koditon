@@ -25,13 +25,13 @@ export default function MatchesPage() {
             <p>{transaction ? `Transaction ${transaction}` : postal ? `Postal ${postal}` : 'Open a prices review link from address lookup.'}</p>
           </div>
           <div className="address-lookup-stats">
-            <Metric label="Candidates" value={candidates.length} />
+            <Metric label={transaction ? 'Matches' : 'Candidates'} value={candidates.length} />
           </div>
         </header>
         {!transaction && !postal && <div className="search-empty-hint"><strong>No review target</strong><span className="search-empty-sub">Open Review from an address lookup prices row.</span></div>}
         {query.isFetching && !body && <div className="loading-state">Loading prices candidates</div>}
         {query.isError && <div className="error-state">Prices candidates could not be loaded.</div>}
-        {body && candidates.length === 0 && <div className="search-empty-hint"><strong>No candidates found</strong><span className="search-empty-sub">This prices transaction has no saved candidate rows.</span></div>}
+        {body && candidates.length === 0 && <div className="search-empty-hint"><strong>{transaction ? 'No matches found' : 'No candidates found'}</strong><span className="search-empty-sub">{transaction ? 'This prices transaction has no saved candidate or linked source rows.' : 'This postal code has no saved candidate rows.'}</span></div>}
         {candidates.length > 0 && (
           <div className={`matches-list${query.isFetching ? ' matches-list--loading' : ''}`}>
             {candidates.map(candidate => <MatchCard key={candidate.id} candidate={candidate} />)}

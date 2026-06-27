@@ -23,3 +23,19 @@ func TestTransactionMatchCandidatesUseListingLocationFallbacks(t *testing.T) {
 		}
 	}
 }
+
+func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *testing.T) {
+	for _, want := range []string{
+		"review_rows AS",
+		"FROM public.property_offering_transactions pot",
+		"pot.prices_transaction_id = $3::uuid",
+		"sl.prices_transaction_id = $3::uuid",
+	} {
+		if !strings.Contains(transactionMatchCandidatesSQL, want) {
+			t.Fatalf("expected transaction review SQL to include %q", want)
+		}
+	}
+	if !strings.Contains(transactionMatchCandidatesSQL, "WHERE ($3::uuid IS NOT NULL OR latest.status = ANY") {
+		t.Fatal("expected postal review to remain limited to candidate statuses")
+	}
+}
