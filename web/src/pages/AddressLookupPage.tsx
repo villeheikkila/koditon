@@ -134,6 +134,7 @@ function RawTransactionPanel({ transactions, lookup }: { transactions: AddressRa
             <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>
               <div>
                 <strong>{transaction.description || transaction.transaction_id}</strong>
+                <span>{pricesTransactionIdentity(transaction.transaction_id)}</span>
                 <span>{[transaction.category, transaction.type, transaction.period_identifier].filter(Boolean).join(' / ')}</span>
                 {facts && <span>{facts}</span>}
               </div>
@@ -318,6 +319,7 @@ function TransactionTable({ title, transactions, sourceRecords, lookup, variant 
           <div className="address-transaction-row" key={`${transaction.transaction_id}:${transaction.link_type}`}>
             <div>
               <strong>{transaction.description || transaction.transaction_id}</strong>
+              <span>{pricesTransactionIdentity(transaction.transaction_id)}</span>
               <span>{[transaction.category, transaction.type, transaction.period_identifier].filter(Boolean).join(' / ')}</span>
               {facts && <span>{facts}</span>}
             </div>
@@ -409,6 +411,10 @@ function formatScore(value?: number | null) {
 
 function shortID(value: string) {
   return value.slice(0, 8)
+}
+
+function pricesTransactionIdentity(id: string) {
+  return `Prices ${shortID(id)}`
 }
 
 function formatBool(value?: boolean | null) {
