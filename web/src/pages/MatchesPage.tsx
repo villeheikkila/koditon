@@ -52,6 +52,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
           <div className="search-card-badges">
             <span className="address-candidate-badge">{candidate.status}</span>
             <span className="search-badge search-badge--kind">{candidate.confidence}</span>
+            <span className="search-badge search-badge--kind">{candidate.listing.offering_id ? 'Aggregated' : 'Unaggregated'}</span>
           </div>
           <h2>{candidate.listing.headline || candidate.listing.street_address || candidate.listing.canonical_id}</h2>
           <p>{[candidate.listing.street_address, candidate.listing.city, candidate.listing.postal].filter(Boolean).join(' / ')}</p>
