@@ -1174,7 +1174,7 @@ selected_listing_matches AS (
     WHERE ($4::text = 'all' OR sl.sale_listing_source_provider = $4::text)
         AND sl.sale_listing_source_kind = ANY(ARRAY['ad'::text, 'announcement'::text])
         AND trim($3::text) <> ''
-        AND sl.sale_listing_postal = li.postal_norm
+        AND COALESCE(sl.sale_listing_postal_norm, public.fnc__normalize_postal(sl.sale_listing_postal)) = li.postal_norm
         AND (
             sl.sale_listing_address_norm = li.address_norm
             OR translate(sl.sale_listing_address_norm, 'åäö', 'aao') = li.address_ascii_norm
@@ -1233,7 +1233,7 @@ selected_listings AS (
         sl.sale_listing_native_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
         COALESCE(sl.sale_listing_street_address, '') AS address,
-        COALESCE(sl.sale_listing_city, '') AS city,
+        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
         COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
         sl.sale_listing_asking_price,
         sl.sale_listing_debt_free_price,
@@ -1299,7 +1299,7 @@ offering_source_records AS (
         sr.sale_listing_native_id,
         COALESCE(sr.sale_listing_headline, sr.sale_listing_street_address, sr.sale_listing_native_id) AS headline,
         COALESCE(sr.sale_listing_street_address, '') AS address,
-        COALESCE(sr.sale_listing_city, '') AS city,
+        COALESCE(sr.sale_listing_city, sr.sale_listing_city_norm, '') AS city,
         COALESCE(sr.sale_listing_postal, sr.sale_listing_postal_norm, '') AS postal,
         sr.sale_listing_asking_price,
         sr.sale_listing_debt_free_price,
@@ -1567,7 +1567,7 @@ SELECT
     candidate.sale_listing_native_id,
     COALESCE(candidate.sale_listing_headline, candidate.sale_listing_street_address, candidate.sale_listing_native_id) AS headline,
     COALESCE(candidate.sale_listing_street_address, '') AS address,
-    COALESCE(candidate.sale_listing_city, '') AS city,
+    COALESCE(candidate.sale_listing_city, candidate.sale_listing_city_norm, '') AS city,
     COALESCE(candidate.sale_listing_postal, candidate.sale_listing_postal_norm, '') AS postal,
     candidate.sale_listing_asking_price,
     candidate.sale_listing_debt_free_price,
@@ -1670,7 +1670,7 @@ SELECT
                     sl.sale_listing_native_id AS native_id,
                     COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
                     COALESCE(sl.sale_listing_street_address, '') AS address,
-                    COALESCE(sl.sale_listing_city, '') AS city,
+                    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
                     COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
                     COALESCE(sl.sale_listing_prices_match_status, '') AS status,
                     ''::text AS method,
@@ -1686,7 +1686,7 @@ SELECT
                     COALESCE(primary_listing.sale_listing_native_id, '') AS native_id,
                     COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, po.property_offering_identity_key) AS headline,
                     COALESCE(primary_listing.sale_listing_street_address, '') AS address,
-                    COALESCE(primary_listing.sale_listing_city, '') AS city,
+                    COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, '') AS city,
                     COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, '') AS postal,
                     pot.property_offering_transaction_link_status AS status,
                     pot.property_offering_transaction_link_method AS method,
