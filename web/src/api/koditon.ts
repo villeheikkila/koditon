@@ -52,6 +52,168 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
+export interface AddressSourceRecord {
+  address?: string;
+  area?: number;
+  asking_price?: number;
+  canonical_id: string;
+  city?: string;
+  debt_free_price?: number;
+  first_seen_at?: string;
+  headline: string;
+  kind: string;
+  last_seen_at?: string;
+  link_method?: string;
+  link_score?: number;
+  link_status?: string;
+  listing_id: string;
+  native_id: string;
+  postal?: string;
+  previous_asking_price?: number;
+  previous_debt_free_price?: number;
+  room_layout?: string;
+  source: string;
+  texts?: AddressListingTexts;
+  updated_at?: string;
+  url?: string;
+}
+
+export interface AddressListingTexts {
+  additional_info?: string;
+  availability?: string;
+  charges?: string;
+  renovations_done?: string;
+  renovations_planned?: string;
+}
+
+export interface AddressSourceCandidate {
+  address?: string;
+  area?: number;
+  asking_price?: number;
+  candidate_offering_id?: string;
+  canonical_id: string;
+  city?: string;
+  confidence: string;
+  created_at?: string;
+  debt_free_price?: number;
+  direction: string;
+  headline: string;
+  kind: string;
+  listing_id: string;
+  native_id: string;
+  postal?: string;
+  price_delta_percent?: number;
+  reasons?: unknown;
+  room_layout?: string;
+  score: number;
+  selected_offering_id?: string;
+  source: string;
+  status: string;
+  url?: string;
+}
+
+export interface AddressTransactionLink {
+  area?: number;
+  build_year?: number;
+  category?: string;
+  city?: string;
+  condition?: string;
+  confidence?: string;
+  created_at?: string;
+  description: string;
+  elevator?: boolean;
+  energy_class?: string;
+  floor?: string;
+  link_method?: string;
+  link_status?: string;
+  link_type: string;
+  neighborhood?: string;
+  period_identifier?: string;
+  plot?: string;
+  postal?: string;
+  price?: number;
+  price_delta_percent?: number;
+  price_per_square_meter?: number;
+  reasons?: unknown;
+  score?: number;
+  transaction_id: string;
+  type?: string;
+  updated_at?: string;
+}
+
+export interface AddressListing {
+  address: string;
+  area?: number;
+  asking_price?: number;
+  canonical_id: string;
+  city?: string;
+  created_at?: string;
+  debt_free_price?: number;
+  first_seen_at?: string;
+  headline: string;
+  kind: string;
+  last_seen_at?: string;
+  listing_id: string;
+  native_id: string;
+  offering_id?: string;
+  postal?: string;
+  previous_asking_price?: number;
+  previous_debt_free_price?: number;
+  price_match_status?: string;
+  published_at?: string;
+  room_layout?: string;
+  source: string;
+  source_match_status?: string;
+  /** @nullable */
+  source_candidates: AddressSourceCandidate[] | null;
+  texts?: AddressListingTexts;
+  /** @nullable */
+  source_records: AddressSourceRecord[] | null;
+  /** @nullable */
+  transactions: AddressTransactionLink[] | null;
+  updated_at?: string;
+  url?: string;
+}
+
+export interface AddressRawTransaction {
+  area?: number;
+  build_year?: number;
+  category?: string;
+  city?: string;
+  condition?: string;
+  created_at?: string;
+  description: string;
+  elevator?: boolean;
+  energy_class?: string;
+  floor?: string;
+  is_matched: boolean;
+  linked_to_lookup: boolean;
+  matched_listing_count: number;
+  matched_offering_count: number;
+  neighborhood?: string;
+  period_identifier?: string;
+  plot?: string;
+  postal?: string;
+  price?: number;
+  price_per_square_meter?: number;
+  transaction_id: string;
+  type?: string;
+  updated_at?: string;
+}
+
+export interface AddressLookupResult {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  address: string;
+  city?: string;
+  /** @nullable */
+  listings: AddressListing[] | null;
+  postal?: string;
+  /** @nullable */
+  raw_transactions: AddressRawTransaction[] | null;
+  source: string;
+}
+
 export interface AppleWebAuthInputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
@@ -326,6 +488,17 @@ export interface DetailFieldOutput {
   value: string;
 }
 
+export interface RawPayloadOutput {
+  original_bytes: number;
+  pretty: string;
+}
+
+export interface DevWebAuthInputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  email: string;
+}
+
 export interface EmailAuthConfirmInputBody {
   /** A URL to the JSON Schema for this object. */
   readonly $schema?: string;
@@ -372,6 +545,7 @@ export interface EntityDetailOutputBody {
   plot_type?: string;
   postal?: string;
   price_per_m2?: number;
+  raw?: RawPayloadOutput;
   /** @nullable */
   related?: DetailFieldOutput[] | null;
   renovations_done_text?: string;
@@ -709,6 +883,29 @@ export interface WebSessionSignOutOutputBody {
   ok: boolean;
 }
 
+export type AddressLookupParams = {
+/**
+ * Street address to inspect
+ */
+address?: string;
+/**
+ * Optional city / municipality filter
+ */
+city?: string;
+/**
+ * Optional postal code filter
+ */
+postal?: string;
+/**
+ * Source filter: shortcut, frontdoor, or all
+ */
+source?: string;
+/**
+ * Maximum listings to return: default 50, max 100
+ */
+page_size?: number;
+};
+
 export type EntityDetailParams = {
 /**
  * Canonical ID or source URL
@@ -863,6 +1060,132 @@ export type HTTPStatusCode3xx = 300 | 301 | 302 | 303 | 304 | 305 | 307 | 308;
 export type HTTPStatusCode4xx = 400 | 401 | 402 | 403 | 404 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 419 | 420 | 421 | 422 | 423 | 424 | 426 | 428 | 429 | 431 | 451;
 export type HTTPStatusCode5xx = 500 | 501 | 502 | 503 | 504 | 505 | 507 | 511;
 export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatusCode3xx | HTTPStatusCode4xx | HTTPStatusCode5xx;
+
+
+/**
+ * Returns source listings for an address with direct Prices links, canonical offering links, and current match candidates.
+ * @summary Lookup listings and price links by address
+ */
+export type addressLookupResponse200 = {
+  data: AddressLookupResult
+  status: 200
+}
+
+export type addressLookupResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type addressLookupResponseSuccess = (addressLookupResponse200) & {
+  headers: Headers;
+};
+export type addressLookupResponseError = (addressLookupResponseDefault) & {
+  headers: Headers;
+};
+
+export type addressLookupResponse = (addressLookupResponseSuccess | addressLookupResponseError)
+
+export const getAddressLookupUrl = (params?: AddressLookupParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/address-lookup?${stringifiedParams}` : `/api/v1/address-lookup`
+}
+
+export const addressLookup = async (params?: AddressLookupParams, options?: RequestInit): Promise<addressLookupResponse> => {
+
+  return customInstance<addressLookupResponse>(getAddressLookupUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAddressLookupQueryKey = (params?: AddressLookupParams,) => {
+    return [
+    `/api/v1/address-lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAddressLookupQueryOptions = <TData = Awaited<ReturnType<typeof addressLookup>>, TError = ErrorType<ErrorModel>>(params?: AddressLookupParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAddressLookupQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof addressLookup>>> = ({ signal }) => addressLookup(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AddressLookupQueryResult = NonNullable<Awaited<ReturnType<typeof addressLookup>>>
+export type AddressLookupQueryError = ErrorType<ErrorModel>
+
+
+export function useAddressLookup<TData = Awaited<ReturnType<typeof addressLookup>>, TError = ErrorType<ErrorModel>>(
+ params: undefined |  AddressLookupParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof addressLookup>>,
+          TError,
+          Awaited<ReturnType<typeof addressLookup>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAddressLookup<TData = Awaited<ReturnType<typeof addressLookup>>, TError = ErrorType<ErrorModel>>(
+ params?: AddressLookupParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof addressLookup>>,
+          TError,
+          Awaited<ReturnType<typeof addressLookup>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAddressLookup<TData = Awaited<ReturnType<typeof addressLookup>>, TError = ErrorType<ErrorModel>>(
+ params?: AddressLookupParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Lookup listings and price links by address
+ */
+
+export function useAddressLookup<TData = Awaited<ReturnType<typeof addressLookup>>, TError = ErrorType<ErrorModel>>(
+ params?: AddressLookupParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof addressLookup>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAddressLookupQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
 
 
 /**
@@ -3551,6 +3874,97 @@ export const useAuthAppleWeb = <TError = ErrorType<ErrorModel>,
         TContext
       > => {
       return useMutation(getAuthAppleWebMutationOptions(options), queryClient);
+    }
+
+/**
+ * Create a web session for a development-only email identity
+ * @summary Development web sign-in
+ */
+export type authDevWebResponse200 = {
+  data: AuthTokenBody
+  status: 200
+}
+
+export type authDevWebResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type authDevWebResponseSuccess = (authDevWebResponse200) & {
+  headers: Headers;
+};
+export type authDevWebResponseError = (authDevWebResponseDefault) & {
+  headers: Headers;
+};
+
+export type authDevWebResponse = (authDevWebResponseSuccess | authDevWebResponseError)
+
+export const getAuthDevWebUrl = () => {
+
+
+
+
+  return `/auth/dev/web`
+}
+
+export const authDevWeb = async (devWebAuthInputBody: NonReadonly<DevWebAuthInputBody>, options?: RequestInit): Promise<authDevWebResponse> => {
+
+  return customInstance<authDevWebResponse>(getAuthDevWebUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      devWebAuthInputBody,)
+  }
+);}
+
+
+
+
+export const getAuthDevWebMutationOptions = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authDevWeb>>, TError,{data: BodyType<NonReadonly<DevWebAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authDevWeb>>, TError,{data: BodyType<NonReadonly<DevWebAuthInputBody>>}, TContext> => {
+
+const mutationKey = ['authDevWeb'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authDevWeb>>, {data: BodyType<NonReadonly<DevWebAuthInputBody>>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authDevWeb(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthDevWebMutationResult = NonNullable<Awaited<ReturnType<typeof authDevWeb>>>
+    export type AuthDevWebMutationBody = BodyType<NonReadonly<DevWebAuthInputBody>>
+    export type AuthDevWebMutationError = ErrorType<ErrorModel>
+
+    /**
+ * @summary Development web sign-in
+ */
+export const useAuthDevWeb = <TError = ErrorType<ErrorModel>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authDevWeb>>, TError,{data: BodyType<NonReadonly<DevWebAuthInputBody>>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authDevWeb>>,
+        TError,
+        {data: BodyType<NonReadonly<DevWebAuthInputBody>>},
+        TContext
+      > => {
+      return useMutation(getAuthDevWebMutationOptions(options), queryClient);
     }
 
 /**

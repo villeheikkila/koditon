@@ -1876,11 +1876,11 @@ SELECT
     sl.sale_listing_energy_class AS frontdoor_ad_energy_class,
     sl.sale_listing_plot_type_raw AS frontdoor_ad_plot_type,
     sl.sale_listing_elevator AS frontdoor_ad_elevator,
-    (CASE
+    COALESCE(sl.sale_listing_sauna, CASE
         WHEN jsonb_path_exists(COALESCE(fa.frontdoor_ad_data, '{}'::jsonb), '$.residenceDetailsDTO.generalDwellingFeatures[*] ? (@ == "HAS_NO_SAUNA")') THEN false
         WHEN jsonb_path_exists(COALESCE(fa.frontdoor_ad_data, '{}'::jsonb), '$.residenceDetailsDTO.generalDwellingFeatures[*] ? (@ == "HAS_SAUNA")') THEN true
         ELSE NULL
-    END)::boolean AS frontdoor_ad_sauna,
+    END, false)::boolean AS frontdoor_ad_sauna,
     sl.sale_listing_rooms_count AS frontdoor_ad_rooms_count,
     fa.frontdoor_ad_data
 FROM public.frontdoor_ads fa

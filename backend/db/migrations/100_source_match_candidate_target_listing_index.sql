@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_property_offering_source_match_candidates_target_listing_score
+ON public.property_offering_source_match_candidates (target_sale_listing_id, property_offering_source_match_score DESC);

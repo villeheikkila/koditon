@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Nav from '../components/Nav'
 import { usePropertyTargetsMap, type PropertyTargetMapMarkersItem, type PropertyTargetsMapParams } from '../api/koditon'
+import { buildAddressLookupPath } from '../lib/address-lookup'
 
 type TargetTypeFilter = 'all' | PropertyTargetMapMarkersItem['target_type']
 
@@ -76,8 +77,8 @@ export default function MapPage() {
   const searchQuery = usePropertyTargetsMap(searchParams, { query: { enabled: hasSearch, placeholderData: previous => previous, staleTime: 30_000 } })
   const viewportBody = viewportQuery.data?.data as { markers?: MapMarker[] | null } | undefined
   const searchBody = searchQuery.data?.data as { markers?: MapMarker[] | null } | undefined
-  const viewportMarkers = viewportBody?.markers ?? []
-  const searchMarkers = searchBody?.markers ?? []
+  const viewportMarkers = useMemo(() => viewportBody?.markers ?? [], [viewportBody?.markers])
+  const searchMarkers = useMemo(() => searchBody?.markers ?? [], [searchBody?.markers])
   const markers = targetFilter === 'all' ? viewportMarkers : viewportMarkers.filter(marker => marker.target_type === targetFilter)
   const searchResults = targetFilter === 'all' ? searchMarkers : searchMarkers.filter(marker => marker.target_type === targetFilter)
   const stats = useMemo(() => markerStats(viewportMarkers), [viewportMarkers])
@@ -263,6 +264,7 @@ function MapSelection({ marker, count }: { marker?: MapMarker; count: number }) 
       </section>
     )
   }
+  const lookupPath = buildAddressLookupPath(marker)
   return (
     <section className="canonical-map-detail">
       <div className="canonical-map-detail-head">
@@ -271,7 +273,10 @@ function MapSelection({ marker, count }: { marker?: MapMarker; count: number }) 
           <h2>{markerTitle(marker)}</h2>
           <p>{formatLocation(marker)}</p>
         </div>
-        <Link to={targetPath(marker)}>Open</Link>
+        <div className="canonical-map-detail-actions">
+          <Link to={targetPath(marker)}>Open</Link>
+          {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
+        </div>
       </div>
       <div className="canonical-map-role">
         <span>Map role</span>
@@ -302,7 +307,9 @@ function markerPopup(marker: MapMarker) {
   const location = escapeHTML(formatLocation(marker))
   const type = escapeHTML(labelTarget(marker.target_type))
   const url = targetPath(marker)
-  return `<div class="canonical-popup"><small>${type}</small><strong>${title}</strong><span>${location}</span><a href="${url}">Open target</a></div>`
+  const lookupURL = buildAddressLookupPath(marker)
+  const lookupLink = lookupURL ? `<a href="${lookupURL}">Address lookup</a>` : ''
+  return `<div class="canonical-popup"><small>${type}</small><strong>${title}</strong><span>${location}</span><a href="${url}">Open target</a>${lookupLink}</div>`
 }
 
 function clusterMapMarkers(map: maplibregl.Map, markers: MapMarker[]) {

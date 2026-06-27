@@ -1,24 +1,36 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { entityDetail } from '../api/koditon'
+import { buildAddressLookupPath, looksLikeEntityInput } from '../lib/address-lookup'
 
 export default function HomePage() {
   const [input, setInput] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  function handleSearch(e: React.FormEvent) {
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed) return
-    const id = encodeURIComponent(trimmed)
-    if (trimmed.split(':')[1] === 'housing-company') {
-      navigate(`/housing-company/${id}`)
+    setError('')
+    if (!looksLikeEntityInput(trimmed)) {
+      navigate(buildAddressLookupPath({ address: trimmed }))
       return
     }
-    if (trimmed.startsWith('r_')) {
-      navigate(`/rental/${id}`)
-      return
+    setLoading(true)
+    try {
+      const response = await entityDetail({ id: trimmed })
+      if (response.status === 200 && response.data.street_address) {
+        navigate(buildAddressLookupPath({ address: response.data.street_address, city: response.data.city, postal: response.data.postal }))
+        return
+      }
+      setError('No address found for that listing.')
+    } catch {
+      setError('Could not resolve that listing. Try a street address instead.')
+    } finally {
+      setLoading(false)
     }
-    navigate(`/listing/${id}`)
   }
 
   return (
@@ -28,22 +40,23 @@ export default function HomePage() {
           <span className="header-logo-dot" style={{ width: 10, height: 10 }} />
           Koditon
         </div>
-        <p className="home-desc">Look up Finnish real estate listing and housing company details by ID or source URL.</p>
+        <p className="home-desc">Look up an address, listing URL, or source canonical ID.</p>
         <form className="home-search-form" onSubmit={handleSearch}>
           <input
             className="filter-input home-search-input"
             type="text"
-            placeholder="l_abc123...  or  https://..."
+            placeholder="Askvägen 4, 22100 Maarianhamina"
             value={input}
             onChange={e => setInput(e.target.value)}
             autoFocus
           />
-          <button className="passkey-btn home-search-btn" type="submit" disabled={!input.trim()}>
-            Look up
+          <button className="passkey-btn home-search-btn" type="submit" disabled={!input.trim() || loading}>
+            {loading ? 'Resolving' : 'Look up'}
           </button>
         </form>
+        {error && <p className="home-error">{error}</p>}
         <p className="home-hint">
-          Examples: <code>l_abc123...</code>, <code>housing-company:...</code>
+          Examples: <code>Askvägen 4</code>, <code>frontdoor:ad:21531967</code>, <code>https://...</code>
         </p>
       </div>
     </div>

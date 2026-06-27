@@ -4,7 +4,9 @@ import { consumeReturnPath, hasAccessToken, restoreSession, signOutSession } fro
 import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import DetailPage from './pages/DetailPage'
+import SourceEntityPage from './pages/SourceEntityPage'
 import SearchPage from './pages/SearchPage'
+import AddressLookupPage from './pages/AddressLookupPage'
 import MapPage from './pages/MapPage'
 import MatchesPage from './pages/MatchesPage'
 import OAuthAuthorizePage from './pages/OAuthAuthorizePage'
@@ -51,17 +53,18 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/target/:targetType/:id" element={<DetailPage />} />
-        <Route path="/listing/:id" element={<DetailPage kind="listing" />} />
-        <Route path="/rental/:id" element={<DetailPage kind="rental" />} />
-        <Route path="/housing-company/:id" element={<DetailPage kind="housingCompany" />} />
+        <Route path="/listing/:id" element={<SourceEntityPage kind="listing" />} />
+        <Route path="/rental/:id" element={<SourceEntityPage kind="rental" />} />
+        <Route path="/housing-company/:id" element={<SourceEntityPage kind="housingCompany" />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/address" element={<AddressLookupPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/prices" element={authenticated ? <DashboardPage onSignOut={handleSignOut} /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/matches" element={authenticated ? <MatchesPage /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
         <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />
 
-        <Route path="/" element={<Navigate to="/search" replace />} />
+        <Route path="/" element={<Navigate to="/address" replace />} />
 
         {/* Catch-all: redirect to root */}
         <Route path="*" element={<Navigate to="/" replace />} />

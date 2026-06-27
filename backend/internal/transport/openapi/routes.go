@@ -68,6 +68,12 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Search ads and housing companies by free text, address, city, postal code, price, and area"
 		op.Tags = []string{"Entity"}
 	})
+	huma.Get(api, "/api/v1/address-lookup", a.addressLookupHandler, func(op *huma.Operation) {
+		op.OperationID = "address-lookup"
+		op.Summary = "Lookup listings and price links by address"
+		op.Description = "Returns source listings for an address with direct Prices links, canonical offering links, and current match candidates."
+		op.Tags = []string{"Entity"}
+	})
 	huma.Get(api, "/api/v1/property-targets/map", a.propertyTargetsMapHandler, func(op *huma.Operation) {
 		op.OperationID = "property-targets-map"
 		op.Summary = "Map canonical property targets"

@@ -13,6 +13,12 @@ export default function Nav({ actions }: NavProps) {
       </div>
       <nav className="nav-links">
         <NavLink
+          to="/address"
+          className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+        >
+          Address
+        </NavLink>
+        <NavLink
           to="/search"
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
         >

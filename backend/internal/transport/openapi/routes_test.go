@@ -1,8 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
@@ -12,4 +15,58 @@ func TestAddRoutesBuildsSchemas(t *testing.T) {
 	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
 	a := API{logger: slog.Default()}
 	a.AddRoutes(api)
+}
+
+func TestAddRoutesIncludesAddressLookup(t *testing.T) {
+	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	data, err := json.Marshal(api.OpenAPI())
+	if err != nil {
+		t.Fatalf("marshal openapi: %v", err)
+	}
+	doc := string(data)
+	if !strings.Contains(doc, "/api/v1/address-lookup") {
+		t.Fatal("expected address lookup path in OpenAPI document")
+	}
+	if !strings.Contains(doc, "address-lookup") {
+		t.Fatal("expected address lookup operation id in OpenAPI document")
+	}
+	for _, want := range []string{"raw_transactions", "linked_to_lookup", "is_matched", "matched_listing_count", "source_records", "source_candidates", "candidate_offering_id", "transactions", "link_type"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected address lookup OpenAPI schema to include %q", want)
+		}
+	}
+}
+
+func TestAddRoutesIncludesEntityRawPayload(t *testing.T) {
+	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	data, err := json.Marshal(api.OpenAPI())
+	if err != nil {
+		t.Fatalf("marshal openapi: %v", err)
+	}
+	doc := string(data)
+	for _, want := range []string{"/api/v1/entity", "raw", "pretty", "original_bytes"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected entity OpenAPI schema to include %q", want)
+		}
+	}
+}
+
+func TestAddressLookupRequiresAddress(t *testing.T) {
+	mux := http.NewServeMux()
+	api := humago.New(mux, NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/address-lookup", nil)
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "address is required") {
+		t.Fatalf("expected address validation error, got %s", rec.Body.String())
+	}
 }

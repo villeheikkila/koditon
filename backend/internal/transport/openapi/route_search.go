@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -47,6 +48,18 @@ type searchOutput struct {
 		Page     int32             `json:"page"`
 		PageSize int32             `json:"page_size"`
 	}
+}
+
+type addressLookupInput struct {
+	Address  string `query:"address"   doc:"Street address to inspect"`
+	City     string `query:"city"      doc:"Optional city / municipality filter"`
+	Postal   string `query:"postal"    doc:"Optional postal code filter"`
+	Source   string `query:"source"    doc:"Source filter: shortcut, frontdoor, or all"`
+	PageSize int32  `query:"page_size" doc:"Maximum listings to return: default 50, max 100"`
+}
+
+type addressLookupOutput struct {
+	Body ads.AddressLookupResult
 }
 
 func (a *API) searchHandler(ctx context.Context, input *searchInput) (*searchOutput, error) {
@@ -107,4 +120,17 @@ func (a *API) searchHandler(ctx context.Context, input *searchInput) (*searchOut
 	out.Body.Page = result.Page
 	out.Body.PageSize = result.PageSize
 	return out, nil
+}
+
+func (a *API) addressLookupHandler(ctx context.Context, input *addressLookupInput) (*addressLookupOutput, error) {
+	logger := logging.With(a.logger, logging.Op("api.address_lookup"))
+	if strings.TrimSpace(input.Address) == "" {
+		return nil, huma.Error400BadRequest("address is required")
+	}
+	result, err := a.adsService.LookupAddress(ctx, ads.AddressLookupParams{Address: input.Address, City: input.City, Postal: input.Postal, Source: input.Source, PageSize: input.PageSize})
+	if err != nil {
+		logger.ErrorContext(ctx, "address lookup failed", "address", input.Address, "city", input.City, "postal", input.Postal, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("address lookup failed")
+	}
+	return &addressLookupOutput{Body: result}, nil
 }

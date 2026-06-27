@@ -19,6 +19,11 @@ type detailFieldOutput struct {
 	Value string `json:"value"`
 }
 
+type rawPayloadOutput struct {
+	Pretty        string `json:"pretty"`
+	OriginalBytes int    `json:"original_bytes"`
+}
+
 type entityDetailOutput struct {
 	Body struct {
 		// Canonical
@@ -71,6 +76,7 @@ type entityDetailOutput struct {
 		CanonicalExtra []detailFieldOutput `json:"canonical_extra,omitempty"`
 		SourceSpecific []detailFieldOutput `json:"source_specific,omitempty"`
 		Related        []detailFieldOutput `json:"related,omitempty"`
+		Raw            *rawPayloadOutput   `json:"raw,omitempty"`
 	}
 }
 
@@ -139,6 +145,9 @@ func (a *API) entityDetailHandler(ctx context.Context, input *entityDetailInput)
 	b.CanonicalExtra = toDetailFields(detail.CanonicalExtra)
 	b.SourceSpecific = toDetailFields(detail.SourceSpecific)
 	b.Related = toDetailFields(detail.Related)
+	if detail.Raw.Pretty != "" || detail.Raw.OriginalBytes > 0 {
+		b.Raw = &rawPayloadOutput{Pretty: detail.Raw.Pretty, OriginalBytes: detail.Raw.OriginalBytes}
+	}
 
 	return out, nil
 }

@@ -12,6 +12,7 @@ import {
   type SourceClaim,
   type TargetOverview,
 } from '../api/koditon'
+import { addressLookupPathFromOverviewFields } from '../lib/address-lookup'
 
 type DetailKind = 'listing' | 'rental' | 'housingCompany'
 
@@ -30,7 +31,7 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
   const claimsBody = claimsQuery.data?.data as { claims?: SourceClaim[] } | undefined
   const claims = claimsBody?.claims ?? []
   const values = detail?.resolved_values ?? []
-  const renovations = detail?.renovation_events ?? []
+  const renovations = useMemo(() => detail?.renovation_events ?? [], [detail?.renovation_events])
   const documents = detail?.documents ?? []
   const [selectedRenovationID, setSelectedRenovationID] = useState<string>('')
   const selectedRenovation = useMemo(() => renovations.find(item => item.id === selectedRenovationID) ?? renovations[0], [renovations, selectedRenovationID])
@@ -88,6 +89,7 @@ function Overview({ overview, fallbackID }: { overview?: TargetOverview; fallbac
   }
   const fields = (overview.fields ?? []).filter(field => field.value)
   const related = overview.related ?? []
+  const lookupPath = addressLookupPathFromOverviewFields(fields)
   return (
     <Panel title="Overview">
       <div className="target-overview">
@@ -96,6 +98,7 @@ function Overview({ overview, fallbackID }: { overview?: TargetOverview; fallbac
             <h2>{overview.title || fallbackID}</h2>
             {overview.subtitle && <p>{overview.subtitle}</p>}
           </div>
+          {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
         </div>
         {fields.length > 0 && (
           <div className="target-overview-fields">

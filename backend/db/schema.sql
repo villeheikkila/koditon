@@ -837,6 +837,7 @@ create table public.property_offering_source_match_candidates (
 
 CREATE INDEX idx_property_offering_source_match_candidates_run_status ON public.property_offering_source_match_candidates USING btree (property_offering_source_match_run_id, property_offering_source_match_status);
 CREATE INDEX idx_property_offering_source_match_candidates_source_score ON public.property_offering_source_match_candidates USING btree (source_sale_listing_id, property_offering_source_match_score DESC);
+CREATE INDEX idx_property_offering_source_match_candidates_target_listing_sc ON public.property_offering_source_match_candidates USING btree (target_sale_listing_id, property_offering_source_match_score DESC);
 CREATE INDEX idx_property_offering_source_match_candidates_target_score ON public.property_offering_source_match_candidates USING btree (target_property_offering_id, property_offering_source_match_score DESC);
 
 create table public.property_offering_source_match_runs (
@@ -1109,6 +1110,7 @@ create table public.property_source_offerings (
   constraint sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
 );
 
+CREATE INDEX idx_property_source_offerings_street_name_number_ascii ON public.property_source_offerings USING btree (translate(sale_listing_street_name_norm, 'åäö'::text, 'aao'::text), sale_listing_street_number_norm, sale_listing_last_seen_at DESC);
 CREATE INDEX idx_sale_listings_area ON public.property_source_offerings USING btree (sale_listing_area_value);
 CREATE INDEX idx_sale_listings_build_year ON public.property_source_offerings USING btree (sale_listing_build_year);
 CREATE INDEX idx_sale_listings_building_match_key ON public.property_source_offerings USING btree (sale_listing_building_match_key);
