@@ -124,10 +124,10 @@ function RawTransactionPanel({ transactions, listings, lookup }: { transactions:
       <header>
         <div>
           <h2>Prices history</h2>
-          <span>{linkedHere} linked here / {candidateHere} candidates here / {matchedElsewhere} matched elsewhere / {unlinked} unlinked</span>
+          <span>{linkedHere} linked here / {candidateHere} candidates here / {matchedElsewhere} matched elsewhere / {unlinked} postal history</span>
         </div>
       </header>
-      {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
+      {transactions.length === 0 && <div className="address-raw-transaction-empty">No linked, candidate, or postal prices history found for this lookup.</div>}
       <div className="address-raw-transaction-list">
         {transactions.map(transaction => {
           const facts = priceTransactionFacts(transaction)
