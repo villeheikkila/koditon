@@ -193,29 +193,45 @@ type AddressTransactionLink struct {
 }
 
 type AddressRawTransaction struct {
-	TransactionID        string     `json:"transaction_id"`
-	Description          string     `json:"description"`
-	Type                 string     `json:"type,omitempty"`
-	Category             string     `json:"category,omitempty"`
-	Area                 *float64   `json:"area,omitempty"`
-	Price                *int64     `json:"price,omitempty"`
-	PricePerSquareMeter  *int64     `json:"price_per_square_meter,omitempty"`
-	BuildYear            *int32     `json:"build_year,omitempty"`
-	Floor                string     `json:"floor,omitempty"`
-	Elevator             *bool      `json:"elevator,omitempty"`
-	Condition            string     `json:"condition,omitempty"`
-	Plot                 string     `json:"plot,omitempty"`
-	EnergyClass          string     `json:"energy_class,omitempty"`
-	PeriodIdentifier     string     `json:"period_identifier,omitempty"`
-	City                 string     `json:"city,omitempty"`
-	Neighborhood         string     `json:"neighborhood,omitempty"`
-	Postal               string     `json:"postal,omitempty"`
-	CreatedAt            *time.Time `json:"created_at,omitempty"`
-	UpdatedAt            *time.Time `json:"updated_at,omitempty"`
-	IsMatched            bool       `json:"is_matched"`
-	LinkedToLookup       bool       `json:"linked_to_lookup"`
-	MatchedListingCount  int32      `json:"matched_listing_count"`
-	MatchedOfferingCount int32      `json:"matched_offering_count"`
+	TransactionID        string                       `json:"transaction_id"`
+	Description          string                       `json:"description"`
+	Type                 string                       `json:"type,omitempty"`
+	Category             string                       `json:"category,omitempty"`
+	Area                 *float64                     `json:"area,omitempty"`
+	Price                *int64                       `json:"price,omitempty"`
+	PricePerSquareMeter  *int64                       `json:"price_per_square_meter,omitempty"`
+	BuildYear            *int32                       `json:"build_year,omitempty"`
+	Floor                string                       `json:"floor,omitempty"`
+	Elevator             *bool                        `json:"elevator,omitempty"`
+	Condition            string                       `json:"condition,omitempty"`
+	Plot                 string                       `json:"plot,omitempty"`
+	EnergyClass          string                       `json:"energy_class,omitempty"`
+	PeriodIdentifier     string                       `json:"period_identifier,omitempty"`
+	City                 string                       `json:"city,omitempty"`
+	Neighborhood         string                       `json:"neighborhood,omitempty"`
+	Postal               string                       `json:"postal,omitempty"`
+	CreatedAt            *time.Time                   `json:"created_at,omitempty"`
+	UpdatedAt            *time.Time                   `json:"updated_at,omitempty"`
+	IsMatched            bool                         `json:"is_matched"`
+	LinkedToLookup       bool                         `json:"linked_to_lookup"`
+	MatchedListingCount  int32                        `json:"matched_listing_count"`
+	MatchedOfferingCount int32                        `json:"matched_offering_count"`
+	Matches              []AddressRawTransactionMatch `json:"matches"`
+}
+
+type AddressRawTransactionMatch struct {
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	CanonicalID string `json:"canonical_id,omitempty"`
+	Source      string `json:"source,omitempty"`
+	NativeID    string `json:"native_id,omitempty"`
+	Headline    string `json:"headline,omitempty"`
+	Address     string `json:"address,omitempty"`
+	City        string `json:"city,omitempty"`
+	Postal      string `json:"postal,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Method      string `json:"method,omitempty"`
+	Score       *int32 `json:"score,omitempty"`
 }
 
 type ReportPage struct {
@@ -649,6 +665,7 @@ type addressRawTransactionRow struct {
 	LinkedToLookup       bool
 	MatchedListingCount  int32
 	MatchedOfferingCount int32
+	Matches              json.RawMessage
 }
 
 type addressSourceCandidateRow struct {
@@ -795,15 +812,33 @@ func (s *Service) lookupAddressRawTransactions(ctx context.Context, result Addre
 	transactions := []AddressRawTransaction{}
 	for rows.Next() {
 		var row addressRawTransactionRow
-		if err := rows.Scan(&row.TransactionID, &row.Description, &row.Type, &row.Category, &row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear, &row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass, &row.PeriodIdentifier, &row.City, &row.Neighborhood, &row.Postal, &row.CreatedAt, &row.UpdatedAt, &row.IsMatched, &row.LinkedToLookup, &row.MatchedListingCount, &row.MatchedOfferingCount); err != nil {
+		if err := rows.Scan(&row.TransactionID, &row.Description, &row.Type, &row.Category, &row.Area, &row.Price, &row.PricePerSquareMeter, &row.BuildYear, &row.Floor, &row.Elevator, &row.Condition, &row.Plot, &row.EnergyClass, &row.PeriodIdentifier, &row.City, &row.Neighborhood, &row.Postal, &row.CreatedAt, &row.UpdatedAt, &row.IsMatched, &row.LinkedToLookup, &row.MatchedListingCount, &row.MatchedOfferingCount, &row.Matches); err != nil {
 			return nil, fmt.Errorf("scan address raw transaction: %w", err)
 		}
-		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount})
+		matches, err := decodeRawTransactionMatches(row.Matches)
+		if err != nil {
+			return nil, fmt.Errorf("decode address raw transaction matches: %w", err)
+		}
+		transactions = append(transactions, AddressRawTransaction{TransactionID: row.TransactionID.String(), Description: row.Description, Type: row.Type, Category: row.Category, Area: row.Area, Price: row.Price, PricePerSquareMeter: row.PricePerSquareMeter, BuildYear: row.BuildYear, Floor: row.Floor, Elevator: row.Elevator, Condition: row.Condition, Plot: row.Plot, EnergyClass: row.EnergyClass, PeriodIdentifier: row.PeriodIdentifier, City: row.City, Neighborhood: row.Neighborhood, Postal: row.Postal, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, IsMatched: row.IsMatched, LinkedToLookup: row.LinkedToLookup, MatchedListingCount: row.MatchedListingCount, MatchedOfferingCount: row.MatchedOfferingCount, Matches: matches})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate address raw transactions: %w", err)
 	}
 	return transactions, nil
+}
+
+func decodeRawTransactionMatches(raw json.RawMessage) ([]AddressRawTransactionMatch, error) {
+	if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return []AddressRawTransactionMatch{}, nil
+	}
+	var matches []AddressRawTransactionMatch
+	if err := json.Unmarshal(raw, &matches); err != nil {
+		return nil, err
+	}
+	if matches == nil {
+		return []AddressRawTransactionMatch{}, nil
+	}
+	return matches, nil
 }
 
 func rawTransactionLocation(result AddressLookupResult) (string, string) {
@@ -1309,7 +1344,66 @@ SELECT
         FROM public.property_offering_transactions pot
         WHERE pot.prices_transaction_id = pt.prices_transaction_id
             AND pot.property_offering_transaction_link_status <> 'rejected'
-    ) AS matched_offering_count
+    ) AS matched_offering_count,
+    COALESCE(
+        (
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'type', match_type,
+                    'id', id,
+                    'canonical_id', canonical_id,
+                    'source', source,
+                    'native_id', native_id,
+                    'headline', headline,
+                    'address', address,
+                    'city', city,
+                    'postal', postal,
+                    'status', status,
+                    'method', method,
+                    'score', score
+                )
+                ORDER BY match_type, headline, id
+            )
+            FROM (
+                SELECT
+                    'listing'::text AS match_type,
+                    sl.sale_listing_id::text AS id,
+                    sl.sale_listing_canonical_id AS canonical_id,
+                    sl.sale_listing_source_provider AS source,
+                    sl.sale_listing_native_id AS native_id,
+                    COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
+                    COALESCE(sl.sale_listing_street_address, '') AS address,
+                    COALESCE(sl.sale_listing_city, '') AS city,
+                    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
+                    COALESCE(sl.sale_listing_prices_match_status, '') AS status,
+                    ''::text AS method,
+                    NULL::integer AS score
+                FROM public.property_source_offerings sl
+                WHERE sl.prices_transaction_id = pt.prices_transaction_id
+                UNION ALL
+                SELECT
+                    'offering'::text AS match_type,
+                    po.property_offering_id::text AS id,
+                    COALESCE(primary_listing.sale_listing_canonical_id, '') AS canonical_id,
+                    COALESCE(primary_listing.sale_listing_source_provider, '') AS source,
+                    COALESCE(primary_listing.sale_listing_native_id, '') AS native_id,
+                    COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, po.property_offering_identity_key) AS headline,
+                    COALESCE(primary_listing.sale_listing_street_address, '') AS address,
+                    COALESCE(primary_listing.sale_listing_city, '') AS city,
+                    COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, '') AS postal,
+                    pot.property_offering_transaction_link_status AS status,
+                    pot.property_offering_transaction_link_method AS method,
+                    pot.property_offering_transaction_link_score AS score
+                FROM public.property_offering_transactions pot
+                JOIN public.property_offerings po ON po.property_offering_id = pot.property_offering_id
+                LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+                WHERE pot.prices_transaction_id = pt.prices_transaction_id
+                    AND pot.property_offering_transaction_link_status <> 'rejected'
+                LIMIT 8
+            ) match
+        ),
+        '[]'::jsonb
+    ) AS matches
 FROM public.prices_transactions pt
 JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id

@@ -71,7 +71,7 @@ func addRoutes(a *API, api huma.API) {
 	huma.Get(api, "/api/v1/address-lookup", a.addressLookupHandler, func(op *huma.Operation) {
 		op.OperationID = "address-lookup"
 		op.Summary = "Lookup listings and price links by address"
-		op.Description = "Returns source listings for an address with direct Prices links, canonical offering links, and current match candidates."
+		op.Description = "Returns source listings for an address with direct prices links, canonical offering links, and current match candidates."
 		op.Tags = []string{"Entity"}
 	})
 	huma.Get(api, "/api/v1/property-targets/map", a.propertyTargetsMapHandler, func(op *huma.Operation) {

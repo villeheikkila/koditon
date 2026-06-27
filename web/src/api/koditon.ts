@@ -190,6 +190,8 @@ export interface AddressRawTransaction {
   linked_to_lookup: boolean;
   matched_listing_count: number;
   matched_offering_count: number;
+  /** @nullable */
+  matches: AddressRawTransactionMatch[] | null;
   neighborhood?: string;
   period_identifier?: string;
   plot?: string;
@@ -199,6 +201,21 @@ export interface AddressRawTransaction {
   transaction_id: string;
   type?: string;
   updated_at?: string;
+}
+
+export interface AddressRawTransactionMatch {
+  address?: string;
+  canonical_id?: string;
+  city?: string;
+  headline?: string;
+  id: string;
+  method?: string;
+  native_id?: string;
+  postal?: string;
+  score?: number;
+  source?: string;
+  status?: string;
+  type: string;
 }
 
 export interface AddressLookupResult {
@@ -1063,7 +1080,7 @@ export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatus
 
 
 /**
- * Returns source listings for an address with direct Prices links, canonical offering links, and current match candidates.
+ * Returns source listings for an address with direct prices links, canonical offering links, and current match candidates.
  * @summary Lookup listings and price links by address
  */
 export type addressLookupResponse200 = {

@@ -35,7 +35,7 @@ export default function AddressLookupPage() {
           <header className="address-lookup-header">
             <div>
               <h1>Address lookup</h1>
-              <p>{body ? [body.address, body.city, body.postal].filter(Boolean).join(' / ') : 'Search source listings and connected Prices transactions.'}</p>
+              <p>{body ? [body.address, body.city, body.postal].filter(Boolean).join(' / ') : 'Search source listings and connected prices transactions.'}</p>
             </div>
             {body && (
               <div className="address-lookup-stats">
@@ -48,7 +48,7 @@ export default function AddressLookupPage() {
               </div>
             )}
           </header>
-          {!lookupParams?.address && <EmptyState title="Enter an address" text="Use the filters to check Shortcut and Frontdoor source listings, then inspect existing Prices links." />}
+          {!lookupParams?.address && <EmptyState title="Enter an address" text="Use the filters to check Shortcut and Frontdoor source listings, then inspect existing prices links." />}
           {lookup.isError && <div className="error-state">Address lookup failed.</div>}
           {lookup.isFetching && !body && <div className="loading-state">Loading address data</div>}
           {body && listings.length === 0 && <EmptyState title="No listings found" text="Try the street address without apartment letters, or add city and postal filters." />}
@@ -132,6 +132,7 @@ function RawTransactionPanel({ transactions }: { transactions: AddressRawTransac
             <div>
               <strong>{rawTransactionStatus(transaction)}</strong>
               <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
+              {rawTransactionMatches(transaction).length > 0 && <span>{rawTransactionMatches(transaction).join(' / ')}</span>}
             </div>
             <Link className="address-transaction-review" to={transactionMatchURL(transaction)}>Review</Link>
           </div>
@@ -185,9 +186,9 @@ function ListingCard({ listing }: { listing: AddressListing }) {
         {sourcePath && <Link to={sourcePath}>Source detail</Link>}
         {listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Source page</a>}
       </div>
-      {linkedTransactions.length > 0 && <TransactionTable title="Connected Prices" transactions={linkedTransactions} sourceRecords={transactionSources} />}
-      {candidateTransactions.length > 0 && <TransactionTable title="Candidate Prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} variant="candidate" />}
-      {transactions.length === 0 && <div className="address-no-transaction">No connected Prices transaction or saved match candidate for this listing.</div>}
+      {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} />}
+      {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} variant="candidate" />}
+      {transactions.length === 0 && <div className="address-no-transaction">No connected prices transaction or saved match candidate for this listing.</div>}
     </article>
   )
 }
@@ -445,6 +446,15 @@ function rawTransactionStatus(transaction: AddressRawTransaction) {
   if (transaction.linked_to_lookup) return 'Linked here'
   if (transaction.is_matched) return `${transaction.matched_listing_count + transaction.matched_offering_count} existing links`
   return 'Unlinked'
+}
+
+function rawTransactionMatches(transaction: AddressRawTransaction) {
+  return (transaction.matches ?? []).slice(0, 3).map(match => {
+    const target = [sourceLabel(match.source), match.native_id].filter(Boolean).join(' ')
+    const label = match.headline || match.address || target || match.id.slice(0, 8)
+    const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
+    return status ? `${label} (${status})` : label
+  })
 }
 
 function transactionEvidence(transaction: AddressTransactionLink, sourceRecords: Map<string, AddressSourceRecord>) {

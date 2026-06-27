@@ -1,6 +1,7 @@
 package ads
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -53,6 +54,28 @@ func TestNormalizeAddressLookupInputParsesPastedAddress(t *testing.T) {
 	}
 	if postal != "22100" {
 		t.Fatalf("expected postal 22100, got %s", postal)
+	}
+}
+
+func TestDecodeRawTransactionMatches(t *testing.T) {
+	score := int32(128)
+	matches, err := decodeRawTransactionMatches(json.RawMessage(`[{"type":"listing","id":"11111111-1111-1111-1111-111111111111","canonical_id":"frontdoor:ad:1","source":"frontdoor","native_id":"1","headline":"Askvägen 4","status":"auto_linked","score":128}]`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	match := matches[0]
+	if match.Type != "listing" || match.CanonicalID != "frontdoor:ad:1" || match.Score == nil || *match.Score != score {
+		t.Fatalf("unexpected match: %+v", match)
+	}
+	empty, err := decodeRawTransactionMatches(json.RawMessage(`null`))
+	if err != nil {
+		t.Fatalf("unexpected null error: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("expected empty matches, got %d", len(empty))
 	}
 }
 
