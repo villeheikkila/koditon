@@ -368,6 +368,8 @@ type TransactionMatchPostalSummary struct {
 type TransactionMatchCandidate struct {
 	ID                string                           `json:"id"`
 	Status            string                           `json:"status"`
+	LinkType          string                           `json:"link_type"`
+	LinkMethod        string                           `json:"link_method,omitempty"`
 	Score             int32                            `json:"score"`
 	Confidence        string                           `json:"confidence"`
 	PriceDeltaPercent *float64                         `json:"price_delta_percent,omitempty"`

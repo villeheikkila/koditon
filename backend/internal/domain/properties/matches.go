@@ -58,6 +58,8 @@ review_rows AS (
     SELECT
         c.sale_listing_prices_transaction_match_candidate_id::text AS id,
         c.sale_listing_prices_transaction_match_status AS status,
+        'candidate'::text AS link_type,
+        'match_candidate'::text AS link_method,
         c.sale_listing_prices_transaction_match_score AS score,
         c.sale_listing_prices_transaction_match_confidence AS confidence,
         c.sale_listing_prices_transaction_match_price_delta_percent AS price_delta_percent,
@@ -70,6 +72,8 @@ review_rows AS (
     SELECT
         pot.property_offering_transaction_id::text,
         pot.property_offering_transaction_link_status,
+        'offering'::text,
+        pot.property_offering_transaction_link_method,
         pot.property_offering_transaction_link_score,
         ''::text,
         NULL::double precision,
@@ -93,6 +97,8 @@ review_rows AS (
     SELECT
         sl.sale_listing_id::text || ':' || sl.prices_transaction_id::text,
         COALESCE(NULLIF(sl.sale_listing_prices_match_status, ''), 'linked'),
+        'direct'::text,
+        'source_listing'::text,
         0::integer,
         ''::text,
         NULL::double precision,
@@ -121,6 +127,8 @@ review_rows AS (
 SELECT
     latest.id,
     latest.status,
+    latest.link_type,
+    latest.link_method,
     latest.score::int4,
     latest.confidence,
     latest.price_delta_percent,
@@ -247,6 +255,8 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 		if err := rows.Scan(
 			&item.ID,
 			&item.Status,
+			&item.LinkType,
+			&item.LinkMethod,
 			&item.Score,
 			&item.Confidence,
 			&priceDelta,

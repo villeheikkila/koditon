@@ -27,6 +27,10 @@ func TestTransactionMatchCandidatesUseListingLocationFallbacks(t *testing.T) {
 func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *testing.T) {
 	for _, want := range []string{
 		"review_rows AS",
+		"'candidate'::text AS link_type",
+		"'match_candidate'::text AS link_method",
+		"'offering'::text",
+		"'direct'::text",
 		"FROM public.property_offering_transactions pot",
 		"pot.prices_transaction_id = $3::uuid",
 		"sl.prices_transaction_id = $3::uuid",

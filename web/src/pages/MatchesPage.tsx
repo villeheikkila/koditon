@@ -103,6 +103,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
           <span className="matches-column-title">Match evidence</span>
           <DetailRows rows={[
             ['Score', candidate.score],
+            ['Link', [candidate.link_type, candidate.link_method].filter(Boolean).join(' / ')],
             ['Confidence', candidate.confidence],
             ['Source ID', sourceIdentity(candidate.listing.source_provider, candidate.listing.native_id)],
             ['Delta', formatPercent(candidate.price_delta_percent)],

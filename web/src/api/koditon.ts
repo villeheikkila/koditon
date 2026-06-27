@@ -230,6 +230,8 @@ export interface AddressRawTransactionMatch {
 export interface TransactionMatchCandidate {
   id: string;
   status: string;
+  link_type: string;
+  link_method?: string;
   score: number;
   confidence: string;
   price_delta_percent?: number;
