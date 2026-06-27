@@ -1763,7 +1763,9 @@ func normalizeSearchParams(params SearchParams) SearchParams {
 
 var (
 	pastedAddressPostalCityRE = regexp.MustCompile(`^(.+?)\s+(\d{5})\s+(.+)$`)
+	pastedAddressPostalRE     = regexp.MustCompile(`^(.+?)\s+(\d{5})$`)
 	pastedPostalCityRE        = regexp.MustCompile(`^(\d{5})\s+(.+)$`)
+	pastedPostalRE            = regexp.MustCompile(`^(\d{5})$`)
 	pastedCityPostalRE        = regexp.MustCompile(`^(.+?)\s+(\d{5})$`)
 )
 
@@ -1791,6 +1793,15 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 		if queryCity == "" {
 			queryCity = strings.TrimSpace(matches[3])
 		}
+		return queryAddress, queryCity, queryPostal
+	}
+	if matches := pastedAddressPostalRE.FindStringSubmatch(queryAddress); matches != nil {
+		if strings.TrimSpace(matches[1]) != "" {
+			queryAddress = strings.TrimSpace(matches[1])
+		}
+		if queryPostal == "" {
+			queryPostal = strings.TrimSpace(matches[2])
+		}
 	}
 	return queryAddress, queryCity, queryPostal
 }
@@ -1806,6 +1817,12 @@ func applyPastedPostalCity(value, city, postal string) (string, string) {
 		}
 		if city == "" {
 			city = strings.TrimSpace(matches[2])
+		}
+		return city, postal
+	}
+	if matches := pastedPostalRE.FindStringSubmatch(text); matches != nil {
+		if postal == "" {
+			postal = strings.TrimSpace(matches[1])
 		}
 		return city, postal
 	}
