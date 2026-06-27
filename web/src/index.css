@@ -4383,8 +4383,14 @@ td.dim { color: var(--text-3); font-size: 12px; }
 
 .address-lookup-stats {
   display: flex;
+  flex-wrap: wrap;
   flex-shrink: 0;
   gap: 8px;
+  justify-content: flex-end;
+}
+
+.address-lookup-stats .model-metric {
+  min-width: 104px;
 }
 
 .address-listing-list {
@@ -5694,7 +5700,7 @@ td.dim { color: var(--text-3); font-size: 12px; }
   .address-lookup-body { grid-template-columns: 1fr; }
   .address-lookup-sidebar { border-bottom: 1px solid var(--border); border-right: 0; }
   .address-lookup-header { flex-direction: column; }
-  .address-lookup-stats { width: 100%; }
+  .address-lookup-stats { justify-content: flex-start; width: 100%; }
   .address-raw-transaction { grid-template-columns: 1fr; }
   .address-listing-card-head { flex-direction: column; }
   .address-listing-price { text-align: left; }

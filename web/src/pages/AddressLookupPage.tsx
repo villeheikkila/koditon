@@ -22,6 +22,8 @@ export default function AddressLookupPage() {
   const rawTransactions = body?.raw_transactions ?? []
   const linkedCount = listings.filter(listing => (listing.transactions ?? []).some(isLinkedTransaction)).length
   const candidateCount = listings.reduce((count, listing) => count + (listing.transactions ?? []).filter(transaction => !isLinkedTransaction(transaction)).length, 0)
+  const unaggregatedCount = listings.filter(listing => !listing.offering_id).length
+  const sourceRecordCount = listings.reduce((count, listing) => count + (listing.source_records ?? []).filter(record => record.listing_id !== listing.listing_id).length, 0)
   const sourceCandidateCount = listings.reduce((count, listing) => count + (listing.source_candidates?.length ?? 0), 0)
   const offeringCount = new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
   const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source } : undefined
@@ -40,8 +42,10 @@ export default function AddressLookupPage() {
             </div>
             {body && (
               <div className="address-lookup-stats">
-                <Metric label="Listings" value={listings.length} />
+                <Metric label="Source listings" value={listings.length} />
+                <Metric label="Unaggregated" value={unaggregatedCount} />
                 <Metric label="Offerings" value={offeringCount} />
+                <Metric label="Source records" value={sourceRecordCount} />
                 <Metric label="Linked" value={linkedCount} />
                 <Metric label="Candidates" value={candidateCount} />
                 <Metric label="Source candidates" value={sourceCandidateCount} />
