@@ -62,7 +62,7 @@ SELECT
     latest.sale_listing_prices_transaction_match_price_delta_percent,
     latest.sale_listing_prices_transaction_match_reasons,
     COALESCE(latest.sale_listing_prices_transaction_match_created_at::text, ''),
-    pos.property_offering_id::text,
+    COALESCE(pos.property_offering_id::text, sl.sale_listing_id::text),
     sl.sale_listing_canonical_id,
     sl.sale_listing_source_provider,
     COALESCE(sl.sale_listing_url, ''),
@@ -113,7 +113,7 @@ FROM latest
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
 LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
 WHERE ($3::uuid IS NOT NULL OR latest.sale_listing_prices_transaction_match_status = ANY(ARRAY['candidate'::text, 'ambiguous'::text]))
