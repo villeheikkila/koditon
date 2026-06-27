@@ -22,7 +22,7 @@ export default function SourceEntityPage({ kind }: { kind: SourceEntityKind }) {
           </div>
           <div className="source-entity-actions">
             {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
-            {detail?.url && <a href={detail.url} target="_blank" rel="noreferrer">Source page</a>}
+            {detail?.external_url_available && detail.url && <a href={detail.url} target="_blank" rel="noreferrer">Source page</a>}
           </div>
         </header>
         {detailQuery.isLoading && <div className="loading-state">Loading source detail</div>}

@@ -59,6 +59,7 @@ export interface AddressSourceRecord {
   canonical_id: string;
   city?: string;
   debt_free_price?: number;
+  external_url_available: boolean;
   first_seen_at?: string;
   headline: string;
   kind: string;
@@ -97,6 +98,7 @@ export interface AddressSourceCandidate {
   created_at?: string;
   debt_free_price?: number;
   direction: string;
+  external_url_available: boolean;
   headline: string;
   kind: string;
   listing_id: string;
@@ -149,6 +151,7 @@ export interface AddressListing {
   city?: string;
   created_at?: string;
   debt_free_price?: number;
+  external_url_available: boolean;
   first_seen_at?: string;
   headline: string;
   kind: string;
@@ -235,6 +238,7 @@ export interface TransactionMatchListingCandidate {
   canonical_id: string;
   source_provider: string;
   url?: string;
+  external_url_available: boolean;
   headline?: string;
   street_address?: string;
   city?: string;
@@ -439,6 +443,7 @@ export interface TargetOverviewRelated {
 }
 
 export interface TargetSourceLink {
+  canonical_id?: string;
   external_id?: string;
   kind: string;
   label: string;
@@ -450,6 +455,7 @@ export interface TargetSourceLink {
   source_table?: string;
   title: string;
   url?: string;
+  external_url_available: boolean;
 }
 
 export interface TargetOverview {
@@ -642,6 +648,7 @@ export interface EntityDetailOutputBody {
   total_charge_monthly?: number;
   total_floors?: number;
   url?: string;
+  external_url_available: boolean;
   water_charge?: number;
 }
 

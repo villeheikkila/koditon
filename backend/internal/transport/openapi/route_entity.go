@@ -27,13 +27,14 @@ type rawPayloadOutput struct {
 type entityDetailOutput struct {
 	Body struct {
 		// Canonical
-		CanonicalID string     `json:"canonical_id"`
-		Source      string     `json:"source"`
-		Kind        string     `json:"kind"`
-		NativeID    string     `json:"native_id"`
-		Headline    string     `json:"headline"`
-		URL         string     `json:"url,omitempty"`
-		LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
+		CanonicalID          string     `json:"canonical_id"`
+		Source               string     `json:"source"`
+		Kind                 string     `json:"kind"`
+		NativeID             string     `json:"native_id"`
+		Headline             string     `json:"headline"`
+		URL                  string     `json:"url,omitempty"`
+		ExternalURLAvailable bool       `json:"external_url_available"`
+		LastSeenAt           *time.Time `json:"last_seen_at,omitempty"`
 
 		// Location
 		StreetAddress string `json:"street_address,omitempty"`
@@ -105,6 +106,7 @@ func (a *API) entityDetailHandler(ctx context.Context, input *entityDetailInput)
 	b.NativeID = detail.Canonical.NativeID
 	b.Headline = detail.Canonical.Headline
 	b.URL = detail.Canonical.URL
+	b.ExternalURLAvailable = detail.Canonical.ExternalURLAvailable
 	if !detail.Canonical.LastSeenAt.IsZero() {
 		t := detail.Canonical.LastSeenAt
 		b.LastSeenAt = &t

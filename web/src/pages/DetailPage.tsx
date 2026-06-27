@@ -12,7 +12,7 @@ import {
   type SourceClaim,
   type TargetOverview,
 } from '../api/koditon'
-import { addressLookupPathFromOverviewFields } from '../lib/address-lookup'
+import { addressLookupPathFromOverviewFields, sourceEntityPath } from '../lib/address-lookup'
 
 type DetailKind = 'listing' | 'rental' | 'housingCompany'
 
@@ -163,15 +163,26 @@ function SourceLinks({ overview }: { overview: TargetOverview }) {
           <h3>{group.label}</h3>
           <div className="target-source-list">
             {group.sources.map((source, index) => (
-              <a key={`${source.provider}:${source.kind}:${source.source_id || index}`} href={source.url || '#'} target="_blank" rel="noreferrer" aria-disabled={!source.url}>
-                <span>{source.provider} / {source.kind}</span>
-                <strong>{source.title || source.source_id || 'Source page'}</strong>
-                <small>{[source.source_id, formatDate(source.last_seen_at)].filter(Boolean).join(' / ')}</small>
-              </a>
+              <SourceLink source={source} index={index} key={`${source.provider}:${source.kind}:${source.source_id || index}`} />
             ))}
           </div>
         </section>
       ))}
+    </div>
+  )
+}
+
+function SourceLink({ source, index }: { source: NonNullable<TargetOverview['sources']>[number]; index: number }) {
+  const detailPath = sourceEntityPath({ canonicalId: source.canonical_id, kind: source.kind })
+  return (
+    <div className="target-source-link" data-source-index={index}>
+      <span>{source.provider} / {source.kind}</span>
+      <strong>{source.title || source.source_id || source.external_id || 'Source'}</strong>
+      <small>{[source.external_id || source.source_id, formatDate(source.last_seen_at)].filter(Boolean).join(' / ')}</small>
+      <div className="target-source-actions">
+        {detailPath && <Link to={detailPath}>Source detail</Link>}
+        {source.external_url_available && source.url && <a href={source.url} target="_blank" rel="noreferrer">Source page</a>}
+      </div>
     </div>
   )
 }

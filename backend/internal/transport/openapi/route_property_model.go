@@ -144,17 +144,19 @@ type TargetOverviewRelated struct {
 }
 
 type TargetSourceLink struct {
-	Label         string     `json:"label"`
-	Provider      string     `json:"provider"`
-	Kind          string     `json:"kind"`
-	SourceTable   string     `json:"source_table,omitempty"`
-	SourceID      string     `json:"source_id,omitempty"`
-	SourceIDValue string     `json:"source_id_value,omitempty"`
-	ExternalID    string     `json:"external_id,omitempty"`
-	Title         string     `json:"title"`
-	URL           string     `json:"url,omitempty"`
-	LinkStatus    string     `json:"link_status,omitempty"`
-	LastSeenAt    *time.Time `json:"last_seen_at,omitempty"`
+	Label                string     `json:"label"`
+	Provider             string     `json:"provider"`
+	Kind                 string     `json:"kind"`
+	SourceTable          string     `json:"source_table,omitempty"`
+	SourceID             string     `json:"source_id,omitempty"`
+	SourceIDValue        string     `json:"source_id_value,omitempty"`
+	CanonicalID          string     `json:"canonical_id,omitempty"`
+	ExternalID           string     `json:"external_id,omitempty"`
+	Title                string     `json:"title"`
+	URL                  string     `json:"url,omitempty"`
+	ExternalURLAvailable bool       `json:"external_url_available"`
+	LinkStatus           string     `json:"link_status,omitempty"`
+	LastSeenAt           *time.Time `json:"last_seen_at,omitempty"`
 }
 
 type TargetBuildingSummary struct {
@@ -1420,16 +1422,26 @@ func (a *API) listTargetSources(ctx context.Context, target CanonicalTargetRef) 
 	}
 	rows, err := a.pool.Query(ctx, `
 SELECT
-    source_provider,
-    source_kind,
-    source_table,
-    COALESCE(source_id::text, ''),
-    source_id_value,
-    COALESCE(source_external_id, ''),
-    COALESCE(source_url, ''),
-    link_status,
-    last_seen_at
-FROM public.property_target_sources
+    pts.source_provider,
+    pts.source_kind,
+    pts.source_table,
+    COALESCE(pts.source_id::text, ''),
+    pts.source_id_value,
+    COALESCE(sl.sale_listing_canonical_id, ''),
+    COALESCE(pts.source_external_id, ''),
+    COALESCE(pts.source_url, ''),
+    CASE
+        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
+        ELSE false
+    END AS external_url_available,
+    pts.link_status,
+    pts.last_seen_at
+FROM public.property_target_sources pts
+LEFT JOIN public.property_source_offerings sl ON pts.source_table = 'property_source_offerings'
+    AND sl.sale_listing_id::text = pts.source_id_value
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 WHERE target_type = $1
     AND target_id = $2
     AND link_status <> 'rejected'
@@ -1442,7 +1454,7 @@ LIMIT 500`, target.Type, targetID)
 	out := []TargetSourceLink{}
 	for rows.Next() {
 		var link TargetSourceLink
-		if err := rows.Scan(&link.Provider, &link.Kind, &link.SourceTable, &link.SourceID, &link.SourceIDValue, &link.ExternalID, &link.URL, &link.LinkStatus, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.Provider, &link.Kind, &link.SourceTable, &link.SourceID, &link.SourceIDValue, &link.CanonicalID, &link.ExternalID, &link.URL, &link.ExternalURLAvailable, &link.LinkStatus, &link.LastSeenAt); err != nil {
 			return nil, err
 		}
 		link.Label = sourceLinkLabel(link.Kind)

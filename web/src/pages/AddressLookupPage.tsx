@@ -184,7 +184,7 @@ function ListingCard({ listing }: { listing: AddressListing }) {
       <div className="address-listing-actions">
         {listing.offering_id && <Link to={`/target/offering/${listing.offering_id}`}>Canonical offering</Link>}
         {sourcePath && <Link to={sourcePath}>Source detail</Link>}
-        {listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Source page</a>}
+        {listing.external_url_available && listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Source page</a>}
       </div>
       {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} />}
       {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} variant="candidate" />}
@@ -232,7 +232,7 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
             <div className="address-source-record-actions">
               {candidate.candidate_offering_id && <Link to={`/target/offering/${candidate.candidate_offering_id}`}>Candidate offering</Link>}
               {sourcePath && <Link to={sourcePath}>Source detail</Link>}
-              {candidate.url && <a href={candidate.url} target="_blank" rel="noreferrer">Source page</a>}
+              {candidate.external_url_available && candidate.url && <a href={candidate.url} target="_blank" rel="noreferrer">Source page</a>}
             </div>
           </div>
         )
@@ -263,7 +263,7 @@ function SourceRecordList({ records }: { records: AddressSourceRecord[] }) {
           <div className="address-source-record-actions">
             {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
             {sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind }) && <Link to={sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind })}>Source detail</Link>}
-            {record.url && <a href={record.url} target="_blank" rel="noreferrer">Source page</a>}
+            {record.external_url_available && record.url && <a href={record.url} target="_blank" rel="noreferrer">Source page</a>}
           </div>
           <SourceTexts texts={record.texts} compact />
         </div>

@@ -66,6 +66,11 @@ SELECT
     sl.sale_listing_canonical_id,
     sl.sale_listing_source_provider,
     COALESCE(sl.sale_listing_url, ''),
+    CASE
+        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN COALESCE(fa.frontdoor_ad_page_not_found, false) = false
+        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
+        ELSE false
+    END AS external_url_available,
     COALESCE(sl.sale_listing_headline, ''),
     COALESCE(sl.sale_listing_street_address, ''),
     COALESCE(sl.sale_listing_city, ''),
@@ -106,6 +111,8 @@ SELECT
     COALESCE(pt.prices_transaction_created_at::text, '')
 FROM latest
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
     AND pos.property_offering_source_link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
@@ -183,6 +190,7 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 			&item.Listing.CanonicalID,
 			&item.Listing.SourceProvider,
 			&item.Listing.URL,
+			&item.Listing.ExternalURLAvailable,
 			&item.Listing.Headline,
 			&item.Listing.StreetAddress,
 			&item.Listing.City,

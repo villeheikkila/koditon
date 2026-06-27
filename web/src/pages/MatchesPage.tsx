@@ -100,7 +100,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
       </div>
       <div className="address-listing-actions">
         <Link to={`/listing/${encodeURIComponent(candidate.listing.canonical_id)}`}>Source detail</Link>
-        {candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Source page</a>}
+        {candidate.listing.external_url_available && candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Source page</a>}
       </div>
     </article>
   )
