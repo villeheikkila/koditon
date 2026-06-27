@@ -25,7 +25,7 @@ export function sourceEntityPath(input: SourceEntityInput) {
   const canonicalId = input.canonicalId?.trim()
   if (!canonicalId) return ''
   const kind = input.kind?.trim().toLowerCase() || canonicalKind(canonicalId)
-  const route = kind === 'announcement' || kind === 'building' ? 'housing-company' : 'listing'
+  const route = sourceEntityRoute(kind)
   return `/${route}/${encodeURIComponent(canonicalId)}`
 }
 
@@ -55,4 +55,10 @@ function normalizeFieldLabel(value: string) {
 function canonicalKind(canonicalId: string) {
   const parts = canonicalId.split(':')
   return parts.length >= 3 ? parts[1]?.trim().toLowerCase() : ''
+}
+
+function sourceEntityRoute(kind: string) {
+  if (kind === 'announcement' || kind === 'building') return 'housing-company'
+  if (kind === 'rental') return 'rental'
+  return 'listing'
 }
