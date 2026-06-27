@@ -66,6 +66,7 @@ SELECT
     COALESCE(pos.property_offering_id::text, ''),
     sl.sale_listing_canonical_id,
     sl.sale_listing_source_provider,
+    sl.sale_listing_native_id,
     COALESCE(sl.sale_listing_url, ''),
     CASE
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
@@ -191,6 +192,7 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 			&item.Listing.OfferingID,
 			&item.Listing.CanonicalID,
 			&item.Listing.SourceProvider,
+			&item.Listing.NativeID,
 			&item.Listing.URL,
 			&item.Listing.ExternalURLAvailable,
 			&item.Listing.Headline,

@@ -104,6 +104,7 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
           <DetailRows rows={[
             ['Score', candidate.score],
             ['Confidence', candidate.confidence],
+            ['Source ID', sourceIdentity(candidate.listing.source_provider, candidate.listing.native_id)],
             ['Delta', formatPercent(candidate.price_delta_percent)],
             ['Created', formatDate(candidate.created_at)],
             ['Reasons', formatReasons(candidate.reasons)],
@@ -289,6 +290,10 @@ function sourceLabel(source?: string) {
   if (source === 'shortcut') return 'Shortcut'
   if (source === 'frontdoor') return 'Frontdoor'
   return source || 'Source'
+}
+
+function sourceIdentity(source?: string, nativeID?: string) {
+  return [sourceLabel(source), nativeID].filter(Boolean).join(' ')
 }
 
 function sourceBadgeClass(source?: string) {

@@ -382,6 +382,7 @@ type TransactionMatchListingCandidate struct {
 	OfferingID           string   `json:"offering_id,omitempty"`
 	CanonicalID          string   `json:"canonical_id"`
 	SourceProvider       string   `json:"source_provider"`
+	NativeID             string   `json:"native_id,omitempty"`
 	URL                  string   `json:"url,omitempty"`
 	ExternalURLAvailable bool     `json:"external_url_available"`
 	Headline             string   `json:"headline,omitempty"`
