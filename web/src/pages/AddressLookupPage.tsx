@@ -57,7 +57,7 @@ export default function AddressLookupPage() {
               {listings.map(listing => <ListingCard key={listing.listing_id} listing={listing} />)}
             </div>
           )}
-          {rawTransactions.length > 0 && <RawTransactionPanel transactions={rawTransactions} />}
+          {body && <RawTransactionPanel transactions={rawTransactions} />}
         </section>
       </div>
     </main>
@@ -118,6 +118,7 @@ function RawTransactionPanel({ transactions }: { transactions: AddressRawTransac
           <span>{transactions.filter(transaction => transaction.linked_to_lookup).length} linked here / {transactions.filter(transaction => !transaction.is_matched).length} unlinked</span>
         </div>
       </header>
+      {transactions.length === 0 && <div className="address-raw-transaction-empty">No prices history found for this lookup.</div>}
       <div className="address-raw-transaction-list">
         {transactions.map(transaction => (
           <div className={`address-raw-transaction${transaction.linked_to_lookup ? ' address-raw-transaction--linked' : ''}`} key={transaction.transaction_id}>

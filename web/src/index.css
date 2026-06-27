@@ -4433,6 +4433,13 @@ td.dim { color: var(--text-3); font-size: 12px; }
   flex-direction: column;
 }
 
+.address-raw-transaction-empty {
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 14px 12px;
+}
+
 .address-raw-transaction {
   align-items: center;
   border-top: 1px solid var(--border);
