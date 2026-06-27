@@ -490,8 +490,16 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
 
 function rawTransactionStatus(transaction: AddressRawTransaction) {
   if (transaction.linked_to_lookup) return 'Linked here'
-  if (transaction.is_matched) return `${transaction.matched_listing_count + transaction.matched_offering_count} existing links`
+  if (transaction.is_matched) return [
+    countLabel(transaction.matched_listing_count, 'source link'),
+    countLabel(transaction.matched_offering_count, 'offering link'),
+  ].filter(Boolean).join(' / ')
   return 'Unlinked'
+}
+
+function countLabel(count: number, label: string) {
+  if (count <= 0) return ''
+  return `${count} ${label}${count === 1 ? '' : 's'}`
 }
 
 function RawTransactionMatches({ transaction }: { transaction: AddressRawTransaction }) {
