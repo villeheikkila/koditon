@@ -165,9 +165,26 @@ function formatDate(value?: string) {
 }
 
 function formatReasons(value: unknown) {
-  if (value == null || typeof value !== 'object') return ''
-  const entries = Object.entries(value).slice(0, 5)
-  return entries.map(([key, entry]) => `${key}: ${formatReasonValue(entry)}`).join(' / ')
+  if (!isRecord(value)) return ''
+  const evidence = [
+    reasonString(value, 'matched_by') ? `Matched by ${reasonString(value, 'matched_by')}` : '',
+    reasonString(value, 'postal') ? `Postal ${reasonString(value, 'postal')}` : sourceTargetReason(value, 'postal', 'Postal'),
+    sourceTargetReason(value, 'address', 'Address'),
+    sourceTargetReason(value, 'street_name', 'Street'),
+    sourceTargetReason(value, 'unit_match_key', 'Unit key'),
+    reasonPair(value, 'area', 'Area'),
+    reasonLayout(value),
+    reasonPair(value, 'build_year', 'Build year'),
+    reasonPair(value, 'floor_level', 'Floor'),
+    reasonPair(value, 'total_floors', 'Floors'),
+    reasonPair(value, 'condition', 'Condition'),
+    reasonPair(value, 'energy', 'Energy'),
+    reasonString(value, 'property_type') ? `Type ${reasonString(value, 'property_type')}` : '',
+    reasonBoolean(value, 'layout_prefix') ? 'Layout prefix matched' : '',
+    reasonScore(value),
+  ].filter(Boolean)
+  if (evidence.length > 0) return evidence.slice(0, 8).join(' / ')
+  return Object.entries(value).slice(0, 5).map(([key, entry]) => `${key}: ${formatReasonValue(entry)}`).join(' / ')
 }
 
 function formatReasonValue(value: unknown): string {
@@ -175,5 +192,71 @@ function formatReasonValue(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return value.map(formatReasonValue).filter(Boolean).join(', ')
   if (typeof value === 'object') return Object.entries(value).map(([key, entry]) => `${key} ${formatReasonValue(entry)}`).join(', ')
+  return ''
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function reasonString(reasons: Record<string, unknown>, key: string) {
+  const value = reasons[key]
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+function reasonBoolean(reasons: Record<string, unknown>, key: string) {
+  return reasons[key] === true
+}
+
+function reasonPair(reasons: Record<string, unknown>, key: string, label: string) {
+  const value = reasons[key]
+  if (!isRecord(value)) return typeof value === 'string' || typeof value === 'number' ? `${label} ${value}` : ''
+  const listing = reasonScalar(value.listing)
+  const transaction = reasonScalar(value.transaction)
+  if (!listing && !transaction) return sourceTargetReason(reasons, key, label)
+  return `${label} ${listing || 'n/a'} / ${transaction || 'n/a'}`
+}
+
+function sourceTargetReason(reasons: Record<string, unknown>, key: string, label: string) {
+  const value = reasons[key]
+  if (!isRecord(value)) return ''
+  const source = reasonScalar(value.source)
+  const target = reasonScalar(value.target)
+  if (!source && !target) return ''
+  return `${label} ${source || 'n/a'} / ${target || 'n/a'}`
+}
+
+function reasonLayout(reasons: Record<string, unknown>) {
+  const value = reasons.layout
+  if (!isRecord(value)) return reasonPair(reasons, 'layout', 'Layout')
+  const listing = reasonScalar(value.listing)
+  const transaction = reasonScalar(value.transaction)
+  const code = reasonScalar(value.code)
+  if (listing || transaction || code) return `Layout${code ? ` ${code}` : ''} ${listing || 'n/a'} / ${transaction || 'n/a'}`
+  return sourceTargetReason(reasons, 'layout', 'Layout')
+}
+
+function reasonScore(reasons: Record<string, unknown>) {
+  const value = reasons.score
+  if (!isRecord(value)) return ''
+  const total = reasonScalar(value.total)
+  if (total) return `Score total ${total}`
+  const parts = ['address', 'unit', 'building', 'street', 'street_area_layout', 'street_area_floor_price', 'area', 'layout', 'floor', 'build_year', 'elevator', 'plot', 'energy', 'condition', 'price', 'temporal', 'transaction', 'postal', 'city'].flatMap(key => {
+    const score = positiveReasonScore(value[key])
+    return score ? [`${key.replaceAll('_', ' ')} ${score}`] : []
+  })
+  return parts.length > 0 ? `Score ${parts.slice(0, 4).join(', ')}` : ''
+}
+
+function positiveReasonScore(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return String(value)
+  if (typeof value === 'string' && value.trim() && value.trim() !== '0') return value.trim()
+  return ''
+}
+
+function reasonScalar(value: unknown) {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'boolean') return String(value)
   return ''
 }
