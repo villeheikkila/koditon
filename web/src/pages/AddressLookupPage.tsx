@@ -167,6 +167,7 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
   const transactionSources = sourceRecordLookup(listing)
   const coverage = sourceCoverage(listing)
   const sourcePath = sourceEntityPath({ canonicalId: listing.canonical_id, kind: listing.kind })
+  const postalReviewPath = postalMatchURL(listing.postal, lookup)
   return (
     <article className="address-listing-card">
       <header className="address-listing-card-head">
@@ -202,6 +203,7 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
       <div className="address-listing-actions">
         {listing.offering_id && <Link to={`/target/offering/${listing.offering_id}`}>Canonical offering</Link>}
         {sourcePath && <Link to={sourcePath}>Source detail</Link>}
+        {postalReviewPath && <Link to={postalReviewPath}>Review postal candidates</Link>}
         {listing.external_url_available && listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Live source page</a>}
       </div>
       {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} lookup={lookup} />}
@@ -496,11 +498,24 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
   const params = new URLSearchParams()
   if (transaction.postal) params.set('postal', transaction.postal)
   params.set('transaction', transaction.transaction_id)
+  appendLookupParams(params, lookup)
+  return `/matches?${params.toString()}`
+}
+
+function postalMatchURL(postal?: string | null, lookup?: AddressLookupInput) {
+  const trimmed = postal?.trim()
+  if (!trimmed) return ''
+  const params = new URLSearchParams()
+  params.set('postal', trimmed)
+  appendLookupParams(params, lookup)
+  return `/matches?${params.toString()}`
+}
+
+function appendLookupParams(params: URLSearchParams, lookup?: AddressLookupInput) {
   if (lookup?.address?.trim()) params.set('lookup_address', lookup.address.trim())
   if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
   if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
   if (lookup?.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
-  return `/matches?${params.toString()}`
 }
 
 function rawTransactionStatus(transaction: AddressRawTransaction) {
