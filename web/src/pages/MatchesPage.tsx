@@ -1,19 +1,24 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import Nav from '../components/Nav'
 import { useTransactionMatchCandidates, type TransactionMatchCandidate } from '../api/koditon'
-import { buildAddressLookupPath, sourceEntityPath } from '../lib/address-lookup'
+import { buildAddressLookupPath, sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
 
 export default function MatchesPage() {
   const [params] = useSearchParams()
   const transaction = params.get('transaction')?.trim() ?? ''
   const postal = params.get('postal')?.trim() ?? ''
-  const addressBackPath = buildAddressLookupPath({ address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal'), source: params.get('lookup_source') }) || '/address'
+  const lookup = { address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal'), source: params.get('lookup_source') }
+  const addressBackPath = buildAddressLookupPath(lookup) || '/address'
   const query = useTransactionMatchCandidates(
     { transaction: transaction || undefined, postal: transaction ? undefined : postal || undefined, limit: transaction ? 50 : 100 },
     { query: { enabled: Boolean(transaction || postal), placeholderData: previous => previous } },
   )
   const body = query.data?.status === 200 ? query.data.data : undefined
   const candidates = body?.candidates ?? []
+  const linkedCount = candidates.filter(candidate => isLinkedReviewRow(candidate)).length
+  const candidateCount = candidates.filter(candidate => !isLinkedReviewRow(candidate)).length
+  const highCount = candidates.filter(candidate => candidate.confidence === 'high').length
+  const ambiguousCount = candidates.filter(candidate => candidate.status === 'ambiguous').length
   return (
     <main className="matches-page">
       <Nav />
@@ -26,6 +31,10 @@ export default function MatchesPage() {
           </div>
           <div className="address-lookup-stats">
             <Metric label={transaction ? 'Matches' : 'Candidates'} value={candidates.length} />
+            <Metric label="Linked" value={linkedCount} />
+            <Metric label="Open" value={candidateCount} />
+            <Metric label="High" value={highCount} />
+            <Metric label="Ambiguous" value={ambiguousCount} />
           </div>
         </header>
         {!transaction && !postal && <div className="search-empty-hint"><strong>No review target</strong><span className="search-empty-sub">Open Review from an address lookup prices row.</span></div>}
@@ -34,7 +43,7 @@ export default function MatchesPage() {
         {body && candidates.length === 0 && <div className="search-empty-hint"><strong>{transaction ? 'No matches found' : 'No candidates found'}</strong><span className="search-empty-sub">{transaction ? 'This prices transaction has no saved candidate or linked source rows.' : 'This postal code has no saved candidate rows.'}</span></div>}
         {candidates.length > 0 && (
           <div className={`matches-list${query.isFetching ? ' matches-list--loading' : ''}`}>
-            {candidates.map(candidate => <MatchCard key={candidate.id} candidate={candidate} />)}
+            {candidates.map(candidate => <MatchCard key={candidate.id} candidate={candidate} lookup={lookup} currentTransaction={transaction} />)}
           </div>
         )}
       </section>
@@ -42,9 +51,10 @@ export default function MatchesPage() {
   )
 }
 
-function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
+function MatchCard({ candidate, lookup, currentTransaction }: { candidate: TransactionMatchCandidate; lookup: AddressLookupInput; currentTransaction: string }) {
   const detailPath = sourceEntityPath({ canonicalId: candidate.listing.canonical_id })
   const lookupPath = buildAddressLookupPath({ address: candidate.listing.street_address, city: candidate.listing.city, postal: candidate.listing.postal, source: candidate.listing.source_provider })
+  const transactionPath = currentTransaction === candidate.transaction.id ? '' : transactionReviewPath(candidate, lookup)
   return (
     <article className="matches-card">
       <header className="matches-card-header">
@@ -116,10 +126,26 @@ function MatchCard({ candidate }: { candidate: TransactionMatchCandidate }) {
         {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
         {candidate.listing.offering_id && <Link to={`/target/offering/${candidate.listing.offering_id}`}>Canonical offering</Link>}
         {detailPath && <Link to={detailPath}>Source detail</Link>}
+        {transactionPath && <Link to={transactionPath}>Review transaction</Link>}
         {candidate.listing.external_url_available && candidate.listing.url && <a href={candidate.listing.url} target="_blank" rel="noreferrer">Live source page</a>}
       </div>
     </article>
   )
+}
+
+function isLinkedReviewRow(candidate: TransactionMatchCandidate) {
+  return candidate.link_type === 'direct' || candidate.link_type === 'offering' || candidate.status === 'linked' || candidate.status === 'auto_linked'
+}
+
+function transactionReviewPath(candidate: TransactionMatchCandidate, lookup: AddressLookupInput) {
+  const params = new URLSearchParams()
+  if (candidate.listing.postal) params.set('postal', candidate.listing.postal)
+  params.set('transaction', candidate.transaction.id)
+  if (lookup.address?.trim()) params.set('lookup_address', lookup.address.trim())
+  if (lookup.city?.trim()) params.set('lookup_city', lookup.city.trim())
+  if (lookup.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
+  if (lookup.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
+  return `/matches?${params.toString()}`
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
