@@ -29,6 +29,7 @@ type ListingRow = {
   area?: number;
   room_layout?: string;
   url?: string;
+  external_url_available?: boolean;
   web_url: string;
   thumbnail_url?: string;
   transactions: PriceTransaction[];
@@ -113,7 +114,7 @@ function renderRow(row: ListingRow): string {
       <div class="actions">
         <button class="icon-btn" title="Ask about this listing" data-ask="${escapeAttr(row.canonical_id)}">Ask</button>
         <button class="icon-btn" title="Open in Koditon" data-open="${escapeAttr(row.web_url)}">Open</button>
-        ${row.url ? `<button class="icon-btn" title="Open source listing" data-open="${escapeAttr(row.url)}">Source</button>` : ""}
+        ${row.external_url_available && row.url ? `<button class="icon-btn" title="Open source listing" data-open="${escapeAttr(row.url)}">Source</button>` : ""}
       </div>
     </article>
   `;

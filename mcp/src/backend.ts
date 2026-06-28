@@ -49,6 +49,7 @@ export type SearchResultRow = {
   area?: number;
   room_layout?: string;
   url?: string;
+  external_url_available?: boolean;
   last_seen_at?: string;
 };
 export type AddressListing = {
@@ -66,6 +67,7 @@ export type AddressListing = {
   area?: number;
   room_layout?: string;
   url?: string;
+  external_url_available?: boolean;
   offering_id?: string;
   transactions?: PriceTransactionLink[];
 };
@@ -115,6 +117,7 @@ export type AppListingRow = {
   area?: number;
   room_layout?: string;
   url?: string;
+  external_url_available?: boolean;
   web_url: string;
   thumbnail_url?: string;
   transactions: PriceTransactionLink[];
@@ -301,6 +304,7 @@ function appRowFromSearch(row: SearchResultRow, webURL: string): AppListingRow {
     area: row.area,
     room_layout: row.room_layout,
     url: row.url,
+    external_url_available: row.external_url_available,
     web_url: webURL,
     transactions: []
   };
@@ -318,6 +322,7 @@ function appRowFromAddress(listing: AddressListing, webURL: string): AppListingR
     area: listing.area,
     room_layout: listing.room_layout,
     url: listing.url,
+    external_url_available: listing.external_url_available,
     web_url: webURL,
     transactions: listing.transactions ?? []
   };
