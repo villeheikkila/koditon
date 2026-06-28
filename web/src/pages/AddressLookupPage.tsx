@@ -547,7 +547,7 @@ function RawTransactionMatches({ transaction, candidateMatches }: { transaction:
     <span className="address-raw-transaction-matches">
       {matches.map(match => {
         const label = rawTransactionMatchLabel(match)
-        const status = [match.status, match.method, formatScore(match.score)].filter(Boolean).join(' / ')
+        const status = [match.status, formatLinkMethod(match.method), formatScore(match.score)].filter(Boolean).join(' / ')
         const path = rawTransactionMatchPath(match)
         const text = status ? `${label} (${status})` : label
         return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
@@ -576,12 +576,19 @@ function candidateRawTransactionMatches(transaction: AddressRawTransaction, list
 
 function rawTransactionMatchLabel(match: NonNullable<AddressRawTransaction['matches']>[number]) {
   const target = [sourceLabel(match.source), match.native_id].filter(Boolean).join(' ')
-  return match.headline || match.address || target || match.id.slice(0, 8)
+  const label = match.headline || match.address || target || match.id.slice(0, 8)
+  if (match.type === 'offering_source') return `Offering source ${label}`
+  if (match.type === 'listing') return `Direct source ${label}`
+  return label
 }
 
 function rawTransactionMatchPath(match: NonNullable<AddressRawTransaction['matches']>[number]) {
   if (match.type === 'offering' && match.id) return `/target/offering/${match.id}`
   return sourceEntityPath({ canonicalId: match.canonical_id })
+}
+
+function formatLinkMethod(value?: string) {
+  return value?.trim().replaceAll('_', ' ') ?? ''
 }
 
 function transactionEvidence(transaction: AddressTransactionLink, sourceRecords: Map<string, AddressSourceRecord>) {
