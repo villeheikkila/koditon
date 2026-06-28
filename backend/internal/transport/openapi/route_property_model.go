@@ -121,6 +121,7 @@ type CanonicalTargetResource struct {
 	Buildings        []TargetBuildingSummary              `json:"buildings,omitempty"`
 	Units            []TargetUnitSummary                  `json:"units,omitempty"`
 	Offerings        []TargetOfferingSummary              `json:"offerings,omitempty"`
+	SourceListings   []TargetSourceListing                `json:"source_listings,omitempty"`
 	Sources          []TargetSourceLink                   `json:"sources,omitempty"`
 }
 
@@ -186,15 +187,88 @@ type TargetUnitSummary struct {
 }
 
 type TargetOfferingSummary struct {
-	Target         CanonicalTargetRef  `json:"target"`
-	UnitTarget     CanonicalTargetRef  `json:"unit_target"`
-	BuildingTarget *CanonicalTargetRef `json:"building_target,omitempty"`
-	HousingTarget  *CanonicalTargetRef `json:"housing_target,omitempty"`
-	Title          string              `json:"title"`
-	Layout         string              `json:"layout,omitempty"`
-	AreaM2         *float64            `json:"area_m2,omitempty"`
-	AskingPriceEUR *int64              `json:"asking_price_eur,omitempty"`
-	LastSeenAt     *time.Time          `json:"last_seen_at,omitempty"`
+	Target                  CanonicalTargetRef  `json:"target"`
+	UnitTarget              *CanonicalTargetRef `json:"unit_target,omitempty"`
+	BuildingTarget          *CanonicalTargetRef `json:"building_target,omitempty"`
+	HousingTarget           *CanonicalTargetRef `json:"housing_target,omitempty"`
+	Title                   string              `json:"title"`
+	Layout                  string              `json:"layout,omitempty"`
+	AreaM2                  *float64            `json:"area_m2,omitempty"`
+	AskingPriceEUR          *int64              `json:"asking_price_eur,omitempty"`
+	LastSeenAt              *time.Time          `json:"last_seen_at,omitempty"`
+	SourceCount             int32               `json:"source_count,omitempty"`
+	Sources                 []string            `json:"sources,omitempty"`
+	PriceMatchTransactionID string              `json:"price_match_transaction_id,omitempty"`
+	PriceMatchStatus        string              `json:"price_match_status,omitempty"`
+	PriceMatchPriceEUR      *int64              `json:"price_match_price_eur,omitempty"`
+	InsightCount            int32               `json:"insight_count,omitempty"`
+	InsightTopSeverity      string              `json:"insight_top_severity,omitempty"`
+}
+
+type TargetSourceListing struct {
+	Target               CanonicalTargetRef  `json:"target"`
+	OfferingTarget       CanonicalTargetRef  `json:"offering_target"`
+	UnitTarget           *CanonicalTargetRef `json:"unit_target,omitempty"`
+	BuildingTarget       *CanonicalTargetRef `json:"building_target,omitempty"`
+	HousingTarget        *CanonicalTargetRef `json:"housing_target,omitempty"`
+	Provider             string              `json:"provider"`
+	Kind                 string              `json:"kind"`
+	NativeID             string              `json:"native_id,omitempty"`
+	CanonicalID          string              `json:"canonical_id,omitempty"`
+	LinkStatus           string              `json:"link_status,omitempty"`
+	LinkMethod           string              `json:"link_method,omitempty"`
+	LinkScore            int32               `json:"link_score,omitempty"`
+	Title                string              `json:"title"`
+	URL                  string              `json:"url,omitempty"`
+	ExternalURLAvailable bool                `json:"external_url_available"`
+	StreetAddress        string              `json:"street_address,omitempty"`
+	City                 string              `json:"city,omitempty"`
+	Postal               string              `json:"postal,omitempty"`
+	RoomLayout           string              `json:"room_layout,omitempty"`
+	AreaM2               *float64            `json:"area_m2,omitempty"`
+	AskingPriceEUR       *int64              `json:"asking_price_eur,omitempty"`
+	DebtFreePriceEUR     *int64              `json:"debt_free_price_eur,omitempty"`
+	PricePerM2           *float64            `json:"price_per_m2,omitempty"`
+	BuildYear            *int32              `json:"build_year,omitempty"`
+	FloorLevel           *int32              `json:"floor_level,omitempty"`
+	FirstSeenAt          *time.Time          `json:"first_seen_at,omitempty"`
+	LastSeenAt           *time.Time          `json:"last_seen_at,omitempty"`
+	PublishedAt          *time.Time          `json:"published_at,omitempty"`
+	PriceMatch           *TargetPriceMatch   `json:"price_match,omitempty"`
+	Insights             []TargetInsight     `json:"insights,omitempty"`
+}
+
+type TargetPriceMatch struct {
+	Target               CanonicalTargetRef `json:"target"`
+	Scope                string             `json:"scope"`
+	Status               string             `json:"status,omitempty"`
+	Method               string             `json:"method,omitempty"`
+	Score                *int32             `json:"score,omitempty"`
+	Reasons              json.RawMessage    `json:"reasons,omitempty"`
+	Description          string             `json:"description,omitempty"`
+	Type                 string             `json:"type,omitempty"`
+	Category             string             `json:"category,omitempty"`
+	AreaM2               float64            `json:"area_m2"`
+	PriceEUR             int64              `json:"price_eur"`
+	PricePerM2           int64              `json:"price_per_m2"`
+	BuildYear            int32              `json:"build_year,omitempty"`
+	Floor                string             `json:"floor,omitempty"`
+	Elevator             bool               `json:"elevator"`
+	Condition            string             `json:"condition,omitempty"`
+	Plot                 string             `json:"plot,omitempty"`
+	EnergyClass          string             `json:"energy_class,omitempty"`
+	PeriodIdentifier     string             `json:"period_identifier,omitempty"`
+	TransactionUpdatedAt time.Time          `json:"transaction_updated_at"`
+}
+
+type TargetInsight struct {
+	Key         string  `json:"key"`
+	Value       string  `json:"value"`
+	Direction   string  `json:"direction,omitempty"`
+	Severity    string  `json:"severity,omitempty"`
+	Confidence  float64 `json:"confidence"`
+	SourceField string  `json:"source_field,omitempty"`
+	Text        string  `json:"text,omitempty"`
 }
 
 type EvidenceRef struct {
@@ -385,12 +459,17 @@ func (a *API) canonicalTargetHandler(ctx context.Context, input *canonicalTarget
 		a.logger.ErrorContext(ctx, "list target children failed", "target_type", target.Type, "target_id", target.ID, "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("target children failed")
 	}
+	sourceListings, err := a.listTargetSourceListings(ctx, target)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "list target source listings failed", "target_type", target.Type, "target_id", target.ID, "error", err, "outcome", logging.OutcomeError)
+		return nil, huma.Error500InternalServerError("target source listings failed")
+	}
 	sources, err := a.listTargetSources(ctx, target)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "list target sources failed", "target_type", target.Type, "target_id", target.ID, "error", err, "outcome", logging.OutcomeError)
 		return nil, huma.Error500InternalServerError("target sources failed")
 	}
-	return &canonicalTargetOutput{Body: CanonicalTargetResource{Target: target, Overview: overview, ResolvedValues: values, RenovationEvents: events, Documents: documents, Buildings: buildings, Units: units, Offerings: offerings, Sources: sources}}, nil
+	return &canonicalTargetOutput{Body: CanonicalTargetResource{Target: target, Overview: overview, ResolvedValues: values, RenovationEvents: events, Documents: documents, Buildings: buildings, Units: units, Offerings: offerings, SourceListings: sourceListings, Sources: sources}}, nil
 }
 
 func (a *API) resolvedValuesHandler(ctx context.Context, input *canonicalTargetInput) (*resolvedValuesOutput, error) {
@@ -1457,6 +1536,7 @@ SELECT
     COALESCE(pts.source_external_id, ''),
     COALESCE(pts.source_url, ''),
     CASE
+        WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
         ELSE false
@@ -1490,6 +1570,280 @@ LIMIT 500`, target.Type, targetID)
 	return out, rows.Err()
 }
 
+func (a *API) listTargetSourceListings(ctx context.Context, target CanonicalTargetRef) ([]TargetSourceListing, error) {
+	targetID, err := uuid.Parse(target.ID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := a.pool.Query(ctx, `
+WITH target_offerings AS (
+    SELECT
+        po.property_offering_id,
+        po.property_unit_id,
+        pu.physical_building_id,
+        pu.housing_company_id
+    FROM public.property_offerings po
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE ($1::text = 'offering' AND po.property_offering_id = $2)
+        OR ($1::text = 'unit' AND po.property_unit_id = $2)
+        OR ($1::text = 'building' AND pu.physical_building_id = $2)
+        OR ($1::text = 'housing_company' AND pu.housing_company_id = $2)
+        OR ($1::text = 'house' AND po.property_house_id = $2)
+),
+ranked AS (
+    SELECT
+        sl.sale_listing_id,
+        target_offerings.property_offering_id,
+        target_offerings.property_unit_id,
+        target_offerings.physical_building_id,
+        target_offerings.housing_company_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_source_kind,
+        COALESCE(sl.sale_listing_native_id, '') AS native_id,
+        COALESCE(sl.sale_listing_canonical_id, '') AS canonical_id,
+        COALESCE(pos.property_offering_source_link_status, '') AS link_status,
+        COALESCE(pos.property_offering_source_link_method, '') AS link_method,
+        COALESCE(pos.property_offering_source_link_score, 0)::int4 AS link_score,
+        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id, sl.sale_listing_id::text) AS title,
+        COALESCE(sl.sale_listing_url, '') AS url,
+        CASE
+            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
+            ELSE false
+        END AS external_url_available,
+        COALESCE(sl.sale_listing_street_address, '') AS street_address,
+        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
+        COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
+        COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
+        sl.sale_listing_area_value,
+        sl.sale_listing_asking_price,
+        sl.sale_listing_debt_free_price,
+        sl.sale_listing_price_per_m2,
+        sl.sale_listing_build_year,
+        sl.sale_listing_floor_level,
+        sl.sale_listing_first_seen_at,
+        sl.sale_listing_last_seen_at,
+        sl.sale_listing_published_at,
+        price_match.transaction_id,
+        COALESCE(price_match.match_scope, '') AS price_match_scope,
+        COALESCE(price_match.match_status, '') AS price_match_status,
+        COALESCE(price_match.match_method, '') AS price_match_method,
+        price_match.match_score,
+        price_match.match_reasons,
+        COALESCE(price_match.description, '') AS transaction_description,
+        COALESCE(price_match.type, '') AS transaction_type,
+        COALESCE(price_match.category, '') AS transaction_category,
+        price_match.area_m2,
+        price_match.price_eur,
+        price_match.price_per_m2,
+        price_match.build_year,
+        COALESCE(price_match.floor, '') AS transaction_floor,
+        price_match.elevator,
+        COALESCE(price_match.condition, '') AS transaction_condition,
+        COALESCE(price_match.plot, '') AS transaction_plot,
+        COALESCE(price_match.energy_class, '') AS transaction_energy_class,
+        COALESCE(price_match.period_identifier, '') AS transaction_period_identifier,
+        price_match.transaction_updated_at,
+        COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json
+    FROM target_offerings
+    JOIN public.property_offering_sources pos ON pos.property_offering_id = target_offerings.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN LATERAL (
+        SELECT
+            match_source.transaction_id,
+            match_source.match_scope,
+            match_source.match_status,
+            match_source.match_method,
+            match_source.match_score,
+            match_source.match_reasons,
+            pt.prices_transaction_description AS description,
+            pt.prices_transaction_type AS type,
+            pt.prices_transaction_category AS category,
+            pt.prices_transaction_area AS area_m2,
+            pt.prices_transaction_price::bigint AS price_eur,
+            pt.prices_transaction_price_per_square_meter::bigint AS price_per_m2,
+            pt.prices_transaction_build_year::int4 AS build_year,
+            pt.prices_transaction_floor AS floor,
+            pt.prices_transaction_elevator AS elevator,
+            pt.prices_transaction_condition AS condition,
+            pt.prices_transaction_plot AS plot,
+            pt.prices_transaction_energy_class AS energy_class,
+            pt.prices_transaction_period_identifier AS period_identifier,
+            pt.prices_transaction_updated_at AS transaction_updated_at
+        FROM (
+            SELECT
+                sl.prices_transaction_id AS transaction_id,
+                'source_listing'::text AS match_scope,
+                COALESCE(sl.sale_listing_prices_match_status, 'linked') AS match_status,
+                'prices_service'::text AS match_method,
+                NULL::int4 AS match_score,
+                NULL::jsonb AS match_reasons,
+                0 AS priority
+            WHERE sl.prices_transaction_id IS NOT NULL
+            UNION ALL
+            SELECT
+                pot.prices_transaction_id AS transaction_id,
+                'grouped_offering'::text AS match_scope,
+                pot.property_offering_transaction_link_status AS match_status,
+                pot.property_offering_transaction_link_method AS match_method,
+                pot.property_offering_transaction_link_score::int4 AS match_score,
+                pot.property_offering_transaction_link_reasons AS match_reasons,
+                1 AS priority
+            FROM public.property_offering_transactions pot
+            WHERE pot.property_offering_id = target_offerings.property_offering_id
+                AND pot.property_offering_transaction_link_status <> 'rejected'
+        ) match_source
+        JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.transaction_id
+        ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+        LIMIT 1
+    ) price_match ON true
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'key', insight.property_source_offering_insight_key,
+            'value', insight.property_source_offering_insight_value,
+            'direction', insight.property_source_offering_insight_direction,
+            'severity', insight.property_source_offering_insight_severity,
+            'confidence', insight.property_source_offering_insight_confidence::double precision / 100,
+            'source_field', insight.property_source_offering_insight_source_field,
+            'text', COALESCE(insight.property_source_offering_insight_text, '')
+        ) ORDER BY insight.property_source_offering_insight_severity DESC, insight.property_source_offering_insight_key) AS insights_json
+        FROM public.property_source_offering_insights insight
+        WHERE insight.sale_listing_id = sl.sale_listing_id
+    ) insight_rows ON true
+)
+SELECT
+    sale_listing_id,
+    property_offering_id,
+    property_unit_id,
+    physical_building_id,
+    housing_company_id,
+    sale_listing_source_provider,
+    sale_listing_source_kind,
+    native_id,
+    canonical_id,
+    link_status,
+    link_method,
+    link_score,
+    title,
+    url,
+    external_url_available,
+    street_address,
+    city,
+    postal,
+    room_layout,
+    sale_listing_area_value,
+    sale_listing_asking_price,
+    sale_listing_debt_free_price,
+    sale_listing_price_per_m2,
+    sale_listing_build_year,
+    sale_listing_floor_level,
+    sale_listing_first_seen_at,
+    sale_listing_last_seen_at,
+    sale_listing_published_at,
+    transaction_id,
+    price_match_scope,
+    price_match_status,
+    price_match_method,
+    match_score,
+    match_reasons,
+    transaction_description,
+    transaction_type,
+    transaction_category,
+    area_m2,
+    price_eur,
+    price_per_m2,
+    build_year,
+    transaction_floor,
+    elevator,
+    transaction_condition,
+    transaction_plot,
+    transaction_energy_class,
+    transaction_period_identifier,
+    transaction_updated_at,
+    insights_json
+FROM ranked
+ORDER BY property_offering_id, sale_listing_last_seen_at DESC NULLS LAST, sale_listing_source_provider, native_id
+LIMIT 1000`, target.Type, targetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []TargetSourceListing{}
+	for rows.Next() {
+		var row TargetSourceListing
+		var listingID, offeringID uuid.UUID
+		var unitID, buildingID, housingID *uuid.UUID
+		var priceTransactionID *uuid.UUID
+		var priceMatch TargetPriceMatch
+		var transactionDescription, transactionType, transactionCategory, transactionFloor, transactionCondition, transactionPlot, transactionEnergyClass, transactionPeriod string
+		var transactionArea *float64
+		var transactionPrice, transactionPricePerM2 *int64
+		var transactionBuildYear *int32
+		var transactionElevator *bool
+		var transactionUpdatedAt *time.Time
+		var insightsJSON json.RawMessage
+		if err := rows.Scan(&listingID, &offeringID, &unitID, &buildingID, &housingID, &row.Provider, &row.Kind, &row.NativeID, &row.CanonicalID, &row.LinkStatus, &row.LinkMethod, &row.LinkScore, &row.Title, &row.URL, &row.ExternalURLAvailable, &row.StreetAddress, &row.City, &row.Postal, &row.RoomLayout, &row.AreaM2, &row.AskingPriceEUR, &row.DebtFreePriceEUR, &row.PricePerM2, &row.BuildYear, &row.FloorLevel, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &priceTransactionID, &priceMatch.Scope, &priceMatch.Status, &priceMatch.Method, &priceMatch.Score, &priceMatch.Reasons, &transactionDescription, &transactionType, &transactionCategory, &transactionArea, &transactionPrice, &transactionPricePerM2, &transactionBuildYear, &transactionFloor, &transactionElevator, &transactionCondition, &transactionPlot, &transactionEnergyClass, &transactionPeriod, &transactionUpdatedAt, &insightsJSON); err != nil {
+			return nil, err
+		}
+		row.Target = CanonicalTargetRef{Type: "listing", ID: listingID.String()}
+		row.OfferingTarget = CanonicalTargetRef{Type: "offering", ID: offeringID.String()}
+		row.Title = firstNonEmpty(row.Title, row.NativeID, listingID.String())
+		if priceTransactionID != nil && transactionArea != nil && transactionPrice != nil && transactionPricePerM2 != nil && transactionUpdatedAt != nil {
+			priceMatch.Target = CanonicalTargetRef{Type: "transaction", ID: priceTransactionID.String()}
+			priceMatch.Description = transactionDescription
+			priceMatch.Type = transactionType
+			priceMatch.Category = transactionCategory
+			priceMatch.AreaM2 = *transactionArea
+			priceMatch.PriceEUR = *transactionPrice
+			priceMatch.PricePerM2 = *transactionPricePerM2
+			priceMatch.Floor = transactionFloor
+			priceMatch.Condition = transactionCondition
+			priceMatch.Plot = transactionPlot
+			priceMatch.EnergyClass = transactionEnergyClass
+			priceMatch.PeriodIdentifier = transactionPeriod
+			priceMatch.TransactionUpdatedAt = *transactionUpdatedAt
+			if transactionBuildYear != nil {
+				priceMatch.BuildYear = *transactionBuildYear
+			}
+			if transactionElevator != nil {
+				priceMatch.Elevator = *transactionElevator
+			}
+			row.PriceMatch = &priceMatch
+		}
+		insights, err := parseTargetInsights(insightsJSON)
+		if err != nil {
+			return nil, err
+		}
+		row.Insights = insights
+		if unitID != nil {
+			row.UnitTarget = &CanonicalTargetRef{Type: "unit", ID: unitID.String()}
+		}
+		if buildingID != nil {
+			row.BuildingTarget = &CanonicalTargetRef{Type: "building", ID: buildingID.String()}
+		}
+		if housingID != nil {
+			row.HousingTarget = &CanonicalTargetRef{Type: "housing_company", ID: housingID.String()}
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func parseTargetInsights(raw json.RawMessage) ([]TargetInsight, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var out []TargetInsight
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("parse target insights: %w", err)
+	}
+	return out, nil
+}
+
 func (a *API) listTargetChildren(ctx context.Context, target CanonicalTargetRef) ([]TargetBuildingSummary, []TargetUnitSummary, []TargetOfferingSummary, error) {
 	targetID, err := uuid.Parse(target.ID)
 	if err != nil {
@@ -1516,6 +1870,9 @@ func (a *API) listTargetChildren(ctx context.Context, target CanonicalTargetRef)
 		return nil, units, offerings, err
 	case "unit":
 		offerings, err := a.listUnitOfferings(ctx, targetID)
+		return nil, nil, offerings, err
+	case "house":
+		offerings, err := a.listHouseOfferings(ctx, targetID)
 		return nil, nil, offerings, err
 	default:
 		return nil, nil, nil, nil
@@ -1626,6 +1983,10 @@ func (a *API) listUnitOfferings(ctx context.Context, unitID uuid.UUID) ([]Target
 	return a.listOfferings(ctx, "pu.property_unit_id = $1", unitID)
 }
 
+func (a *API) listHouseOfferings(ctx context.Context, houseID uuid.UUID) ([]TargetOfferingSummary, error) {
+	return a.listOfferings(ctx, "ph.property_house_id = $1", houseID)
+}
+
 func (a *API) listOfferings(ctx context.Context, predicate string, id uuid.UUID) ([]TargetOfferingSummary, error) {
 	rows, err := a.pool.Query(ctx, fmt.Sprintf(`
 SELECT
@@ -1633,13 +1994,69 @@ SELECT
     pu.property_unit_id,
     pu.physical_building_id,
     pu.housing_company_id,
-    COALESCE(po.property_offering_headline, pu.property_unit_room_layout, pu.property_unit_address_norm, po.property_offering_id::text),
-    COALESCE(pu.property_unit_room_layout, ''),
-    pu.property_unit_area_value,
+    COALESCE(po.property_offering_headline, pu.property_unit_room_layout, pu.property_unit_address_norm, ph.property_house_address_norm, po.property_offering_id::text),
+    COALESCE(pu.property_unit_room_layout, primary_listing.sale_listing_room_layout, ''),
+    COALESCE(pu.property_unit_area_value, ph.property_house_area_value),
     po.property_offering_asking_price,
-    po.property_offering_last_seen_at
-FROM public.property_units pu
-JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
+    po.property_offering_last_seen_at,
+    COALESCE(source_stats.source_count, 0)::int4,
+    COALESCE(source_stats.sources, '') AS sources,
+    COALESCE(price_match.transaction_id::text, '')::text AS price_match_transaction_id,
+    COALESCE(price_match.match_status, '') AS price_match_status,
+    COALESCE(price_match.price_eur, 0)::bigint AS price_match_price_eur,
+    COALESCE(insight_stats.insight_count, 0)::int4 AS insight_count,
+    COALESCE(insight_stats.top_severity, '') AS insight_top_severity
+FROM public.property_offerings po
+LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
+LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+LEFT JOIN LATERAL (
+    SELECT
+        count(DISTINCT pos.sale_listing_id)::int4 AS source_count,
+        string_agg(DISTINCT sl.sale_listing_source_provider, ',' ORDER BY sl.sale_listing_source_provider) AS sources
+    FROM public.property_offering_sources pos
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    WHERE pos.property_offering_id = po.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+) source_stats ON true
+LEFT JOIN LATERAL (
+    SELECT
+        pt.prices_transaction_id AS transaction_id,
+        match_source.match_status,
+        pt.prices_transaction_price AS price_eur
+    FROM (
+        SELECT
+            sl.prices_transaction_id,
+            COALESCE(sl.sale_listing_prices_match_status, 'linked') AS match_status,
+            0 AS priority,
+            NULL::int4 AS score
+        FROM public.property_source_offerings sl
+        WHERE sl.sale_listing_id = po.primary_sale_listing_id
+            AND sl.prices_transaction_id IS NOT NULL
+        UNION ALL
+        SELECT
+            pot.prices_transaction_id,
+            pot.property_offering_transaction_link_status AS match_status,
+            1 AS priority,
+            pot.property_offering_transaction_link_score::int4 AS score
+        FROM public.property_offering_transactions pot
+        WHERE pot.property_offering_id = po.property_offering_id
+            AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) match_source
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
+    ORDER BY match_source.priority, match_source.score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+    LIMIT 1
+) price_match ON true
+LEFT JOIN LATERAL (
+    SELECT
+        count(*)::int4 AS insight_count,
+        max(insight.property_source_offering_insight_severity)::text AS top_severity
+    FROM public.property_offering_sources pos
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.property_source_offering_insights insight ON insight.sale_listing_id = sl.sale_listing_id
+    WHERE pos.property_offering_id = po.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+) insight_stats ON true
 WHERE %s
 ORDER BY po.property_offering_last_seen_at DESC NULLS LAST, po.property_offering_asking_price ASC NULLS LAST, po.property_offering_id
 LIMIT 500`, predicate), id)
@@ -1650,14 +2067,24 @@ LIMIT 500`, predicate), id)
 	out := []TargetOfferingSummary{}
 	for rows.Next() {
 		var row TargetOfferingSummary
-		var id, unitID, housingID uuid.UUID
-		var buildingID *uuid.UUID
-		if err := rows.Scan(&id, &unitID, &buildingID, &housingID, &row.Title, &row.Layout, &row.AreaM2, &row.AskingPriceEUR, &row.LastSeenAt); err != nil {
+		var id uuid.UUID
+		var unitID, buildingID, housingID *uuid.UUID
+		var sourcesCSV string
+		var priceMatchPrice int64
+		if err := rows.Scan(&id, &unitID, &buildingID, &housingID, &row.Title, &row.Layout, &row.AreaM2, &row.AskingPriceEUR, &row.LastSeenAt, &row.SourceCount, &sourcesCSV, &row.PriceMatchTransactionID, &row.PriceMatchStatus, &priceMatchPrice, &row.InsightCount, &row.InsightTopSeverity); err != nil {
 			return nil, err
 		}
 		row.Target = CanonicalTargetRef{Type: "offering", ID: id.String()}
-		row.UnitTarget = CanonicalTargetRef{Type: "unit", ID: unitID.String()}
-		row.HousingTarget = &CanonicalTargetRef{Type: "housing_company", ID: housingID.String()}
+		if unitID != nil {
+			row.UnitTarget = &CanonicalTargetRef{Type: "unit", ID: unitID.String()}
+		}
+		if housingID != nil {
+			row.HousingTarget = &CanonicalTargetRef{Type: "housing_company", ID: housingID.String()}
+		}
+		row.Sources = splitCommaList(sourcesCSV)
+		if row.PriceMatchTransactionID != "" {
+			row.PriceMatchPriceEUR = &priceMatchPrice
+		}
 		if buildingID != nil {
 			row.BuildingTarget = &CanonicalTargetRef{Type: "building", ID: buildingID.String()}
 		}
@@ -2026,6 +2453,18 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func splitCommaList(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func formatOptionalInt(value *int64, suffix string) string {

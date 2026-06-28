@@ -32,9 +32,41 @@ func TestAddRoutesIncludesAddressLookup(t *testing.T) {
 	if !strings.Contains(doc, "address-lookup") {
 		t.Fatal("expected address lookup operation id in OpenAPI document")
 	}
-	for _, want := range []string{"connected prices links", "raw prices history", "source-specific offering matches", "raw_transactions", "linked_to_lookup", "candidate_to_lookup", "scope", "is_matched", "matched_listing_count", "listing_count", "has_more_listings", "source_records", "source_candidates", "candidate_offering_id", "transactions", "matches", "link_type", "external_url_available", "reasons_summary", "canonical_id", "offering_id"} {
+	for _, want := range []string{"connected prices links", "raw prices history", "source-specific offering matches", "raw_transactions", "linked_to_lookup", "candidate_to_lookup", "scope", "is_matched", "matched_listing_count", "listing_count", "has_more_listings", "source_records", "source_candidates", "candidate_offering_id", "transactions", "matches", "link_type", "external_url_available", "reasons_summary", "canonical_id", "offering_id", "insights", "source_field"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("expected address lookup OpenAPI schema to include %q", want)
+		}
+	}
+}
+
+func TestAddRoutesIncludesGroupedOfferingSearch(t *testing.T) {
+	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	data, err := json.Marshal(api.OpenAPI())
+	if err != nil {
+		t.Fatalf("marshal openapi: %v", err)
+	}
+	doc := string(data)
+	for _, want := range []string{"/api/v1/search/grouped-offerings", "search-grouped-offerings", "Search grouped offerings", "source_count", "sources", "housing_company_id", "price_match_transaction_id", "insight_count"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected grouped offering search OpenAPI schema to include %q", want)
+		}
+	}
+}
+
+func TestAddRoutesIncludesPropertyTargetOfferingMetadata(t *testing.T) {
+	api := humago.New(http.NewServeMux(), NewConfig("Koditon API", "test"))
+	a := API{logger: slog.Default()}
+	a.AddRoutes(api)
+	data, err := json.Marshal(api.OpenAPI())
+	if err != nil {
+		t.Fatalf("marshal openapi: %v", err)
+	}
+	doc := string(data)
+	for _, want := range []string{"/api/v1/property-targets/{targetType}/{targetID}", "offerings", "source_count", "sources", "price_match_transaction_id", "price_match_status", "price_match_price_eur", "insight_count", "insight_top_severity"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected property target OpenAPI schema to include %q", want)
 		}
 	}
 }
@@ -48,7 +80,7 @@ func TestAddRoutesIncludesEntityRawPayload(t *testing.T) {
 		t.Fatalf("marshal openapi: %v", err)
 	}
 	doc := string(data)
-	for _, want := range []string{"/api/v1/entity", "raw", "pretty", "original_bytes", "external_url_available"} {
+	for _, want := range []string{"/api/v1/entity", "raw", "pretty", "original_bytes", "external_url_available", "price_match", "transaction_id", "price_eur", "insights", "source_field"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("expected entity OpenAPI schema to include %q", want)
 		}

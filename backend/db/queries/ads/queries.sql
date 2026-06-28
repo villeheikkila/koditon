@@ -1461,6 +1461,12 @@ WITH unified AS (
         'ad'::text AS kind,
         sa.shortcut_ad_id::text AS native_id,
         ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id,
+        COALESCE(linked.sale_listing_id::text, '') AS listing_id,
+        COALESCE(linked.property_offering_id::text, '') AS offering_id,
+        COALESCE(linked.link_status, '') AS link_status,
+        COALESCE(linked.link_method, '') AS link_method,
+        linked.link_score::int4 AS link_score,
+        (sa.shortcut_ad_url IS NOT NULL AND sa.shortcut_ad_url <> '' AND sa.shortcut_ad_last_seen_at >= now() - interval '7 days') AS external_url_available,
         COALESCE(raw.street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text)::text AS headline,
         COALESCE(raw.street_address, sb.shortcut_building_address)::text AS address,
         raw.city::text AS city,
@@ -1475,6 +1481,20 @@ WITH unified AS (
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    LEFT JOIN LATERAL (
+        SELECT
+            sl.sale_listing_id,
+            pos.property_offering_id,
+            pos.property_offering_source_link_status AS link_status,
+            pos.property_offering_source_link_method AS link_method,
+            pos.property_offering_source_link_score AS link_score
+        FROM public.property_source_offerings sl
+        LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        WHERE sl.shortcut_ad_id = sa.shortcut_ad_id
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) linked ON true
     CROSS JOIN LATERAL (
         SELECT
             public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data) AS street_address,
@@ -1489,6 +1509,12 @@ WITH unified AS (
         'building'::text AS kind,
         sb.shortcut_building_id::text AS native_id,
         ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
+        ''::text AS listing_id,
+        ''::text AS offering_id,
+        ''::text AS link_status,
+        ''::text AS link_method,
+        NULL::int4 AS link_score,
+        (sb.shortcut_building_url IS NOT NULL AND sb.shortcut_building_url <> '') AS external_url_available,
         COALESCE(sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_external_id::text) AS headline,
         sb.shortcut_building_address AS address,
         NULL::text AS city,
@@ -1508,6 +1534,12 @@ WITH unified AS (
         'ad'::text AS kind,
         fa.frontdoor_ad_external_id AS native_id,
         sl.sale_listing_id::text AS canonical_id,
+        sl.sale_listing_id::text AS listing_id,
+        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(pos.property_offering_source_link_status, '') AS link_status,
+        COALESCE(pos.property_offering_source_link_method, '') AS link_method,
+        pos.property_offering_source_link_score::int4 AS link_score,
+        (fa.frontdoor_ad_page_not_found = false) AS external_url_available,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, fa.frontdoor_ad_external_id) AS headline,
         sl.sale_listing_street_address AS address,
         sl.sale_listing_city AS city,
@@ -1522,12 +1554,30 @@ WITH unified AS (
         sl.sale_listing_published_at AS published_at
     FROM public.frontdoor_ads fa
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
+    LEFT JOIN LATERAL (
+        SELECT
+            pos.property_offering_id,
+            pos.property_offering_source_link_status,
+            pos.property_offering_source_link_method,
+            pos.property_offering_source_link_score
+        FROM public.property_offering_sources pos
+        WHERE pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) pos ON true
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
         'announcement'::text AS kind,
         sl.sale_listing_native_id AS native_id,
         sl.sale_listing_id::text AS canonical_id,
+        sl.sale_listing_id::text AS listing_id,
+        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(pos.property_offering_source_link_status, '') AS link_status,
+        COALESCE(pos.property_offering_source_link_method, '') AS link_method,
+        pos.property_offering_source_link_score::int4 AS link_score,
+        COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
         sl.sale_listing_street_address AS address,
         sl.sale_listing_city AS city,
@@ -1541,6 +1591,19 @@ WITH unified AS (
         NULL::text AS listing_type,
         sl.sale_listing_published_at AS published_at
     FROM public.property_source_offerings sl
+    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN LATERAL (
+        SELECT
+            pos.property_offering_id,
+            pos.property_offering_source_link_status,
+            pos.property_offering_source_link_method,
+            pos.property_offering_source_link_score
+        FROM public.property_offering_sources pos
+        WHERE pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) pos ON true
     WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
@@ -1548,6 +1611,12 @@ WITH unified AS (
         'building'::text AS kind,
         fb.frontdoor_building_id::text AS native_id,
         ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
+        ''::text AS listing_id,
+        ''::text AS offering_id,
+        ''::text AS link_status,
+        ''::text AS link_method,
+        NULL::int4 AS link_score,
+        (fb.frontdoor_building_url IS NOT NULL AND fb.frontdoor_building_url <> '') AS external_url_available,
         COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_id::text) AS headline,
         concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number) AS address,
         COALESCE(fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city,
@@ -1574,34 +1643,96 @@ WITH unified AS (
       AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
       AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
       AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text)
+      AND (sqlc.arg(grouping_filter) = 'all' OR (sqlc.arg(grouping_filter) = 'grouped' AND u.offering_id <> '') OR (sqlc.arg(grouping_filter) = 'ungrouped' AND u.offering_id = ''))
       AND (sqlc.narg('published_after')::timestamptz IS NULL OR u.published_at >= sqlc.narg('published_after')::timestamptz)
       AND (sqlc.narg('published_before')::timestamptz IS NULL OR u.published_at <= sqlc.narg('published_before')::timestamptz)
 )
 SELECT
-    source,
-    kind,
-    native_id,
-    canonical_id::text AS canonical_id,
-    headline,
-    address,
-    city,
-    postal,
-    price,
-    area,
-    room_layout::text AS room_layout,
-    url,
-    last_seen_at
-FROM filtered
+    u.source,
+    u.kind,
+    u.native_id,
+    u.canonical_id::text AS canonical_id,
+    u.listing_id::text AS listing_id,
+    u.offering_id::text AS offering_id,
+    COALESCE(hc.housing_company_id::text, '')::text AS housing_company_id,
+    COALESCE(hc.housing_company_name, '') AS housing_company_name,
+    u.link_status,
+    u.link_method,
+    COALESCE(u.link_score, 0)::int4 AS link_score,
+    COALESCE(u.external_url_available, false)::bool AS external_url_available,
+    COALESCE(price_match.transaction_id::text, '')::text AS price_match_transaction_id,
+    COALESCE(price_match.match_scope, '') AS price_match_scope,
+    COALESCE(price_match.match_status, '') AS price_match_status,
+    COALESCE(price_match.match_method, '') AS price_match_method,
+    COALESCE(price_match.match_score, 0)::int4 AS price_match_score,
+    COALESCE(price_match.price_eur, 0)::bigint AS price_match_price_eur,
+    COALESCE(insight_stats.insight_count, 0)::int4 AS insight_count,
+    COALESCE(insight_stats.top_severity, '') AS insight_top_severity,
+    u.headline,
+    u.address,
+    u.city,
+    u.postal,
+    u.price,
+    u.area,
+    u.room_layout::text AS room_layout,
+    u.url,
+    u.last_seen_at
+FROM filtered u
+LEFT JOIN public.property_offerings po ON po.property_offering_id::text = u.offering_id
+LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+LEFT JOIN LATERAL (
+    SELECT
+        pt.prices_transaction_id AS transaction_id,
+        match_source.match_scope,
+        match_source.match_status,
+        match_source.match_method,
+        match_source.match_score,
+        pt.prices_transaction_price AS price_eur
+    FROM (
+        SELECT
+            sl.prices_transaction_id,
+            'source_listing'::text AS match_scope,
+            COALESCE(sl.sale_listing_prices_match_status, 'linked') AS match_status,
+            'prices_service'::text AS match_method,
+            NULL::int4 AS match_score,
+            0 AS priority
+        FROM public.property_source_offerings sl
+        WHERE sl.sale_listing_id::text = u.listing_id
+            AND sl.prices_transaction_id IS NOT NULL
+        UNION ALL
+        SELECT
+            pot.prices_transaction_id,
+            'grouped_offering'::text AS match_scope,
+            pot.property_offering_transaction_link_status AS match_status,
+            pot.property_offering_transaction_link_method AS match_method,
+            pot.property_offering_transaction_link_score::int4 AS match_score,
+            1 AS priority
+        FROM public.property_offering_transactions pot
+        WHERE pot.property_offering_id::text = u.offering_id
+            AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) match_source
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
+    ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+    LIMIT 1
+) price_match ON true
+LEFT JOIN LATERAL (
+    SELECT
+        count(*)::int4 AS insight_count,
+        max(property_source_offering_insight_severity)::text AS top_severity
+    FROM public.property_source_offering_insights insight
+    WHERE insight.sale_listing_id::text = u.listing_id
+) insight_stats ON true
 ORDER BY
-    CASE WHEN sqlc.arg(sort_mode) = 'price_asc' THEN price END ASC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'price_desc' THEN price END DESC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'area_asc' THEN area END ASC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'area_desc' THEN area END DESC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'seen_desc' THEN last_seen_at END DESC NULLS LAST,
-    last_seen_at DESC,
-    source,
-    kind,
-    native_id
+    CASE WHEN sqlc.arg(sort_mode) = 'price_asc' THEN u.price END ASC NULLS LAST,
+    CASE WHEN sqlc.arg(sort_mode) = 'price_desc' THEN u.price END DESC NULLS LAST,
+    CASE WHEN sqlc.arg(sort_mode) = 'area_asc' THEN u.area END ASC NULLS LAST,
+    CASE WHEN sqlc.arg(sort_mode) = 'area_desc' THEN u.area END DESC NULLS LAST,
+    CASE WHEN sqlc.arg(sort_mode) = 'seen_desc' THEN u.last_seen_at END DESC NULLS LAST,
+    u.last_seen_at DESC,
+    u.source,
+    u.kind,
+    u.native_id
 LIMIT sqlc.arg(limit_count)::int
 OFFSET sqlc.arg(offset_count)::int;
 
@@ -1610,6 +1741,7 @@ WITH unified AS (
     SELECT
         'shortcut'::text AS source,
         'ad'::text AS kind,
+        COALESCE(linked.property_offering_id::text, '') AS offering_id,
         raw.city::text AS city,
         raw.postal::text AS postal,
         raw.price::bigint AS price,
@@ -1619,6 +1751,15 @@ WITH unified AS (
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    LEFT JOIN LATERAL (
+        SELECT pos.property_offering_id
+        FROM public.property_source_offerings sl
+        JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        WHERE sl.shortcut_ad_id = sa.shortcut_ad_id
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) linked ON true
     CROSS JOIN LATERAL (
         SELECT
             public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data) AS street_address,
@@ -1631,6 +1772,7 @@ WITH unified AS (
     SELECT
         'shortcut'::text AS source,
         'building'::text AS kind,
+        ''::text AS offering_id,
         NULL::text AS city,
         NULL::text AS postal,
         NULL::bigint AS price,
@@ -1643,6 +1785,7 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'ad'::text AS kind,
+        COALESCE(pos.property_offering_id::text, '') AS offering_id,
         sl.sale_listing_city AS city,
         sl.sale_listing_postal AS postal,
         sl.sale_listing_asking_price AS price,
@@ -1652,10 +1795,19 @@ WITH unified AS (
         sl.sale_listing_published_at AS published_at
     FROM public.frontdoor_ads fa
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
+    LEFT JOIN LATERAL (
+        SELECT pos.property_offering_id
+        FROM public.property_offering_sources pos
+        WHERE pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) pos ON true
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
         'announcement'::text AS kind,
+        COALESCE(pos.property_offering_id::text, '') AS offering_id,
         sl.sale_listing_city AS city,
         sl.sale_listing_postal AS postal,
         sl.sale_listing_asking_price AS price,
@@ -1664,11 +1816,20 @@ WITH unified AS (
         NULL::text AS listing_type,
         sl.sale_listing_published_at AS published_at
     FROM public.property_source_offerings sl
+    LEFT JOIN LATERAL (
+        SELECT pos.property_offering_id
+        FROM public.property_offering_sources pos
+        WHERE pos.sale_listing_id = sl.sale_listing_id
+            AND pos.property_offering_source_link_status <> 'rejected'
+        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        LIMIT 1
+    ) pos ON true
     WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
         'building'::text AS kind,
+        ''::text AS offering_id,
         COALESCE(fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city,
         fb.frontdoor_building_postcode AS postal,
         NULL::bigint AS price,
@@ -1690,6 +1851,7 @@ WHERE (sqlc.arg(source_filter) = 'all' OR u.source = sqlc.arg(source_filter))
   AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
   AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
   AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text)
+  AND (sqlc.arg(grouping_filter) = 'all' OR (sqlc.arg(grouping_filter) = 'grouped' AND u.offering_id <> '') OR (sqlc.arg(grouping_filter) = 'ungrouped' AND u.offering_id = ''))
   AND (sqlc.narg('published_after')::timestamptz IS NULL OR u.published_at >= sqlc.narg('published_after')::timestamptz)
   AND (sqlc.narg('published_before')::timestamptz IS NULL OR u.published_at <= sqlc.narg('published_before')::timestamptz);
 

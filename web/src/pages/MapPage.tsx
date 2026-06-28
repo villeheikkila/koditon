@@ -164,7 +164,7 @@ export default function MapPage() {
             <h1>Property targets</h1>
             <p>Standalone houses, physical buildings, and housing companies on the same map.</p>
           </div>
-          <Link className="model-upload" to="/search">Targets</Link>
+          <Link className="model-upload" to="/search?view=grouped&grouping=grouped">Grouped listings</Link>
         </header>
         <section className="canonical-map-overview" aria-label="Map target summary">
           <button type="button" className={targetTabClass(targetFilter, 'all')} onClick={() => setTargetFilter('all')}>

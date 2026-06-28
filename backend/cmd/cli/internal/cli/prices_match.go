@@ -6,6 +6,8 @@ import (
 	"io"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"koditon/internal/domain/properties"
 )
 
 type PricesMatchSaleListingsFlags struct {
@@ -42,11 +44,12 @@ func RunPricesMatchSaleListings(ctx context.Context, pool *pgxpool.Pool, f Price
 	if margin == 0 {
 		margin = 15
 	}
-	var runID string
-	if err := pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches($1, $2, $3)::text`, f.AutoLinkSafe, threshold, margin).Scan(&runID); err != nil {
+	service := properties.NewService(pool)
+	run, err := service.RunSaleListingTransactionMatch(ctx, properties.TransactionMatchRunOptions{AutoLinkSafe: f.AutoLinkSafe, ScoreThreshold: int32(threshold), CompetitorMargin: int32(margin)})
+	if err != nil {
 		return fmt.Errorf("match sale listings: %w", err)
 	}
-	summary, err := loadPricesMatchSaleListingsSummary(ctx, pool, runID)
+	summary, err := loadPricesMatchSaleListingsSummary(ctx, pool, run.RunID)
 	if err != nil {
 		return err
 	}

@@ -25,6 +25,7 @@ type SearchParams struct {
 	Query           string
 	Source          string
 	Kind            string
+	Grouping        string
 	ListingType     string
 	MinPrice        *int64
 	MaxPrice        *int64
@@ -40,19 +41,35 @@ type SearchParams struct {
 }
 
 type UnifiedEntityRow struct {
-	CanonicalID string
-	Source      string
-	Kind        string
-	NativeID    string
-	Headline    string
-	Address     string
-	City        string
-	Postal      string
-	Price       *int64
-	Area        *float64
-	RoomLayout  string
-	URL         string
-	LastSeenAt  time.Time
+	CanonicalID             string
+	Source                  string
+	Kind                    string
+	NativeID                string
+	ListingID               string
+	OfferingID              string
+	HousingCompanyID        string
+	HousingCompanyName      string
+	LinkStatus              string
+	LinkMethod              string
+	LinkScore               *int32
+	PriceMatchTransactionID string
+	PriceMatchScope         string
+	PriceMatchStatus        string
+	PriceMatchMethod        string
+	PriceMatchScore         *int32
+	PriceMatchPrice         *int64
+	InsightCount            int32
+	InsightTopSeverity      string
+	Headline                string
+	Address                 string
+	City                    string
+	Postal                  string
+	Price                   *int64
+	Area                    *float64
+	RoomLayout              string
+	URL                     string
+	ExternalURLAvailable    bool
+	LastSeenAt              time.Time
 }
 
 type AddressLookupParams struct {
@@ -70,8 +87,32 @@ type AddressLookupResult struct {
 	Source          string                  `json:"source"`
 	ListingCount    int                     `json:"listing_count"`
 	HasMoreListings bool                    `json:"has_more_listings"`
+	Offerings       []AddressOffering       `json:"offerings"`
 	Listings        []AddressListing        `json:"listings"`
 	RawTransactions []AddressRawTransaction `json:"raw_transactions"`
+}
+
+type AddressOffering struct {
+	OfferingID           string                   `json:"offering_id"`
+	HousingCompanyID     string                   `json:"housing_company_id,omitempty"`
+	HousingCompanyName   string                   `json:"housing_company_name,omitempty"`
+	Headline             string                   `json:"headline"`
+	Address              string                   `json:"address,omitempty"`
+	City                 string                   `json:"city,omitempty"`
+	Postal               string                   `json:"postal,omitempty"`
+	AskingPrice          *int64                   `json:"asking_price,omitempty"`
+	DebtFreePrice        *int64                   `json:"debt_free_price,omitempty"`
+	Area                 *float64                 `json:"area,omitempty"`
+	RoomLayout           string                   `json:"room_layout,omitempty"`
+	FirstSeenAt          *time.Time               `json:"first_seen_at,omitempty"`
+	LastSeenAt           *time.Time               `json:"last_seen_at,omitempty"`
+	SourceCount          int                      `json:"source_count"`
+	Sources              []string                 `json:"sources"`
+	SourceRecords        []AddressSourceRecord    `json:"source_records"`
+	Transactions         []AddressTransactionLink `json:"transactions"`
+	Insights             []AddressInsight         `json:"insights,omitempty"`
+	Representative       AddressSourceRecord      `json:"representative"`
+	SourceCandidateCount int                      `json:"source_candidate_count"`
 }
 
 type AddressListing struct {
@@ -80,6 +121,8 @@ type AddressListing struct {
 	Source                string                   `json:"source"`
 	Kind                  string                   `json:"kind"`
 	NativeID              string                   `json:"native_id"`
+	HousingCompanyID      string                   `json:"housing_company_id,omitempty"`
+	HousingCompanyName    string                   `json:"housing_company_name,omitempty"`
 	Headline              string                   `json:"headline"`
 	Address               string                   `json:"address"`
 	City                  string                   `json:"city,omitempty"`
@@ -104,6 +147,7 @@ type AddressListing struct {
 	SourceRecords         []AddressSourceRecord    `json:"source_records"`
 	SourceCandidates      []AddressSourceCandidate `json:"source_candidates"`
 	Transactions          []AddressTransactionLink `json:"transactions"`
+	Insights              []AddressInsight         `json:"insights,omitempty"`
 }
 
 type AddressListingTexts struct {
@@ -139,6 +183,17 @@ type AddressSourceRecord struct {
 	LinkMethod            string               `json:"link_method,omitempty"`
 	LinkScore             *int32               `json:"link_score,omitempty"`
 	Texts                 *AddressListingTexts `json:"texts,omitempty"`
+	Insights              []AddressInsight     `json:"insights,omitempty"`
+}
+
+type AddressInsight struct {
+	Key         string  `json:"key"`
+	Value       string  `json:"value"`
+	Direction   string  `json:"direction,omitempty"`
+	Severity    string  `json:"severity,omitempty"`
+	Confidence  float64 `json:"confidence,omitempty"`
+	SourceField string  `json:"source_field,omitempty"`
+	Text        string  `json:"text,omitempty"`
 }
 
 type AddressSourceCandidate struct {
@@ -251,6 +306,37 @@ type ReportPage struct {
 	PageSize int32
 }
 
+type GroupedOfferingSearchPage struct {
+	Rows     []GroupedOfferingRow
+	Total    int64
+	Page     int32
+	PageSize int32
+}
+
+type GroupedOfferingRow struct {
+	OfferingID              string
+	HousingCompanyID        string
+	HousingCompanyName      string
+	Headline                string
+	Address                 string
+	City                    string
+	Postal                  string
+	Price                   *int64
+	Area                    *float64
+	RoomLayout              string
+	LastSeenAt              *time.Time
+	SourceCount             int32
+	Sources                 []string
+	PriceMatchTransactionID string
+	PriceMatchScope         string
+	PriceMatchStatus        string
+	PriceMatchMethod        string
+	PriceMatchScore         *int32
+	PriceMatchPrice         *int64
+	InsightCount            int32
+	InsightTopSeverity      string
+}
+
 type DetailField struct {
 	Label string
 	Value string
@@ -337,6 +423,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	offset := (normalized.Page - 1) * normalized.PageSize
 	source := stringPtr(normalized.Source)
 	kind := stringPtr(normalized.Kind)
+	grouping := stringPtr(normalized.Grouping)
 	sort := stringPtr(normalized.Sort)
 	listingTypeFilter := emptyToNil(normalized.ListingType)
 	if normalized.ListingType == "all" {
@@ -355,6 +442,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MinArea:           normalized.MinArea,
 		MaxArea:           normalized.MaxArea,
 		ListingTypeFilter: listingTypeFilter,
+		GroupingFilter:    grouping,
 		PublishedAfter:    publishedAfter,
 		PublishedBefore:   publishedBefore,
 	})
@@ -375,6 +463,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 		MinArea:           normalized.MinArea,
 		MaxArea:           normalized.MaxArea,
 		ListingTypeFilter: listingTypeFilter,
+		GroupingFilter:    grouping,
 		PublishedAfter:    publishedAfter,
 		PublishedBefore:   publishedBefore,
 	})
@@ -384,22 +473,73 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 	mapped := make([]UnifiedEntityRow, 0, len(rows))
 	for _, row := range rows {
 		mapped = append(mapped, UnifiedEntityRow{
-			CanonicalID: strings.TrimSpace(row.CanonicalID),
-			Source:      row.Source,
-			Kind:        row.Kind,
-			NativeID:    row.NativeID,
-			Headline:    strings.TrimSpace(row.Headline),
-			Address:     strings.TrimSpace(row.Address),
-			City:        strings.TrimSpace(row.City),
-			Postal:      strings.TrimSpace(row.Postal),
-			Price:       int64Ptr(row.Price),
-			Area:        float64Ptr(row.Area),
-			RoomLayout:  strings.TrimSpace(row.RoomLayout),
-			URL:         strings.TrimSpace(row.Url),
-			LastSeenAt:  row.LastSeenAt,
+			CanonicalID:             strings.TrimSpace(row.CanonicalID),
+			Source:                  row.Source,
+			Kind:                    row.Kind,
+			NativeID:                row.NativeID,
+			ListingID:               strings.TrimSpace(row.ListingID),
+			OfferingID:              strings.TrimSpace(row.OfferingID),
+			HousingCompanyID:        strings.TrimSpace(row.HousingCompanyID),
+			HousingCompanyName:      strings.TrimSpace(row.HousingCompanyName),
+			LinkStatus:              strings.TrimSpace(row.LinkStatus),
+			LinkMethod:              strings.TrimSpace(row.LinkMethod),
+			LinkScore:               int32Ptr(row.LinkScore),
+			PriceMatchTransactionID: strings.TrimSpace(row.PriceMatchTransactionID),
+			PriceMatchScope:         strings.TrimSpace(row.PriceMatchScope),
+			PriceMatchStatus:        strings.TrimSpace(row.PriceMatchStatus),
+			PriceMatchMethod:        strings.TrimSpace(row.PriceMatchMethod),
+			PriceMatchScore:         int32Ptr(row.PriceMatchScore),
+			PriceMatchPrice:         int64PtrIf(row.PriceMatchTransactionID != "", row.PriceMatchPriceEur),
+			InsightCount:            row.InsightCount,
+			InsightTopSeverity:      strings.TrimSpace(row.InsightTopSeverity),
+			Headline:                strings.TrimSpace(row.Headline),
+			Address:                 strings.TrimSpace(row.Address),
+			City:                    strings.TrimSpace(row.City),
+			Postal:                  strings.TrimSpace(row.Postal),
+			Price:                   int64Ptr(row.Price),
+			Area:                    float64Ptr(row.Area),
+			RoomLayout:              strings.TrimSpace(row.RoomLayout),
+			URL:                     strings.TrimSpace(row.Url),
+			ExternalURLAvailable:    row.ExternalUrlAvailable,
+			LastSeenAt:              row.LastSeenAt,
 		})
 	}
 	return ReportPage{Rows: mapped, Total: count, Page: normalized.Page, PageSize: normalized.PageSize}, nil
+}
+
+func (s *Service) SearchGroupedOfferings(ctx context.Context, params SearchParams) (GroupedOfferingSearchPage, error) {
+	normalized := normalizeSearchParams(params)
+	offset := (normalized.Page - 1) * normalized.PageSize
+	args := []any{normalizeSource(normalized.Source), normalizeKind(normalized.Kind), emptyToNil(normalized.Query), emptyToNil(normalized.City), emptyToNil(normalized.Postal), normalized.MinPrice, normalized.MaxPrice, normalized.MinArea, normalized.MaxArea, stringPtr(normalized.Sort), normalized.PublishedAfter, normalized.PublishedBefore}
+	var total int64
+	if err := s.db.QueryRow(ctx, groupedOfferingSearchCountSQL, args...).Scan(&total); err != nil {
+		return GroupedOfferingSearchPage{}, fmt.Errorf("count grouped offerings: %w", err)
+	}
+	rows, err := s.db.Query(ctx, groupedOfferingSearchSQL, append(args, normalized.PageSize, offset)...)
+	if err != nil {
+		return GroupedOfferingSearchPage{}, fmt.Errorf("search grouped offerings: %w", err)
+	}
+	defer rows.Close()
+	out := []GroupedOfferingRow{}
+	for rows.Next() {
+		var row GroupedOfferingRow
+		var sourcesCSV string
+		var priceMatchPrice int64
+		var priceMatchScore int32
+		if err := rows.Scan(&row.OfferingID, &row.HousingCompanyID, &row.HousingCompanyName, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Price, &row.Area, &row.RoomLayout, &row.LastSeenAt, &row.SourceCount, &sourcesCSV, &row.PriceMatchTransactionID, &row.PriceMatchScope, &row.PriceMatchStatus, &row.PriceMatchMethod, &priceMatchScore, &priceMatchPrice, &row.InsightCount, &row.InsightTopSeverity); err != nil {
+			return GroupedOfferingSearchPage{}, fmt.Errorf("scan grouped offering: %w", err)
+		}
+		row.Sources = splitCSV(sourcesCSV)
+		if row.PriceMatchTransactionID != "" {
+			row.PriceMatchScore = int32Ptr(priceMatchScore)
+			row.PriceMatchPrice = int64PtrIf(true, priceMatchPrice)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return GroupedOfferingSearchPage{}, fmt.Errorf("iterate grouped offerings: %w", err)
+	}
+	return GroupedOfferingSearchPage{Rows: out, Total: total, Page: normalized.Page, PageSize: normalized.PageSize}, nil
 }
 
 func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams) (AddressLookupResult, error) {
@@ -431,7 +571,7 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	lookupRows := []addressLookupRow{}
 	for rows.Next() {
 		var row addressLookupRow
-		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.ListingCount, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges); err != nil {
+		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.HousingCompanyID, &row.HousingCompanyName, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.InsightsJSON, &row.ListingCount, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges, &row.SourceRecordInsightsJSON); err != nil {
 			return AddressLookupResult{}, fmt.Errorf("scan address listing: %w", err)
 		}
 		lookupRows = append(lookupRows, row)
@@ -443,6 +583,7 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	if err := s.attachAddressSourceCandidates(ctx, &result); err != nil {
 		return AddressLookupResult{}, err
 	}
+	result.Offerings = addressOfferings(result.Listings)
 	rawTransactions, err := s.lookupAddressRawTransactions(ctx, result, 40)
 	if err != nil {
 		return AddressLookupResult{}, err
@@ -603,11 +744,14 @@ type addressLookupRow struct {
 	PriceMatchStatus                 string
 	SourceMatchStatus                string
 	OfferingID                       *uuid.UUID
+	HousingCompanyID                 *uuid.UUID
+	HousingCompanyName               string
 	AvailabilityText                 string
 	RenovationsDoneText              string
 	RenovationsPlannedText           string
 	AdditionalInfoText               string
 	ChargesText                      string
+	InsightsJSON                     json.RawMessage
 	ListingCount                     int
 	TransactionID                    *uuid.UUID
 	LinkType                         string
@@ -663,6 +807,7 @@ type addressLookupRow struct {
 	SourceRecordRenovationsPlan      string
 	SourceRecordAdditionalInfo       string
 	SourceRecordCharges              string
+	SourceRecordInsightsJSON         json.RawMessage
 }
 
 type addressRawTransactionRow struct {
@@ -722,7 +867,7 @@ type addressSourceCandidateRow struct {
 }
 
 func buildAddressLookupResult(address, city, postal, source string, rows []addressLookupRow) AddressLookupResult {
-	result := AddressLookupResult{Address: address, City: city, Postal: postal, Source: source, Listings: []AddressListing{}, RawTransactions: []AddressRawTransaction{}}
+	result := AddressLookupResult{Address: address, City: city, Postal: postal, Source: source, Offerings: []AddressOffering{}, Listings: []AddressListing{}, RawTransactions: []AddressRawTransaction{}}
 	index := map[uuid.UUID]int{}
 	sourceRecordsByOffering := map[uuid.UUID][]AddressSourceRecord{}
 	seenSourceRecords := map[uuid.UUID]map[uuid.UUID]struct{}{}
@@ -738,10 +883,10 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 				seenSourceRecords[*row.OfferingID] = seen
 			}
 			sourceRecordID := row.ListingID
-			sourceRecord := AddressSourceRecord{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText)}
+			sourceRecord := AddressSourceRecord{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), Insights: parseAddressInsights(row.InsightsJSON)}
 			if row.SourceRecordListingID != nil {
 				sourceRecordID = *row.SourceRecordListingID
-				sourceRecord = AddressSourceRecord{ListingID: row.SourceRecordListingID.String(), CanonicalID: row.SourceRecordCanonicalID, Source: row.SourceRecordSource, Kind: row.SourceRecordKind, NativeID: row.SourceRecordNativeID, Headline: row.SourceRecordHeadline, Address: row.SourceRecordAddress, City: row.SourceRecordCity, Postal: row.SourceRecordPostal, AskingPrice: row.SourceRecordAskingPrice, DebtFreePrice: row.SourceRecordDebtFreePrice, Area: row.SourceRecordArea, RoomLayout: row.SourceRecordRoomLayout, URL: row.SourceRecordURL, ExternalURLAvailable: row.SourceRecordExternalURLAvailable, FirstSeenAt: row.SourceRecordFirstSeenAt, LastSeenAt: row.SourceRecordLastSeenAt, UpdatedAt: row.SourceRecordUpdatedAt, PreviousAskingPrice: row.SourceRecordPreviousAsk, PreviousDebtFreePrice: row.SourceRecordPreviousDebt, LinkStatus: row.SourceRecordLinkStatus, LinkMethod: row.SourceRecordLinkMethod, LinkScore: row.SourceRecordLinkScore, Texts: addressListingTexts(row.SourceRecordAvailability, row.SourceRecordRenovationsDone, row.SourceRecordRenovationsPlan, row.SourceRecordAdditionalInfo, row.SourceRecordCharges)}
+				sourceRecord = AddressSourceRecord{ListingID: row.SourceRecordListingID.String(), CanonicalID: row.SourceRecordCanonicalID, Source: row.SourceRecordSource, Kind: row.SourceRecordKind, NativeID: row.SourceRecordNativeID, Headline: row.SourceRecordHeadline, Address: row.SourceRecordAddress, City: row.SourceRecordCity, Postal: row.SourceRecordPostal, AskingPrice: row.SourceRecordAskingPrice, DebtFreePrice: row.SourceRecordDebtFreePrice, Area: row.SourceRecordArea, RoomLayout: row.SourceRecordRoomLayout, URL: row.SourceRecordURL, ExternalURLAvailable: row.SourceRecordExternalURLAvailable, FirstSeenAt: row.SourceRecordFirstSeenAt, LastSeenAt: row.SourceRecordLastSeenAt, UpdatedAt: row.SourceRecordUpdatedAt, PreviousAskingPrice: row.SourceRecordPreviousAsk, PreviousDebtFreePrice: row.SourceRecordPreviousDebt, LinkStatus: row.SourceRecordLinkStatus, LinkMethod: row.SourceRecordLinkMethod, LinkScore: row.SourceRecordLinkScore, Texts: addressListingTexts(row.SourceRecordAvailability, row.SourceRecordRenovationsDone, row.SourceRecordRenovationsPlan, row.SourceRecordAdditionalInfo, row.SourceRecordCharges), Insights: parseAddressInsights(row.SourceRecordInsightsJSON)}
 			}
 			if _, ok := seen[sourceRecordID]; !ok {
 				seen[sourceRecordID] = struct{}{}
@@ -750,7 +895,7 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 		}
 		listingIndex, ok := index[row.ListingID]
 		if !ok {
-			listing := AddressListing{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, PriceMatchStatus: row.PriceMatchStatus, SourceMatchStatus: row.SourceMatchStatus, OfferingID: uuidPtrString(row.OfferingID), Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), SourceRecords: []AddressSourceRecord{}, SourceCandidates: []AddressSourceCandidate{}, Transactions: []AddressTransactionLink{}}
+			listing := AddressListing{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, HousingCompanyID: uuidPtrString(row.HousingCompanyID), HousingCompanyName: row.HousingCompanyName, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, PriceMatchStatus: row.PriceMatchStatus, SourceMatchStatus: row.SourceMatchStatus, OfferingID: uuidPtrString(row.OfferingID), Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), SourceRecords: []AddressSourceRecord{}, SourceCandidates: []AddressSourceCandidate{}, Transactions: []AddressTransactionLink{}, Insights: parseAddressInsights(row.InsightsJSON)}
 			result.Listings = append(result.Listings, listing)
 			listingIndex = len(result.Listings) - 1
 			index[row.ListingID] = listingIndex
@@ -771,11 +916,59 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 			result.Listings[i].SourceRecords = slices.Clone(sourceRecordsByOffering[offeringID])
 		}
 	}
+	result.Offerings = addressOfferings(result.Listings)
 	if result.ListingCount == 0 {
 		result.ListingCount = len(result.Listings)
 	}
 	result.HasMoreListings = result.ListingCount > len(result.Listings)
 	return result
+}
+
+func addressOfferings(listings []AddressListing) []AddressOffering {
+	index := map[string]int{}
+	out := []AddressOffering{}
+	for _, listing := range listings {
+		if listing.OfferingID == "" {
+			continue
+		}
+		sourceRecords := listing.SourceRecords
+		if len(sourceRecords) == 0 {
+			sourceRecords = []AddressSourceRecord{addressSourceRecordFromListing(listing)}
+		}
+		offeringIndex, ok := index[listing.OfferingID]
+		if !ok {
+			representative := representativeAddressSourceRecord(sourceRecords)
+			out = append(out, AddressOffering{OfferingID: listing.OfferingID, HousingCompanyID: listing.HousingCompanyID, HousingCompanyName: listing.HousingCompanyName, Headline: firstNonEmpty(representative.Headline, listing.Headline, representative.Address, listing.OfferingID), Address: firstNonEmpty(representative.Address, listing.Address), City: firstNonEmpty(representative.City, listing.City), Postal: firstNonEmpty(representative.Postal, listing.Postal), AskingPrice: firstInt64(representative.AskingPrice, listing.AskingPrice), DebtFreePrice: firstInt64(representative.DebtFreePrice, listing.DebtFreePrice), Area: firstFloat64(representative.Area, listing.Area), RoomLayout: firstNonEmpty(representative.RoomLayout, listing.RoomLayout), FirstSeenAt: earliestTimePtr(representative.FirstSeenAt, listing.FirstSeenAt), LastSeenAt: latestTimePtr(representative.LastSeenAt, listing.LastSeenAt), SourceRecords: []AddressSourceRecord{}, Transactions: []AddressTransactionLink{}, Representative: representative})
+			offeringIndex = len(out) - 1
+			index[listing.OfferingID] = offeringIndex
+		}
+		out[offeringIndex].HousingCompanyID = firstNonEmpty(out[offeringIndex].HousingCompanyID, listing.HousingCompanyID)
+		out[offeringIndex].HousingCompanyName = firstNonEmpty(out[offeringIndex].HousingCompanyName, listing.HousingCompanyName)
+		out[offeringIndex].SourceRecords = appendUniqueAddressSourceRecords(out[offeringIndex].SourceRecords, sourceRecords)
+		out[offeringIndex].Transactions = appendUniqueAddressTransactions(out[offeringIndex].Transactions, listing.Transactions)
+		out[offeringIndex].FirstSeenAt = earliestTimePtr(out[offeringIndex].FirstSeenAt, listing.FirstSeenAt)
+		out[offeringIndex].LastSeenAt = latestTimePtr(out[offeringIndex].LastSeenAt, listing.LastSeenAt)
+		out[offeringIndex].SourceCandidateCount += len(listing.SourceCandidates)
+	}
+	for i := range out {
+		out[i].SourceRecords = sortAddressSourceRecords(out[i].SourceRecords)
+		out[i].SourceCount = len(out[i].SourceRecords)
+		out[i].Sources = addressOfferingSourceLabels(out[i].SourceRecords)
+		out[i].Insights = addressOfferingInsights(out[i].SourceRecords)
+		out[i].Representative = representativeAddressSourceRecord(out[i].SourceRecords)
+		out[i].Headline = firstNonEmpty(out[i].Representative.Headline, out[i].Headline)
+		out[i].Address = firstNonEmpty(out[i].Representative.Address, out[i].Address)
+		out[i].City = firstNonEmpty(out[i].Representative.City, out[i].City)
+		out[i].Postal = firstNonEmpty(out[i].Representative.Postal, out[i].Postal)
+		out[i].AskingPrice = firstInt64(out[i].Representative.AskingPrice, out[i].AskingPrice)
+		out[i].DebtFreePrice = firstInt64(out[i].Representative.DebtFreePrice, out[i].DebtFreePrice)
+		out[i].Area = firstFloat64(out[i].Representative.Area, out[i].Area)
+		out[i].RoomLayout = firstNonEmpty(out[i].Representative.RoomLayout, out[i].RoomLayout)
+	}
+	slices.SortFunc(out, func(a, b AddressOffering) int {
+		return compareTimeDesc(a.LastSeenAt, b.LastSeenAt)
+	})
+	return out
 }
 
 func (s *Service) attachAddressSourceCandidates(ctx context.Context, result *AddressLookupResult) error {
@@ -1173,6 +1366,169 @@ func isLinkedAddressTransaction(transaction AddressTransactionLink) bool {
 	return linkType == "direct" || linkType == "offering" || linkType == "source_record" || linkStatus == "linked" || linkStatus == "auto_linked"
 }
 
+const groupedOfferingSearchCountSQL = `
+WITH source_rows AS (
+    SELECT
+        pos.property_offering_id,
+        sl.sale_listing_id
+    FROM public.property_offering_sources pos
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+    WHERE pos.property_offering_source_link_status <> 'rejected'
+      AND ($1::text = 'all' OR sl.sale_listing_source_provider = $1::text)
+      AND ($2::text = 'all' OR sl.sale_listing_source_kind = $2::text)
+      AND ($3::text IS NULL OR lower(concat_ws(' ', po.property_offering_headline, sl.sale_listing_search_text, sl.sale_listing_canonical_id, sl.sale_listing_native_id, hc.housing_company_name, pu.property_unit_address_norm, ph.property_house_address_norm)) LIKE ('%' || lower(trim($3::text)) || '%'))
+      AND ($4::text IS NULL OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+      AND ($5::text IS NULL OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
+      AND ($6::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) >= $6::bigint)
+      AND ($7::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) <= $7::bigint)
+      AND ($8::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) >= $8::float8)
+      AND ($9::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) <= $9::float8)
+      AND ($11::timestamptz IS NULL OR sl.sale_listing_published_at >= $11::timestamptz)
+      AND ($12::timestamptz IS NULL OR sl.sale_listing_published_at <= $12::timestamptz)
+)
+SELECT count(DISTINCT property_offering_id)::bigint
+FROM source_rows`
+
+const groupedOfferingSearchSQL = `
+WITH source_rows AS (
+    SELECT
+        pos.property_offering_id,
+        sl.sale_listing_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_source_kind,
+        sl.prices_transaction_id,
+        COALESCE(sl.sale_listing_prices_match_status, '') AS prices_match_status,
+        sl.sale_listing_last_seen_at
+    FROM public.property_offering_sources pos
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+    WHERE pos.property_offering_source_link_status <> 'rejected'
+      AND ($1::text = 'all' OR sl.sale_listing_source_provider = $1::text)
+      AND ($2::text = 'all' OR sl.sale_listing_source_kind = $2::text)
+      AND ($3::text IS NULL OR lower(concat_ws(' ', po.property_offering_headline, sl.sale_listing_search_text, sl.sale_listing_canonical_id, sl.sale_listing_native_id, hc.housing_company_name, pu.property_unit_address_norm, ph.property_house_address_norm)) LIKE ('%' || lower(trim($3::text)) || '%'))
+      AND ($4::text IS NULL OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+      AND ($5::text IS NULL OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
+      AND ($6::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) >= $6::bigint)
+      AND ($7::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) <= $7::bigint)
+      AND ($8::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) >= $8::float8)
+      AND ($9::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) <= $9::float8)
+      AND ($11::timestamptz IS NULL OR sl.sale_listing_published_at >= $11::timestamptz)
+      AND ($12::timestamptz IS NULL OR sl.sale_listing_published_at <= $12::timestamptz)
+), offering_matches AS (
+    SELECT
+        property_offering_id,
+        count(DISTINCT sale_listing_id)::int4 AS source_count,
+        string_agg(DISTINCT sale_listing_source_provider, ',' ORDER BY sale_listing_source_provider) AS sources,
+        max(sale_listing_last_seen_at) AS source_last_seen_at
+    FROM source_rows
+    GROUP BY property_offering_id
+), offering_rows AS (
+    SELECT
+        po.property_offering_id,
+        COALESCE(hc.housing_company_id::text, '')::text AS housing_company_id,
+        COALESCE(hc.housing_company_name, '') AS housing_company_name,
+        COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, pu.property_unit_room_layout, pu.property_unit_address_norm, ph.property_house_address_norm, po.property_offering_id::text) AS headline,
+        COALESCE(primary_listing.sale_listing_street_address, pu.property_unit_address_norm, hc.housing_company_address_norm, ph.property_house_address_norm, '') AS address,
+        COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '') AS city,
+        COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '') AS postal,
+        po.property_offering_asking_price AS price,
+        COALESCE(pu.property_unit_area_value, ph.property_house_area_value) AS area,
+        COALESCE(pu.property_unit_room_layout, primary_listing.sale_listing_room_layout, '') AS room_layout,
+        COALESCE(po.property_offering_last_seen_at, offering_matches.source_last_seen_at) AS last_seen_at,
+        offering_matches.source_count,
+        COALESCE(offering_matches.sources, '') AS sources
+    FROM offering_matches
+    JOIN public.property_offerings po ON po.property_offering_id = offering_matches.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
+    LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+)
+SELECT
+    row.property_offering_id::text,
+    row.housing_company_id,
+    row.housing_company_name,
+    row.headline,
+    row.address,
+    row.city,
+    row.postal,
+    row.price,
+    row.area,
+    row.room_layout,
+    row.last_seen_at,
+    row.source_count,
+    row.sources,
+    COALESCE(price_match.transaction_id::text, '')::text AS price_match_transaction_id,
+    COALESCE(price_match.match_scope, '') AS price_match_scope,
+    COALESCE(price_match.match_status, '') AS price_match_status,
+    COALESCE(price_match.match_method, '') AS price_match_method,
+    COALESCE(price_match.match_score, 0)::int4 AS price_match_score,
+    COALESCE(price_match.price_eur, 0)::bigint AS price_match_price_eur,
+    COALESCE(insight_stats.insight_count, 0)::int4 AS insight_count,
+    COALESCE(insight_stats.top_severity, '') AS insight_top_severity
+FROM offering_rows row
+LEFT JOIN LATERAL (
+    SELECT
+        pt.prices_transaction_id AS transaction_id,
+        match_source.match_scope,
+        match_source.match_status,
+        match_source.match_method,
+        match_source.match_score,
+        pt.prices_transaction_price AS price_eur
+    FROM (
+        SELECT
+            sr.prices_transaction_id,
+            'source_listing'::text AS match_scope,
+            COALESCE(NULLIF(sr.prices_match_status, ''), 'linked') AS match_status,
+            'prices_service'::text AS match_method,
+            NULL::int4 AS match_score,
+            0 AS priority
+        FROM source_rows sr
+        WHERE sr.property_offering_id = row.property_offering_id
+            AND sr.prices_transaction_id IS NOT NULL
+        UNION ALL
+        SELECT
+            pot.prices_transaction_id,
+            'grouped_offering'::text AS match_scope,
+            pot.property_offering_transaction_link_status AS match_status,
+            pot.property_offering_transaction_link_method AS match_method,
+            pot.property_offering_transaction_link_score::int4 AS match_score,
+            1 AS priority
+        FROM public.property_offering_transactions pot
+        WHERE pot.property_offering_id = row.property_offering_id
+            AND pot.property_offering_transaction_link_status <> 'rejected'
+    ) match_source
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
+    ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+    LIMIT 1
+) price_match ON true
+LEFT JOIN LATERAL (
+    SELECT
+        count(*)::int4 AS insight_count,
+        max(insight.property_source_offering_insight_severity)::text AS top_severity
+    FROM source_rows sr
+    JOIN public.property_source_offering_insights insight ON insight.sale_listing_id = sr.sale_listing_id
+    WHERE sr.property_offering_id = row.property_offering_id
+) insight_stats ON true
+ORDER BY
+    CASE WHEN $10::text = 'price_asc' THEN row.price END ASC NULLS LAST,
+    CASE WHEN $10::text = 'price_desc' THEN row.price END DESC NULLS LAST,
+    CASE WHEN $10::text = 'area_asc' THEN row.area END ASC NULLS LAST,
+    CASE WHEN $10::text = 'area_desc' THEN row.area END DESC NULLS LAST,
+    CASE WHEN $10::text = 'seen_desc' THEN row.last_seen_at END DESC NULLS LAST,
+    row.last_seen_at DESC NULLS LAST,
+    row.price ASC NULLS LAST,
+    row.property_offering_id
+LIMIT $13::int
+OFFSET $14::int`
+
 const addressLookupSQL = `
 WITH lookup_input AS (
     SELECT
@@ -1277,11 +1633,14 @@ selected_listings AS (
         COALESCE(sl.sale_listing_prices_match_status, '') AS prices_match_status,
         COALESCE(sl.sale_listing_source_match_status, '') AS source_match_status,
         sli.property_offering_id,
+        pu.housing_company_id,
+        COALESCE(hc.housing_company_name, '') AS housing_company_name,
         COALESCE(sl.sale_listing_availability_text, '') AS availability_text,
         COALESCE(sl.sale_listing_renovations_done_text, '') AS renovations_done_text,
         COALESCE(sl.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
         COALESCE(sl.sale_listing_additional_info_text, '') AS additional_info_text,
         COALESCE(sl.sale_listing_charges_text, '') AS charges_text,
+        COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json,
         ROW_NUMBER() OVER (
             ORDER BY
                 CASE
@@ -1298,8 +1657,24 @@ selected_listings AS (
         count(*) OVER ()::integer AS listing_count
     FROM selected_listing_ids sli
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = sli.sale_listing_id
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = sli.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
     LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
     LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'key', insight.property_source_offering_insight_key,
+            'value', insight.property_source_offering_insight_value,
+            'direction', insight.property_source_offering_insight_direction,
+            'severity', insight.property_source_offering_insight_severity,
+            'confidence', insight.property_source_offering_insight_confidence::double precision / 100,
+            'source_field', insight.property_source_offering_insight_source_field,
+            'text', COALESCE(insight.property_source_offering_insight_text, '')
+        ) ORDER BY insight.property_source_offering_insight_severity DESC, insight.property_source_offering_insight_key) AS insights_json
+        FROM public.property_source_offering_insights insight
+        WHERE insight.sale_listing_id = sl.sale_listing_id
+    ) insight_rows ON true
     CROSS JOIN lookup_input li
 ),
 limited_listings AS (
@@ -1349,13 +1724,27 @@ offering_source_records AS (
         COALESCE(sr.sale_listing_renovations_done_text, '') AS renovations_done_text,
         COALESCE(sr.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
         COALESCE(sr.sale_listing_additional_info_text, '') AS additional_info_text,
-        COALESCE(sr.sale_listing_charges_text, '') AS charges_text
+        COALESCE(sr.sale_listing_charges_text, '') AS charges_text,
+        COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json
     FROM matched_offerings mo
     JOIN public.property_offering_sources pos ON pos.property_offering_id = mo.property_offering_id
         AND pos.property_offering_source_link_status <> 'rejected'
     JOIN public.property_source_offerings sr ON sr.sale_listing_id = pos.sale_listing_id
     LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sr.frontdoor_ad_id
     LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sr.frontdoor_building_announcement_id
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+            'key', insight.property_source_offering_insight_key,
+            'value', insight.property_source_offering_insight_value,
+            'direction', insight.property_source_offering_insight_direction,
+            'severity', insight.property_source_offering_insight_severity,
+            'confidence', insight.property_source_offering_insight_confidence::double precision / 100,
+            'source_field', insight.property_source_offering_insight_source_field,
+            'text', COALESCE(insight.property_source_offering_insight_text, '')
+        ) ORDER BY insight.property_source_offering_insight_severity DESC, insight.property_source_offering_insight_key) AS insights_json
+        FROM public.property_source_offering_insights insight
+        WHERE insight.sale_listing_id = sr.sale_listing_id
+    ) insight_rows ON true
 ),
 latest_candidates AS (
     SELECT DISTINCT ON (c.sale_listing_id, c.prices_transaction_id)
@@ -1470,11 +1859,14 @@ SELECT
     sl.prices_match_status,
     sl.source_match_status,
     sl.property_offering_id,
+    sl.housing_company_id,
+    sl.housing_company_name,
     sl.availability_text,
     sl.renovations_done_text,
     sl.renovations_planned_text,
     sl.additional_info_text,
     sl.charges_text,
+    sl.insights_json,
     sl.listing_count,
     pt.prices_transaction_id,
     COALESCE(dl.link_type, ''),
@@ -1529,7 +1921,8 @@ SELECT
     COALESCE(osr.renovations_done_text, ''),
     COALESCE(osr.renovations_planned_text, ''),
     COALESCE(osr.additional_info_text, ''),
-    COALESCE(osr.charges_text, '')
+    COALESCE(osr.charges_text, ''),
+    COALESCE(osr.insights_json, '[]'::jsonb)
 FROM limited_listings sl
 LEFT JOIN dedup_links dl ON dl.sale_listing_id = sl.sale_listing_id
 LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = dl.prices_transaction_id
@@ -1898,7 +2291,7 @@ func hostFromBase(base string) string {
 }
 
 func normalizeSearchParams(params SearchParams) SearchParams {
-	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), ListingType: normalizeListingType(params.ListingType), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
+	normalized := SearchParams{Query: strings.TrimSpace(params.Query), Source: normalizeSource(params.Source), Kind: normalizeKind(params.Kind), Grouping: normalizeGrouping(params.Grouping), ListingType: normalizeListingType(params.ListingType), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, City: strings.TrimSpace(params.City), Postal: strings.TrimSpace(params.Postal), Page: params.Page, PageSize: normalizePageSize(params.PageSize), Sort: normalizeSort(params.Sort), PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
 	if normalized.Page < 1 {
 		normalized.Page = 1
 	}
@@ -2080,6 +2473,15 @@ func normalizeListingType(listingType string) string {
 	}
 }
 
+func normalizeGrouping(grouping string) string {
+	switch strings.ToLower(strings.TrimSpace(grouping)) {
+	case "grouped", "ungrouped":
+		return strings.ToLower(strings.TrimSpace(grouping))
+	default:
+		return "all"
+	}
+}
+
 func normalizeSort(sortMode string) string {
 	switch strings.ToLower(strings.TrimSpace(sortMode)) {
 	case "price_asc", "price_desc", "area_asc", "area_desc", "seen_desc":
@@ -2104,6 +2506,18 @@ func stringPtr(value string) *string {
 		return nil
 	}
 	return &v
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func emptyToNil(value string) *string {
@@ -2396,6 +2810,15 @@ func firstFloat64(values ...*float64) *float64 {
 	return nil
 }
 
+func firstInt64(values ...*int64) *int64 {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
 func firstInt32(values ...*int32) *int32 {
 	for _, value := range values {
 		if value != nil {
@@ -2413,6 +2836,13 @@ func valueOrEmpty(value *string) string {
 }
 
 func int64Ptr(value int64) *int64 {
+	return &value
+}
+
+func int64PtrIf(ok bool, value int64) *int64 {
+	if !ok {
+		return nil
+	}
 	return &value
 }
 
@@ -2441,6 +2871,157 @@ func addressListingTexts(availability, renovationsDone, renovationsPlanned, addi
 	return &texts
 }
 
+func parseAddressInsights(raw json.RawMessage) []AddressInsight {
+	if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil
+	}
+	var out []AddressInsight
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func addressSourceRecordFromListing(listing AddressListing) AddressSourceRecord {
+	return AddressSourceRecord{ListingID: listing.ListingID, CanonicalID: listing.CanonicalID, Source: listing.Source, Kind: listing.Kind, NativeID: listing.NativeID, Headline: listing.Headline, Address: listing.Address, City: listing.City, Postal: listing.Postal, AskingPrice: listing.AskingPrice, DebtFreePrice: listing.DebtFreePrice, Area: listing.Area, RoomLayout: listing.RoomLayout, URL: listing.URL, ExternalURLAvailable: listing.ExternalURLAvailable, FirstSeenAt: listing.FirstSeenAt, LastSeenAt: listing.LastSeenAt, UpdatedAt: listing.UpdatedAt, PreviousAskingPrice: listing.PreviousAskingPrice, PreviousDebtFreePrice: listing.PreviousDebtFreePrice, Texts: listing.Texts, Insights: listing.Insights}
+}
+
+func addressOfferingInsights(records []AddressSourceRecord) []AddressInsight {
+	seen := map[string]struct{}{}
+	out := []AddressInsight{}
+	for _, record := range records {
+		for _, insight := range record.Insights {
+			key := record.ListingID + ":" + insight.SourceField + ":" + insight.Key + ":" + insight.Value
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, insight)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func representativeAddressSourceRecord(records []AddressSourceRecord) AddressSourceRecord {
+	if len(records) == 0 {
+		return AddressSourceRecord{}
+	}
+	return sortAddressSourceRecords(records)[0]
+}
+
+func sortAddressSourceRecords(records []AddressSourceRecord) []AddressSourceRecord {
+	out := slices.Clone(records)
+	slices.SortFunc(out, func(a, b AddressSourceRecord) int {
+		if cmp := compareTimeDesc(a.LastSeenAt, b.LastSeenAt); cmp != 0 {
+			return cmp
+		}
+		if a.Source != b.Source {
+			return strings.Compare(a.Source, b.Source)
+		}
+		return strings.Compare(a.NativeID, b.NativeID)
+	})
+	return out
+}
+
+func appendUniqueAddressSourceRecords(dst []AddressSourceRecord, src []AddressSourceRecord) []AddressSourceRecord {
+	seen := map[string]struct{}{}
+	out := make([]AddressSourceRecord, 0, len(dst)+len(src))
+	for _, record := range append(dst, src...) {
+		key := record.ListingID
+		if key == "" {
+			key = record.Source + ":" + record.Kind + ":" + record.NativeID
+		}
+		if key == "::" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, record)
+	}
+	return out
+}
+
+func appendUniqueAddressTransactions(dst []AddressTransactionLink, src []AddressTransactionLink) []AddressTransactionLink {
+	seen := map[string]struct{}{}
+	out := make([]AddressTransactionLink, 0, len(dst)+len(src))
+	for _, transaction := range append(dst, src...) {
+		key := transaction.TransactionID + ":" + transaction.LinkType
+		if key == ":" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, transaction)
+	}
+	return out
+}
+
+func addressOfferingSourceLabels(records []AddressSourceRecord) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, record := range records {
+		if record.Source == "" {
+			continue
+		}
+		if _, ok := seen[record.Source]; ok {
+			continue
+		}
+		seen[record.Source] = struct{}{}
+		out = append(out, record.Source)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func earliestTimePtr(values ...*time.Time) *time.Time {
+	var out *time.Time
+	for _, value := range values {
+		if value != nil && (out == nil || value.Before(*out)) {
+			out = value
+		}
+	}
+	return out
+}
+
+func latestTimePtr(values ...*time.Time) *time.Time {
+	var out *time.Time
+	for _, value := range values {
+		if value != nil && (out == nil || value.After(*out)) {
+			out = value
+		}
+	}
+	return out
+}
+
+func compareTimeDesc(a, b *time.Time) int {
+	if a == nil && b == nil {
+		return 0
+	}
+	if a == nil {
+		return 1
+	}
+	if b == nil {
+		return -1
+	}
+	if a.After(*b) {
+		return -1
+	}
+	if a.Before(*b) {
+		return 1
+	}
+	return 0
+}
+
 func formatBool(value bool) string {
 	if value {
 		return "true"
@@ -2467,6 +3048,13 @@ func formatInt32(value *int32) string {
 		return ""
 	}
 	return strconv.FormatInt(int64(*value), 10)
+}
+
+func int32Ptr(value int32) *int32 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }
 
 func formatInt64Ptr(value *int64) string {

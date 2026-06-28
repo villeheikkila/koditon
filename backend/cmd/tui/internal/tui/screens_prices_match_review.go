@@ -10,6 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"koditon/internal/domain/properties"
 )
 
 type pricesMatchReviewStartMsg struct {
@@ -267,15 +269,16 @@ func (s *pricesMatchReviewScreen) hasGroup() bool {
 func startPricesMatchReviewCmd(pool *pgxpool.Pool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		var runID string
-		if err := pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, 90, 15)::text`).Scan(&runID); err != nil {
+		service := properties.NewService(pool)
+		matchRun, err := service.RunSaleListingTransactionMatch(ctx, properties.TransactionMatchRunOptions{AutoLinkSafe: true, ScoreThreshold: 90, CompetitorMargin: 15})
+		if err != nil {
 			return pricesMatchReviewStartMsg{err: fmt.Errorf("run matching: %w", err)}
 		}
-		run, err := loadPricesMatchRunSummary(ctx, pool, runID)
+		run, err := loadPricesMatchRunSummary(ctx, pool, matchRun.RunID)
 		if err != nil {
 			return pricesMatchReviewStartMsg{err: err}
 		}
-		group, err := loadPricesMatchCandidateGroup(ctx, pool, runID, 0)
+		group, err := loadPricesMatchCandidateGroup(ctx, pool, matchRun.RunID, 0)
 		return pricesMatchReviewStartMsg{run: run, group: group, err: err}
 	}
 }

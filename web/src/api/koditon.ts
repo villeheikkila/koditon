@@ -62,6 +62,7 @@ export interface AddressSourceRecord {
   external_url_available: boolean;
   first_seen_at?: string;
   headline: string;
+  insights?: AddressInsight[] | null;
   kind: string;
   last_seen_at?: string;
   link_method?: string;
@@ -77,6 +78,42 @@ export interface AddressSourceRecord {
   texts?: AddressListingTexts;
   updated_at?: string;
   url?: string;
+}
+
+export interface AddressInsight {
+  confidence?: number;
+  direction?: string;
+  key: string;
+  severity?: string;
+  source_field?: string;
+  text?: string;
+  value: string;
+}
+
+export interface AddressOffering {
+  address?: string;
+  area?: number;
+  asking_price?: number;
+  city?: string;
+  debt_free_price?: number;
+  first_seen_at?: string;
+  headline: string;
+  housing_company_id?: string;
+  housing_company_name?: string;
+  insights?: AddressInsight[] | null;
+  last_seen_at?: string;
+  offering_id: string;
+  postal?: string;
+  representative: AddressSourceRecord;
+  room_layout?: string;
+  source_candidate_count: number;
+  source_count: number;
+  /** @nullable */
+  source_records: AddressSourceRecord[] | null;
+  /** @nullable */
+  sources: string[] | null;
+  /** @nullable */
+  transactions: AddressTransactionLink[] | null;
 }
 
 export interface AddressListingTexts {
@@ -158,6 +195,9 @@ export interface AddressListing {
   external_url_available: boolean;
   first_seen_at?: string;
   headline: string;
+  housing_company_id?: string;
+  housing_company_name?: string;
+  insights?: AddressInsight[] | null;
   kind: string;
   last_seen_at?: string;
   listing_id: string;
@@ -307,6 +347,8 @@ export interface AddressLookupResult {
   listing_count: number;
   /** @nullable */
   listings: AddressListing[] | null;
+  /** @nullable */
+  offerings: AddressOffering[] | null;
   postal?: string;
   /** @nullable */
   raw_transactions: AddressRawTransaction[] | null;
@@ -437,11 +479,86 @@ export interface TargetOfferingSummary {
   asking_price_eur?: number;
   building_target?: CanonicalTargetRef;
   housing_target?: CanonicalTargetRef;
+  insight_count?: number;
+  insight_top_severity?: string;
   last_seen_at?: string;
   layout?: string;
+  price_match_price_eur?: number;
+  price_match_status?: string;
+  price_match_transaction_id?: string;
+  source_count?: number;
+  /** @nullable */
+  sources?: string[] | null;
   target: CanonicalTargetRef;
   title: string;
-  unit_target: CanonicalTargetRef;
+  unit_target?: CanonicalTargetRef;
+}
+
+export interface TargetSourceListing {
+  area_m2?: number;
+  asking_price_eur?: number;
+  build_year?: number;
+  building_target?: CanonicalTargetRef;
+  canonical_id?: string;
+  city?: string;
+  debt_free_price_eur?: number;
+  external_url_available: boolean;
+  first_seen_at?: string;
+  floor_level?: number;
+  housing_target?: CanonicalTargetRef;
+  /** @nullable */
+  insights?: TargetInsight[] | null;
+  kind: string;
+  last_seen_at?: string;
+  link_method?: string;
+  link_score?: number;
+  link_status?: string;
+  native_id?: string;
+  offering_target: CanonicalTargetRef;
+  postal?: string;
+  price_per_m2?: number;
+  price_match?: TargetPriceMatch;
+  provider: string;
+  published_at?: string;
+  room_layout?: string;
+  street_address?: string;
+  target: CanonicalTargetRef;
+  title: string;
+  unit_target?: CanonicalTargetRef;
+  url?: string;
+}
+
+export interface TargetPriceMatch {
+  area_m2: number;
+  build_year?: number;
+  category?: string;
+  condition?: string;
+  description?: string;
+  elevator: boolean;
+  energy_class?: string;
+  floor?: string;
+  method?: string;
+  period_identifier?: string;
+  plot?: string;
+  price_eur: number;
+  price_per_m2: number;
+  reasons?: unknown;
+  scope: string;
+  score?: number;
+  status?: string;
+  target: CanonicalTargetRef;
+  transaction_updated_at: string;
+  type?: string;
+}
+
+export interface TargetInsight {
+  confidence: number;
+  direction?: string;
+  key: string;
+  severity?: string;
+  source_field?: string;
+  text?: string;
+  value: string;
 }
 
 export interface TargetOverviewField {
@@ -578,6 +695,8 @@ export interface CanonicalTargetResource {
   /** @nullable */
   resolved_values: ResolvedValue[] | null;
   /** @nullable */
+  source_listings?: TargetSourceListing[] | null;
+  /** @nullable */
   sources?: TargetSourceLink[] | null;
   target: CanonicalTargetRef;
   /** @nullable */
@@ -643,6 +762,10 @@ export interface EntityDetailOutputBody {
   last_seen_at?: string;
   maintenance_charge_monthly?: number;
   native_id: string;
+  price_match?: EntityPriceMatchOutput;
+  insights?: EntityInsightOutput[] | null;
+  listing_id?: string;
+  offering_id?: string;
   plot_type?: string;
   postal?: string;
   price_per_m2?: number;
@@ -655,6 +778,9 @@ export interface EntityDetailOutputBody {
   rooms_count?: number;
   sauna?: boolean;
   source: string;
+  source_count?: number;
+  /** @nullable */
+  source_records?: EntitySourceRecordOutput[] | null;
   /** @nullable */
   source_specific?: DetailFieldOutput[] | null;
   street_address?: string;
@@ -663,6 +789,51 @@ export interface EntityDetailOutputBody {
   url?: string;
   external_url_available: boolean;
   water_charge?: number;
+}
+
+export interface EntitySourceRecordOutput {
+  address?: string;
+  area?: number;
+  asking_price?: number;
+  canonical_id: string;
+  city?: string;
+  external_url_available: boolean;
+  headline?: string;
+  insights?: EntityInsightOutput[] | null;
+  kind: string;
+  last_seen_at?: string;
+  link_method?: string;
+  link_score?: number;
+  link_status?: string;
+  listing_id: string;
+  native_id: string;
+  postal?: string;
+  price_match?: EntityPriceMatchOutput;
+  source: string;
+  url?: string;
+}
+
+export interface EntityPriceMatchOutput {
+  category?: string;
+  description?: string;
+  method?: string;
+  price_eur?: number;
+  scope?: string;
+  score?: number;
+  status?: string;
+  transaction_id: string;
+  type?: string;
+  updated_at?: string;
+}
+
+export interface EntityInsightOutput {
+  confidence?: number;
+  direction?: string;
+  key: string;
+  severity?: string;
+  source_field?: string;
+  text?: string;
+  value: string;
 }
 
 export interface ErrorDetail {
@@ -914,13 +1085,30 @@ export interface SearchResultRow {
   canonical_id: string;
   city?: string;
   headline?: string;
+  housing_company_id?: string;
+  housing_company_name?: string;
+  insight_count?: number;
+  insight_top_severity?: string;
   kind: string;
   last_seen_at?: string;
+  link_method?: string;
+  link_score?: number;
+  link_status?: string;
+  listing_id?: string;
+  native_id: string;
+  offering_id?: string;
   postal?: string;
   price?: number;
+  price_match_method?: string;
+  price_match_price_eur?: number;
+  price_match_scope?: string;
+  price_match_score?: number;
+  price_match_status?: string;
+  price_match_transaction_id?: string;
   room_layout?: string;
   source: string;
   url?: string;
+  external_url_available: boolean;
 }
 
 export interface SearchOutputBody {
@@ -930,6 +1118,41 @@ export interface SearchOutputBody {
   page_size: number;
   /** @nullable */
   rows: SearchResultRow[] | null;
+  total: number;
+}
+
+export interface GroupedOfferingSearchRow {
+  address?: string;
+  area?: number;
+  city?: string;
+  headline?: string;
+  housing_company_id?: string;
+  housing_company_name?: string;
+  insight_count?: number;
+  insight_top_severity?: string;
+  last_seen_at?: string;
+  offering_id: string;
+  postal?: string;
+  price?: number;
+  price_match_method?: string;
+  price_match_price_eur?: number;
+  price_match_scope?: string;
+  price_match_score?: number;
+  price_match_status?: string;
+  price_match_transaction_id?: string;
+  room_layout?: string;
+  source_count: number;
+  /** @nullable */
+  sources: string[] | null;
+}
+
+export interface GroupedOfferingSearchOutputBody {
+  /** A URL to the JSON Schema for this object. */
+  readonly $schema?: string;
+  page: number;
+  page_size: number;
+  /** @nullable */
+  rows: GroupedOfferingSearchRow[] | null;
   total: number;
 }
 
@@ -1113,6 +1336,10 @@ source?: string;
  * Kind filter: ad, announcement, building, or all
  */
 kind?: string;
+/**
+ * Grouping filter: grouped, ungrouped, or all
+ */
+grouping?: string;
 /**
  * City / municipality filter
  */
@@ -1378,6 +1605,73 @@ export function useTransactionMatchCandidates<TData = Awaited<ReturnType<typeof 
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+
+export type searchGroupedOfferingsResponse200 = {
+  data: GroupedOfferingSearchOutputBody
+  status: 200
+}
+
+export type searchGroupedOfferingsResponseDefault = {
+  data: ErrorModel
+  status: Exclude<HTTPStatusCodes, 200>
+}
+
+export type searchGroupedOfferingsResponseSuccess = (searchGroupedOfferingsResponse200) & {
+  headers: Headers;
+};
+export type searchGroupedOfferingsResponseError = (searchGroupedOfferingsResponseDefault) & {
+  headers: Headers;
+};
+
+export type searchGroupedOfferingsResponse = (searchGroupedOfferingsResponseSuccess | searchGroupedOfferingsResponseError)
+
+export const getSearchGroupedOfferingsUrl = (params?: SearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+  const stringifiedParams = normalizedParams.toString();
+  return stringifiedParams.length > 0 ? `/api/v1/search/grouped-offerings?${stringifiedParams}` : `/api/v1/search/grouped-offerings`
+}
+
+export const searchGroupedOfferings = async (params?: SearchParams, options?: RequestInit): Promise<searchGroupedOfferingsResponse> => {
+  return customInstance<searchGroupedOfferingsResponse>(getSearchGroupedOfferingsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+  }
+);}
+
+export const getSearchGroupedOfferingsQueryKey = (params?: SearchParams,) => {
+    return [
+    `/api/v1/search/grouped-offerings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+export const getSearchGroupedOfferingsQueryOptions = <TData = Awaited<ReturnType<typeof searchGroupedOfferings>>, TError = ErrorType<ErrorModel>>(params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchGroupedOfferings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey =  queryOptions?.queryKey ?? getSearchGroupedOfferingsQueryKey(params);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchGroupedOfferings>>> = ({ signal }) => searchGroupedOfferings(params, { signal, ...requestOptions });
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchGroupedOfferings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchGroupedOfferingsQueryResult = NonNullable<Awaited<ReturnType<typeof searchGroupedOfferings>>>
+export type SearchGroupedOfferingsQueryError = ErrorType<ErrorModel>
+
+export function useSearchGroupedOfferings<TData = Awaited<ReturnType<typeof searchGroupedOfferings>>, TError = ErrorType<ErrorModel>>(
+ params?: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchGroupedOfferings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchGroupedOfferingsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 
 

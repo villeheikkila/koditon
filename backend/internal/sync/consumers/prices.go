@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
+	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/taskqueue"
 	syncjobs "koditon/internal/sync/jobs"
@@ -471,43 +472,23 @@ WHERE sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LastSeenAt,
 }
 
 func (c *Consumer) runPricesMatchForSaleListing(ctx context.Context, saleListingID string) (pricesMatchRunSummary, error) {
-	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, 90, 15, $1::uuid)::text`, saleListingID).Scan(&runID); err != nil {
+	listingID, err := uuid.Parse(saleListingID)
+	if err != nil {
+		return pricesMatchRunSummary{}, fmt.Errorf("parse sale listing id: %w", err)
+	}
+	summary, err := c.propertiesService.RunSaleListingTransactionMatch(ctx, properties.TransactionMatchRunOptions{AutoLinkSafe: true, ScoreThreshold: 90, CompetitorMargin: 15, TargetListingID: &listingID})
+	if err != nil {
 		return pricesMatchRunSummary{}, fmt.Errorf("run prices sale listing match: %w", err)
 	}
-	var summary pricesMatchRunSummary
-	err := c.pool.QueryRow(ctx, `
-SELECT
-    sale_listing_prices_transaction_match_run_id::text,
-    sale_listing_prices_transaction_match_candidates_count,
-    sale_listing_prices_transaction_match_auto_linked_count,
-    sale_listing_prices_transaction_match_ambiguous_count
-FROM public.sale_listing_prices_transaction_match_runs
-WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
-	if err != nil {
-		return pricesMatchRunSummary{}, fmt.Errorf("load prices sale listing match run: %w", err)
-	}
-	return summary, nil
+	return pricesMatchRunSummary{RunID: summary.RunID, Candidates: summary.Candidates, AutoLinked: summary.AutoLinked, Ambiguous: summary.Ambiguous}, nil
 }
 
 func (c *Consumer) runPricesMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (pricesMatchRunSummary, error) {
-	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_sale_listing_prices_transaction_matches(true, $1, $2, NULL::uuid)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
+	summary, err := c.propertiesService.RunSaleListingTransactionMatch(ctx, properties.TransactionMatchRunOptions{AutoLinkSafe: true, ScoreThreshold: int32(scoreThreshold), CompetitorMargin: int32(competitorMargin)})
+	if err != nil {
 		return pricesMatchRunSummary{}, fmt.Errorf("run prices sale listing match backfill: %w", err)
 	}
-	var summary pricesMatchRunSummary
-	err := c.pool.QueryRow(ctx, `
-SELECT
-    sale_listing_prices_transaction_match_run_id::text,
-    sale_listing_prices_transaction_match_candidates_count,
-    sale_listing_prices_transaction_match_auto_linked_count,
-    sale_listing_prices_transaction_match_ambiguous_count
-FROM public.sale_listing_prices_transaction_match_runs
-WHERE sale_listing_prices_transaction_match_run_id = $1::uuid`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
-	if err != nil {
-		return pricesMatchRunSummary{}, fmt.Errorf("load prices sale listing match backfill run: %w", err)
-	}
-	return summary, nil
+	return pricesMatchRunSummary{RunID: summary.RunID, Candidates: summary.Candidates, AutoLinked: summary.AutoLinked, Ambiguous: summary.Ambiguous}, nil
 }
 
 func (c *Consumer) updatePricesMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {

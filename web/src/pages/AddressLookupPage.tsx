@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
-import { useAddressLookup, type AddressListing, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
+import { useAddressLookup, type AddressInsight, type AddressListing, type AddressOffering, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
 import { appendAddressLookupParams, buildAddressLookupPath, sourceEntityPath, withAddressLookupContext, type AddressLookupInput } from '../lib/address-lookup'
 
 const sources = [
@@ -20,13 +20,16 @@ export default function AddressLookupPage() {
   const lookup = useAddressLookup(lookupParams, { query: { enabled: Boolean(lookupParams?.address), placeholderData: previous => previous } })
   const body = lookup.data?.status === 200 ? lookup.data.data : undefined
   const listings = body?.listings ?? []
+  const offerings = body?.offerings ?? []
   const rawTransactions = body?.raw_transactions ?? []
+  const [viewMode, setViewMode] = useState<'grouped' | 'raw'>('grouped')
   const linkedCount = listings.filter(listing => (listing.transactions ?? []).some(isLinkedTransaction)).length
   const candidateCount = listings.reduce((count, listing) => count + (listing.transactions ?? []).filter(transaction => !isLinkedTransaction(transaction)).length, 0)
   const unaggregatedCount = listings.filter(listing => !listing.offering_id).length
   const sourceRecordCount = listings.reduce((count, listing) => count + (listing.source_records ?? []).filter(record => record.listing_id !== listing.listing_id).length, 0)
   const sourceCandidateCount = listings.reduce((count, listing) => count + (listing.source_candidates?.length ?? 0), 0)
-  const offeringCount = new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
+  const offeringCount = offerings.length || new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
+  const rawListings = viewMode === 'grouped' ? listings.filter(listing => !listing.offering_id) : listings
   const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source } : undefined
   return (
     <main className="address-lookup-page">
@@ -59,6 +62,28 @@ export default function AddressLookupPage() {
           {lookup.isFetching && !body && <div className="loading-state">Loading address data</div>}
           {body && listings.length === 0 && <EmptyState title="No listings found" text="Try the street address without apartment letters, or add city and postal filters." />}
           {listings.length > 0 && (
+            <div className="address-view-tabs">
+              <button className={viewMode === 'grouped' ? 'is-active' : ''} type="button" onClick={() => setViewMode('grouped')}>Grouped offerings</button>
+              <button className={viewMode === 'raw' ? 'is-active' : ''} type="button" onClick={() => setViewMode('raw')}>Raw source listings</button>
+            </div>
+          )}
+          {viewMode === 'grouped' && offerings.length > 0 && (
+            <div className={`address-listing-list${lookup.isFetching ? ' address-listing-list--loading' : ''}`}>
+              {offerings.map(offering => <OfferingCard key={offering.offering_id} offering={offering} lookup={reviewLookup} />)}
+            </div>
+          )}
+          {viewMode === 'grouped' && rawListings.length > 0 && (
+            <section className="address-ungrouped-section">
+              <header>
+                <h2>Ungrouped source listings</h2>
+                <span>{rawListings.length} not linked to a canonical offering</span>
+              </header>
+              <div className={`address-listing-list${lookup.isFetching ? ' address-listing-list--loading' : ''}`}>
+                {rawListings.map(listing => <ListingCard key={listing.listing_id} listing={listing} lookup={reviewLookup} />)}
+              </div>
+            </section>
+          )}
+          {viewMode === 'raw' && listings.length > 0 && (
             <div className={`address-listing-list${lookup.isFetching ? ' address-listing-list--loading' : ''}`}>
               {listings.map(listing => <ListingCard key={listing.listing_id} listing={listing} lookup={reviewLookup} />)}
             </div>
@@ -67,6 +92,57 @@ export default function AddressLookupPage() {
         </section>
       </div>
     </main>
+  )
+}
+
+function OfferingCard({ offering, lookup }: { offering: AddressOffering; lookup?: AddressLookupInput }) {
+  const records = offering.source_records ?? []
+  const transactions = offering.transactions ?? []
+  const linkedTransactions = transactions.filter(isLinkedTransaction)
+  const candidateTransactions = transactions.filter(transaction => !isLinkedTransaction(transaction))
+  const representative = offering.representative
+  const sourcePath = sourceEntityPath({ canonicalId: representative.canonical_id, kind: representative.kind })
+  const recordLookup = new Map(records.map(record => [record.listing_id, record]))
+  return (
+    <article className="address-listing-card address-offering-card">
+      <header className="address-listing-card-head">
+        <div>
+          <div className="search-card-badges">
+            <span className="search-badge search-badge--kind">Grouped offering</span>
+            {offering.sources?.map(source => <span className={`search-badge search-badge--${source === 'shortcut' ? 'shortcut' : 'frontdoor'}`} key={source}>{sourceLabel(source)}</span>)}
+            {offering.housing_company_id && <span className="search-badge search-badge--linked">Company</span>}
+            {linkedTransactions.length > 0 && <span className="address-link-badge">Prices linked</span>}
+            {candidateTransactions.length > 0 && <span className="address-candidate-badge">Candidates</span>}
+            {Boolean(offering.insights?.length) && <span className="search-badge search-badge--insight">{offering.insights?.length} insights</span>}
+            {offering.source_candidate_count > 0 && <span className="address-candidate-badge">Source candidates</span>}
+          </div>
+          <h2>{offering.headline || offering.address || offering.offering_id}</h2>
+          <p>{[offering.address, offering.city, offering.postal].filter(Boolean).join(' / ')}</p>
+        </div>
+        <div className="address-listing-price">
+          <strong>{formatEUR(offering.asking_price)}</strong>
+          <span>{formatArea(offering.area)}</span>
+        </div>
+      </header>
+      <div className="address-listing-meta">
+        <span>Offering {shortID(offering.offering_id)}</span>
+        {offering.housing_company_name && <span>{offering.housing_company_name}</span>}
+        <span>{offering.source_count} source records</span>
+        <span>{offering.room_layout || 'No room layout'}</span>
+        <span>{formatDate(offering.last_seen_at)}</span>
+      </div>
+      <div className="address-listing-actions">
+        <Link to={withAddressLookupContext(`/target/offering/${offering.offering_id}`, lookup)}>Canonical offering</Link>
+        {offering.housing_company_id && <Link to={withAddressLookupContext(`/target/housing_company/${offering.housing_company_id}`, lookup)}>Housing company</Link>}
+        {sourcePath && <Link to={withAddressLookupContext(sourcePath, lookup)}>Representative source</Link>}
+        <LiveSourceLink available={representative.external_url_available} url={representative.url} />
+      </div>
+      <InsightList insights={offering.insights} limit={6} />
+      {records.length > 0 && <SourceRecordList records={records} lookup={lookup} title="Provider source records" />}
+      {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={recordLookup} lookup={lookup} />}
+      {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={recordLookup} lookup={lookup} variant="candidate" />}
+      {transactions.length === 0 && <div className="address-no-transaction">No connected prices transaction or saved match candidate for this grouped offering.</div>}
+    </article>
   )
 }
 
@@ -178,7 +254,9 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
             <span className="search-badge search-badge--kind">{listing.kind}</span>
             {linkedTransactions.length > 0 && <span className="address-link-badge">Prices linked</span>}
             {candidateTransactions.length > 0 && <span className="address-candidate-badge">Candidates</span>}
+            {Boolean(listing.insights?.length) && <span className="search-badge search-badge--insight">{listing.insights?.length} insights</span>}
             {sourceCandidates.length > 0 && <span className="address-candidate-badge">Source candidates</span>}
+            {listing.housing_company_id && <span className="search-badge search-badge--linked">Company</span>}
           </div>
           <h2>{listing.headline || listing.address || listing.canonical_id}</h2>
           <p>{[listing.address, listing.city, listing.postal].filter(Boolean).join(' / ')}</p>
@@ -191,6 +269,7 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
       <div className="address-listing-meta">
         <span>{sourceLabel(listing.source)} {listing.native_id}</span>
         <span>{listing.offering_id ? `Offering ${shortID(listing.offering_id)}` : 'Unaggregated source listing'}</span>
+        {listing.housing_company_name && <span>{listing.housing_company_name}</span>}
         <span>{listing.room_layout || 'No room layout'}</span>
         <span>{formatDate(listing.last_seen_at)}</span>
         {listing.price_match_status && <span>{listing.price_match_status}</span>}
@@ -198,11 +277,13 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
       </div>
       <ListingTimeline listing={listing} />
       {coverage.length > 0 && <div className="address-source-coverage">{coverage.map(item => <span key={item}>{item}</span>)}</div>}
+      <InsightList insights={listing.insights} limit={4} />
       <SourceTexts texts={listing.texts} />
       {sourceRecords.length > 0 && <SourceRecordList records={sourceRecords} lookup={lookup} />}
       {sourceCandidates.length > 0 && <SourceCandidateList candidates={sourceCandidates} lookup={lookup} />}
       <div className="address-listing-actions">
         {listing.offering_id && <Link to={withAddressLookupContext(`/target/offering/${listing.offering_id}`, lookup)}>Canonical offering</Link>}
+        {listing.housing_company_id && <Link to={withAddressLookupContext(`/target/housing_company/${listing.housing_company_id}`, lookup)}>Housing company</Link>}
         {sourcePath && <Link to={withAddressLookupContext(sourcePath, lookup)}>Source detail</Link>}
         {postalReviewPath && <Link to={postalReviewPath}>Review postal candidates</Link>}
         <LiveSourceLink available={listing.external_url_available} url={listing.url} />
@@ -269,10 +350,10 @@ function SourceCandidateList({ candidates, lookup }: { candidates: AddressSource
   )
 }
 
-function SourceRecordList({ records, lookup }: { records: AddressSourceRecord[]; lookup?: AddressLookupInput }) {
+function SourceRecordList({ records, lookup, title = 'Same offering source records' }: { records: AddressSourceRecord[]; lookup?: AddressLookupInput; title?: string }) {
   return (
     <div className="address-source-records">
-      <span className="address-source-records-title">Same offering source records</span>
+      <span className="address-source-records-title">{title}</span>
       {records.map(record => {
         const lookupPath = buildAddressLookupPath({ address: record.address, city: record.city, postal: record.postal, source: record.source })
         const sourcePath = sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind })
@@ -291,6 +372,7 @@ function SourceRecordList({ records, lookup }: { records: AddressSourceRecord[];
               <span>{sourceRecordTimeline(record)}</span>
               {sourceRecordLink(record) && <span>{sourceRecordLink(record)}</span>}
             </div>
+            <InsightList insights={record.insights} limit={3} compact />
             <div className="address-source-record-actions">
               {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
               {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
@@ -316,6 +398,22 @@ function SourceTexts({ texts, compact = false }: { texts?: AddressListing['texts
           <span>{item.value}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function InsightList({ insights, limit, compact = false }: { insights?: AddressInsight[] | null; limit: number; compact?: boolean }) {
+  const visible = insights?.slice(0, limit) ?? []
+  if (visible.length === 0) return null
+  return (
+    <div className={compact ? 'address-insights address-insights--compact' : 'address-insights'}>
+      {visible.map(insight => (
+        <span key={`${insight.source_field}:${insight.key}:${insight.value}`}>
+          <strong>{insightLabel(insight)}</strong>
+          {insight.value}
+        </span>
+      ))}
+      {insights && insights.length > visible.length && <span>{insights.length - visible.length} more</span>}
     </div>
   )
 }
@@ -487,6 +585,10 @@ function sourceTextItems(texts?: AddressListing['texts']) {
     const text = typeof value === 'string' ? value.trim() : ''
     return text ? [{ label, value: text }] : []
   })
+}
+
+function insightLabel(insight: AddressInsight) {
+  return [insight.severity, insight.key].filter(Boolean).join(' / ') || 'Insight'
 }
 
 function formatPercent(value?: number | null) {

@@ -11,6 +11,10 @@ import {
   type RenovationEvent,
   type ResolvedValue,
   type SourceClaim,
+  type TargetBuildingSummary,
+  type TargetOfferingSummary,
+  type TargetSourceListing,
+  type TargetUnitSummary,
   type TargetOverview,
 } from '../api/koditon'
 import { addressLookupInputFromParams, addressLookupPathFromOverviewFields, buildAddressLookupPath, sourceEntityPath, withAddressLookupContext } from '../lib/address-lookup'
@@ -35,6 +39,10 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
   const values = detail?.resolved_values ?? []
   const renovations = useMemo(() => detail?.renovation_events ?? [], [detail?.renovation_events])
   const documents = detail?.documents ?? []
+  const sourceListings = detail?.source_listings ?? []
+  const buildings = detail?.buildings ?? []
+  const units = detail?.units ?? []
+  const offerings = detail?.offerings ?? []
   const contextLookup = addressLookupInputFromParams(params)
   const contextLookupPath = buildAddressLookupPath(contextLookup)
   const [selectedRenovationID, setSelectedRenovationID] = useState<string>('')
@@ -67,6 +75,8 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
             <div className="model-grid">
               <section className="model-column model-column--main">
                 <Overview overview={detail.overview} fallbackID={id} contextLookup={contextLookup} contextLookupPath={contextLookupPath} />
+                <TargetChildren buildings={buildings} units={units} offerings={offerings} contextLookup={contextLookup} />
+                <SourceListings listings={sourceListings} contextLookup={contextLookup} />
                 <ResolvedValues values={values} />
                 <Renovations events={renovations} selectedID={selectedRenovation?.id ?? ''} onSelect={setSelectedRenovationID} />
                 <Documents documents={documents} />
@@ -80,6 +90,173 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
         )}
       </div>
     </main>
+  )
+}
+
+function SourceListings({ listings, contextLookup }: { listings: TargetSourceListing[]; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  const [mode, setMode] = useState<'grouped' | 'raw'>('grouped')
+  const groups = useMemo(() => {
+    const map = new Map<string, TargetSourceListing[]>()
+    for (const listing of listings) {
+      const key = listing.offering_target.id
+      map.set(key, [...(map.get(key) ?? []), listing])
+    }
+    return Array.from(map.entries()).map(([offeringID, items]) => ({ offeringID, items })).sort((a, b) => compareListingGroups(a.items, b.items))
+  }, [listings])
+  return (
+    <Panel title="Source Listings" count={listings.length}>
+      {groups.length === 0 ? <Empty text="No linked provider listings." /> : (
+        <div className="source-listing-groups">
+          {listings.length > 1 && (
+            <div className="address-view-tabs source-listing-tabs">
+              <button className={mode === 'grouped' ? 'is-active' : ''} type="button" onClick={() => setMode('grouped')}>Grouped offerings</button>
+              <button className={mode === 'raw' ? 'is-active' : ''} type="button" onClick={() => setMode('raw')}>Raw source records</button>
+            </div>
+          )}
+          {mode === 'grouped' ? (
+            groups.map(group => <SourceListingGroup group={group} contextLookup={contextLookup} key={group.offeringID} />)
+          ) : (
+            <div className="source-listing-list">
+              {listings.map(listing => <SourceListingRow listing={listing} contextLookup={contextLookup} key={listing.target.id} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+function SourceListingGroup({ group, contextLookup }: { group: { offeringID: string; items: TargetSourceListing[] }; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  const representative = group.items[0]
+  const providers = Array.from(new Set(group.items.map(item => item.provider).filter(Boolean)))
+  const priceMatches = group.items.filter(item => item.price_match).length
+  const insightCount = group.items.reduce((count, item) => count + (item.insights?.length ?? 0), 0)
+  if (!representative) return null
+  return (
+    <section className="source-listing-group">
+      <div className="source-listing-group-head">
+        <div>
+          <span>Grouped offering</span>
+          <h3>{representative.title || representative.street_address || shortID(group.offeringID)}</h3>
+          <p>{[representative.room_layout, formatOptionalArea(representative.area_m2), formatOptionalCurrency(representative.asking_price_eur)].filter(Boolean).join(' / ')}</p>
+        </div>
+        <Link to={withAddressLookupContext(`/target/offering/${group.offeringID}`, contextLookup)}>Open grouped detail</Link>
+      </div>
+      <div className="source-listing-group-meta">
+        <Fact label="Sources" value={providers.join(', ') || '-'} />
+        <Fact label="Records" value={String(group.items.length)} />
+        <Fact label="Price matches" value={priceMatches ? String(priceMatches) : '-'} />
+        <Fact label="Insights" value={insightCount ? String(insightCount) : '-'} />
+        <Fact label="Latest seen" value={formatDate(latestListingDate(group.items))} />
+        <Fact label="Link score" value={bestLinkScore(group.items)} />
+      </div>
+      <div className="source-listing-list">
+        {group.items.map(listing => <SourceListingRow listing={listing} contextLookup={contextLookup} key={listing.target.id} />)}
+      </div>
+    </section>
+  )
+}
+
+function SourceListingRow({ listing, contextLookup }: { listing: TargetSourceListing; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  const detailPath = sourceEntityPath({ canonicalId: listing.canonical_id, kind: listing.kind })
+  return (
+    <article className="source-listing-row">
+      <div className="source-listing-main">
+        <span>{listing.provider} / {listing.kind}</span>
+        <strong>{listing.title || listing.native_id || shortID(listing.target.id)}</strong>
+        <small>{[listing.street_address, listing.postal, listing.city].filter(Boolean).join(' ')}</small>
+      </div>
+      <div className="source-listing-facts">
+        <Fact label="Price" value={formatOptionalCurrency(listing.asking_price_eur)} />
+        <Fact label="Debt-free" value={formatOptionalCurrency(listing.debt_free_price_eur)} />
+        <Fact label="Area" value={formatOptionalArea(listing.area_m2)} />
+        <Fact label="Layout" value={listing.room_layout} />
+        <Fact label="Seen" value={formatDate(listing.last_seen_at)} />
+        <Fact label="Match" value={formatPriceMatch(listing)} />
+      </div>
+      {(listing.insights?.length ?? 0) > 0 && (
+        <div className="source-listing-insights">
+          {listing.insights?.slice(0, 4).map(insight => (
+            <span key={`${insight.source_field}:${insight.key}`}>
+              <strong>{insight.key}</strong>
+              {insight.value}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="source-listing-actions">
+        {detailPath && <Link to={withAddressLookupContext(detailPath, contextLookup)}>Source detail</Link>}
+        <Link to={withAddressLookupContext(`/target/offering/${listing.offering_target.id}`, contextLookup)}>Grouped detail</Link>
+        {listing.price_match && <Link to={withAddressLookupContext(`/matches?transaction=${listing.price_match.target.id}`, contextLookup)}>Price match</Link>}
+        <LiveSourceLink available={listing.external_url_available} url={listing.url} />
+      </div>
+    </article>
+  )
+}
+
+function TargetChildren({ buildings, units, offerings, contextLookup }: { buildings: TargetBuildingSummary[]; units: TargetUnitSummary[]; offerings: TargetOfferingSummary[]; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  const count = buildings.length + units.length + offerings.length
+  if (count === 0) return null
+  return (
+    <Panel title="Canonical Children" count={count}>
+      <div className="target-children">
+        {offerings.length > 0 && <TargetOfferingList offerings={offerings} contextLookup={contextLookup} />}
+        {units.length > 0 && <TargetUnitList units={units} contextLookup={contextLookup} />}
+        {buildings.length > 0 && <TargetBuildingList buildings={buildings} contextLookup={contextLookup} />}
+      </div>
+    </Panel>
+  )
+}
+
+function TargetOfferingList({ offerings, contextLookup }: { offerings: TargetOfferingSummary[]; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  return (
+    <section className="target-child-group">
+      <h3>Grouped offerings</h3>
+      <div className="target-child-list">
+        {offerings.map(offering => (
+          <Link className="target-child-card" to={withAddressLookupContext(`/target/offering/${offering.target.id}`, contextLookup)} key={offering.target.id}>
+            <span>{targetOfferingEyebrow(offering)}</span>
+            <strong>{offering.title}</strong>
+            <small>{[formatOptionalArea(offering.area_m2), formatOptionalCurrency(offering.asking_price_eur), formatDate(offering.last_seen_at)].filter(Boolean).join(' / ')}</small>
+            <small>{targetOfferingMetadata(offering)}</small>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function TargetUnitList({ units, contextLookup }: { units: TargetUnitSummary[]; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  return (
+    <section className="target-child-group">
+      <h3>Units</h3>
+      <div className="target-child-list">
+        {units.map(unit => (
+          <Link className="target-child-card" to={withAddressLookupContext(`/target/unit/${unit.target.id}`, contextLookup)} key={unit.target.id}>
+            <span>{unit.layout || 'Unit'}</span>
+            <strong>{unit.title}</strong>
+            <small>{[unit.address, formatOptionalArea(unit.area_m2), countLabel(unit.offering_count, 'offering')].filter(Boolean).join(' / ')}</small>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function TargetBuildingList({ buildings, contextLookup }: { buildings: TargetBuildingSummary[]; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
+  return (
+    <section className="target-child-group">
+      <h3>Buildings</h3>
+      <div className="target-child-list">
+        {buildings.map(building => (
+          <Link className="target-child-card" to={withAddressLookupContext(`/target/building/${building.target.id}`, contextLookup)} key={building.target.id}>
+            <span>{building.postal || 'Building'}</span>
+            <strong>{building.title}</strong>
+            <small>{[building.address, countLabel(building.unit_count, 'unit'), countLabel(building.offering_count, 'offering')].filter(Boolean).join(' / ')}</small>
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -381,6 +558,15 @@ function Badge({ children }: { children: ReactNode }) {
   return <span className="model-badge">{children}</span>
 }
 
+function Fact({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value || '-'}</strong>
+    </div>
+  )
+}
+
 function groupByNamespace(values: ResolvedValue[]) {
   const map = new Map<string, ResolvedValue[]>()
   for (const value of values) {
@@ -412,6 +598,70 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('fi-FI', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)
 }
 
+function formatOptionalCurrency(value?: number): string {
+  return value == null ? '' : formatCurrency(value)
+}
+
+function formatOptionalArea(value?: number): string {
+  return value == null ? '' : `${value.toFixed(1)} m2`
+}
+
+function formatPriceMatch(listing: TargetSourceListing): string {
+  if (listing.price_match) {
+    return [listing.price_match.status, formatOptionalCurrency(listing.price_match.price_eur)].filter(Boolean).join(' / ')
+  }
+  return listing.link_status || ''
+}
+
+function targetOfferingEyebrow(offering: TargetOfferingSummary): string {
+  const sources = offering.sources?.map(sourceLabel).join(' + ')
+  return [offering.layout || 'Offering', sources].filter(Boolean).join(' / ')
+}
+
+function sourceLabel(source?: string): string {
+  if (source === 'shortcut') return 'Shortcut'
+  if (source === 'frontdoor') return 'Frontdoor'
+  return source || ''
+}
+
+function targetOfferingMetadata(offering: TargetOfferingSummary): string {
+  return [
+    countLabel(offering.source_count ?? 0, 'source'),
+    offering.price_match_status ? `Price ${[offering.price_match_status, formatOptionalCurrency(offering.price_match_price_eur)].filter(Boolean).join(' ')}` : '',
+    offering.insight_count ? `${offering.insight_count} insights` : '',
+  ].filter(Boolean).join(' / ')
+}
+
+function latestListingDate(listings: TargetSourceListing[]): string | undefined {
+  return listings.reduce<string | undefined>((latest, listing) => {
+    if (!listing.last_seen_at) return latest
+    if (!latest) return listing.last_seen_at
+    return new Date(listing.last_seen_at).getTime() > new Date(latest).getTime() ? listing.last_seen_at : latest
+  }, undefined)
+}
+
+function bestLinkScore(listings: TargetSourceListing[]): string {
+  const score = listings.reduce<number | undefined>((best, listing) => {
+    if (listing.link_score == null) return best
+    if (best == null) return listing.link_score
+    return Math.max(best, listing.link_score)
+  }, undefined)
+  return score == null ? '' : String(score)
+}
+
+function compareListingGroups(a: TargetSourceListing[], b: TargetSourceListing[]): number {
+  return listingGroupTime(b) - listingGroupTime(a)
+}
+
+function listingGroupTime(listings: TargetSourceListing[]): number {
+  const date = latestListingDate(listings)
+  return date ? new Date(date).getTime() : 0
+}
+
+function countLabel(value: number, noun: string): string {
+  return `${value} ${noun}${value === 1 ? '' : 's'}`
+}
+
 function formatDate(value?: string): string {
   if (!value) return ''
   return new Intl.DateTimeFormat('fi-FI').format(new Date(value))
@@ -435,4 +685,8 @@ function labelStatus(value: string): string {
 
 function labelCategory(value: string): string {
   return value.replaceAll('_', ' ')
+}
+
+function shortID(value: string): string {
+  return value.slice(0, 8)
 }

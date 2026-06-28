@@ -1,7 +1,14 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { entityDetail } from '../api/koditon'
 import { buildAddressLookupPath, looksLikeEntityInput } from '../lib/address-lookup'
+
+const shortcuts = [
+  { to: '/search', label: 'Source listings', detail: 'Raw provider rows with grouping, prices, and insights' },
+  { to: '/search?view=grouped&grouping=grouped', label: 'Grouped offerings', detail: 'Canonical offerings across Frontdoor and Shortcut' },
+  { to: '/map', label: 'Map targets', detail: 'Houses, buildings, and housing companies by location' },
+  { to: '/matches', label: 'Price matches', detail: 'Listing-to-transaction review queue' },
+]
 
 export default function HomePage() {
   const [input, setInput] = useState('')
@@ -40,7 +47,7 @@ export default function HomePage() {
           <span className="header-logo-dot" style={{ width: 10, height: 10 }} />
           Koditon
         </div>
-        <p className="home-desc">Look up an address, listing URL, or source canonical ID.</p>
+        <p className="home-desc">Look up an address, listing URL, or provider canonical ID.</p>
         <form className="home-search-form" onSubmit={handleSearch}>
           <input
             className="filter-input home-search-input"
@@ -58,6 +65,14 @@ export default function HomePage() {
         <p className="home-hint">
           Examples: <code>Askvägen 4</code>, <code>frontdoor:ad:21531967</code>, <code>https://...</code>
         </p>
+        <div className="home-shortcuts" aria-label="Browse shortcuts">
+          {shortcuts.map(shortcut => (
+            <Link key={shortcut.to} to={shortcut.to}>
+              <span>{shortcut.label}</span>
+              <small>{shortcut.detail}</small>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )

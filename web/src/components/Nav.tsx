@@ -22,7 +22,7 @@ export default function Nav({ actions }: NavProps) {
           to="/search"
           className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
         >
-          Targets
+          Listings
         </NavLink>
         <NavLink
           to="/map"
