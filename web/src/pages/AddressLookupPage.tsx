@@ -339,8 +339,8 @@ function TransactionTable({ title, transactions, sourceRecords, lookup, variant 
               <span>{[formatArea(transaction.area), formatPricePerM2(transaction.price_per_square_meter)].filter(Boolean).join(' / ')}</span>
             </div>
             <div>
-              <strong>{transaction.link_type}</strong>
-              <span>{[transaction.link_status, transaction.confidence, formatScore(transaction.score), formatPercent(transaction.price_delta_percent)].filter(Boolean).join(' / ')}</span>
+              <strong>{formatLinkType(transaction.link_type)}</strong>
+              <span>{[formatLinkStatus(transaction.link_status), transaction.confidence, formatScore(transaction.score), formatPercent(transaction.price_delta_percent)].filter(Boolean).join(' / ')}</span>
               <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review match</Link>
             </div>
             {evidence.length > 0 && (
@@ -589,6 +589,24 @@ function rawTransactionMatchPath(match: NonNullable<AddressRawTransaction['match
 
 function formatLinkMethod(value?: string) {
   return value?.trim().replaceAll('_', ' ') ?? ''
+}
+
+function formatLinkType(value?: string) {
+  const normalized = value?.trim()
+  if (normalized === 'direct') return 'Direct source'
+  if (normalized === 'offering') return 'Offering'
+  if (normalized === 'source_record') return 'Offering source'
+  if (normalized === 'candidate') return 'Candidate'
+  return formatLinkMethod(normalized)
+}
+
+function formatLinkStatus(value?: string) {
+  const normalized = value?.trim()
+  if (normalized === 'auto_linked') return 'Auto linked'
+  if (normalized === 'linked') return 'Linked'
+  if (normalized === 'candidate') return 'Candidate'
+  if (normalized === 'ambiguous') return 'Ambiguous'
+  return formatLinkMethod(normalized)
 }
 
 function transactionEvidence(transaction: AddressTransactionLink, sourceRecords: Map<string, AddressSourceRecord>) {
