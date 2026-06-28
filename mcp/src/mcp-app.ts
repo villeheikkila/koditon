@@ -125,7 +125,7 @@ function renderTransaction(transaction: PriceTransaction): string {
     <div class="sale-row">
       <div>
         <strong>${escapeHTML(transaction.description || transaction.transaction_id || transaction.id || "Sale")}</strong>
-        <span>${escapeHTML(location || details || "Prices")}</span>
+        <span>${escapeHTML(location || details || "prices")}</span>
       </div>
       <div>
         <strong>${escapeHTML(formatEUR(transaction.price) || "n/a")}</strong>

@@ -25,7 +25,7 @@ registerAppTool(
     description: "Search Finnish property listings by address, postal code, city, realtor/office text, price, or area. Returns rows with key facts, links, and available actual sale price data.",
     inputSchema: {
       query: z.string().optional().describe("Free-text search across listing, housing company, address, URL, and realtor/office text where indexed."),
-      address: z.string().optional().describe("Street address. Uses the address lookup flow with linked Prices sale prices."),
+      address: z.string().optional().describe("Street address. Uses the address lookup flow with linked prices sale rows."),
       postal: z.string().optional().describe("Postal code or prefix."),
       city: z.string().optional().describe("City or municipality."),
       realtor: z.string().optional().describe("Realtor, office, seller, or contact text to include in the free-text search."),
@@ -38,7 +38,7 @@ registerAppTool(
       sort: z.enum(["price_asc", "price_desc", "area_asc", "area_desc", "seen_desc"]).optional(),
       page: z.number().int().positive().optional(),
       page_size: z.union([z.literal(25), z.literal(50), z.literal(100)]).optional(),
-      include_prices: z.boolean().optional().describe("When searching by postal/city, also include recent actual sale price rows from Prices."),
+      include_prices: z.boolean().optional().describe("When searching by postal/city, also include recent actual sale price rows from prices."),
       transaction_limit: z.number().int().positive().max(100).optional()
     },
     _meta: { ui: { resourceUri: appResourceUri } }
