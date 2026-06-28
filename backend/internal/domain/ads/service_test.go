@@ -345,8 +345,8 @@ func TestAppendAddressSourceCandidateRowsDeduplicatesCandidates(t *testing.T) {
 		},
 	}
 	rows := []addressSourceCandidateRow{
-		{SelectedListingID: selectedID, CandidateListingID: candidateID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", Address: "Askvägen 4 G", City: "Maarianhamina", Postal: "22100", SelectedOfferingID: selectedOfferingID, CandidateOfferingID: candidateOfferingID, Direction: "source_to_target", Status: "candidate", Score: 118, Confidence: "high", PriceDeltaPercent: &priceDelta, Reasons: []byte(`{"postal":"22100"}`), CreatedAt: &createdAt},
-		{SelectedListingID: selectedID, CandidateListingID: candidateID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", SelectedOfferingID: selectedOfferingID, CandidateOfferingID: candidateOfferingID, Direction: "source_to_target", Status: "candidate", Score: 118, Confidence: "high"},
+		{SelectedListingID: selectedID, CandidateListingID: candidateID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", Address: "Askvägen 4 G", City: "Maarianhamina", Postal: "22100", SelectedOfferingID: &selectedOfferingID, CandidateOfferingID: &candidateOfferingID, Direction: "source_to_target", Status: "candidate", Score: 118, Confidence: "high", PriceDeltaPercent: &priceDelta, Reasons: []byte(`{"postal":"22100"}`), CreatedAt: &createdAt},
+		{SelectedListingID: selectedID, CandidateListingID: candidateID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", SelectedOfferingID: &selectedOfferingID, CandidateOfferingID: &candidateOfferingID, Direction: "source_to_target", Status: "candidate", Score: 118, Confidence: "high"},
 	}
 	appendAddressSourceCandidateRows(&result, map[uuid.UUID]int{selectedID: 0}, rows)
 	candidates := result.Listings[0].SourceCandidates
@@ -371,6 +371,27 @@ func TestAppendAddressSourceCandidateRowsDeduplicatesCandidates(t *testing.T) {
 	}
 	if candidate.CreatedAt == nil || !candidate.CreatedAt.Equal(createdAt) {
 		t.Fatalf("expected created at %v, got %v", createdAt, candidate.CreatedAt)
+	}
+}
+
+func TestAppendAddressSourceCandidateRowsAllowsUnaggregatedCandidates(t *testing.T) {
+	selectedID := uuid.MustParse("abababab-abab-abab-abab-abababababab")
+	candidateID := uuid.MustParse("cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd")
+	result := AddressLookupResult{
+		Listings: []AddressListing{
+			{ListingID: selectedID.String(), SourceCandidates: []AddressSourceCandidate{}},
+		},
+	}
+	rows := []addressSourceCandidateRow{
+		{SelectedListingID: selectedID, CandidateListingID: candidateID, CanonicalID: "frontdoor:ad:21531967", Source: "frontdoor", Kind: "ad", NativeID: "21531967", Status: "candidate", Score: 98},
+	}
+	appendAddressSourceCandidateRows(&result, map[uuid.UUID]int{selectedID: 0}, rows)
+	candidates := result.Listings[0].SourceCandidates
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(candidates))
+	}
+	if candidates[0].SelectedOfferingID != "" || candidates[0].CandidateOfferingID != "" {
+		t.Fatalf("expected empty offering provenance, got %+v", candidates[0])
 	}
 }
 

@@ -707,8 +707,8 @@ type addressSourceCandidateRow struct {
 	RoomLayout           string
 	URL                  string
 	ExternalURLAvailable bool
-	SelectedOfferingID   uuid.UUID
-	CandidateOfferingID  uuid.UUID
+	SelectedOfferingID   *uuid.UUID
+	CandidateOfferingID  *uuid.UUID
 	Direction            string
 	Status               string
 	Score                int32
@@ -817,7 +817,7 @@ func appendAddressSourceCandidateRows(result *AddressLookupResult, index map[uui
 			continue
 		}
 		seen[key] = struct{}{}
-		result.Listings[listingIndex].SourceCandidates = append(result.Listings[listingIndex].SourceCandidates, AddressSourceCandidate{ListingID: row.CandidateListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, SelectedOfferingID: row.SelectedOfferingID.String(), CandidateOfferingID: row.CandidateOfferingID.String(), Direction: row.Direction, Status: row.Status, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, ReasonsSummary: addressMatchReasonSummary(row.Reasons), CreatedAt: row.CreatedAt})
+		result.Listings[listingIndex].SourceCandidates = append(result.Listings[listingIndex].SourceCandidates, AddressSourceCandidate{ListingID: row.CandidateListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, SelectedOfferingID: uuidPtrString(row.SelectedOfferingID), CandidateOfferingID: uuidPtrString(row.CandidateOfferingID), Direction: row.Direction, Status: row.Status, Score: row.Score, Confidence: row.Confidence, PriceDeltaPercent: row.PriceDeltaPercent, Reasons: row.Reasons, ReasonsSummary: addressMatchReasonSummary(row.Reasons), CreatedAt: row.CreatedAt})
 	}
 }
 
