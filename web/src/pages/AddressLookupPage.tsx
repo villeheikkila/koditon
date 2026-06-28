@@ -15,7 +15,7 @@ export default function AddressLookupPage() {
   const [urlParams, setUrlParams] = useSearchParams()
   const lookupParams = useMemo(() => {
     const address = urlParams.get('address')?.trim() ?? ''
-    return address ? { address, city: valueOrUndefined(urlParams.get('city')), postal: valueOrUndefined(urlParams.get('postal')), source: urlParams.get('source') || 'all', page_size: 50 } : undefined
+    return address ? { address, city: valueOrUndefined(urlParams.get('city')), postal: valueOrUndefined(urlParams.get('postal')), source: urlParams.get('source') || 'all', page_size: lookupPageSize(urlParams) } : undefined
   }, [urlParams])
   const lookup = useAddressLookup(lookupParams, { query: { enabled: Boolean(lookupParams?.address), placeholderData: previous => previous } })
   const body = lookup.data?.status === 200 ? lookup.data.data : undefined
@@ -31,6 +31,11 @@ export default function AddressLookupPage() {
   const offeringCount = offerings.length || new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
   const rawListings = viewMode === 'grouped' ? listings.filter(listing => !listing.offering_id) : listings
   const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source } : undefined
+  function showMoreListings() {
+    const next = new URLSearchParams(urlParams)
+    next.set('page_size', '100')
+    setUrlParams(next)
+  }
   return (
     <main className="address-lookup-page">
       <Nav />
@@ -62,9 +67,12 @@ export default function AddressLookupPage() {
           {lookup.isFetching && !body && <div className="loading-state">Loading address data</div>}
           {body && listings.length === 0 && <EmptyState title="No listings found" text="Try the street address without apartment letters, or add city and postal filters." />}
           {listings.length > 0 && (
-            <div className="address-view-tabs">
-              <button className={viewMode === 'grouped' ? 'is-active' : ''} type="button" onClick={() => setViewMode('grouped')}>Grouped offerings</button>
-              <button className={viewMode === 'raw' ? 'is-active' : ''} type="button" onClick={() => setViewMode('raw')}>Raw source listings</button>
+            <div className="address-result-controls">
+              <div className="address-view-tabs">
+                <button className={viewMode === 'grouped' ? 'is-active' : ''} type="button" onClick={() => setViewMode('grouped')}>Grouped offerings</button>
+                <button className={viewMode === 'raw' ? 'is-active' : ''} type="button" onClick={() => setViewMode('raw')}>Raw source listings</button>
+              </div>
+              {body?.has_more_listings && (lookupParams?.page_size ?? 50) < 100 && <button className="search-clear-btn" type="button" onClick={showMoreListings}>Show 100 source listings</button>}
             </div>
           )}
           {viewMode === 'grouped' && offerings.length > 0 && (
@@ -151,6 +159,7 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
   const [cityInput, setCityInput] = useState(() => initialParams.get('city') ?? '')
   const [postalInput, setPostalInput] = useState(() => initialParams.get('postal') ?? '')
   const [sourceInput, setSourceInput] = useState(() => initialParams.get('source') ?? 'all')
+  const [pageSizeInput, setPageSizeInput] = useState(() => String(lookupPageSize(initialParams)))
   function submit(event: FormEvent) {
     event.preventDefault()
     const address = addressInput.trim()
@@ -160,6 +169,7 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
     if (cityInput.trim()) next.set('city', cityInput.trim())
     if (postalInput.trim()) next.set('postal', postalInput.trim())
     if (sourceInput !== 'all') next.set('source', sourceInput)
+    if (pageSizeInput !== '50') next.set('page_size', pageSizeInput)
     onChange(next)
   }
   function clearFilters() {
@@ -185,8 +195,16 @@ function AddressLookupForm({ initialParams, isFetching, onChange }: { initialPar
           {sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
+      <label className="search-filter-group">
+        <span className="search-filter-label">Source listings</span>
+        <select id="address-lookup-page-size" name="page_size" className="search-select" value={pageSizeInput} onChange={event => setPageSizeInput(event.target.value)}>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
       <button className="search-filter-trigger" type="submit" disabled={!addressInput.trim() || isFetching}>{isFetching ? 'Searching' : 'Find listings'}</button>
-      <button className="search-clear-btn" type="button" onClick={clearFilters} disabled={!addressInput && !cityInput && !postalInput && sourceInput === 'all'}>Clear</button>
+      <button className="search-clear-btn" type="button" onClick={clearFilters} disabled={!addressInput && !cityInput && !postalInput && sourceInput === 'all' && pageSizeInput === '50'}>Clear</button>
     </form>
   )
 }
@@ -475,6 +493,12 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 function valueOrUndefined(value: string | null) {
   const trimmed = value?.trim()
   return trimmed || undefined
+}
+
+function lookupPageSize(params: URLSearchParams) {
+  const value = Number(params.get('page_size'))
+  if (value === 25 || value === 50 || value === 100) return value
+  return 50
 }
 
 function sourceLabel(source?: string) {

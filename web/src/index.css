@@ -5013,10 +5013,18 @@ td.dim { color: var(--text-3); font-size: 12px; }
   opacity: 0.62;
 }
 
+.address-result-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 .address-view-tabs {
   display: inline-flex;
   gap: 4px;
-  margin-bottom: 10px;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
