@@ -504,3 +504,20 @@ func TestAddressLookupUsesLiveShortcutAdAvailability(t *testing.T) {
 		t.Fatal("expected source candidates SQL to require recent shortcut sightings")
 	}
 }
+
+func TestAddressSourceCandidatesAreCappedPerSelectedListing(t *testing.T) {
+	for _, want := range []string{
+		"ranked_latest AS",
+		"row_number() OVER",
+		"PARTITION BY selected_sale_listing_id",
+		"WHERE latest.candidate_rank <= 5",
+		"LIMIT 250",
+	} {
+		if !strings.Contains(addressSourceCandidatesSQL, want) {
+			t.Fatalf("expected source candidate SQL to include %q", want)
+		}
+	}
+	if strings.Contains(addressSourceCandidatesSQL, "LIMIT 100") {
+		t.Fatal("expected source candidate SQL to avoid a global first-100 cap")
+	}
+}

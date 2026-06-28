@@ -1570,6 +1570,15 @@ latest AS (
         *
     FROM candidates
     ORDER BY selected_sale_listing_id, candidate_sale_listing_id, property_offering_source_match_created_at DESC, property_offering_source_match_score DESC
+),
+ranked_latest AS (
+    SELECT
+        latest.*,
+        row_number() OVER (
+            PARTITION BY selected_sale_listing_id
+            ORDER BY property_offering_source_match_score DESC, property_offering_source_match_created_at DESC
+        ) AS candidate_rank
+    FROM latest
 )
 SELECT
     latest.selected_sale_listing_id,
@@ -1602,12 +1611,13 @@ SELECT
     latest.property_offering_source_match_price_delta_percent,
     latest.property_offering_source_match_reasons,
     latest.property_offering_source_match_created_at
-FROM latest
+FROM ranked_latest latest
 JOIN public.property_source_offerings candidate ON candidate.sale_listing_id = latest.candidate_sale_listing_id
 LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = candidate.frontdoor_ad_id
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = candidate.frontdoor_building_announcement_id
+WHERE latest.candidate_rank <= 5
 ORDER BY latest.selected_sale_listing_id, latest.property_offering_source_match_score DESC, latest.property_offering_source_match_created_at DESC
-LIMIT 100`
+LIMIT 250`
 
 const addressRawTransactionsSQL = `
 SELECT
