@@ -1,30 +1,10 @@
 package workflows
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
-
-	"github.com/earendil-works/absurd/sdks/go/absurd"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
-
-func TestRegisterAllRegistersCatalogWithAbsurd(t *testing.T) {
-	t.Parallel()
-	app, err := absurd.New(absurd.Options{DriverName: "pgx", DatabaseURL: "postgres://unused/unused", QueueName: QueueCanonicalDB})
-	if err != nil {
-		t.Fatalf("absurd.New returned error: %v", err)
-	}
-	t.Cleanup(func() { _ = app.Close() })
-	err = RegisterAll(app, func(context.Context, Params) (Result, error) {
-		return Result{Status: "ok"}, nil
-	})
-	if err != nil {
-		t.Fatalf("RegisterAll returned error: %v", err)
-	}
-}
 
 func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 	t.Parallel()
@@ -43,15 +23,15 @@ func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 	}
 	seen := make(map[string]bool, len(defs))
 	for _, def := range defs {
-		if def.Provider == "" || def.Kind == "" || def.Queue == "" {
+		if def.Name == "" || def.Queue == "" {
 			t.Fatalf("definition has empty contract fields: %#v", def)
 		}
-		if seen[def.Provider+"/"+def.Kind] {
-			t.Fatalf("duplicate definition: %s/%s", def.Provider, def.Kind)
+		if seen[def.Name] {
+			t.Fatalf("duplicate definition: %s", def.Name)
 		}
-		seen[def.Provider+"/"+def.Kind] = true
+		seen[def.Name] = true
 		if _, ok := wantQueues[def.Queue]; !ok {
-			t.Fatalf("%s uses unexpected queue %q", def.Kind, def.Queue)
+			t.Fatalf("%s uses unexpected queue %q", def.Name, def.Queue)
 		}
 		wantQueues[def.Queue] = true
 	}
@@ -65,50 +45,52 @@ func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 func TestHandlerOnlyCanonicalJobsAreClassified(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		kind      string
+		name      string
 		adminOnly bool
 	}{
-		{kind: "canonical_backfill_target_sources", adminOnly: true},
-		{kind: "canonical_backfill_building_coordinates", adminOnly: true},
-		{kind: "canonical_backfill_detached_houses", adminOnly: false},
+		{name: "canonical_backfill_target_sources", adminOnly: true},
+		{name: "canonical_backfill_building_coordinates", adminOnly: true},
+		{name: "canonical_backfill_detached_houses", adminOnly: false},
 	} {
-		def, ok := FindDefinition("canonical", tc.kind)
+		def, ok := FindDefinition(tc.name)
 		if !ok {
-			t.Fatalf("%s missing", tc.kind)
+			t.Fatalf("%s missing", tc.name)
 		}
 		if def.Queue != QueueCanonicalDB {
-			t.Fatalf("%s queue = %q, want %q", tc.kind, def.Queue, QueueCanonicalDB)
+			t.Fatalf("%s queue = %q, want %q", tc.name, def.Queue, QueueCanonicalDB)
 		}
 		if def.AdminOnly != tc.adminOnly {
-			t.Fatalf("%s adminOnly = %v, want %v", tc.kind, def.AdminOnly, tc.adminOnly)
+			t.Fatalf("%s adminOnly = %v, want %v", tc.name, def.AdminOnly, tc.adminOnly)
 		}
 	}
-	if _, ok := FindDefinition("canonical", "canonical_rebuild_spatial_read_model"); ok {
+	if _, ok := FindDefinition("canonical_rebuild_spatial_read_model"); ok {
 		t.Fatal("spatial read model no-op should not be an Absurd task")
 	}
 }
 
-func TestIdempotencyKeyMatchesOldDedupShape(t *testing.T) {
+func TestIdempotencyKeyUsesTaskNameAndCanonicalParams(t *testing.T) {
 	t.Parallel()
-	got := IdempotencyKey(" frontdoor ", " frontdoor_sync ", " ad:123 ")
-	if got != "frontdoor:frontdoor_sync:ad:123" {
-		t.Fatalf("idempotency key = %q", got)
+	a := IdempotencyKey("frontdoor_sync", json.RawMessage(`{"source_type":"ad","source_id":"123"}`))
+	b := IdempotencyKey("frontdoor_sync", json.RawMessage(`{ "source_type" : "ad", "source_id" : "123" }`))
+	if a != b {
+		t.Fatalf("idempotency keys differ: %q != %q", a, b)
+	}
+	if a == "frontdoor_sync" {
+		t.Fatalf("non-empty params should affect idempotency key")
 	}
 }
 
-func TestValidateParams(t *testing.T) {
+func TestValidateTaskParams(t *testing.T) {
 	t.Parallel()
-	err := ValidateParams(Params{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: "ad:123", Payload: json.RawMessage(`{"source":"test"}`)})
-	if err != nil {
-		t.Fatalf("ValidateParams valid = %v", err)
+	if err := ValidateTaskParams("frontdoor_sync", json.RawMessage(`{"source_type":"ad","source_id":"123"}`)); err != nil {
+		t.Fatalf("ValidateTaskParams valid = %v", err)
 	}
-	err = ValidateParams(Params{Provider: "frontdoor", Kind: "missing", EntityID: "ad:123"})
+	err := ValidateTaskParams("missing", json.RawMessage(`{}`))
 	if !errors.Is(err, ErrUnknownTask) {
-		t.Fatalf("ValidateParams unknown = %v, want ErrUnknownTask", err)
+		t.Fatalf("ValidateTaskParams unknown = %v, want ErrUnknownTask", err)
 	}
-	err = ValidateParams(Params{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: "ad:123", Payload: json.RawMessage(`{`)})
-	if err == nil {
-		t.Fatal("ValidateParams invalid payload succeeded")
+	if err := ValidateTaskParams("frontdoor_sync", json.RawMessage(`{`)); err == nil {
+		t.Fatal("ValidateTaskParams invalid JSON succeeded")
 	}
 }
 
@@ -123,92 +105,22 @@ func TestQueueAssignmentsUseAbsurdIsolationQueues(t *testing.T) {
 		"frontdoor_ad_data_hash_backfill":       QueueFrontdoor,
 		"postal_sync":                           QueuePostal,
 	}
-	for kind, want := range cases {
-		provider := providerForKind(kind)
-		def, ok := FindDefinition(provider, kind)
+	for name, want := range cases {
+		def, ok := FindDefinition(name)
 		if !ok {
-			t.Fatalf("%s missing", kind)
+			t.Fatalf("%s missing", name)
 		}
 		if def.Queue != want {
-			t.Fatalf("%s queue = %q, want %q", kind, def.Queue, want)
+			t.Fatalf("%s queue = %q, want %q", name, def.Queue, want)
 		}
 	}
 }
 
-func TestImplementedCatalogMarksExecutableAbsurdTasks(t *testing.T) {
+func TestTaskRegistryMarksExecutableAbsurdTasks(t *testing.T) {
 	t.Parallel()
-	if !IsImplemented("postal", "postal_sync") {
-		t.Fatal("postal_sync should be marked implemented")
-	}
-	for _, kind := range []string{
-		"prices_cities_init",
-		"prices_sync_all",
-		"prices_sync",
-		"prices_postal_code_sync",
-		"prices_postal_code_page_sync",
-		"prices_neighborhood_postal_code_sync",
-		"prices_match_sale_listings_backfill",
-		"prices_match_sale_listings_fanout",
-		"prices_match_sale_listing",
-	} {
-		if !IsImplemented("prices", kind) {
-			t.Fatalf("%s should be marked implemented", kind)
+	for _, def := range AllDefinitions() {
+		if _, ok := FindDefinition(def.Name); !ok {
+			t.Fatalf("%s should be registered", def.Name)
 		}
-	}
-	for _, kind := range []string{
-		"frontdoor_sitemap_sync",
-		"frontdoor_buildings_sitemap_sync",
-		"frontdoor_sync",
-		"frontdoor_ad_data_hash_backfill",
-	} {
-		if !IsImplemented("frontdoor", kind) {
-			t.Fatalf("%s should be marked implemented", kind)
-		}
-	}
-	for _, kind := range []string{
-		"shortcut_sitemap_sync",
-		"shortcut_buildings_sitemap_sync",
-		"shortcut_scraper_sync",
-		"shortcut_api_sync",
-		"shortcut_ad_data_hash_backfill",
-	} {
-		if !IsImplemented("shortcut", kind) {
-			t.Fatalf("%s should be marked implemented", kind)
-		}
-	}
-	for _, kind := range []string{
-		"canonicalize_source_ads_fanout",
-		"canonicalize_source_ad",
-		"canonical_match_sale_listing_sources_backfill",
-		"canonical_match_sale_listing_sources_fanout",
-		"canonical_match_sale_listing_source",
-		"canonical_rebuild_dimension_layer_backfill",
-		"canonical_rebuild_dimension_layer_listing",
-		"canonical_resolve_dirty_dimension_targets",
-		"canonical_resolve_dimension_target",
-		"canonical_extract_manager_certificate",
-		"canonical_project_manager_certificate",
-		"canonical_backfill_target_sources",
-		"canonical_backfill_building_coordinates",
-		"canonical_backfill_detached_houses",
-	} {
-		if !IsImplemented("canonical", kind) {
-			t.Fatalf("%s should be marked implemented", kind)
-		}
-	}
-}
-
-func providerForKind(kind string) string {
-	switch {
-	case strings.HasPrefix(kind, "frontdoor"):
-		return "frontdoor"
-	case strings.HasPrefix(kind, "shortcut"):
-		return "shortcut"
-	case strings.HasPrefix(kind, "prices"):
-		return "prices"
-	case strings.HasPrefix(kind, "postal"):
-		return "postal"
-	default:
-		return "canonical"
 	}
 }

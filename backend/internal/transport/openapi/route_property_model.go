@@ -2387,7 +2387,7 @@ func (a *API) enqueueTargetResolution(ctx context.Context, target CanonicalTarge
 	if err != nil {
 		return QueuedCanonicalJob{}, fmt.Errorf("marshal target resolution payload: %w", err)
 	}
-	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalResolveDimensionTarget, "dimension_target:"+target.Type+":"+target.ID, payload)
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, consumers.TaskTypeCanonicalResolveDimensionTarget, payload)
 	if err != nil {
 		return QueuedCanonicalJob{}, err
 	}

@@ -244,34 +244,35 @@ func newAPIQueryCommand(opts *commandOptions) *cobra.Command {
 func newSyncCommand(opts *commandOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Enqueue and inspect durable sync jobs",
+		Short: "Spawn and inspect durable sync tasks",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
-	cmd.AddCommand(newSyncEnqueueCommand(opts))
+	cmd.AddCommand(newSyncSpawnCommand(opts))
 	cmd.AddCommand(newSyncStatusCommand(opts))
 	cmd.AddCommand(newSyncRunCommand(opts))
 	return cmd
 }
 
-func newSyncEnqueueCommand(opts *commandOptions) *cobra.Command {
+func newSyncSpawnCommand(opts *commandOptions) *cobra.Command {
 	var watch bool
 	var interval time.Duration
+	var params string
 	cmd := &cobra.Command{
-		Use:   "enqueue <provider> <kind> <entity-id>",
-		Short: "Enqueue a durable sync job",
+		Use:   "spawn <task-name>",
+		Short: "Spawn a durable sync task",
 		Example: strings.Join([]string{
-			"cli sync enqueue frontdoor frontdoor_sitemap_sync frontdoor:sitemap --json --watch",
-			"cli sync enqueue frontdoor frontdoor_sync ad:12345 --json --watch",
-			"cli sync enqueue shortcut shortcut_buildings_sitemap_sync shortcut:buildings_sitemap --json",
-			"cli sync enqueue prices prices_sync city:Helsinki --json --watch",
-			"cli sync enqueue postal postal_sync postal:all --json",
+			`cli sync spawn frontdoor_sitemap_sync --json --watch`,
+			`cli sync spawn frontdoor_sync --params '{"source_type":"ad","source_id":"12345"}' --json --watch`,
+			`cli sync spawn shortcut_buildings_sitemap_sync --json`,
+			`cli sync spawn prices_sync --params '{"city":"Helsinki"}' --json --watch`,
+			`cli sync spawn postal_sync --json`,
 		}, "\n"),
-		Args: cobra.ExactArgs(3),
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := validateSyncJobTarget(args[0], args[1]); err != nil {
+			if err := validateSyncTask(args[0], []byte(params)); err != nil {
 				return err
 			}
 			store, closeFn, err := setupAbsurdSyncStore(opts.ctx)
@@ -280,9 +281,8 @@ func newSyncEnqueueCommand(opts *commandOptions) *cobra.Command {
 			}
 			defer closeFn()
 			return cli.RunAbsurdSync(opts.ctx, store, cli.AbsurdSyncFlags{
-				Provider: args[0],
-				Kind:     args[1],
-				EntityID: args[2],
+				TaskName: args[0],
+				Params:   []byte(params),
 				Watch:    watch,
 				Interval: interval,
 				JSON:     opts.json,
@@ -292,6 +292,7 @@ func newSyncEnqueueCommand(opts *commandOptions) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&watch, "watch", false, "Watch the sync job until it reaches a final status")
 	cmd.Flags().DurationVar(&interval, "interval", 2*time.Second, "Watch polling interval")
+	cmd.Flags().StringVar(&params, "params", "{}", "JSON task params")
 	return cmd
 }
 
@@ -425,9 +426,6 @@ func setupAbsurdSyncStore(ctx context.Context) (*workflows.Store, func(), error)
 	return workflows.NewStore(app), func() { _ = app.Close() }, nil
 }
 
-func validateSyncJobTarget(provider, kind string) error {
-	if _, ok := workflows.FindDefinition(provider, kind); !ok {
-		return fmt.Errorf("sync kind %q is not implemented for provider %q", kind, provider)
-	}
-	return nil
+func validateSyncTask(taskName string, params []byte) error {
+	return workflows.ValidateTaskParams(taskName, params)
 }

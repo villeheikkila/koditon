@@ -59,11 +59,11 @@ func (c *Consumer) startPricesWorkflowWorker(ctx context.Context, cfg Config) er
 		return errors.New("prices service is not configured")
 	}
 	for _, kind := range pricesWorkflowKinds {
-		def, ok := workflows.FindDefinition("prices", kind)
+		def, ok := workflows.FindDefinition(kind)
 		if !ok {
 			return fmt.Errorf("missing prices workflow definition: %s", kind)
 		}
-		task := absurd.Task[workflows.Params, workflows.Result](
+		task := absurd.Task[json.RawMessage, json.RawMessage](
 			kind,
 			c.handlePricesWorkflow,
 			absurd.TaskOptions{QueueName: workflows.QueuePrices, DefaultMaxAttempts: def.DefaultMaxAttempts, DefaultCancellation: def.DefaultCancellation},
@@ -97,21 +97,15 @@ func (c *Consumer) startPricesWorkflowWorker(ctx context.Context, cfg Config) er
 	return nil
 }
 
-func (c *Consumer) handlePricesWorkflow(ctx context.Context, params workflows.Params) (workflows.Result, error) {
-	if err := workflows.ValidateParams(params); err != nil {
-		return workflows.Result{}, err
-	}
-	if params.Provider != "prices" {
-		return workflows.Result{}, fmt.Errorf("invalid prices workflow provider: %s", params.Provider)
-	}
+func (c *Consumer) handlePricesWorkflow(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+	taskName := absurd.MustTaskContext(ctx).TaskName()
 	logger := logging.With(c.logger,
 		logging.Op("consumer.prices.workflow"),
-		slog.String("task_type", params.Kind),
-		slog.String("entity_id", params.EntityID),
+		slog.String("task_type", taskName),
 	)
 	var result any
 	var err error
-	switch params.Kind {
+	switch taskName {
 	case TaskTypePricesCitiesInit, TaskTypePricesSyncAll:
 		result, err = c.runPricesCitiesFanoutWorkflow(ctx, logger)
 	case TaskTypePricesSync:
@@ -129,16 +123,16 @@ func (c *Consumer) handlePricesWorkflow(ctx context.Context, params workflows.Pa
 	case TaskTypePricesMatchSaleListing:
 		result, err = c.runPricesMatchSaleListingWorkflow(ctx, logger, params)
 	default:
-		return workflows.Result{}, fmt.Errorf("unknown prices workflow kind: %s", params.Kind)
+		return nil, fmt.Errorf("unknown prices workflow kind: %s", taskName)
 	}
 	if err != nil {
-		return workflows.Result{}, err
+		return nil, err
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return workflows.Result{}, fmt.Errorf("marshal prices workflow result: %w", err)
+		return nil, fmt.Errorf("marshal prices workflow result: %w", err)
 	}
-	return workflows.Result{Status: "succeeded", Result: raw}, nil
+	return raw, nil
 }
 
 func (c *Consumer) runPricesCitiesFanoutWorkflow(ctx context.Context, logger *slog.Logger) (pricesFanoutResult, error) {
@@ -155,10 +149,13 @@ func (c *Consumer) runPricesCitiesFanoutWorkflow(ctx context.Context, logger *sl
 			if city == "" {
 				continue
 			}
-			if _, err := workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
-				Provider: "prices",
-				Kind:     TaskTypePricesSync,
-				EntityID: entityPrefixCity + city,
+			params, err := json.Marshal(map[string]string{"city": city})
+			if err != nil {
+				return pricesFanoutResult{}, err
+			}
+			if _, err := workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
+				TaskName: TaskTypePricesSync,
+				Params:   params,
 			}); err != nil {
 				return pricesFanoutResult{}, err
 			}
@@ -169,13 +166,16 @@ func (c *Consumer) runPricesCitiesFanoutWorkflow(ctx context.Context, logger *sl
 	})
 }
 
-func (c *Consumer) runPricesCityWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (syncprices.SyncCityIndexResult, error) {
-	entityType, cityName, err := parseJobEntity(params.EntityID)
-	if err != nil {
-		return syncprices.SyncCityIndexResult{}, err
+func (c *Consumer) runPricesCityWorkflow(ctx context.Context, logger *slog.Logger, raw json.RawMessage) (syncprices.SyncCityIndexResult, error) {
+	var params struct {
+		City string `json:"city"`
 	}
-	if entityType != "city" {
-		return syncprices.SyncCityIndexResult{}, fmt.Errorf("expected city entity, got %s", entityType)
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return syncprices.SyncCityIndexResult{}, fmt.Errorf("decode prices city params: %w", err)
+	}
+	cityName := strings.TrimSpace(params.City)
+	if cityName == "" {
+		return syncprices.SyncCityIndexResult{}, fmt.Errorf("city is required")
 	}
 	result, err := absurd.Step(ctx, "sync-city-index", func(ctx context.Context) (syncprices.SyncCityIndexResult, error) {
 		result, err := c.pricesService.SyncCityIndex(ctx, cityName, func(p syncprices.SyncCityProgress) {
@@ -207,8 +207,8 @@ func (c *Consumer) runPricesCityWorkflow(ctx context.Context, logger *slog.Logge
 	return result, nil
 }
 
-func (c *Consumer) runPricesPostalCodeWorkflow(ctx context.Context, params workflows.Params) (pricesFanoutResult, error) {
-	payload, err := decodePricesPostalCodeWorkflowPayload(params.Payload)
+func (c *Consumer) runPricesPostalCodeWorkflow(ctx context.Context, params json.RawMessage) (pricesFanoutResult, error) {
+	payload, err := decodePricesPostalCodeWorkflowPayload(params)
 	if err != nil {
 		return pricesFanoutResult{}, err
 	}
@@ -221,8 +221,8 @@ func (c *Consumer) runPricesPostalCodeWorkflow(ctx context.Context, params workf
 	})
 }
 
-func (c *Consumer) runPricesPostalCodePageWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (syncprices.SyncPostalCodePageResult, error) {
-	payload, err := decodePricesPostalCodeWorkflowPayload(params.Payload)
+func (c *Consumer) runPricesPostalCodePageWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (syncprices.SyncPostalCodePageResult, error) {
+	payload, err := decodePricesPostalCodeWorkflowPayload(params)
 	if err != nil {
 		return syncprices.SyncPostalCodePageResult{}, err
 	}
@@ -267,11 +267,9 @@ func (c *Consumer) spawnPricesPostalCodePage(ctx context.Context, payload prices
 	if err != nil {
 		return fmt.Errorf("marshal prices postal code page payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
-		Provider: "prices",
-		Kind:     TaskTypePricesPostalCodePageSync,
-		EntityID: pricesPostalCodePageEntityID(payload.City, payload.PostalCode, payload.Page),
-		Payload:  raw,
+	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypePricesPostalCodePageSync,
+		Params:   raw,
 	})
 	return err
 }
@@ -292,7 +290,7 @@ func decodePricesPostalCodeWorkflowPayload(raw json.RawMessage) (pricesPostalCod
 	return payload, nil
 }
 
-func (c *Consumer) runPricesNeighborhoodPostalCodeWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (any, error) {
+func (c *Consumer) runPricesNeighborhoodPostalCodeWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (any, error) {
 	payload, err := decodePricesNeighborhoodPostalCodeWorkflowPayload(params)
 	if err != nil {
 		return nil, err
@@ -349,17 +347,15 @@ func (c *Consumer) spawnPricesNeighborhoodPostalCodePage(ctx context.Context, pa
 	if err != nil {
 		return fmt.Errorf("marshal prices neighborhood postal code payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
-		Provider: "prices",
-		Kind:     TaskTypePricesNeighborhoodPostalCodeSync,
-		EntityID: pricesNeighborhoodPostalCodeEntityID(payload.City, payload.PostalCode, payload.Page),
-		Payload:  raw,
+	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypePricesNeighborhoodPostalCodeSync,
+		Params:   raw,
 	})
 	return err
 }
 
-func (c *Consumer) runPricesMatchSaleListingsBackfillWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (pricesMatchRunSummary, error) {
-	payload, err := decodePricesMatchBackfillWorkflowPayload(params.Payload)
+func (c *Consumer) runPricesMatchSaleListingsBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (pricesMatchRunSummary, error) {
+	payload, err := decodePricesMatchBackfillWorkflowPayload(params)
 	if err != nil {
 		return pricesMatchRunSummary{}, err
 	}
@@ -373,8 +369,8 @@ func (c *Consumer) runPricesMatchSaleListingsBackfillWorkflow(ctx context.Contex
 	return run, nil
 }
 
-func (c *Consumer) runPricesMatchSaleListingsFanoutWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (pricesFanoutResult, error) {
-	payload, err := decodePricesMatchFanoutWorkflowPayload(params.Payload)
+func (c *Consumer) runPricesMatchSaleListingsFanoutWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (pricesFanoutResult, error) {
+	payload, err := decodePricesMatchFanoutWorkflowPayload(params)
 	if err != nil {
 		return pricesFanoutResult{}, err
 	}
@@ -415,7 +411,7 @@ LIMIT $1`, payload.Limit)
 	})
 }
 
-func (c *Consumer) runPricesMatchSaleListingWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (pricesMatchListingWorkflowResult, error) {
+func (c *Consumer) runPricesMatchSaleListingWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (pricesMatchListingWorkflowResult, error) {
 	payload, err := decodePricesMatchSaleListingWorkflowPayload(params)
 	if err != nil {
 		return pricesMatchListingWorkflowResult{}, err
@@ -520,10 +516,10 @@ func (c *Consumer) updatePricesMatchStateStep(ctx context.Context, stepName stri
 	return err
 }
 
-func decodePricesNeighborhoodPostalCodeWorkflowPayload(params workflows.Params) (pricesNeighborhoodPostalCodeWorkflowPayload, error) {
+func decodePricesNeighborhoodPostalCodeWorkflowPayload(raw json.RawMessage) (pricesNeighborhoodPostalCodeWorkflowPayload, error) {
 	var payload pricesNeighborhoodPostalCodeWorkflowPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return pricesNeighborhoodPostalCodeWorkflowPayload{}, fmt.Errorf("decode prices neighborhood postal code payload: %w", err)
 		}
 	}
@@ -567,21 +563,14 @@ func decodePricesMatchFanoutWorkflowPayload(raw json.RawMessage) (pricesMatchFan
 	return payload, nil
 }
 
-func decodePricesMatchSaleListingWorkflowPayload(params workflows.Params) (pricesMatchSaleListingPayload, error) {
+func decodePricesMatchSaleListingWorkflowPayload(raw json.RawMessage) (pricesMatchSaleListingPayload, error) {
 	var payload pricesMatchSaleListingPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return pricesMatchSaleListingPayload{}, fmt.Errorf("decode prices sale listing match payload: %w", err)
 		}
 	}
-	if payload.SaleListingID == "" {
-		_, value, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return pricesMatchSaleListingPayload{}, fmt.Errorf("parse listing entity: %w", err)
-		}
-		value, _, _ = strings.Cut(value, ":attempt:")
-		payload.SaleListingID = strings.TrimSpace(value)
-	}
+	payload.SaleListingID = strings.TrimSpace(payload.SaleListingID)
 	if payload.SaleListingID == "" {
 		return pricesMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
 	}
@@ -596,11 +585,9 @@ func (c *Consumer) spawnPricesMatchSaleListing(ctx context.Context, saleListingI
 	if err != nil {
 		return fmt.Errorf("marshal prices sale listing match payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
-		Provider:     "prices",
-		Kind:         TaskTypePricesMatchSaleListing,
-		EntityID:     fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
-		Payload:      payload,
+	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName:     TaskTypePricesMatchSaleListing,
+		Params:       payload,
 		Cancellation: &absurd.CancellationPolicy{MaxDuration: int64((pricesMatchMaxAge + pricesMatchRetryDelay).Seconds())},
 	})
 	return err

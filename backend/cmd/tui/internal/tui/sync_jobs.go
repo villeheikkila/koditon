@@ -15,7 +15,19 @@ type enqueuedSyncWork struct {
 	tasks []workflows.EnqueueResult
 }
 
-func enqueueAndWatchSyncJobs(ctx context.Context, app *appContext, report reportFn, jobs []workflows.SpawnRequest) (actionResult, error) {
+func syncTask(taskName string, params any) workflows.SpawnTaskRequest {
+	raw := json.RawMessage(`{}`)
+	if params != nil {
+		encoded, err := json.Marshal(params)
+		if err != nil {
+			encoded = raw
+		}
+		raw = encoded
+	}
+	return workflows.SpawnTaskRequest{TaskName: taskName, Params: raw}
+}
+
+func enqueueAndWatchSyncJobs(ctx context.Context, app *appContext, report reportFn, jobs []workflows.SpawnTaskRequest) (actionResult, error) {
 	if app.workflowStore == nil {
 		return actionResult{}, fmt.Errorf("sync workflow store unavailable")
 	}
@@ -27,8 +39,8 @@ func enqueueAndWatchSyncJobs(ctx context.Context, app *appContext, report report
 		if job.MaxAttempts == 0 {
 			job.MaxAttempts = 3
 		}
-		if !workflows.IsImplemented(job.Provider, job.Kind) {
-			return actionResult{}, fmt.Errorf("sync kind %q is not implemented for provider %q", job.Kind, job.Provider)
+		if _, ok := workflows.FindDefinition(job.TaskName); !ok {
+			return actionResult{}, fmt.Errorf("sync task %q is not implemented", job.TaskName)
 		}
 		result, err := app.workflowStore.Enqueue(ctx, job)
 		if err != nil {
@@ -63,7 +75,7 @@ func watchSyncJobs(ctx context.Context, app *appContext, report reportFn, enqueu
 			if snapshot.IsTerminal() {
 				done++
 				if snapshot.State != "completed" {
-					failed = append(failed, fmt.Sprintf("%s %s/%s: %s", snapshot.State, result.Kind, result.EntityID, string(snapshot.Failure)))
+					failed = append(failed, fmt.Sprintf("%s %s: %s", snapshot.State, result.TaskName, string(snapshot.Failure)))
 				}
 			}
 		}

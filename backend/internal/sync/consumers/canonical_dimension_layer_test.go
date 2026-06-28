@@ -18,7 +18,7 @@ func TestDecodeDimensionLayerListingPayloadCarriesExpectedDirtyAt(t *testing.T) 
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
-	payload, err := decodeDimensionLayerListingPayload(syncJobEnvelope{SyncJobPayload: raw})
+	payload, err := decodeDimensionLayerListingWorkflowPayload(raw)
 	if err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestDecodeDirtyDimensionTargetPayloadCarriesExpectedDirtyAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
-	payload, err := decodeDirtyDimensionTargetPayload(syncJobEnvelope{SyncJobPayload: raw})
+	payload, err := decodeDirtyDimensionTargetWorkflowPayload(raw)
 	if err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}

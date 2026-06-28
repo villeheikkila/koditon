@@ -25,9 +25,7 @@ type EnqueueResult struct {
 	Attempt  int
 	Created  bool
 	Queue    string
-	Provider string
-	Kind     string
-	EntityID string
+	TaskName string
 }
 
 type Snapshot struct {
@@ -49,13 +47,13 @@ func NewStore(app *absurd.Client) *Store {
 	return &Store{app: app}
 }
 
-func (s *Store) Enqueue(ctx context.Context, req SpawnRequest) (EnqueueResult, error) {
+func (s *Store) Enqueue(ctx context.Context, req SpawnTaskRequest) (EnqueueResult, error) {
 	if s == nil || s.app == nil {
 		return EnqueueResult{}, errors.New("absurd store is not configured")
 	}
-	def, ok := FindDefinition(req.Provider, req.Kind)
+	def, ok := FindDefinition(req.TaskName)
 	if !ok {
-		return EnqueueResult{}, fmt.Errorf("%w: %s/%s", ErrUnknownTask, req.Provider, req.Kind)
+		return EnqueueResult{}, fmt.Errorf("%w: %s", ErrUnknownTask, req.TaskName)
 	}
 	spawned, err := Spawn(ctx, s.app, req)
 	if err != nil {
@@ -67,9 +65,7 @@ func (s *Store) Enqueue(ctx context.Context, req SpawnRequest) (EnqueueResult, e
 		Attempt:  spawned.Attempt,
 		Created:  spawned.Created,
 		Queue:    def.Queue,
-		Provider: strings.TrimSpace(req.Provider),
-		Kind:     strings.TrimSpace(req.Kind),
-		EntityID: strings.TrimSpace(req.EntityID),
+		TaskName: strings.TrimSpace(req.TaskName),
 	}, nil
 }
 

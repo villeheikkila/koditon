@@ -14,9 +14,8 @@ import (
 )
 
 type AbsurdSyncFlags struct {
-	Provider string
-	Kind     string
-	EntityID string
+	TaskName string
+	Params   json.RawMessage
 	Watch    bool
 	Interval time.Duration
 	JSON     bool
@@ -26,9 +25,7 @@ type AbsurdSyncFlags struct {
 type absurdSyncTaskOutput struct {
 	ID       string          `json:"id"`
 	Queue    string          `json:"queue,omitempty"`
-	Provider string          `json:"provider,omitempty"`
-	Kind     string          `json:"kind,omitempty"`
-	EntityID string          `json:"entity_id,omitempty"`
+	TaskName string          `json:"task_name,omitempty"`
 	State    string          `json:"state,omitempty"`
 	Result   json.RawMessage `json:"result,omitempty"`
 	Failure  json.RawMessage `json:"failure,omitempty"`
@@ -38,10 +35,9 @@ type absurdSyncTaskOutput struct {
 
 func RunAbsurdSync(ctx context.Context, store *workflows.Store, f AbsurdSyncFlags) error {
 	out := resolveOutput(f.Out)
-	result, err := store.Enqueue(ctx, workflows.SpawnRequest{
-		Provider:    f.Provider,
-		Kind:        f.Kind,
-		EntityID:    f.EntityID,
+	result, err := store.Enqueue(ctx, workflows.SpawnTaskRequest{
+		TaskName:    f.TaskName,
+		Params:      f.Params,
 		MaxAttempts: 3,
 	})
 	if err != nil {
@@ -53,9 +49,9 @@ func RunAbsurdSync(ctx context.Context, store *workflows.Store, f AbsurdSyncFlag
 			return err
 		}
 	} else if result.Created {
-		fmt.Fprintf(out, "queued absurd task %s %s %s id=%s queue=%s\n", result.Provider, result.Kind, result.EntityID, result.TaskID, result.Queue)
+		fmt.Fprintf(out, "queued absurd task %s id=%s queue=%s\n", result.TaskName, result.TaskID, result.Queue)
 	} else {
-		fmt.Fprintf(out, "existing absurd task %s %s %s id=%s queue=%s\n", result.Provider, result.Kind, result.EntityID, result.TaskID, result.Queue)
+		fmt.Fprintf(out, "existing absurd task %s id=%s queue=%s\n", result.TaskName, result.TaskID, result.Queue)
 	}
 	if !f.Watch {
 		return nil
@@ -130,9 +126,7 @@ func mapAbsurdEnqueueResult(result workflows.EnqueueResult) absurdSyncTaskOutput
 	return absurdSyncTaskOutput{
 		ID:       result.TaskID,
 		Queue:    result.Queue,
-		Provider: result.Provider,
-		Kind:     result.Kind,
-		EntityID: result.EntityID,
+		TaskName: result.TaskName,
 		RunID:    result.RunID,
 		Attempt:  result.Attempt,
 	}

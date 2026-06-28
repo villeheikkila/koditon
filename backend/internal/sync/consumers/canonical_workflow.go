@@ -68,11 +68,11 @@ func (c *Consumer) startCanonicalWorkflowWorker(ctx context.Context, cfg Config)
 		return errors.New("canonical absurd workflow client is not configured")
 	}
 	for _, kind := range canonicalWorkflowKinds {
-		def, ok := workflows.FindDefinition("canonical", kind)
+		def, ok := workflows.FindDefinition(kind)
 		if !ok {
 			return fmt.Errorf("missing canonical workflow definition: %s", kind)
 		}
-		task := absurd.Task[workflows.Params, workflows.Result](
+		task := absurd.Task[json.RawMessage, json.RawMessage](
 			kind,
 			c.handleCanonicalWorkflow,
 			absurd.TaskOptions{QueueName: workflows.QueueCanonicalDB, DefaultMaxAttempts: def.DefaultMaxAttempts, DefaultCancellation: def.DefaultCancellation},
@@ -114,11 +114,11 @@ func (c *Consumer) startCanonicalLLMWorkflowWorker(ctx context.Context, cfg Conf
 		return errors.New("properties service is not configured")
 	}
 	for _, kind := range canonicalLLMWorkflowKinds {
-		def, ok := workflows.FindDefinition("canonical", kind)
+		def, ok := workflows.FindDefinition(kind)
 		if !ok {
 			return fmt.Errorf("missing canonical llm workflow definition: %s", kind)
 		}
-		task := absurd.Task[workflows.Params, workflows.Result](
+		task := absurd.Task[json.RawMessage, json.RawMessage](
 			kind,
 			c.handleCanonicalWorkflow,
 			absurd.TaskOptions{QueueName: workflows.QueueCanonicalLLM, DefaultMaxAttempts: def.DefaultMaxAttempts, DefaultCancellation: def.DefaultCancellation},
@@ -152,21 +152,15 @@ func (c *Consumer) startCanonicalLLMWorkflowWorker(ctx context.Context, cfg Conf
 	return nil
 }
 
-func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params workflows.Params) (workflows.Result, error) {
-	if err := workflows.ValidateParams(params); err != nil {
-		return workflows.Result{}, err
-	}
-	if params.Provider != "canonical" {
-		return workflows.Result{}, fmt.Errorf("invalid canonical workflow provider: %s", params.Provider)
-	}
+func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+	taskName := absurd.MustTaskContext(ctx).TaskName()
 	logger := logging.With(c.logger,
 		logging.Op("consumer.canonical.workflow"),
-		slog.String("task_type", params.Kind),
-		slog.String("entity_id", params.EntityID),
+		slog.String("task_type", taskName),
 	)
 	var result any
 	var err error
-	switch params.Kind {
+	switch taskName {
 	case TaskTypeCanonicalizeSourceAdsFanout:
 		result, err = c.runCanonicalizeSourceAdsFanoutWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalizeSourceAd:
@@ -196,20 +190,20 @@ func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params workflows
 	case TaskTypeCanonicalProjectManagerCertificate:
 		result, err = c.runCanonicalProjectManagerCertificateWorkflow(ctx, logger, params)
 	default:
-		return workflows.Result{}, fmt.Errorf("unknown canonical workflow kind: %s", params.Kind)
+		return nil, fmt.Errorf("unknown canonical workflow kind: %s", taskName)
 	}
 	if err != nil {
-		return workflows.Result{}, err
+		return nil, err
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return workflows.Result{}, fmt.Errorf("marshal canonical workflow result: %w", err)
+		return nil, fmt.Errorf("marshal canonical workflow result: %w", err)
 	}
-	return workflows.Result{Status: "succeeded", Result: raw}, nil
+	return raw, nil
 }
 
-func (c *Consumer) runCanonicalizeSourceAdsFanoutWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalFanoutResult, error) {
-	payload, err := decodeCanonicalizeSourceAdsFanoutWorkflowPayload(params.Payload)
+func (c *Consumer) runCanonicalizeSourceAdsFanoutWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalFanoutResult, error) {
+	payload, err := decodeCanonicalizeSourceAdsFanoutWorkflowPayload(params)
 	if err != nil {
 		return canonicalFanoutResult{}, err
 	}
@@ -284,7 +278,7 @@ UNION ALL
 	return result, nil
 }
 
-func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalizeSourceAdPayload, error) {
+func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalizeSourceAdPayload, error) {
 	payload, err := decodeCanonicalizeSourceAdWorkflowPayload(params)
 	if err != nil {
 		return canonicalizeSourceAdPayload{}, err
@@ -307,8 +301,8 @@ func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *
 	return payload, nil
 }
 
-func (c *Consumer) runCanonicalMatchBackfillWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalMatchRunSummary, error) {
-	payload, err := decodeCanonicalMatchBackfillWorkflowPayload(params.Payload)
+func (c *Consumer) runCanonicalMatchBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalMatchRunSummary, error) {
+	payload, err := decodeCanonicalMatchBackfillWorkflowPayload(params)
 	if err != nil {
 		return canonicalMatchRunSummary{}, err
 	}
@@ -322,8 +316,8 @@ func (c *Consumer) runCanonicalMatchBackfillWorkflow(ctx context.Context, logger
 	return run, nil
 }
 
-func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalFanoutResult, error) {
-	payload, err := decodeCanonicalMatchFanoutWorkflowPayload(params.Payload)
+func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalFanoutResult, error) {
+	payload, err := decodeCanonicalMatchFanoutWorkflowPayload(params)
 	if err != nil {
 		return canonicalFanoutResult{}, err
 	}
@@ -363,7 +357,7 @@ LIMIT $1`, payload.Limit)
 	})
 }
 
-func (c *Consumer) runCanonicalMatchSaleListingSourceWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalMatchListingWorkflowResult, error) {
+func (c *Consumer) runCanonicalMatchSaleListingSourceWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalMatchListingWorkflowResult, error) {
 	payload, err := decodeCanonicalMatchSaleListingWorkflowPayload(params)
 	if err != nil {
 		return canonicalMatchListingWorkflowResult{}, err
@@ -425,8 +419,8 @@ func (c *Consumer) runCanonicalMatchSaleListingSourceWorkflow(ctx context.Contex
 	return canonicalMatchListingWorkflowResult{SaleListingID: row.ID, Status: status, Run: &run}, nil
 }
 
-func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (dimensionLayerBackfillResult, error) {
-	payload, err := decodeDimensionLayerBackfillWorkflowPayload(params.Payload)
+func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (dimensionLayerBackfillResult, error) {
+	payload, err := decodeDimensionLayerBackfillWorkflowPayload(params)
 	if err != nil {
 		return dimensionLayerBackfillResult{}, err
 	}
@@ -475,7 +469,7 @@ func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger
 	return result, nil
 }
 
-func (c *Consumer) runDimensionLayerListingWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (json.RawMessage, error) {
+func (c *Consumer) runDimensionLayerListingWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (json.RawMessage, error) {
 	payload, err := decodeDimensionLayerListingWorkflowPayload(params)
 	if err != nil {
 		return nil, err
@@ -504,8 +498,8 @@ func (c *Consumer) runDimensionLayerListingWorkflow(ctx context.Context, logger 
 	return result, nil
 }
 
-func (c *Consumer) runResolveDirtyDimensionTargetsWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (canonicalFanoutResult, error) {
-	payload, err := decodeDirtyDimensionTargetsWorkflowPayload(params.Payload)
+func (c *Consumer) runResolveDirtyDimensionTargetsWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalFanoutResult, error) {
+	payload, err := decodeDirtyDimensionTargetsWorkflowPayload(params)
 	if err != nil {
 		return canonicalFanoutResult{}, err
 	}
@@ -537,7 +531,7 @@ func (c *Consumer) runResolveDirtyDimensionTargetsWorkflow(ctx context.Context, 
 	})
 }
 
-func (c *Consumer) runResolveDimensionTargetWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (json.RawMessage, error) {
+func (c *Consumer) runResolveDimensionTargetWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (json.RawMessage, error) {
 	payload, err := decodeDirtyDimensionTargetWorkflowPayload(params)
 	if err != nil {
 		return nil, err
@@ -558,7 +552,7 @@ func (c *Consumer) runResolveDimensionTargetWorkflow(ctx context.Context, logger
 
 func (c *Consumer) runCanonicalBackfillTargetSourcesWorkflow(ctx context.Context, logger *slog.Logger) (canonicalFanoutResult, error) {
 	_, err := absurd.Step(ctx, "backfill-target-sources", func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.handleCanonicalBackfillTargetSources(ctx, logger, syncJobEnvelope{})
+		return struct{}{}, c.handleCanonicalBackfillTargetSources(ctx, logger)
 	})
 	if err != nil {
 		return canonicalFanoutResult{}, err
@@ -568,7 +562,7 @@ func (c *Consumer) runCanonicalBackfillTargetSourcesWorkflow(ctx context.Context
 
 func (c *Consumer) runCanonicalBackfillBuildingCoordinatesWorkflow(ctx context.Context, logger *slog.Logger) (canonicalFanoutResult, error) {
 	_, err := absurd.Step(ctx, "backfill-building-coordinates", func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.handleCanonicalBackfillBuildingCoordinates(ctx, logger, syncJobEnvelope{})
+		return struct{}{}, c.handleCanonicalBackfillBuildingCoordinates(ctx, logger)
 	})
 	if err != nil {
 		return canonicalFanoutResult{}, err
@@ -576,8 +570,8 @@ func (c *Consumer) runCanonicalBackfillBuildingCoordinatesWorkflow(ctx context.C
 	return canonicalFanoutResult{Enqueued: 0}, nil
 }
 
-func (c *Consumer) runCanonicalBackfillDetachedHousesWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (detachedHouseBackfillResult, error) {
-	payload, err := decodeDetachedHouseBackfillWorkflowPayload(params.Payload)
+func (c *Consumer) runCanonicalBackfillDetachedHousesWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (detachedHouseBackfillResult, error) {
+	payload, err := decodeDetachedHouseBackfillWorkflowPayload(params)
 	if err != nil {
 		return detachedHouseBackfillResult{}, err
 	}
@@ -604,7 +598,7 @@ func (c *Consumer) runCanonicalBackfillDetachedHousesWorkflow(ctx context.Contex
 	return detachedHouseBackfillResult{Count: count}, nil
 }
 
-func (c *Consumer) runCanonicalExtractManagerCertificateWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (properties.ManagerCertificateSourceExtractionResult, error) {
+func (c *Consumer) runCanonicalExtractManagerCertificateWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (properties.ManagerCertificateSourceExtractionResult, error) {
 	payload, err := decodeManagerCertificateDocumentWorkflowPayload(params)
 	if err != nil {
 		return properties.ManagerCertificateSourceExtractionResult{}, err
@@ -631,7 +625,7 @@ func (c *Consumer) runCanonicalExtractManagerCertificateWorkflow(ctx context.Con
 	return result, nil
 }
 
-func (c *Consumer) runCanonicalProjectManagerCertificateWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (properties.ManagerCertificateExtractionResult, error) {
+func (c *Consumer) runCanonicalProjectManagerCertificateWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (properties.ManagerCertificateExtractionResult, error) {
 	payload, err := decodeManagerCertificateDocumentWorkflowPayload(params)
 	if err != nil {
 		return properties.ManagerCertificateExtractionResult{}, err
@@ -675,20 +669,12 @@ func decodeCanonicalizeSourceAdsFanoutWorkflowPayload(raw json.RawMessage) (cano
 	return payload, nil
 }
 
-func decodeCanonicalizeSourceAdWorkflowPayload(params workflows.Params) (canonicalizeSourceAdPayload, error) {
+func decodeCanonicalizeSourceAdWorkflowPayload(raw json.RawMessage) (canonicalizeSourceAdPayload, error) {
 	var payload canonicalizeSourceAdPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return canonicalizeSourceAdPayload{}, fmt.Errorf("decode canonicalize source ad payload: %w", err)
 		}
-	}
-	if payload.SourceTable == "" || payload.SourceID == "" {
-		sourceTable, sourceID, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return canonicalizeSourceAdPayload{}, err
-		}
-		payload.SourceTable = sourceTable
-		payload.SourceID = sourceID
 	}
 	payload.SourceTable = strings.TrimSpace(payload.SourceTable)
 	payload.SourceID = strings.TrimSpace(payload.SourceID)
@@ -711,20 +697,14 @@ func decodeCanonicalMatchFanoutWorkflowPayload(raw json.RawMessage) (canonicalMa
 	return payload, nil
 }
 
-func decodeCanonicalMatchSaleListingWorkflowPayload(params workflows.Params) (canonicalMatchSaleListingPayload, error) {
+func decodeCanonicalMatchSaleListingWorkflowPayload(raw json.RawMessage) (canonicalMatchSaleListingPayload, error) {
 	var payload canonicalMatchSaleListingPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return canonicalMatchSaleListingPayload{}, fmt.Errorf("decode canonical sale listing source match payload: %w", err)
 		}
 	}
-	if payload.SaleListingID == "" {
-		_, value, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return canonicalMatchSaleListingPayload{}, fmt.Errorf("parse sale listing entity: %w", err)
-		}
-		payload.SaleListingID, _, _ = strings.Cut(strings.TrimSpace(value), ":attempt:")
-	}
+	payload.SaleListingID = strings.TrimSpace(payload.SaleListingID)
 	if payload.SaleListingID == "" {
 		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
 	}
@@ -752,20 +732,14 @@ func decodeDimensionLayerBackfillWorkflowPayload(raw json.RawMessage) (dimension
 	return payload, nil
 }
 
-func decodeDimensionLayerListingWorkflowPayload(params workflows.Params) (dimensionLayerListingPayload, error) {
+func decodeDimensionLayerListingWorkflowPayload(raw json.RawMessage) (dimensionLayerListingPayload, error) {
 	var payload dimensionLayerListingPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return dimensionLayerListingPayload{}, fmt.Errorf("decode dimension layer listing payload: %w", err)
 		}
 	}
-	if payload.SaleListingID == "" {
-		_, value, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return dimensionLayerListingPayload{}, fmt.Errorf("parse sale listing entity: %w", err)
-		}
-		payload.SaleListingID = value
-	}
+	payload.SaleListingID = strings.TrimSpace(payload.SaleListingID)
 	if payload.SaleListingID == "" {
 		return dimensionLayerListingPayload{}, fmt.Errorf("sale_listing_id is required")
 	}
@@ -788,27 +762,12 @@ func decodeDirtyDimensionTargetsWorkflowPayload(raw json.RawMessage) (dirtyDimen
 	return payload, nil
 }
 
-func decodeDirtyDimensionTargetWorkflowPayload(params workflows.Params) (dirtyDimensionTargetPayload, error) {
+func decodeDirtyDimensionTargetWorkflowPayload(raw json.RawMessage) (dirtyDimensionTargetPayload, error) {
 	var payload dirtyDimensionTargetPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return dirtyDimensionTargetPayload{}, fmt.Errorf("decode dimension target payload: %w", err)
 		}
-	}
-	if payload.TargetType == "" || payload.TargetID == "" {
-		entityType, value, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return dirtyDimensionTargetPayload{}, fmt.Errorf("parse dimension target entity: %w", err)
-		}
-		if entityType != "dimension_target" {
-			return dirtyDimensionTargetPayload{}, fmt.Errorf("dimension target entity type must be dimension_target")
-		}
-		targetType, targetID, ok := strings.Cut(value, ":")
-		if !ok || targetType == "" || targetID == "" {
-			return dirtyDimensionTargetPayload{}, fmt.Errorf("dimension target entity must be dimension_target:type:uuid")
-		}
-		payload.TargetType = targetType
-		payload.TargetID = targetID
 	}
 	payload.TargetType = strings.TrimSpace(payload.TargetType)
 	payload.TargetID = strings.TrimSpace(payload.TargetID)
@@ -834,19 +793,15 @@ func decodeDetachedHouseBackfillWorkflowPayload(raw json.RawMessage) (detachedHo
 	return payload, nil
 }
 
-func decodeManagerCertificateDocumentWorkflowPayload(params workflows.Params) (managerCertificateDocumentPayload, error) {
+func decodeManagerCertificateDocumentWorkflowPayload(raw json.RawMessage) (managerCertificateDocumentPayload, error) {
 	var payload managerCertificateDocumentPayload
-	if len(params.Payload) > 0 {
-		if err := json.Unmarshal(params.Payload, &payload); err != nil {
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
 			return managerCertificateDocumentPayload{}, fmt.Errorf("decode manager certificate payload: %w", err)
 		}
 	}
 	if payload.PropertyDocumentID == "" {
-		_, value, err := parseJobEntity(params.EntityID)
-		if err != nil {
-			return managerCertificateDocumentPayload{}, fmt.Errorf("parse property document entity: %w", err)
-		}
-		payload.PropertyDocumentID = value
+		payload.PropertyDocumentID = strings.TrimSpace(payload.DocumentID)
 	}
 	payload.PropertyDocumentID = strings.TrimSpace(payload.PropertyDocumentID)
 	payload.Model = strings.TrimSpace(payload.Model)
@@ -864,11 +819,9 @@ func (c *Consumer) spawnCanonicalSourceMatchSaleListing(ctx context.Context, sal
 	if err != nil {
 		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
-		Provider: "canonical",
-		Kind:     TaskTypeCanonicalMatchSaleListingSource,
-		EntityID: fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
-		Payload:  payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeCanonicalMatchSaleListingSource,
+		Params:   payload,
 	})
 	return err
 }
@@ -878,11 +831,9 @@ func (c *Consumer) spawnCanonicalizeSourceAdsFanout(ctx context.Context, limit i
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ads fanout payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
-		Provider: "canonical",
-		Kind:     TaskTypeCanonicalizeSourceAdsFanout,
-		EntityID: fmt.Sprintf("canonical:source_ads:%d", time.Now().UTC().UnixNano()),
-		Payload:  payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeCanonicalizeSourceAdsFanout,
+		Params:   payload,
 	})
 	return err
 }

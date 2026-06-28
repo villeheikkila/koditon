@@ -35,7 +35,7 @@ func TestStoreEnqueueUsesAbsurdSpawnContract(t *testing.T) {
 	t.Parallel()
 	client := &fakeAbsurdClient{spawnedTask: absurd.SpawnResult{TaskID: "task-1", RunID: "run-1", Attempt: 1, Created: true}}
 	store := &Store{app: client}
-	result, err := store.Enqueue(context.Background(), SpawnRequest{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: "ad:123"})
+	result, err := store.Enqueue(context.Background(), SpawnTaskRequest{TaskName: "frontdoor_sync", Params: []byte(`{"source_type":"ad","source_id":"123"}`)})
 	if err != nil {
 		t.Fatalf("Enqueue returned error: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestStoreEnqueueUsesAbsurdSpawnContract(t *testing.T) {
 	if client.spawnOpts.QueueName != QueueFrontdoor {
 		t.Fatalf("queue = %q", client.spawnOpts.QueueName)
 	}
-	if client.spawnOpts.IdempotencyKey != "frontdoor:frontdoor_sync:ad:123" {
+	if client.spawnOpts.IdempotencyKey == "" || client.spawnOpts.IdempotencyKey == "frontdoor_sync" {
 		t.Fatalf("idempotency = %q", client.spawnOpts.IdempotencyKey)
 	}
 }

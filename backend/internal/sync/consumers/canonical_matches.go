@@ -3,17 +3,12 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
-	"koditon/internal/platform/logging"
 	"koditon/internal/sync/workflows"
 )
 
@@ -52,130 +47,6 @@ type canonicalMatchRunSummary struct {
 	Ambiguous  int32
 }
 
-func (c *Consumer) handleCanonicalMatchSaleListingSourcesBackfill(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
-	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_sources_backfill"))
-	payload := canonicalMatchBackfillPayload{ScoreThreshold: 95, CompetitorMargin: 10}
-	if len(job.SyncJobPayload) > 0 {
-		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return newPermanentError(fmt.Errorf("decode canonical source match backfill payload: %w", err), "invalid payload")
-		}
-	}
-	if payload.ScoreThreshold <= 0 {
-		payload.ScoreThreshold = 95
-	}
-	if payload.CompetitorMargin < 0 {
-		payload.CompetitorMargin = 10
-	}
-	run, err := c.runCanonicalSourceMatchBackfill(ctx, int(payload.ScoreThreshold), int(payload.CompetitorMargin))
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(map[string]any{
-		"run_id":      run.RunID,
-		"candidates":  run.Candidates,
-		"auto_linked": run.AutoLinked,
-		"ambiguous":   run.Ambiguous,
-	})
-	if err == nil {
-		c.updatePricesCheckpoint(ctx, job, map[string]any{
-			"run_id":      run.RunID,
-			"candidates":  run.Candidates,
-			"auto_linked": run.AutoLinked,
-			"ambiguous":   run.Ambiguous,
-			"updated_at":  time.Now().UTC(),
-			"result":      json.RawMessage(result),
-		})
-	}
-	logger.InfoContext(ctx, "canonical sale listing source backfill matched", "run_id", run.RunID, "candidates", run.Candidates, "auto_linked", run.AutoLinked, "ambiguous", run.Ambiguous, "outcome", logging.OutcomeSuccess)
-	return nil
-}
-
-func (c *Consumer) handleCanonicalMatchSaleListingSourcesFanout(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
-	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_sources_fanout"))
-	payload := canonicalMatchFanoutPayload{Limit: 5000}
-	if len(job.SyncJobPayload) > 0 {
-		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return newPermanentError(fmt.Errorf("decode canonical source match fanout payload: %w", err), "invalid payload")
-		}
-	}
-	if payload.Limit <= 0 || payload.Limit > 5000 {
-		payload.Limit = 5000
-	}
-	rows, err := c.pool.Query(ctx, `
-SELECT sl.sale_listing_id::text, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
-FROM public.property_source_offerings sl
-JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-WHERE sl.sale_listing_source_kind = 'ad'
-    AND pos.property_offering_source_link_status <> 'rejected'
-    AND pos.property_offering_source_link_method <> 'manual'
-    AND COALESCE(sl.sale_listing_source_match_status, 'pending') IN ('pending', 'deferred', 'noop')
-    AND COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at) <= now()
-ORDER BY COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at), sl.sale_listing_updated_at
-LIMIT $1`, payload.Limit)
-	if err != nil {
-		return fmt.Errorf("list sale listings for canonical source matching: %w", err)
-	}
-	defer rows.Close()
-	enqueued := 0
-	for rows.Next() {
-		var saleListingID string
-		var attempt int32
-		if err := rows.Scan(&saleListingID, &attempt); err != nil {
-			return fmt.Errorf("scan canonical source match fanout row: %w", err)
-		}
-		if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID, attempt+1, time.Now()); err != nil {
-			return err
-		}
-		enqueued++
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate canonical source match fanout rows: %w", err)
-	}
-	logger.InfoContext(ctx, "canonical sale listing source match jobs enqueued", "count", enqueued, "outcome", logging.OutcomeSuccess)
-	return nil
-}
-
-func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
-	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_source"))
-	payload, err := decodeCanonicalMatchSaleListingPayload(job)
-	if err != nil {
-		return newPermanentError(err, "invalid payload")
-	}
-	row, err := c.loadCanonicalMatchSaleListing(ctx, payload.SaleListingID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		return err
-	}
-	if row.LinkMethod != nil && *row.LinkMethod == "manual" {
-		if err := c.updateCanonicalSourceMatchState(ctx, row.ID, "manual_linked", nil, nil); err != nil {
-			return err
-		}
-		return c.projectTypedHousingCompanyProfileForSaleListing(ctx, row.ID)
-	}
-	run, err := c.runCanonicalSourceMatchForSaleListing(ctx, row.ID)
-	if err != nil {
-		return err
-	}
-	if run.AutoLinked > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source auto-linked", "sale_listing_id", row.ID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
-		if err := c.updateCanonicalSourceMatchState(ctx, row.ID, "auto_linked", nil, &run.RunID); err != nil {
-			return err
-		}
-		return c.projectTypedHousingCompanyProfileForSaleListing(ctx, row.ID)
-	}
-	if run.Ambiguous > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source needs review", "sale_listing_id", row.ID, "run_id", run.RunID, "candidates", run.Ambiguous)
-		return c.updateCanonicalSourceMatchState(ctx, row.ID, "needs_review", nil, &run.RunID)
-	}
-	next := time.Now().UTC().Add(7 * 24 * time.Hour)
-	if run.Candidates == 0 {
-		return c.updateCanonicalSourceMatchState(ctx, row.ID, "noop", &next, &run.RunID)
-	}
-	return c.updateCanonicalSourceMatchState(ctx, row.ID, "deferred", &next, &run.RunID)
-}
-
 func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.Context, saleListingID string) error {
 	id, err := uuid.Parse(saleListingID)
 	if err != nil {
@@ -188,29 +59,6 @@ func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.C
 		return fmt.Errorf("enqueue dimension layer listing: %w", err)
 	}
 	return nil
-}
-
-func decodeCanonicalMatchSaleListingPayload(job syncJobEnvelope) (canonicalMatchSaleListingPayload, error) {
-	var payload canonicalMatchSaleListingPayload
-	if len(job.SyncJobPayload) > 0 {
-		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return canonicalMatchSaleListingPayload{}, fmt.Errorf("decode canonical sale listing source match payload: %w", err)
-		}
-	}
-	if payload.SaleListingID == "" {
-		_, value, err := parseJobEntity(job.SyncJobEntityID)
-		if err != nil {
-			return canonicalMatchSaleListingPayload{}, fmt.Errorf("parse sale listing entity: %w", err)
-		}
-		payload.SaleListingID, _, _ = strings.Cut(strings.TrimSpace(value), ":attempt:")
-	}
-	if payload.SaleListingID == "" {
-		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
-	}
-	if _, err := uuid.Parse(payload.SaleListingID); err != nil {
-		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id must be a uuid: %w", err)
-	}
-	return payload, nil
 }
 
 func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, saleListingID string) (canonicalMatchSaleListingRow, error) {
@@ -283,11 +131,9 @@ func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, s
 	if err != nil {
 		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
-		Provider: "canonical",
-		Kind:     TaskTypeCanonicalMatchSaleListingSource,
-		EntityID: fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
-		Payload:  payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeCanonicalMatchSaleListingSource,
+		Params:   payload,
 	})
 	return err
 }

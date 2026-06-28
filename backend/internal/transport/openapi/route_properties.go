@@ -449,11 +449,11 @@ func (a *API) managerCertificateUploadHandler(ctx context.Context, input *manage
 }
 
 func (a *API) enqueueManagerCertificateExtraction(ctx context.Context, document properties.PropertyDocumentSummary, model string) (propertyDocumentJobResult, error) {
-	payload, err := json.Marshal(map[string]string{"property_document_id": document.ID, "model": strings.TrimSpace(model)})
+	payload, err := json.Marshal(map[string]string{"document_id": document.ID, "model": strings.TrimSpace(model)})
 	if err != nil {
 		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate extraction payload: %w", err)
 	}
-	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalExtractManagerCertificate, "property_document:"+document.ID, payload)
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, consumers.TaskTypeCanonicalExtractManagerCertificate, payload)
 	if err != nil {
 		return propertyDocumentJobResult{}, err
 	}
@@ -461,11 +461,11 @@ func (a *API) enqueueManagerCertificateExtraction(ctx context.Context, document 
 }
 
 func (a *API) enqueueManagerCertificateProjection(ctx context.Context, document properties.PropertyDocumentSummary) (propertyDocumentJobResult, error) {
-	payload, err := json.Marshal(map[string]string{"property_document_id": document.ID})
+	payload, err := json.Marshal(map[string]string{"document_id": document.ID})
 	if err != nil {
 		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate projection payload: %w", err)
 	}
-	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalProjectManagerCertificate, "property_document:"+document.ID, payload)
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, consumers.TaskTypeCanonicalProjectManagerCertificate, payload)
 	if err != nil {
 		return propertyDocumentJobResult{}, err
 	}

@@ -24,7 +24,7 @@ func (c *Consumer) startPostalWorkflowWorker(ctx context.Context, cfg Config) er
 	if c.postalService == nil {
 		return errors.New("postal service is not configured")
 	}
-	task := absurd.Task[workflows.Params, workflows.Result](
+	task := absurd.Task[json.RawMessage, json.RawMessage](
 		TaskTypePostalSync,
 		c.handlePostalWorkflow,
 		absurd.TaskOptions{QueueName: workflows.QueuePostal, DefaultMaxAttempts: 3},
@@ -57,27 +57,24 @@ func (c *Consumer) startPostalWorkflowWorker(ctx context.Context, cfg Config) er
 	return nil
 }
 
-func (c *Consumer) handlePostalWorkflow(ctx context.Context, params workflows.Params) (workflows.Result, error) {
-	if err := workflows.ValidateParams(params); err != nil {
-		return workflows.Result{}, err
-	}
-	if params.Kind != TaskTypePostalSync {
-		return workflows.Result{}, fmt.Errorf("unknown postal workflow kind: %s", params.Kind)
+func (c *Consumer) handlePostalWorkflow(ctx context.Context, _ json.RawMessage) (json.RawMessage, error) {
+	taskName := absurd.MustTaskContext(ctx).TaskName()
+	if taskName != TaskTypePostalSync {
+		return nil, fmt.Errorf("unknown postal workflow kind: %s", taskName)
 	}
 	logger := logging.With(c.logger,
 		logging.Op("consumer.postal.workflow"),
-		slog.String("task_type", params.Kind),
-		slog.String("entity_id", params.EntityID),
+		slog.String("task_type", taskName),
 	)
 	result, err := c.runPostalWorkflow(ctx, logger)
 	if err != nil {
-		return workflows.Result{}, err
+		return nil, err
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return workflows.Result{}, fmt.Errorf("marshal postal workflow result: %w", err)
+		return nil, fmt.Errorf("marshal postal workflow result: %w", err)
 	}
-	return workflows.Result{Status: "succeeded", Result: raw}, nil
+	return raw, nil
 }
 
 func (c *Consumer) runPostalWorkflow(ctx context.Context, logger *slog.Logger) (syncpostal.SyncResult, error) {

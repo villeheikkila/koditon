@@ -5,19 +5,9 @@ import (
 )
 
 const (
-	entityPrefixCity = "city:"
-	priorityLow      = -10
-	priorityNormal   = 0
+	priorityLow    = -10
+	priorityNormal = 0
 )
-
-type syncMessage struct {
-	Data syncMessageData
-}
-
-type syncMessageData struct {
-	EntityID string
-	TaskType string
-}
 
 type permanentError struct {
 	err    error

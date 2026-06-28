@@ -62,7 +62,7 @@ func TestSyncHelpListsCanonicalSubcommands(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 	out := stdout.String()
-	for _, want := range []string{"enqueue", "status", "run"} {
+	for _, want := range []string{"spawn", "status", "run"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in help:\n%s", want, out)
 		}
@@ -109,28 +109,28 @@ func TestLegacySyncShorthandIsRejected(t *testing.T) {
 	}
 }
 
-func TestValidateSyncJobTarget(t *testing.T) {
+func TestValidateSyncTask(t *testing.T) {
 	t.Parallel()
-	if err := validateSyncJobTarget("prices", "prices_sync"); err != nil {
-		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	if err := validateSyncTask("prices_sync", []byte(`{"city":"Helsinki"}`)); err != nil {
+		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
-	if err := validateSyncJobTarget("frontdoor", "frontdoor_ad_data_hash_backfill"); err != nil {
-		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	if err := validateSyncTask("frontdoor_ad_data_hash_backfill", []byte(`{}`)); err != nil {
+		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
-	if err := validateSyncJobTarget("shortcut", "shortcut_ad_data_hash_backfill"); err != nil {
-		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	if err := validateSyncTask("shortcut_ad_data_hash_backfill", []byte(`{}`)); err != nil {
+		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
-	if err := validateSyncJobTarget("canonical", "canonicalize_source_ads_fanout"); err != nil {
-		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	if err := validateSyncTask("canonicalize_source_ads_fanout", []byte(`{}`)); err != nil {
+		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
-	if err := validateSyncJobTarget("canonical", "canonical_rebuild_dimension_layer_backfill"); err != nil {
-		t.Fatalf("validateSyncJobTarget returned error: %v", err)
+	if err := validateSyncTask("canonical_rebuild_dimension_layer_backfill", []byte(`{}`)); err != nil {
+		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
-	err := validateSyncJobTarget("prices", "frontdoor_sync")
+	err := validateSyncTask("missing_task", []byte(`{}`))
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), "not implemented") {
+	if !strings.Contains(err.Error(), "unknown sync workflow task") {
 		t.Fatalf("error = %v", err)
 	}
 }

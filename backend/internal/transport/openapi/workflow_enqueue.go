@@ -2,26 +2,23 @@ package api
 
 import (
 	"context"
-	"fmt"
 
 	"koditon/internal/sync/workflows"
 )
 
-func (a *API) spawnSyncWorkflow(ctx context.Context, provider, kind, entityID string, payload []byte) (string, bool, error) {
-	def, ok := workflows.FindDefinition(provider, kind)
+func (a *API) spawnSyncWorkflow(ctx context.Context, taskName string, params []byte) (string, bool, error) {
+	def, ok := workflows.FindDefinition(taskName)
 	if !ok {
-		return "", false, fmt.Errorf("unknown sync workflow: %s/%s", provider, kind)
+		return "", false, workflows.ErrUnknownTask
 	}
 	app, err := workflows.NewClient(a.cfg.DatabaseURL, def.Queue)
 	if err != nil {
 		return "", false, err
 	}
 	defer func() { _ = app.Close() }()
-	result, err := workflows.Spawn(ctx, app, workflows.SpawnRequest{
-		Provider: provider,
-		Kind:     kind,
-		EntityID: entityID,
-		Payload:  payload,
+	result, err := workflows.Spawn(ctx, app, workflows.SpawnTaskRequest{
+		TaskName: taskName,
+		Params:   params,
 	})
 	if err != nil {
 		return "", false, err

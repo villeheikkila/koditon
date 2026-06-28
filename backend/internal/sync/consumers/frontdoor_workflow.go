@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/earendil-works/absurd/sdks/go/absurd"
@@ -37,6 +38,11 @@ type frontdoorEntityResult struct {
 	Type     string `json:"type"`
 }
 
+type sourceEntityParams struct {
+	SourceType string `json:"source_type"`
+	SourceID   string `json:"source_id"`
+}
+
 func (c *Consumer) startFrontdoorWorkflowWorker(ctx context.Context, cfg Config) error {
 	if c.frontdoorWorkflowClient == nil {
 		return errors.New("frontdoor absurd workflow client is not configured")
@@ -45,11 +51,11 @@ func (c *Consumer) startFrontdoorWorkflowWorker(ctx context.Context, cfg Config)
 		return errors.New("frontdoor service is not configured")
 	}
 	for _, kind := range frontdoorWorkflowKinds {
-		def, ok := workflows.FindDefinition("frontdoor", kind)
+		def, ok := workflows.FindDefinition(kind)
 		if !ok {
 			return fmt.Errorf("missing frontdoor workflow definition: %s", kind)
 		}
-		task := absurd.Task[workflows.Params, workflows.Result](
+		task := absurd.Task[json.RawMessage, json.RawMessage](
 			kind,
 			c.handleFrontdoorWorkflow,
 			absurd.TaskOptions{QueueName: workflows.QueueFrontdoor, DefaultMaxAttempts: def.DefaultMaxAttempts, DefaultCancellation: def.DefaultCancellation},
@@ -83,21 +89,15 @@ func (c *Consumer) startFrontdoorWorkflowWorker(ctx context.Context, cfg Config)
 	return nil
 }
 
-func (c *Consumer) handleFrontdoorWorkflow(ctx context.Context, params workflows.Params) (workflows.Result, error) {
-	if err := workflows.ValidateParams(params); err != nil {
-		return workflows.Result{}, err
-	}
-	if params.Provider != "frontdoor" {
-		return workflows.Result{}, fmt.Errorf("invalid frontdoor workflow provider: %s", params.Provider)
-	}
+func (c *Consumer) handleFrontdoorWorkflow(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+	taskName := absurd.MustTaskContext(ctx).TaskName()
 	logger := logging.With(c.logger,
 		logging.Op("consumer.frontdoor.workflow"),
-		slog.String("task_type", params.Kind),
-		slog.String("entity_id", params.EntityID),
+		slog.String("task_type", taskName),
 	)
 	var result any
 	var err error
-	switch params.Kind {
+	switch taskName {
 	case TaskTypeFrontdoorSitemapSync:
 		result, err = c.runFrontdoorSitemapWorkflow(ctx, logger, false)
 	case TaskTypeFrontdoorBuildingsSitemapSync:
@@ -107,16 +107,16 @@ func (c *Consumer) handleFrontdoorWorkflow(ctx context.Context, params workflows
 	case TaskTypeFrontdoorAdDataHashBackfill:
 		result, err = c.runFrontdoorAdDataHashBackfillWorkflow(ctx, logger, params)
 	default:
-		return workflows.Result{}, fmt.Errorf("unknown frontdoor workflow kind: %s", params.Kind)
+		return nil, fmt.Errorf("unknown frontdoor workflow kind: %s", taskName)
 	}
 	if err != nil {
-		return workflows.Result{}, err
+		return nil, err
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return workflows.Result{}, fmt.Errorf("marshal frontdoor workflow result: %w", err)
+		return nil, fmt.Errorf("marshal frontdoor workflow result: %w", err)
 	}
-	return workflows.Result{Status: "succeeded", Result: raw}, nil
+	return raw, nil
 }
 
 func (c *Consumer) runFrontdoorSitemapWorkflow(ctx context.Context, logger *slog.Logger, buildingsOnly bool) (frontdoorSitemapResult, error) {
@@ -158,20 +158,20 @@ func (c *Consumer) runFrontdoorSitemapWorkflow(ctx context.Context, logger *slog
 	return sitemap, nil
 }
 
-func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (frontdoorEntityResult, error) {
-	entityType, externalID, err := parseJobEntity(params.EntityID)
+func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.Logger, raw json.RawMessage) (frontdoorEntityResult, error) {
+	params, err := decodeSourceEntityParams(raw)
 	if err != nil {
 		return frontdoorEntityResult{}, err
 	}
-	switch entityType {
+	switch params.SourceType {
 	case "ad":
 		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, c.frontdoorService.SyncAd(ctx, externalID)
+			return struct{}{}, c.frontdoorService.SyncAd(ctx, params.SourceID)
 		}); err != nil {
 			return frontdoorEntityResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (frontdoorFanoutResult, error) {
-			ad, err := c.queries.GetFrontdoorAdByExternalID(ctx, externalID)
+			ad, err := c.queries.GetFrontdoorAdByExternalID(ctx, params.SourceID)
 			if err != nil {
 				return frontdoorFanoutResult{}, fmt.Errorf("load synced frontdoor ad for canonicalization enqueue: %w", err)
 			}
@@ -187,12 +187,12 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 		}
 	case "building":
 		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, c.frontdoorService.SyncBuilding(ctx, externalID)
+			return struct{}{}, c.frontdoorService.SyncBuilding(ctx, params.SourceID)
 		}); err != nil {
 			return frontdoorEntityResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "canonicalize-source-announcements", func(ctx context.Context) (frontdoorFanoutResult, error) {
-			buildingID, err := uuid.Parse(externalID)
+			buildingID, err := uuid.Parse(params.SourceID)
 			if err != nil {
 				return frontdoorFanoutResult{}, nil
 			}
@@ -212,23 +212,31 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			return frontdoorEntityResult{}, err
 		}
 	default:
-		return frontdoorEntityResult{}, fmt.Errorf("unknown frontdoor entity type: %s", entityType)
+		return frontdoorEntityResult{}, fmt.Errorf("unknown frontdoor source type: %s", params.SourceType)
 	}
-	logger.InfoContext(ctx, "frontdoor entity workflow completed", "entity_id", params.EntityID, "outcome", logging.OutcomeSuccess)
-	return frontdoorEntityResult{EntityID: params.EntityID, Type: entityType}, nil
+	entityID := params.SourceType + ":" + params.SourceID
+	logger.InfoContext(ctx, "frontdoor entity workflow completed", "source_type", params.SourceType, "source_id", params.SourceID, "outcome", logging.OutcomeSuccess)
+	return frontdoorEntityResult{EntityID: entityID, Type: params.SourceType}, nil
 }
 
 func (c *Consumer) spawnFrontdoorSync(ctx context.Context, entityID string) error {
-	_, err := workflows.Spawn(ctx, c.frontdoorWorkflowClient, workflows.SpawnRequest{
-		Provider: "frontdoor",
-		Kind:     TaskTypeFrontdoorSync,
-		EntityID: entityID,
+	entityType, sourceID, err := parseJobEntity(entityID)
+	if err != nil {
+		return err
+	}
+	params, err := json.Marshal(sourceEntityParams{SourceType: entityType, SourceID: sourceID})
+	if err != nil {
+		return err
+	}
+	_, err = workflows.Spawn(ctx, c.frontdoorWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeFrontdoorSync,
+		Params:   params,
 	})
 	return err
 }
 
-func (c *Consumer) runFrontdoorAdDataHashBackfillWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (sourcejson.BackfillResult, error) {
-	payload, err := decodeSourceAdDataHashBackfillPayload(params.Payload, "frontdoor")
+func (c *Consumer) runFrontdoorAdDataHashBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (sourcejson.BackfillResult, error) {
+	payload, err := decodeSourceAdDataHashBackfillPayload(params, "frontdoor")
 	if err != nil {
 		return sourcejson.BackfillResult{}, err
 	}
@@ -260,11 +268,25 @@ func (c *Consumer) spawnFrontdoorHashBackfill(ctx context.Context, limit int32) 
 	if err != nil {
 		return fmt.Errorf("marshal frontdoor hash backfill payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.frontdoorWorkflowClient, workflows.SpawnRequest{
-		Provider: "frontdoor",
-		Kind:     TaskTypeFrontdoorAdDataHashBackfill,
-		EntityID: fmt.Sprintf("frontdoor:ad_data_hash_backfill:%d", time.Now().UTC().UnixNano()),
-		Payload:  payload,
+	_, err = workflows.Spawn(ctx, c.frontdoorWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeFrontdoorAdDataHashBackfill,
+		Params:   payload,
 	})
 	return err
+}
+
+func decodeSourceEntityParams(raw json.RawMessage) (sourceEntityParams, error) {
+	var params sourceEntityParams
+	if len(raw) == 0 {
+		raw = json.RawMessage(`{}`)
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return sourceEntityParams{}, fmt.Errorf("decode source entity params: %w", err)
+	}
+	params.SourceType = strings.TrimSpace(params.SourceType)
+	params.SourceID = strings.TrimSpace(params.SourceID)
+	if params.SourceType == "" || params.SourceID == "" {
+		return sourceEntityParams{}, fmt.Errorf("source_type and source_id are required")
+	}
+	return params, nil
 }

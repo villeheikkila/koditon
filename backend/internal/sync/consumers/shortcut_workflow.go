@@ -66,11 +66,11 @@ func (c *Consumer) startShortcutWorkflowWorkers(ctx context.Context, cfg Config)
 
 func (c *Consumer) registerShortcutWorkflows(app *absurd.Client, kinds []string) error {
 	for _, kind := range kinds {
-		def, ok := workflows.FindDefinition("shortcut", kind)
+		def, ok := workflows.FindDefinition(kind)
 		if !ok {
 			return fmt.Errorf("missing shortcut workflow definition: %s", kind)
 		}
-		task := absurd.Task[workflows.Params, workflows.Result](
+		task := absurd.Task[json.RawMessage, json.RawMessage](
 			kind,
 			c.handleShortcutWorkflow,
 			absurd.TaskOptions{QueueName: def.Queue, DefaultMaxAttempts: def.DefaultMaxAttempts, DefaultCancellation: def.DefaultCancellation},
@@ -132,21 +132,15 @@ func (c *Consumer) startShortcutScraperWorker(ctx context.Context, cfg Config) {
 	}()
 }
 
-func (c *Consumer) handleShortcutWorkflow(ctx context.Context, params workflows.Params) (workflows.Result, error) {
-	if err := workflows.ValidateParams(params); err != nil {
-		return workflows.Result{}, err
-	}
-	if params.Provider != "shortcut" {
-		return workflows.Result{}, fmt.Errorf("invalid shortcut workflow provider: %s", params.Provider)
-	}
+func (c *Consumer) handleShortcutWorkflow(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+	taskName := absurd.MustTaskContext(ctx).TaskName()
 	logger := logging.With(c.logger,
 		logging.Op("consumer.shortcut.workflow"),
-		slog.String("task_type", params.Kind),
-		slog.String("entity_id", params.EntityID),
+		slog.String("task_type", taskName),
 	)
 	var result any
 	var err error
-	switch params.Kind {
+	switch taskName {
 	case TaskTypeShortcutSitemapSync:
 		result, err = c.runShortcutSitemapWorkflow(ctx, logger, false)
 	case TaskTypeShortcutBuildingsSitemapSync:
@@ -158,16 +152,16 @@ func (c *Consumer) handleShortcutWorkflow(ctx context.Context, params workflows.
 	case TaskTypeShortcutAdDataHashBackfill:
 		result, err = c.runShortcutAdDataHashBackfillWorkflow(ctx, logger, params)
 	default:
-		return workflows.Result{}, fmt.Errorf("unknown shortcut workflow kind: %s", params.Kind)
+		return nil, fmt.Errorf("unknown shortcut workflow kind: %s", taskName)
 	}
 	if err != nil {
-		return workflows.Result{}, err
+		return nil, err
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return workflows.Result{}, fmt.Errorf("marshal shortcut workflow result: %w", err)
+		return nil, fmt.Errorf("marshal shortcut workflow result: %w", err)
 	}
-	return workflows.Result{Status: "succeeded", Result: raw}, nil
+	return raw, nil
 }
 
 func (c *Consumer) runShortcutSitemapWorkflow(ctx context.Context, logger *slog.Logger, buildingsOnly bool) (shortcutSitemapResult, error) {
@@ -209,14 +203,14 @@ func (c *Consumer) runShortcutSitemapWorkflow(ctx context.Context, logger *slog.
 	return sitemap, nil
 }
 
-func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params, mode string) (shortcutEntityResult, error) {
-	entityType, sourceID, err := parseJobEntity(params.EntityID)
+func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.Logger, raw json.RawMessage, mode string) (shortcutEntityResult, error) {
+	params, err := decodeSourceEntityParams(raw)
 	if err != nil {
 		return shortcutEntityResult{}, err
 	}
-	switch entityType {
+	switch params.SourceType {
 	case "ad":
-		adID, err := strconv.ParseInt(sourceID, 10, 64)
+		adID, err := strconv.ParseInt(params.SourceID, 10, 64)
 		if err != nil {
 			return shortcutEntityResult{}, fmt.Errorf("invalid shortcut ad id: %w", err)
 		}
@@ -233,7 +227,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 			if ad.ShortcutAdDataHash == nil {
 				return shortcutFanoutResult{}, nil
 			}
-			if err := c.enqueueCanonicalizeSourceAd(ctx, "shortcut_ad", sourceID, int32(priorityNormal)); err != nil {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, "shortcut_ad", params.SourceID, int32(priorityNormal)); err != nil {
 				return shortcutFanoutResult{}, err
 			}
 			return shortcutFanoutResult{Enqueued: 1}, nil
@@ -241,7 +235,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 			return shortcutEntityResult{}, err
 		}
 	case "building":
-		buildingID, err := uuid.Parse(sourceID)
+		buildingID, err := uuid.Parse(params.SourceID)
 		if err != nil {
 			return shortcutEntityResult{}, fmt.Errorf("invalid shortcut building id: %w", err)
 		}
@@ -251,10 +245,11 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 			return shortcutEntityResult{}, err
 		}
 	default:
-		return shortcutEntityResult{}, fmt.Errorf("unknown shortcut entity type: %s", entityType)
+		return shortcutEntityResult{}, fmt.Errorf("unknown shortcut source type: %s", params.SourceType)
 	}
-	logger.InfoContext(ctx, "shortcut entity workflow completed", "entity_id", params.EntityID, "mode", mode, "outcome", logging.OutcomeSuccess)
-	return shortcutEntityResult{EntityID: params.EntityID, Type: entityType, Mode: mode}, nil
+	entityID := params.SourceType + ":" + params.SourceID
+	logger.InfoContext(ctx, "shortcut entity workflow completed", "source_type", params.SourceType, "source_id", params.SourceID, "mode", mode, "outcome", logging.OutcomeSuccess)
+	return shortcutEntityResult{EntityID: entityID, Type: params.SourceType, Mode: mode}, nil
 }
 
 func (c *Consumer) spawnShortcutSync(ctx context.Context, kind string, entityID string) error {
@@ -262,16 +257,23 @@ func (c *Consumer) spawnShortcutSync(ctx context.Context, kind string, entityID 
 	if kind == TaskTypeShortcutScraperSync {
 		app = c.shortcutScraperWorkflowClient
 	}
-	_, err := workflows.Spawn(ctx, app, workflows.SpawnRequest{
-		Provider: "shortcut",
-		Kind:     kind,
-		EntityID: entityID,
+	entityType, sourceID, err := parseJobEntity(entityID)
+	if err != nil {
+		return err
+	}
+	params, err := json.Marshal(sourceEntityParams{SourceType: entityType, SourceID: sourceID})
+	if err != nil {
+		return err
+	}
+	_, err = workflows.Spawn(ctx, app, workflows.SpawnTaskRequest{
+		TaskName: kind,
+		Params:   params,
 	})
 	return err
 }
 
-func (c *Consumer) runShortcutAdDataHashBackfillWorkflow(ctx context.Context, logger *slog.Logger, params workflows.Params) (sourcejson.BackfillResult, error) {
-	payload, err := decodeSourceAdDataHashBackfillPayload(params.Payload, "shortcut")
+func (c *Consumer) runShortcutAdDataHashBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (sourcejson.BackfillResult, error) {
+	payload, err := decodeSourceAdDataHashBackfillPayload(params, "shortcut")
 	if err != nil {
 		return sourcejson.BackfillResult{}, err
 	}
@@ -303,11 +305,9 @@ func (c *Consumer) spawnShortcutHashBackfill(ctx context.Context, limit int32) e
 	if err != nil {
 		return fmt.Errorf("marshal shortcut hash backfill payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.shortcutAPIWorkflowClient, workflows.SpawnRequest{
-		Provider: "shortcut",
-		Kind:     TaskTypeShortcutAdDataHashBackfill,
-		EntityID: fmt.Sprintf("shortcut:ad_data_hash_backfill:%d", time.Now().UTC().UnixNano()),
-		Payload:  payload,
+	_, err = workflows.Spawn(ctx, c.shortcutAPIWorkflowClient, workflows.SpawnTaskRequest{
+		TaskName: TaskTypeShortcutAdDataHashBackfill,
+		Params:   payload,
 	})
 	return err
 }

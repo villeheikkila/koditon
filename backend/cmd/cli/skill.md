@@ -104,25 +104,25 @@ Output includes: core fields (address, city, price, area, URL), promoted detail 
 
 Output columns: period, description, type, area, price, €/m², postal code, neighborhood, condition.
 
-### sync — Enqueue and inspect durable sync jobs
+### sync — Spawn and inspect durable sync tasks
 
-Mutating provider sync work must go through Absurd workflows. A consumer process must be running to execute queued work; `--watch` polls Absurd task status.
+Mutating provider sync work must go through named Absurd tasks. A consumer process must be running to execute queued work; `--watch` polls Absurd task status.
 
 ```
-./cli sync enqueue <provider> <kind> <entity-id> [--watch] [--interval 2s] [--json]
+./cli sync spawn <task-name> [--params '<json>'] [--watch] [--interval 2s] [--json]
 ./cli sync status <task-id> [--json]
 ./cli sync run [--workers 1] [--maintenance] [--maintenance-interval 1m]
 ```
 
-Common enqueue commands:
+Common spawn commands:
 
 ```bash
-./cli --json sync enqueue frontdoor frontdoor_sitemap_sync frontdoor:sitemap --watch
-./cli --json sync enqueue frontdoor frontdoor_sync ad:12345 --watch
-./cli --json sync enqueue shortcut shortcut_buildings_sitemap_sync shortcut:buildings_sitemap
-./cli --json sync enqueue prices prices_sync city:Helsinki --watch
-./cli --json sync enqueue prices prices_sync_all prices:sync_all
-./cli --json sync enqueue postal postal_sync postal:all
+./cli --json sync spawn frontdoor_sitemap_sync --watch
+./cli --json sync spawn frontdoor_sync --params '{"source_type":"ad","source_id":"12345"}' --watch
+./cli --json sync spawn shortcut_buildings_sitemap_sync
+./cli --json sync spawn prices_sync --params '{"city":"Helsinki"}' --watch
+./cli --json sync spawn prices_sync_all
+./cli --json sync spawn postal_sync
 ```
 
 Inspection and repair:
@@ -137,7 +137,7 @@ Inspection and repair:
 1. Start with a broad `search` to find entities of interest.
 2. Copy a canonical ID from the results and use `detail` for the full picture.
 3. Use `transactions` to look up comparable sale prices in the same area.
-4. Use `--json sync enqueue ... --watch` for any mutating provider sync work.
+4. Use `--json sync spawn ... --watch` for any mutating provider sync work.
 
 ## Requirements
 
