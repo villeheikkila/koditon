@@ -1291,6 +1291,7 @@ source_links AS (
         sl.sale_listing_source_provider AS provider,
         sl.sale_listing_source_kind AS kind,
         sl.sale_listing_native_id AS source_id,
+        sl.sale_listing_canonical_id AS canonical_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
         COALESCE(sl.sale_listing_url, '') AS url,
         CASE
@@ -1308,6 +1309,7 @@ source_links AS (
         'shortcut'::text AS provider,
         'building'::text AS kind,
         sb.shortcut_building_external_id::text AS source_id,
+        ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
         COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
         sb.shortcut_building_url AS url,
         COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
@@ -1321,6 +1323,7 @@ source_links AS (
         'frontdoor'::text AS provider,
         'building'::text AS kind,
         fb.frontdoor_building_id::text AS source_id,
+        ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
         COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
         fb.frontdoor_building_url AS url,
         COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
@@ -1329,7 +1332,7 @@ source_links AS (
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
-SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
+SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
 ORDER BY label, provider, last_seen_at DESC NULLS LAST, title`, offeringID)
 	if err != nil {
@@ -1338,7 +1341,7 @@ ORDER BY label, provider, last_seen_at DESC NULLS LAST, title`, offeringID)
 	defer rows.Close()
 	for rows.Next() {
 		var link TargetSourceLink
-		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.CanonicalID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
 			return err
 		}
 		overview.Sources = append(overview.Sources, link)
@@ -1363,6 +1366,7 @@ source_links AS (
         sl.sale_listing_source_provider AS provider,
         sl.sale_listing_source_kind AS kind,
         sl.sale_listing_native_id AS source_id,
+        sl.sale_listing_canonical_id AS canonical_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
         COALESCE(sl.sale_listing_url, '') AS url,
         CASE
@@ -1380,6 +1384,7 @@ source_links AS (
         'shortcut'::text AS provider,
         'building'::text AS kind,
         sb.shortcut_building_external_id::text AS source_id,
+        ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
         COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
         sb.shortcut_building_url AS url,
         COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
@@ -1393,6 +1398,7 @@ source_links AS (
         'frontdoor'::text AS provider,
         'building'::text AS kind,
         fb.frontdoor_building_id::text AS source_id,
+        ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
         COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
         fb.frontdoor_building_url AS url,
         COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
@@ -1401,7 +1407,7 @@ source_links AS (
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
-SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
+SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
 ORDER BY label, provider, last_seen_at DESC NULLS LAST, title
 LIMIT 500`, housingCompanyID)
@@ -1411,7 +1417,7 @@ LIMIT 500`, housingCompanyID)
 	defer rows.Close()
 	for rows.Next() {
 		var link TargetSourceLink
-		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.CanonicalID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
 			return err
 		}
 		overview.Sources = append(overview.Sources, link)
