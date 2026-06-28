@@ -469,7 +469,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), LastSeenAt: row.ShortcutAdLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), ExternalURLAvailable: strings.TrimSpace(row.ShortcutAdUrl) != "" && row.ShortcutAdLastSeenAt.After(time.Now().AddDate(0, 0, -7)), LastSeenAt: row.ShortcutAdLastSeenAt}}
 			detail.Normalized = normalizedFromShortcutAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: ptrUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
@@ -1252,6 +1252,7 @@ selected_listings AS (
         COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
         COALESCE(sl.sale_listing_url, '') AS url,
         CASE
+            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
             WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
             WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
             ELSE false
@@ -1318,6 +1319,7 @@ offering_source_records AS (
         COALESCE(sr.sale_listing_room_layout, '') AS room_layout,
         COALESCE(sr.sale_listing_url, '') AS url,
         CASE
+            WHEN sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad' THEN sr.shortcut_ad_id IS NOT NULL AND COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'
             WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
             WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
             ELSE false
@@ -1586,6 +1588,7 @@ SELECT
     COALESCE(candidate.sale_listing_room_layout, '') AS room_layout,
     COALESCE(candidate.sale_listing_url, '') AS url,
     CASE
+        WHEN candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad' THEN candidate.shortcut_ad_id IS NOT NULL AND COALESCE(candidate.sale_listing_url, '') <> '' AND candidate.sale_listing_last_seen_at >= now() - interval '7 days'
         WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
         WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
         ELSE false

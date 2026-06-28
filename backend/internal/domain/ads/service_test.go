@@ -485,3 +485,22 @@ func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
 		t.Fatal("expected raw transaction matches to use offering source rows instead of only the primary listing")
 	}
 }
+
+func TestAddressLookupUsesLiveShortcutAdAvailability(t *testing.T) {
+	for _, want := range []string{
+		"sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad'",
+		"sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad'",
+		"COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'",
+		"COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'",
+	} {
+		if !strings.Contains(addressLookupSQL, want) {
+			t.Fatalf("expected address lookup SQL to include %q", want)
+		}
+	}
+	if !strings.Contains(addressSourceCandidatesSQL, "candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad'") {
+		t.Fatal("expected source candidates SQL to include shortcut ad availability")
+	}
+	if !strings.Contains(addressSourceCandidatesSQL, "candidate.sale_listing_last_seen_at >= now() - interval '7 days'") {
+		t.Fatal("expected source candidates SQL to require recent shortcut sightings")
+	}
+}

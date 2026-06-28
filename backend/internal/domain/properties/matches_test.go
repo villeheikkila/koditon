@@ -49,3 +49,14 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 		t.Fatal("expected transaction review to include all offering source records, not only primary listings")
 	}
 }
+
+func TestTransactionMatchCandidatesUseLiveShortcutAdAvailability(t *testing.T) {
+	for _, want := range []string{
+		"sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad'",
+		"COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'",
+	} {
+		if !strings.Contains(transactionMatchCandidatesSQL, want) {
+			t.Fatalf("expected transaction match SQL to include %q", want)
+		}
+	}
+}
