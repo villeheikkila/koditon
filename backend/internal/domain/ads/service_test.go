@@ -98,21 +98,35 @@ func TestStripTrailingAddressCity(t *testing.T) {
 	cases := []struct {
 		name    string
 		address string
-		city    string
+		cities  []string
 		want    string
 	}{
-		{name: "strips city", address: "Rieväkatu 8 A Tampere", city: "Tampere", want: "Rieväkatu 8 A"},
-		{name: "strips ascii city", address: "Karsikkotie 5 Jyvaskyla", city: "Jyväskylä", want: "Karsikkotie 5"},
-		{name: "keeps different city", address: "Mikonkatu 25 Helsinki", city: "Tampere", want: "Mikonkatu 25 Helsinki"},
-		{name: "keeps city only", address: "Tampere", city: "Tampere", want: "Tampere"},
+		{name: "strips city", address: "Rieväkatu 8 A Tampere", cities: []string{"Tampere"}, want: "Rieväkatu 8 A"},
+		{name: "strips ascii city", address: "Karsikkotie 5 Jyvaskyla", cities: []string{"Jyväskylä"}, want: "Karsikkotie 5"},
+		{name: "strips city alias", address: "Askvagen 4 Mariehamn", cities: []string{"Maarianhamina", "Mariehamn"}, want: "Askvagen 4"},
+		{name: "keeps different city", address: "Mikonkatu 25 Helsinki", cities: []string{"Tampere"}, want: "Mikonkatu 25 Helsinki"},
+		{name: "keeps city only", address: "Tampere", cities: []string{"Tampere"}, want: "Tampere"},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := stripTrailingAddressCity(tt.address, tt.city)
+			got := stripTrailingAddressCity(tt.address, tt.cities)
 			if got != tt.want {
 				t.Fatalf("expected %q, got %q", tt.want, got)
 			}
 		})
+	}
+}
+
+func TestUniqueNonEmptyStrings(t *testing.T) {
+	got := uniqueNonEmptyStrings("Jyväskylä", "Jyvaskyla", "", "Tampere")
+	want := []string{"Jyväskylä", "Tampere"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d values, got %d: %+v", len(want), len(got), got)
+	}
+	for i, value := range want {
+		if got[i] != value {
+			t.Fatalf("expected value %d to be %q, got %q", i, value, got[i])
+		}
 	}
 }
 

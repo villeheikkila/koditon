@@ -407,11 +407,11 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	}
 	queryAddress, city, postal := normalizeAddressLookupInput(address, params.City, params.Postal)
 	if city == "" && postal != "" {
-		resolvedCity, err := s.lookupPostalCity(ctx, postal)
+		resolvedCity, cityAliases, err := s.lookupPostalCities(ctx, postal)
 		if err != nil {
 			return AddressLookupResult{}, err
 		}
-		if stripped := stripTrailingAddressCity(queryAddress, resolvedCity); stripped != queryAddress {
+		if stripped := stripTrailingAddressCity(queryAddress, cityAliases); stripped != queryAddress {
 			queryAddress = stripped
 			city = resolvedCity
 		}
@@ -1868,48 +1868,69 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 	return queryAddress, queryCity, queryPostal
 }
 
-func (s *Service) lookupPostalCity(ctx context.Context, postal string) (string, error) {
+func (s *Service) lookupPostalCities(ctx context.Context, postal string) (string, []string, error) {
 	normalizedPostal := strings.TrimSpace(postal)
 	if normalizedPostal == "" {
-		return "", nil
+		return "", nil, nil
 	}
-	var city string
+	var cityFI, citySV string
 	err := s.db.QueryRow(ctx, `
-SELECT COALESCE(pm.postal_municipality_name_fi, '')
+SELECT COALESCE(pm.postal_municipality_name_fi, ''), COALESCE(pm.postal_municipality_name_sv, '')
 FROM public.postal_postal_codes ppc
 JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE ppc.postal_postal_code_code = public.fnc__normalize_postal($1::text)
 ORDER BY pm.postal_municipality_name_fi
-LIMIT 1`, normalizedPostal).Scan(&city)
+LIMIT 1`, normalizedPostal).Scan(&cityFI, &citySV)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", nil
+			return "", nil, nil
 		}
-		return "", fmt.Errorf("lookup postal city: %w", err)
+		return "", nil, fmt.Errorf("lookup postal city: %w", err)
 	}
-	return strings.TrimSpace(city), nil
+	cityFI = strings.TrimSpace(cityFI)
+	citySV = strings.TrimSpace(citySV)
+	return cityFI, uniqueNonEmptyStrings(cityFI, citySV), nil
 }
 
-func stripTrailingAddressCity(address, city string) string {
+func stripTrailingAddressCity(address string, cities []string) string {
 	trimmedAddress := strings.TrimSpace(address)
-	trimmedCity := strings.TrimSpace(city)
-	if trimmedAddress == "" || trimmedCity == "" {
+	if trimmedAddress == "" || len(cities) == 0 {
 		return trimmedAddress
 	}
 	addressFields := strings.Fields(trimmedAddress)
-	cityFields := strings.Fields(trimmedCity)
-	if len(addressFields) <= len(cityFields) {
-		return trimmedAddress
+	for _, city := range cities {
+		cityFields := strings.Fields(strings.TrimSpace(city))
+		if len(addressFields) <= len(cityFields) {
+			continue
+		}
+		addressTail := strings.Join(addressFields[len(addressFields)-len(cityFields):], " ")
+		if foldAddressText(addressTail) == foldAddressText(city) {
+			return strings.Join(addressFields[:len(addressFields)-len(cityFields)], " ")
+		}
 	}
-	addressTail := strings.Join(addressFields[len(addressFields)-len(cityFields):], " ")
-	if foldAddressText(addressTail) != foldAddressText(trimmedCity) {
-		return trimmedAddress
-	}
-	return strings.Join(addressFields[:len(addressFields)-len(cityFields)], " ")
+	return trimmedAddress
 }
 
 func foldAddressText(value string) string {
 	return strings.NewReplacer("å", "a", "ä", "a", "ö", "o").Replace(strings.ToLower(strings.TrimSpace(value)))
+}
+
+func uniqueNonEmptyStrings(values ...string) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := foldAddressText(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func applyPastedPostalCity(value, city, postal string) (string, string) {
