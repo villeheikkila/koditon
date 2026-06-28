@@ -24,6 +24,31 @@ export function buildAddressLookupPath(input: AddressLookupInput) {
   return `/address?${params.toString()}`
 }
 
+export function addressLookupInputFromParams(params: URLSearchParams): AddressLookupInput {
+  return {
+    address: params.get('lookup_address'),
+    city: params.get('lookup_city'),
+    postal: params.get('lookup_postal'),
+    source: params.get('lookup_source'),
+  }
+}
+
+export function appendAddressLookupParams(params: URLSearchParams, lookup?: AddressLookupInput) {
+  if (lookup?.address?.trim()) params.set('lookup_address', lookup.address.trim())
+  if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
+  if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
+  if (lookup?.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
+}
+
+export function withAddressLookupContext(path: string, lookup?: AddressLookupInput) {
+  if (!path) return ''
+  const [base, query = ''] = path.split('?', 2)
+  const params = new URLSearchParams(query)
+  appendAddressLookupParams(params, lookup)
+  const queryString = params.toString()
+  return queryString ? `${base}?${queryString}` : base
+}
+
 export function sourceEntityPath(input: SourceEntityInput) {
   const canonicalId = input.canonicalId?.trim()
   if (!canonicalId) return ''

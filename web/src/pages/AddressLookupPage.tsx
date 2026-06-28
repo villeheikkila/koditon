@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useAddressLookup, type AddressListing, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
-import { buildAddressLookupPath, sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
+import { appendAddressLookupParams, buildAddressLookupPath, sourceEntityPath, withAddressLookupContext, type AddressLookupInput } from '../lib/address-lookup'
 
 const sources = [
   ['all', 'All sources'],
@@ -148,7 +148,7 @@ function RawTransactionPanel({ transactions, listings, lookup }: { transactions:
               <div>
                 <strong>{rawTransactionStatus(transaction)}</strong>
                 <span>{[transaction.neighborhood, transaction.postal, formatShortDate(transaction.created_at)].filter(Boolean).join(' / ')}</span>
-                <RawTransactionMatches transaction={transaction} candidateMatches={candidateMatches} />
+                <RawTransactionMatches transaction={transaction} candidateMatches={candidateMatches} lookup={lookup} />
               </div>
               <Link className="address-transaction-review" to={transactionMatchURL(transaction, lookup)}>Review</Link>
             </div>
@@ -199,11 +199,11 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
       <ListingTimeline listing={listing} />
       {coverage.length > 0 && <div className="address-source-coverage">{coverage.map(item => <span key={item}>{item}</span>)}</div>}
       <SourceTexts texts={listing.texts} />
-      {sourceRecords.length > 0 && <SourceRecordList records={sourceRecords} />}
-      {sourceCandidates.length > 0 && <SourceCandidateList candidates={sourceCandidates} />}
+      {sourceRecords.length > 0 && <SourceRecordList records={sourceRecords} lookup={lookup} />}
+      {sourceCandidates.length > 0 && <SourceCandidateList candidates={sourceCandidates} lookup={lookup} />}
       <div className="address-listing-actions">
-        {listing.offering_id && <Link to={`/target/offering/${listing.offering_id}`}>Canonical offering</Link>}
-        {sourcePath && <Link to={sourcePath}>Source detail</Link>}
+        {listing.offering_id && <Link to={withAddressLookupContext(`/target/offering/${listing.offering_id}`, lookup)}>Canonical offering</Link>}
+        {sourcePath && <Link to={withAddressLookupContext(sourcePath, lookup)}>Source detail</Link>}
         {postalReviewPath && <Link to={postalReviewPath}>Review postal candidates</Link>}
         <LiveSourceLink available={listing.external_url_available} url={listing.url} />
       </div>
@@ -229,7 +229,7 @@ function ListingTimeline({ listing }: { listing: AddressListing }) {
   )
 }
 
-function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidate[] }) {
+function SourceCandidateList({ candidates, lookup }: { candidates: AddressSourceCandidate[]; lookup?: AddressLookupInput }) {
   return (
     <div className="address-source-records address-source-candidates">
       <span className="address-source-records-title">Candidate source matches</span>
@@ -258,8 +258,8 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
             )}
             <div className="address-source-record-actions">
               {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
-              {candidate.candidate_offering_id && <Link to={`/target/offering/${candidate.candidate_offering_id}`}>Candidate offering</Link>}
-              {sourcePath && <Link to={sourcePath}>Source detail</Link>}
+              {candidate.candidate_offering_id && <Link to={withAddressLookupContext(`/target/offering/${candidate.candidate_offering_id}`, lookup)}>Candidate offering</Link>}
+              {sourcePath && <Link to={withAddressLookupContext(sourcePath, lookup)}>Source detail</Link>}
               <LiveSourceLink available={candidate.external_url_available} url={candidate.url} />
             </div>
           </div>
@@ -269,7 +269,7 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
   )
 }
 
-function SourceRecordList({ records }: { records: AddressSourceRecord[] }) {
+function SourceRecordList({ records, lookup }: { records: AddressSourceRecord[]; lookup?: AddressLookupInput }) {
   return (
     <div className="address-source-records">
       <span className="address-source-records-title">Same offering source records</span>
@@ -294,7 +294,7 @@ function SourceRecordList({ records }: { records: AddressSourceRecord[] }) {
             <div className="address-source-record-actions">
               {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
               {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
-              {sourcePath && <Link to={sourcePath}>Source detail</Link>}
+              {sourcePath && <Link to={withAddressLookupContext(sourcePath, lookup)}>Source detail</Link>}
               <LiveSourceLink available={record.external_url_available} url={record.url} />
             </div>
             <SourceTexts texts={record.texts} compact />
@@ -499,7 +499,7 @@ function transactionMatchURL(transaction: { transaction_id: string; postal?: str
   const params = new URLSearchParams()
   if (transaction.postal) params.set('postal', transaction.postal)
   params.set('transaction', transaction.transaction_id)
-  appendLookupParams(params, lookup)
+  appendAddressLookupParams(params, lookup)
   return `/matches?${params.toString()}`
 }
 
@@ -508,15 +508,8 @@ function postalMatchURL(postal?: string | null, lookup?: AddressLookupInput) {
   if (!trimmed) return ''
   const params = new URLSearchParams()
   params.set('postal', trimmed)
-  appendLookupParams(params, lookup)
+  appendAddressLookupParams(params, lookup)
   return `/matches?${params.toString()}`
-}
-
-function appendLookupParams(params: URLSearchParams, lookup?: AddressLookupInput) {
-  if (lookup?.address?.trim()) params.set('lookup_address', lookup.address.trim())
-  if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
-  if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
-  if (lookup?.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
 }
 
 function rawTransactionStatus(transaction: AddressRawTransaction) {
@@ -541,7 +534,7 @@ type CandidateRawTransactionMatch = {
   status: string
 }
 
-function RawTransactionMatches({ transaction, candidateMatches }: { transaction: AddressRawTransaction; candidateMatches: CandidateRawTransactionMatch[] }) {
+function RawTransactionMatches({ transaction, candidateMatches, lookup }: { transaction: AddressRawTransaction; candidateMatches: CandidateRawTransactionMatch[]; lookup?: AddressLookupInput }) {
   const matches = transaction.matches ?? []
   if (matches.length === 0 && candidateMatches.length === 0) return null
   return (
@@ -549,12 +542,12 @@ function RawTransactionMatches({ transaction, candidateMatches }: { transaction:
       {matches.map(match => {
         const label = rawTransactionMatchLabel(match)
         const status = [match.status, formatLinkMethod(match.method), formatScore(match.score)].filter(Boolean).join(' / ')
-        const path = rawTransactionMatchPath(match)
+        const path = withAddressLookupContext(rawTransactionMatchPath(match), lookup)
         const text = status ? `${label} (${status})` : label
         return (
           <span key={`${match.type}:${match.id}`}>
             {path ? <Link to={path}>{text}</Link> : text}
-            {match.offering_id && <Link to={`/target/offering/${match.offering_id}`}>Canonical offering</Link>}
+            {match.offering_id && <Link to={withAddressLookupContext(`/target/offering/${match.offering_id}`, lookup)}>Canonical offering</Link>}
           </span>
         )
       })}

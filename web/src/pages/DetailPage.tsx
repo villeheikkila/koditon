@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import {
@@ -13,7 +13,7 @@ import {
   type SourceClaim,
   type TargetOverview,
 } from '../api/koditon'
-import { addressLookupPathFromOverviewFields, sourceEntityPath } from '../lib/address-lookup'
+import { addressLookupInputFromParams, addressLookupPathFromOverviewFields, buildAddressLookupPath, sourceEntityPath, withAddressLookupContext } from '../lib/address-lookup'
 
 type DetailKind = 'listing' | 'rental' | 'housingCompany'
 
@@ -24,6 +24,7 @@ function targetTypeForKind(kind: DetailKind): string {
 
 export default function DetailPage({ kind }: { kind?: DetailKind }) {
   const { id = '', targetType: targetTypeParam = '' } = useParams()
+  const [params] = useSearchParams()
   const targetType = targetTypeParam || targetTypeForKind(kind ?? 'listing')
   const detailQuery = usePropertyTargetsDetail(targetType, id, { query: { enabled: Boolean(id) } })
   const claimsQuery = usePropertyTargetsClaims(targetType, id, { query: { enabled: Boolean(id) } })
@@ -34,6 +35,8 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
   const values = detail?.resolved_values ?? []
   const renovations = useMemo(() => detail?.renovation_events ?? [], [detail?.renovation_events])
   const documents = detail?.documents ?? []
+  const contextLookup = addressLookupInputFromParams(params)
+  const contextLookupPath = buildAddressLookupPath(contextLookup)
   const [selectedRenovationID, setSelectedRenovationID] = useState<string>('')
   const selectedRenovation = useMemo(() => renovations.find(item => item.id === selectedRenovationID) ?? renovations[0], [renovations, selectedRenovationID])
   async function uploadCertificate(file: File | undefined) {
@@ -47,7 +50,7 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
       <div className="model-shell">
         <header className="model-header">
           <div>
-            <Link className="model-back" to="/search">Targets</Link>
+            <Link className="model-back" to={contextLookupPath || '/search'}>{contextLookupPath ? 'Address lookup' : 'Targets'}</Link>
             <h1>{labelTargetType(targetType)}</h1>
             <p>{id}</p>
           </div>
@@ -63,7 +66,7 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
             <TargetSummary values={values} renovations={renovations} documents={documents} claims={claims} />
             <div className="model-grid">
               <section className="model-column model-column--main">
-                <Overview overview={detail.overview} fallbackID={id} />
+                <Overview overview={detail.overview} fallbackID={id} contextLookup={contextLookup} contextLookupPath={contextLookupPath} />
                 <ResolvedValues values={values} />
                 <Renovations events={renovations} selectedID={selectedRenovation?.id ?? ''} onSelect={setSelectedRenovationID} />
                 <Documents documents={documents} />
@@ -80,7 +83,7 @@ export default function DetailPage({ kind }: { kind?: DetailKind }) {
   )
 }
 
-function Overview({ overview, fallbackID }: { overview?: TargetOverview; fallbackID: string }) {
+function Overview({ overview, fallbackID, contextLookup, contextLookupPath }: { overview?: TargetOverview; fallbackID: string; contextLookup: ReturnType<typeof addressLookupInputFromParams>; contextLookupPath: string }) {
   if (!overview) {
     return (
       <Panel title="Overview">
@@ -90,7 +93,7 @@ function Overview({ overview, fallbackID }: { overview?: TargetOverview; fallbac
   }
   const fields = (overview.fields ?? []).filter(field => field.value)
   const related = overview.related ?? []
-  const lookupPath = addressLookupPathFromOverviewFields(fields)
+  const lookupPath = contextLookupPath || addressLookupPathFromOverviewFields(fields)
   return (
     <Panel title="Overview">
       <div className="target-overview">
@@ -111,14 +114,14 @@ function Overview({ overview, fallbackID }: { overview?: TargetOverview; fallbac
             ))}
           </div>
         )}
-        <RelatedTargets items={related} />
-        <SourceLinks overview={overview} />
+        <RelatedTargets items={related} contextLookup={contextLookup} />
+        <SourceLinks overview={overview} contextLookup={contextLookup} />
       </div>
     </Panel>
   )
 }
 
-function RelatedTargets({ items }: { items: NonNullable<TargetOverview['related']> }) {
+function RelatedTargets({ items, contextLookup }: { items: NonNullable<TargetOverview['related']>; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
   const groups = useMemo(() => {
     const map = new Map<string, NonNullable<TargetOverview['related']>>()
     for (const item of items) {
@@ -135,7 +138,7 @@ function RelatedTargets({ items }: { items: NonNullable<TargetOverview['related'
           <h3>{group.label}</h3>
           <div className="target-overview-related">
             {group.items.map(item => (
-              <Link key={`${item.target.type}:${item.target.id}`} to={`/target/${item.target.type}/${item.target.id}`}>
+              <Link key={`${item.target.type}:${item.target.id}`} to={withAddressLookupContext(`/target/${item.target.type}/${item.target.id}`, contextLookup)}>
                 <span>{item.target.type.replaceAll('_', ' ')}</span>
                 <strong>{item.title}</strong>
               </Link>
@@ -147,7 +150,7 @@ function RelatedTargets({ items }: { items: NonNullable<TargetOverview['related'
   )
 }
 
-function SourceLinks({ overview }: { overview: TargetOverview }) {
+function SourceLinks({ overview, contextLookup }: { overview: TargetOverview; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
   const groups = useMemo(() => {
     const map = new Map<string, NonNullable<TargetOverview['sources']>>()
     for (const source of overview.sources ?? []) {
@@ -164,7 +167,7 @@ function SourceLinks({ overview }: { overview: TargetOverview }) {
           <h3>{group.label}</h3>
           <div className="target-source-list">
             {group.sources.map((source, index) => (
-              <SourceLink source={source} index={index} key={`${source.provider}:${source.kind}:${source.source_id || index}`} />
+              <SourceLink source={source} index={index} contextLookup={contextLookup} key={`${source.provider}:${source.kind}:${source.source_id || index}`} />
             ))}
           </div>
         </section>
@@ -173,7 +176,7 @@ function SourceLinks({ overview }: { overview: TargetOverview }) {
   )
 }
 
-function SourceLink({ source, index }: { source: NonNullable<TargetOverview['sources']>[number]; index: number }) {
+function SourceLink({ source, index, contextLookup }: { source: NonNullable<TargetOverview['sources']>[number]; index: number; contextLookup: ReturnType<typeof addressLookupInputFromParams> }) {
   const detailPath = sourceEntityPath({ canonicalId: source.canonical_id, kind: source.kind })
   return (
     <div className="target-source-link" data-source-index={index}>
@@ -181,7 +184,7 @@ function SourceLink({ source, index }: { source: NonNullable<TargetOverview['sou
       <strong>{source.title || source.source_id || source.external_id || 'Source'}</strong>
       <small>{[source.external_id || source.source_id, formatDate(source.last_seen_at)].filter(Boolean).join(' / ')}</small>
       <div className="target-source-actions">
-        {detailPath && <Link to={detailPath}>Source detail</Link>}
+        {detailPath && <Link to={withAddressLookupContext(detailPath, contextLookup)}>Source detail</Link>}
         <LiveSourceLink available={source.external_url_available} url={source.url} />
       </div>
     </div>

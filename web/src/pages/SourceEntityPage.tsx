@@ -1,16 +1,18 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useEntityDetail, type DetailFieldOutput, type EntityDetailOutputBody } from '../api/koditon'
-import { buildAddressLookupPath } from '../lib/address-lookup'
+import { addressLookupInputFromParams, buildAddressLookupPath } from '../lib/address-lookup'
 
 type SourceEntityKind = 'listing' | 'rental' | 'housingCompany'
 
 export default function SourceEntityPage({ kind }: { kind: SourceEntityKind }) {
   const { id = '' } = useParams()
+  const [params] = useSearchParams()
   const detailQuery = useEntityDetail({ id }, { query: { enabled: Boolean(id) } })
   const detail = detailQuery.data?.status === 200 ? detailQuery.data.data : undefined
-  const lookupPath = detail ? buildAddressLookupPath({ address: detail.street_address, city: detail.city, postal: detail.postal, source: detail.source }) : ''
+  const contextLookupPath = buildAddressLookupPath(addressLookupInputFromParams(params))
+  const lookupPath = contextLookupPath || (detail ? buildAddressLookupPath({ address: detail.street_address, city: detail.city, postal: detail.postal, source: detail.source }) : '')
   return (
     <main className="model-page">
       <Nav />

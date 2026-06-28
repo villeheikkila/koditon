@@ -2,7 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useTransactionMatchCandidates, type TransactionMatchCandidate } from '../api/koditon'
-import { buildAddressLookupPath, sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
+import { buildAddressLookupPath, sourceEntityPath, withAddressLookupContext, type AddressLookupInput } from '../lib/address-lookup'
 
 export default function MatchesPage() {
   const [params] = useSearchParams()
@@ -126,8 +126,8 @@ function MatchCard({ candidate, lookup, currentTransaction }: { candidate: Trans
       </div>
       <div className="address-listing-actions">
         {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
-        {candidate.listing.offering_id && <Link to={`/target/offering/${candidate.listing.offering_id}`}>Canonical offering</Link>}
-        {detailPath && <Link to={detailPath}>Source detail</Link>}
+        {candidate.listing.offering_id && <Link to={withAddressLookupContext(`/target/offering/${candidate.listing.offering_id}`, lookup)}>Canonical offering</Link>}
+        {detailPath && <Link to={withAddressLookupContext(detailPath, lookup)}>Source detail</Link>}
         {transactionPath && <Link to={transactionPath}>Review transaction</Link>}
         <LiveSourceLink available={candidate.listing.external_url_available} url={candidate.listing.url} />
       </div>
