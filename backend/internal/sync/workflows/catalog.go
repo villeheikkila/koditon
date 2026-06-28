@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/earendil-works/absurd/sdks/go/absurd"
 )
@@ -32,10 +33,11 @@ type Definition struct {
 }
 
 type SpawnTaskRequest struct {
-	TaskName     string
-	Params       json.RawMessage
-	MaxAttempts  int
-	Cancellation *absurd.CancellationPolicy
+	TaskName       string
+	Params         json.RawMessage
+	MaxAttempts    int
+	Cancellation   *absurd.CancellationPolicy
+	IdempotencyKey string
 }
 
 var ErrUnknownTask = errors.New("unknown sync workflow task")
@@ -139,10 +141,14 @@ func Spawn(ctx context.Context, app spawnClient, req SpawnTaskRequest) (absurd.S
 	if cancellation == nil {
 		cancellation = &absurd.CancellationPolicy{MaxDelay: 35 * 60}
 	}
+	idempotencyKey := strings.TrimSpace(req.IdempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = IdempotencyKey(def.Name, params)
+	}
 	return app.Spawn(ctx, def.Name, params, absurd.SpawnOptions{
 		QueueName:      def.Queue,
 		MaxAttempts:    maxAttempts,
-		IdempotencyKey: IdempotencyKey(def.Name, params),
+		IdempotencyKey: idempotencyKey,
 		RetryStrategy:  &absurd.RetryStrategy{Kind: "exponential", BaseSeconds: 5, Factor: 2, MaxSeconds: 300},
 		Cancellation:   cancellation,
 	})
@@ -155,6 +161,13 @@ func IdempotencyKey(taskName string, params json.RawMessage) string {
 	}
 	sum := sha256.Sum256(params)
 	return strings.TrimSpace(taskName) + ":" + hex.EncodeToString(sum[:])[:24]
+}
+
+func CronSlotIdempotencyKey(taskName, scheduleName string, slot time.Time) string {
+	slotText := slot.UTC().Truncate(time.Minute).Format("2006-01-02T15:04")
+	raw := strings.TrimSpace(taskName) + "|" + strings.TrimSpace(scheduleName) + "|" + slotText
+	sum := sha256.Sum256([]byte(raw))
+	return "cron:" + hex.EncodeToString(sum[:])[:24]
 }
 
 func normalizeParams(params json.RawMessage) json.RawMessage {

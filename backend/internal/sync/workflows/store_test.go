@@ -2,8 +2,10 @@ package workflows
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/earendil-works/absurd/sdks/go/absurd"
 )
@@ -50,6 +52,48 @@ func TestStoreEnqueueUsesAbsurdSpawnContract(t *testing.T) {
 	}
 	if client.spawnOpts.IdempotencyKey == "" || client.spawnOpts.IdempotencyKey == "frontdoor_sync" {
 		t.Fatalf("idempotency = %q", client.spawnOpts.IdempotencyKey)
+	}
+}
+
+func TestTaskSpawnerSpawnUsesTypedParams(t *testing.T) {
+	t.Parallel()
+	client := &fakeAbsurdClient{spawnedTask: absurd.SpawnResult{TaskID: "task-1", Created: true}}
+	spawner := NewTaskSpawner(client)
+	_, err := spawner.Spawn(context.Background(), "prices_sync", map[string]string{"city": "Helsinki"})
+	if err != nil {
+		t.Fatalf("Spawn returned error: %v", err)
+	}
+	raw, ok := client.spawnParams.(json.RawMessage)
+	if !ok {
+		t.Fatalf("spawn params type = %T, want json.RawMessage", client.spawnParams)
+	}
+	if string(raw) != `{"city":"Helsinki"}` {
+		t.Fatalf("spawn params = %s", raw)
+	}
+	if client.spawnOpts.QueueName != QueuePrices {
+		t.Fatalf("queue = %q, want %q", client.spawnOpts.QueueName, QueuePrices)
+	}
+}
+
+func TestTaskSpawnerSpawnCronSlotUsesSlotIdempotency(t *testing.T) {
+	t.Parallel()
+	client := &fakeAbsurdClient{spawnedTask: absurd.SpawnResult{TaskID: "task-1", Created: true}}
+	spawner := NewTaskSpawner(client)
+	slot := time.Date(2026, 6, 28, 12, 30, 0, 0, time.UTC)
+	_, err := spawner.SpawnCronSlot(context.Background(), "prices_sync_all", nil, "prices-hourly", slot)
+	if err != nil {
+		t.Fatalf("SpawnCronSlot returned error: %v", err)
+	}
+	want := CronSlotIdempotencyKey("prices_sync_all", "prices-hourly", slot)
+	if client.spawnOpts.IdempotencyKey != want {
+		t.Fatalf("idempotency = %q, want %q", client.spawnOpts.IdempotencyKey, want)
+	}
+}
+
+func TestMarshalParamsRejectsInvalidRawJSON(t *testing.T) {
+	t.Parallel()
+	if _, err := MarshalParams(json.RawMessage(`{`)); err == nil {
+		t.Fatal("MarshalParams accepted invalid raw JSON")
 	}
 }
 

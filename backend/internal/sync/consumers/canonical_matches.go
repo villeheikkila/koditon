@@ -55,7 +55,7 @@ func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.C
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: id, Reason: "source_link_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty: %w", err)
 	}
-	if err := c.enqueueDimensionLayerListing(ctx, id, "source_link_changed", nil, time.Now()); err != nil {
+	if err := c.enqueueDimensionLayerListing(ctx, id, "source_link_changed", nil); err != nil {
 		return fmt.Errorf("enqueue dimension layer listing: %w", err)
 	}
 	return nil
@@ -126,7 +126,7 @@ WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID)
 	return nil
 }
 
-func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, saleListingID string, attempt int32, runAfter time.Time) error {
+func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, saleListingID string, attempt int32) error {
 	payload, err := json.Marshal(canonicalMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
 	if err != nil {
 		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)

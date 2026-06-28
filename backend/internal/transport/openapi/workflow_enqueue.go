@@ -2,24 +2,20 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"koditon/internal/sync/workflows"
 )
 
 func (a *API) spawnSyncWorkflow(ctx context.Context, taskName string, params []byte) (string, bool, error) {
-	def, ok := workflows.FindDefinition(taskName)
-	if !ok {
-		return "", false, workflows.ErrUnknownTask
-	}
-	app, err := workflows.NewClient(a.cfg.DatabaseURL, def.Queue)
+	spawnCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	spawner, err := workflows.NewDatabaseTaskSpawner(a.cfg.DatabaseURL)
 	if err != nil {
 		return "", false, err
 	}
-	defer func() { _ = app.Close() }()
-	result, err := workflows.Spawn(ctx, app, workflows.SpawnTaskRequest{
-		TaskName: taskName,
-		Params:   params,
-	})
+	defer func() { _ = spawner.Close() }()
+	result, err := spawner.SpawnRaw(spawnCtx, workflows.SpawnTaskRequest{TaskName: taskName, Params: params})
 	if err != nil {
 		return "", false, err
 	}

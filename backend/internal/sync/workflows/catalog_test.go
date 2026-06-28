@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
@@ -77,6 +78,19 @@ func TestIdempotencyKeyUsesTaskNameAndCanonicalParams(t *testing.T) {
 	}
 	if a == "frontdoor_sync" {
 		t.Fatalf("non-empty params should affect idempotency key")
+	}
+}
+
+func TestCronSlotIdempotencyKeyUsesUTCMinuteSlot(t *testing.T) {
+	t.Parallel()
+	slot := time.Date(2026, 6, 28, 12, 30, 45, 0, time.FixedZone("EEST", 3*60*60))
+	a := CronSlotIdempotencyKey("prices_sync_all", "nightly-prices", slot)
+	b := CronSlotIdempotencyKey("prices_sync_all", "nightly-prices", slot.UTC().Truncate(time.Minute))
+	if a != b {
+		t.Fatalf("cron slot keys differ: %q != %q", a, b)
+	}
+	if a == IdempotencyKey("prices_sync_all", json.RawMessage(`{}`)) {
+		t.Fatalf("cron key should not collapse to default task idempotency key")
 	}
 }
 

@@ -441,7 +441,7 @@ func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger
 	result, err := absurd.Step(ctx, "spawn-listing-rebuilds", func(ctx context.Context) (dimensionLayerBackfillResult, error) {
 		result := dimensionLayerBackfillResult{}
 		for _, listingID := range listingIDs {
-			if err := c.enqueueDimensionLayerListing(ctx, listingID, "backfill", nil, time.Now()); err != nil {
+			if err := c.enqueueDimensionLayerListing(ctx, listingID, "backfill", nil); err != nil {
 				return dimensionLayerBackfillResult{}, fmt.Errorf("enqueue dimension layer listing %s: %w", listingID, err)
 			}
 			result.LastSaleListingID = listingID.String()
@@ -457,7 +457,7 @@ func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger
 			return dimensionLayerBackfillResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "spawn-next-page", func(ctx context.Context) (canonicalFanoutResult, error) {
-			if err := c.enqueueDimensionLayerBackfill(ctx, result.LastSaleListingID, payload.BatchSize, time.Now()); err != nil {
+			if err := c.enqueueDimensionLayerBackfill(ctx, result.LastSaleListingID, payload.BatchSize); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			return canonicalFanoutResult{Enqueued: 1}, nil
@@ -513,11 +513,11 @@ func (c *Consumer) runResolveDirtyDimensionTargetsWorkflow(ctx context.Context, 
 		enqueued := 0
 		for _, target := range targets {
 			if target.TargetType == "listing" {
-				if err := c.enqueueDimensionLayerListing(ctx, target.TargetID, "dirty_target", &target.DirtyAt, time.Now()); err != nil {
+				if err := c.enqueueDimensionLayerListing(ctx, target.TargetID, "dirty_target", &target.DirtyAt); err != nil {
 					return canonicalFanoutResult{}, err
 				}
 			} else {
-				if err := c.enqueueDimensionTarget(ctx, target.TargetType, target.TargetID, target.DirtyAt, time.Now()); err != nil {
+				if err := c.enqueueDimensionTarget(ctx, target.TargetType, target.TargetID, target.DirtyAt); err != nil {
 					return canonicalFanoutResult{}, err
 				}
 			}
@@ -586,7 +586,7 @@ func (c *Consumer) runCanonicalBackfillDetachedHousesWorkflow(ctx context.Contex
 			return detachedHouseBackfillResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "spawn-next-detached-house-backfill", func(ctx context.Context) (canonicalFanoutResult, error) {
-			if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize, time.Now()); err != nil {
+			if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			return canonicalFanoutResult{Enqueued: 1}, nil
@@ -614,7 +614,7 @@ func (c *Consumer) runCanonicalExtractManagerCertificateWorkflow(ctx context.Con
 		return properties.ManagerCertificateSourceExtractionResult{}, fmt.Errorf("parse extracted document id: %w", err)
 	}
 	if _, err := absurd.Step(ctx, "spawn-manager-certificate-projection", func(ctx context.Context) (canonicalFanoutResult, error) {
-		if err := c.enqueueManagerCertificateProjection(ctx, documentID, time.Now()); err != nil {
+		if err := c.enqueueManagerCertificateProjection(ctx, documentID); err != nil {
 			return canonicalFanoutResult{}, err
 		}
 		return canonicalFanoutResult{Enqueued: 1}, nil

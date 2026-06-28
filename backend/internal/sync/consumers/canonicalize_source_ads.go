@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -108,7 +107,7 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "source_listing_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty for frontdoor ad source offering: %w", err)
 	}
-	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1, time.Now()); err != nil {
+	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1); err != nil {
 		return err
 	}
 	logger.InfoContext(ctx, "frontdoor ad canonicalized", "frontdoor_ad_id", sourceID, "sale_listing_id", saleListingID.String(), "outcome", logging.OutcomeSuccess)
@@ -152,7 +151,7 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "source_listing_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty for shortcut ad source offering: %w", err)
 	}
-	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1, time.Now()); err != nil {
+	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1); err != nil {
 		return err
 	}
 	logger.InfoContext(ctx, "shortcut ad canonicalized", "shortcut_ad_id", shortcutAdID, "sale_listing_id", saleListingID.String(), "outcome", logging.OutcomeSuccess)
@@ -171,7 +170,7 @@ func (c *Consumer) enqueueCanonicalizeSourceAd(ctx context.Context, sourceTable,
 	return err
 }
 
-func (c *Consumer) enqueueCanonicalizeSourceAdsFanout(ctx context.Context, limit int32, runAfter time.Time) error {
+func (c *Consumer) enqueueCanonicalizeSourceAdsFanout(ctx context.Context, limit int32) error {
 	payload, err := json.Marshal(canonicalizeSourceAdsFanoutPayload{Limit: limit})
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ads fanout payload: %w", err)

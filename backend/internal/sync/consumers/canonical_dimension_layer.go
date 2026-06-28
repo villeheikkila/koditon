@@ -88,7 +88,7 @@ func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context,
 	if err != nil {
 		return newPermanentError(fmt.Errorf("parse extracted document id: %w", err), "invalid result")
 	}
-	if err := c.enqueueManagerCertificateProjection(ctx, documentID, time.Now()); err != nil {
+	if err := c.enqueueManagerCertificateProjection(ctx, documentID); err != nil {
 		return fmt.Errorf("enqueue manager certificate projection %s: %w", payload.PropertyDocumentID, err)
 	}
 	logger.InfoContext(ctx, "manager certificate source extracted", "property_document_id", payload.PropertyDocumentID, "model", result.Model, "schema_version", result.SchemaVersion, "outcome", logging.OutcomeSuccess)
@@ -225,7 +225,7 @@ func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, lo
 		return fmt.Errorf("backfill detached property houses: %w", err)
 	}
 	if count == payload.BatchSize {
-		if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize, time.Now().Add(30*time.Second)); err != nil {
+		if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize); err != nil {
 			return err
 		}
 	}
@@ -263,7 +263,7 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Cont
 		return nil
 	}
 	for _, listingID := range listingIDs {
-		if err := c.enqueueDimensionLayerListing(ctx, listingID, "backfill", nil, time.Now()); err != nil {
+		if err := c.enqueueDimensionLayerListing(ctx, listingID, "backfill", nil); err != nil {
 			return fmt.Errorf("enqueue dimension layer listing %s: %w", listingID, err)
 		}
 		cursor = &listingID
@@ -271,7 +271,7 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Cont
 		enqueued++
 	}
 	if len(listingIDs) == int(payload.BatchSize) {
-		if err := c.enqueueDimensionLayerBackfill(ctx, lastSaleListingID, payload.BatchSize, time.Now().Add(time.Minute)); err != nil {
+		if err := c.enqueueDimensionLayerBackfill(ctx, lastSaleListingID, payload.BatchSize); err != nil {
 			return err
 		}
 	}
@@ -315,11 +315,11 @@ func (c *Consumer) handleCanonicalResolveDirtyDimensionTargets(ctx context.Conte
 	enqueued := 0
 	for _, target := range targets {
 		if target.TargetType == "listing" {
-			if err := c.enqueueDimensionLayerListing(ctx, target.TargetID, "dirty_target", &target.DirtyAt, time.Now()); err != nil {
+			if err := c.enqueueDimensionLayerListing(ctx, target.TargetID, "dirty_target", &target.DirtyAt); err != nil {
 				return err
 			}
 		} else {
-			if err := c.enqueueDimensionTarget(ctx, target.TargetType, target.TargetID, target.DirtyAt, time.Now()); err != nil {
+			if err := c.enqueueDimensionTarget(ctx, target.TargetType, target.TargetID, target.DirtyAt); err != nil {
 				return err
 			}
 		}
@@ -389,7 +389,7 @@ func (c *Consumer) rebuildDimensionLayerForListing(ctx context.Context, saleList
 	return result, nil
 }
 
-func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListingID uuid.UUID, reason string, expectedDirtyAt *time.Time, runAfter time.Time) error {
+func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListingID uuid.UUID, reason string, expectedDirtyAt *time.Time) error {
 	payload, err := json.Marshal(dimensionLayerListingPayload{SaleListingID: saleListingID.String(), Reason: reason, ExpectedDirtyAt: expectedDirtyAt})
 	if err != nil {
 		return fmt.Errorf("marshal dimension layer listing payload: %w", err)
@@ -401,7 +401,7 @@ func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListing
 	return err
 }
 
-func (c *Consumer) enqueueDimensionTarget(ctx context.Context, targetType string, targetID uuid.UUID, expectedDirtyAt time.Time, runAfter time.Time) error {
+func (c *Consumer) enqueueDimensionTarget(ctx context.Context, targetType string, targetID uuid.UUID, expectedDirtyAt time.Time) error {
 	payload, err := json.Marshal(dirtyDimensionTargetPayload{TargetType: targetType, TargetID: targetID.String(), ExpectedDirtyAt: &expectedDirtyAt})
 	if err != nil {
 		return fmt.Errorf("marshal dimension target payload: %w", err)
@@ -425,7 +425,7 @@ func (c *Consumer) enqueueDirtyDimensionTargetFanout(ctx context.Context) error 
 	return err
 }
 
-func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleListingID string, batchSize int32, runAfter time.Time) error {
+func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleListingID string, batchSize int32) error {
 	payload, err := json.Marshal(dimensionLayerBackfillPayload{BatchSize: batchSize, AfterSaleListingID: afterSaleListingID})
 	if err != nil {
 		return fmt.Errorf("marshal dimension layer backfill payload: %w", err)
@@ -437,7 +437,7 @@ func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleL
 	return err
 }
 
-func (c *Consumer) enqueueDetachedHouseBackfill(ctx context.Context, batchSize int32, runAfter time.Time) error {
+func (c *Consumer) enqueueDetachedHouseBackfill(ctx context.Context, batchSize int32) error {
 	payload, err := json.Marshal(detachedHouseBackfillPayload{BatchSize: batchSize})
 	if err != nil {
 		return fmt.Errorf("marshal detached house backfill payload: %w", err)
@@ -449,7 +449,7 @@ func (c *Consumer) enqueueDetachedHouseBackfill(ctx context.Context, batchSize i
 	return err
 }
 
-func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, documentID uuid.UUID, runAfter time.Time) error {
+func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, documentID uuid.UUID) error {
 	payload, err := json.Marshal(managerCertificateDocumentPayload{DocumentID: documentID.String(), PropertyDocumentID: documentID.String()})
 	if err != nil {
 		return fmt.Errorf("marshal manager certificate projection payload: %w", err)

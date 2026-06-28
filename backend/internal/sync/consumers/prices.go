@@ -133,7 +133,7 @@ WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID, 
 	return nil
 }
 
-func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, saleListingID string, attempt int32, runAfter time.Time) error {
+func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, saleListingID string, attempt int32) error {
 	payload, err := json.Marshal(pricesMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
 	if err != nil {
 		return fmt.Errorf("marshal prices sale listing match payload: %w", err)
