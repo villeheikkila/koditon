@@ -229,6 +229,7 @@ type AddressRawTransaction struct {
 type AddressRawTransactionMatch struct {
 	Type        string `json:"type"`
 	ID          string `json:"id"`
+	OfferingID  string `json:"offering_id,omitempty"`
 	CanonicalID string `json:"canonical_id,omitempty"`
 	Source      string `json:"source,omitempty"`
 	NativeID    string `json:"native_id,omitempty"`
@@ -1648,6 +1649,7 @@ SELECT
                 jsonb_build_object(
                     'type', match_type,
                     'id', id,
+                    'offering_id', offering_id,
                     'canonical_id', canonical_id,
                     'source', source,
                     'native_id', native_id,
@@ -1665,6 +1667,7 @@ SELECT
                 SELECT
                     'listing'::text AS match_type,
                     sl.sale_listing_id::text AS id,
+                    ''::text AS offering_id,
                     sl.sale_listing_canonical_id AS canonical_id,
                     sl.sale_listing_source_provider AS source,
                     sl.sale_listing_native_id AS native_id,
@@ -1681,6 +1684,7 @@ SELECT
                 SELECT
                     'offering_source'::text AS match_type,
                     pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text AS id,
+                    pot.property_offering_id::text AS offering_id,
                     sl.sale_listing_canonical_id AS canonical_id,
                     sl.sale_listing_source_provider AS source,
                     sl.sale_listing_native_id AS native_id,

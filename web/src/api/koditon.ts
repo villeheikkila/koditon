@@ -220,6 +220,7 @@ export interface AddressRawTransactionMatch {
   id: string;
   method?: string;
   native_id?: string;
+  offering_id?: string;
   postal?: string;
   score?: number;
   source?: string;

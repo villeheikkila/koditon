@@ -551,7 +551,12 @@ function RawTransactionMatches({ transaction, candidateMatches }: { transaction:
         const status = [match.status, formatLinkMethod(match.method), formatScore(match.score)].filter(Boolean).join(' / ')
         const path = rawTransactionMatchPath(match)
         const text = status ? `${label} (${status})` : label
-        return path ? <Link key={`${match.type}:${match.id}`} to={path}>{text}</Link> : <span key={`${match.type}:${match.id}`}>{text}</span>
+        return (
+          <span key={`${match.type}:${match.id}`}>
+            {path ? <Link to={path}>{text}</Link> : text}
+            {match.offering_id && <Link to={`/target/offering/${match.offering_id}`}>Canonical offering</Link>}
+          </span>
+        )
       })}
       {candidateMatches.map(match => {
         const text = match.status ? `${match.label} (${match.status})` : match.label
