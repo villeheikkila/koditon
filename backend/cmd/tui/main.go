@@ -16,10 +16,10 @@ import (
 	"koditon/internal/platform/config"
 	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
-	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
+	"koditon/internal/sync/workflows"
 )
 
 func main() {
@@ -55,8 +55,16 @@ func run(ctx context.Context, stderr io.Writer) error {
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
 	runner := syncflows.NewRunner(logger, adsService, pricesService, shortcutService, frontdoorService, postalService)
-	syncJobStore := syncjobs.NewStore(logger, pool)
-	p := tea.NewProgram(tui.NewApp(runner, tui.WithWebBaseURL(cfg.WebBaseURL), tui.WithSyncJobs(syncJobStore), tui.WithDBPool(pool)).Model(), tea.WithOutput(stderr))
+	workflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB)
+	if err != nil {
+		return fmt.Errorf("create absurd workflow client: %w", err)
+	}
+	defer func() { _ = workflowClient.Close() }()
+	if err := workflows.EnsureQueues(ctx, workflowClient); err != nil {
+		return fmt.Errorf("ensure absurd workflow queues: %w", err)
+	}
+	workflowStore := workflows.NewStore(workflowClient)
+	p := tea.NewProgram(tui.NewApp(runner, tui.WithWebBaseURL(cfg.WebBaseURL), tui.WithWorkflows(workflowStore), tui.WithDBPool(pool)).Model(), tea.WithOutput(stderr))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
 	}

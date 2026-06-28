@@ -13,58 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const archive = `-- name: Archive :one
-SELECT pgmq.archive(
-    $1,
-    $2::bigint
-)::bool AS archived
-`
-
-type ArchiveParams struct {
-	QueueName interface{} `json:"queue_name"`
-	MsgID     int64       `json:"msg_id"`
-}
-
-func (q *Queries) Archive(ctx context.Context, arg ArchiveParams) (bool, error) {
-	row := q.db.QueryRow(ctx, archive, arg.QueueName, arg.MsgID)
-	var archived bool
-	err := row.Scan(&archived)
-	return archived, err
-}
-
-const archiveBatch = `-- name: ArchiveBatch :many
-SELECT msg_id::bigint AS msg_id
-FROM pgmq.archive(
-    $1,
-    $2::bigint[]
-) AS msg_id
-`
-
-type ArchiveBatchParams struct {
-	QueueName interface{} `json:"queue_name"`
-	MsgIds    []int64     `json:"msg_ids"`
-}
-
-func (q *Queries) ArchiveBatch(ctx context.Context, arg ArchiveBatchParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, archiveBatch, arg.QueueName, arg.MsgIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var msg_id int64
-		if err := rows.Scan(&msg_id); err != nil {
-			return nil, err
-		}
-		items = append(items, msg_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const attachPropertyDocumentToOffering = `-- name: AttachPropertyDocumentToOffering :one
 WITH relinked AS (
     SELECT public.fnc__relink_property_document_offering(
@@ -1032,25 +980,6 @@ func (q *Queries) CreateDetachedPropertyDocument(ctx context.Context, arg Create
 	return i, err
 }
 
-const createPartitionedQueue = `-- name: CreatePartitionedQueue :exec
-SELECT pgmq.create_partitioned(
-    $1,
-    $2,
-    $3
-)
-`
-
-type CreatePartitionedQueueParams struct {
-	QueueName         interface{} `json:"queue_name"`
-	PartitionInterval interface{} `json:"partition_interval"`
-	RetentionInterval interface{} `json:"retention_interval"`
-}
-
-func (q *Queries) CreatePartitionedQueue(ctx context.Context, arg CreatePartitionedQueueParams) error {
-	_, err := q.db.Exec(ctx, createPartitionedQueue, arg.QueueName, arg.PartitionInterval, arg.RetentionInterval)
-	return err
-}
-
 const createPropertyDocumentExtractionRun = `-- name: CreatePropertyDocumentExtractionRun :one
 INSERT INTO public.property_document_extraction_runs (
     property_document_id,
@@ -1196,76 +1125,6 @@ func (q *Queries) CreatePropertyDocumentForOffering(ctx context.Context, arg Cre
 	return i, err
 }
 
-const createQueue = `-- name: CreateQueue :exec
-SELECT pgmq.create($1)
-`
-
-func (q *Queries) CreateQueue(ctx context.Context, queueName interface{}) error {
-	_, err := q.db.Exec(ctx, createQueue, queueName)
-	return err
-}
-
-const createUnloggedQueue = `-- name: CreateUnloggedQueue :exec
-SELECT pgmq.create_unlogged($1)
-`
-
-func (q *Queries) CreateUnloggedQueue(ctx context.Context, queueName interface{}) error {
-	_, err := q.db.Exec(ctx, createUnloggedQueue, queueName)
-	return err
-}
-
-const delete = `-- name: Delete :one
-SELECT pgmq.delete(
-    $1,
-    $2::bigint
-)::bool AS deleted
-`
-
-type DeleteParams struct {
-	QueueName interface{} `json:"queue_name"`
-	MsgID     int64       `json:"msg_id"`
-}
-
-func (q *Queries) Delete(ctx context.Context, arg DeleteParams) (bool, error) {
-	row := q.db.QueryRow(ctx, delete, arg.QueueName, arg.MsgID)
-	var deleted bool
-	err := row.Scan(&deleted)
-	return deleted, err
-}
-
-const deleteBatch = `-- name: DeleteBatch :many
-SELECT msg_id::bigint AS msg_id
-FROM pgmq.delete(
-    $1,
-    $2::bigint[]
-) AS msg_id
-`
-
-type DeleteBatchParams struct {
-	QueueName interface{} `json:"queue_name"`
-	MsgIds    []int64     `json:"msg_ids"`
-}
-
-func (q *Queries) DeleteBatch(ctx context.Context, arg DeleteBatchParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, deleteBatch, arg.QueueName, arg.MsgIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var msg_id int64
-		if err := rows.Scan(&msg_id); err != nil {
-			return nil, err
-		}
-		items = append(items, msg_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const deleteExpiredRuntimeKV = `-- name: DeleteExpiredRuntimeKV :exec
 DELETE FROM runtime.kv_store
 WHERE expires_at <= now()
@@ -1334,17 +1193,6 @@ WHERE shortcut_ad_id = $1
 func (q *Queries) DeleteSaleListingForShortcutAd(ctx context.Context, shortcutAdID *int64) error {
 	_, err := q.db.Exec(ctx, deleteSaleListingForShortcutAd, shortcutAdID)
 	return err
-}
-
-const dropQueue = `-- name: DropQueue :one
-SELECT pgmq.drop_queue($1)::bool AS dropped
-`
-
-func (q *Queries) DropQueue(ctx context.Context, queueName interface{}) (bool, error) {
-	row := q.db.QueryRow(ctx, dropQueue, queueName)
-	var dropped bool
-	err := row.Scan(&dropped)
-	return dropped, err
 }
 
 const ensureManagerCertificateHousingCompany = `-- name: EnsureManagerCertificateHousingCompany :one
@@ -1769,53 +1617,6 @@ func (q *Queries) FinishPropertyDocumentExtractionRun(ctx context.Context, arg F
 		arg.PropertyDocumentExtractionRunID,
 	)
 	return err
-}
-
-const getAllQueueMetrics = `-- name: GetAllQueueMetrics :many
-SELECT
-    queue_name::text AS queue_name,
-    queue_length::bigint AS queue_length,
-    newest_msg_age_sec::int AS newest_msg_age_sec,
-    oldest_msg_age_sec::int AS oldest_msg_age_sec,
-    total_messages::bigint AS total_messages,
-    scrape_time::timestamptz AS scrape_time
-FROM pgmq.metrics_all()
-`
-
-type GetAllQueueMetricsRow struct {
-	QueueName       string    `json:"queue_name"`
-	QueueLength     int64     `json:"queue_length"`
-	NewestMsgAgeSec int32     `json:"newest_msg_age_sec"`
-	OldestMsgAgeSec int32     `json:"oldest_msg_age_sec"`
-	TotalMessages   int64     `json:"total_messages"`
-	ScrapeTime      time.Time `json:"scrape_time"`
-}
-
-func (q *Queries) GetAllQueueMetrics(ctx context.Context) ([]GetAllQueueMetricsRow, error) {
-	rows, err := q.db.Query(ctx, getAllQueueMetrics)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetAllQueueMetricsRow{}
-	for rows.Next() {
-		var i GetAllQueueMetricsRow
-		if err := rows.Scan(
-			&i.QueueName,
-			&i.QueueLength,
-			&i.NewestMsgAgeSec,
-			&i.OldestMsgAgeSec,
-			&i.TotalMessages,
-			&i.ScrapeTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getFrontdoorAdUnifiedDetail = `-- name: GetFrontdoorAdUnifiedDetail :one
@@ -2727,44 +2528,6 @@ func (q *Queries) GetPropertySourceOfferingValuationExtractionTexts(ctx context.
 		&i.BuildingDescriptionText,
 		&i.BuildingOtherInfoText,
 		&i.ChargesText,
-	)
-	return i, err
-}
-
-const getQueueMetrics = `-- name: GetQueueMetrics :one
-
-SELECT
-    queue_name::text AS queue_name,
-    queue_length::bigint AS queue_length,
-    newest_msg_age_sec::int AS newest_msg_age_sec,
-    oldest_msg_age_sec::int AS oldest_msg_age_sec,
-    total_messages::bigint AS total_messages,
-    scrape_time::timestamptz AS scrape_time
-FROM pgmq.metrics($1)
-`
-
-type GetQueueMetricsRow struct {
-	QueueName       string    `json:"queue_name"`
-	QueueLength     int64     `json:"queue_length"`
-	NewestMsgAgeSec int32     `json:"newest_msg_age_sec"`
-	OldestMsgAgeSec int32     `json:"oldest_msg_age_sec"`
-	TotalMessages   int64     `json:"total_messages"`
-	ScrapeTime      time.Time `json:"scrape_time"`
-}
-
-// ============================================
-// PGMQ METRICS QUERIES
-// ============================================
-func (q *Queries) GetQueueMetrics(ctx context.Context, queueName interface{}) (GetQueueMetricsRow, error) {
-	row := q.db.QueryRow(ctx, getQueueMetrics, queueName)
-	var i GetQueueMetricsRow
-	err := row.Scan(
-		&i.QueueName,
-		&i.QueueLength,
-		&i.NewestMsgAgeSec,
-		&i.OldestMsgAgeSec,
-		&i.TotalMessages,
-		&i.ScrapeTime,
 	)
 	return i, err
 }
@@ -3729,51 +3492,6 @@ func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleLi
 	return items, nil
 }
 
-const listQueues = `-- name: ListQueues :many
-
-SELECT
-    queue_name::text AS queue_name,
-    is_partitioned::bool AS is_partitioned,
-    is_unlogged::bool AS is_unlogged,
-    created_at::timestamptz AS created_at
-FROM pgmq.list_queues()
-`
-
-type ListQueuesRow struct {
-	QueueName     string    `json:"queue_name"`
-	IsPartitioned bool      `json:"is_partitioned"`
-	IsUnlogged    bool      `json:"is_unlogged"`
-	CreatedAt     time.Time `json:"created_at"`
-}
-
-// ============================================
-// PGMQ QUEUE MANAGEMENT QUERIES
-// ============================================
-func (q *Queries) ListQueues(ctx context.Context) ([]ListQueuesRow, error) {
-	rows, err := q.db.Query(ctx, listQueues)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListQueuesRow{}
-	for rows.Next() {
-		var i ListQueuesRow
-		if err := rows.Scan(
-			&i.QueueName,
-			&i.IsPartitioned,
-			&i.IsUnlogged,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const markListingDimensionTargetsDirty = `-- name: MarkListingDimensionTargetsDirty :one
 SELECT public.fnc__mark_listing_dimension_targets_dirty($1::uuid, $2::text)::integer
 `
@@ -3788,53 +3506,6 @@ func (q *Queries) MarkListingDimensionTargetsDirty(ctx context.Context, arg Mark
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const pop = `-- name: Pop :many
-SELECT
-    msg_id::bigint AS msg_id,
-    read_ct::int AS read_ct,
-    enqueued_at::timestamptz AS enqueued_at,
-    vt::timestamptz AS vt,
-    message::jsonb AS message,
-    headers::jsonb AS headers
-FROM pgmq.pop($1)
-`
-
-type PopRow struct {
-	MsgID      int64           `json:"msg_id"`
-	ReadCt     int32           `json:"read_ct"`
-	EnqueuedAt time.Time       `json:"enqueued_at"`
-	Vt         time.Time       `json:"vt"`
-	Message    json.RawMessage `json:"message"`
-	Headers    json.RawMessage `json:"headers"`
-}
-
-func (q *Queries) Pop(ctx context.Context, queueName interface{}) ([]PopRow, error) {
-	rows, err := q.db.Query(ctx, pop, queueName)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []PopRow{}
-	for rows.Next() {
-		var i PopRow
-		if err := rows.Scan(
-			&i.MsgID,
-			&i.ReadCt,
-			&i.EnqueuedAt,
-			&i.Vt,
-			&i.Message,
-			&i.Headers,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const projectDimensionProfileForTarget = `-- name: ProjectDimensionProfileForTarget :one
@@ -3862,74 +3533,6 @@ func (q *Queries) ProjectListingProviderDimensionClaims(ctx context.Context, sal
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const purgeQueue = `-- name: PurgeQueue :one
-SELECT pgmq.purge_queue($1)::bigint AS count
-`
-
-func (q *Queries) PurgeQueue(ctx context.Context, queueName interface{}) (int64, error) {
-	row := q.db.QueryRow(ctx, purgeQueue, queueName)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const read = `-- name: Read :many
-SELECT
-    msg_id::bigint AS msg_id,
-    read_ct::int AS read_ct,
-    enqueued_at::timestamptz AS enqueued_at,
-    vt::timestamptz AS vt,
-    message::jsonb AS message,
-    headers::jsonb AS headers
-FROM pgmq.read(
-    $1,
-    $2,
-    $3
-)
-`
-
-type ReadParams struct {
-	QueueName   interface{} `json:"queue_name"`
-	VtSeconds   interface{} `json:"vt_seconds"`
-	NumMessages interface{} `json:"num_messages"`
-}
-
-type ReadRow struct {
-	MsgID      int64           `json:"msg_id"`
-	ReadCt     int32           `json:"read_ct"`
-	EnqueuedAt time.Time       `json:"enqueued_at"`
-	Vt         time.Time       `json:"vt"`
-	Message    json.RawMessage `json:"message"`
-	Headers    json.RawMessage `json:"headers"`
-}
-
-func (q *Queries) Read(ctx context.Context, arg ReadParams) ([]ReadRow, error) {
-	rows, err := q.db.Query(ctx, read, arg.QueueName, arg.VtSeconds, arg.NumMessages)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ReadRow{}
-	for rows.Next() {
-		var i ReadRow
-		if err := rows.Scan(
-			&i.MsgID,
-			&i.ReadCt,
-			&i.EnqueuedAt,
-			&i.Vt,
-			&i.Message,
-			&i.Headers,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const rebuildListingDimensionLayer = `-- name: RebuildListingDimensionLayer :one
@@ -4513,123 +4116,6 @@ func (q *Queries) SearchUnifiedEntities(ctx context.Context, arg SearchUnifiedEn
 			&i.RoomLayout,
 			&i.Url,
 			&i.LastSeenAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const send = `-- name: Send :one
-
-SELECT pgmq.send(
-    $1,
-    $2,
-    $3::int
-)::bigint AS msg_id
-`
-
-type SendParams struct {
-	QueueName    interface{} `json:"queue_name"`
-	Message      interface{} `json:"message"`
-	DelaySeconds int32       `json:"delay_seconds"`
-}
-
-// ============================================
-// PGMQ MESSAGE OPERATIONS
-// ============================================
-func (q *Queries) Send(ctx context.Context, arg SendParams) (int64, error) {
-	row := q.db.QueryRow(ctx, send, arg.QueueName, arg.Message, arg.DelaySeconds)
-	var msg_id int64
-	err := row.Scan(&msg_id)
-	return msg_id, err
-}
-
-const sendBatch = `-- name: SendBatch :many
-SELECT msg_id::bigint AS msg_id
-FROM pgmq.send_batch(
-    $1,
-    $2::jsonb[],
-    $3::int
-) AS msg_id
-`
-
-type SendBatchParams struct {
-	QueueName    interface{}       `json:"queue_name"`
-	Messages     []json.RawMessage `json:"messages"`
-	DelaySeconds int32             `json:"delay_seconds"`
-}
-
-func (q *Queries) SendBatch(ctx context.Context, arg SendBatchParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, sendBatch, arg.QueueName, arg.Messages, arg.DelaySeconds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var msg_id int64
-		if err := rows.Scan(&msg_id); err != nil {
-			return nil, err
-		}
-		items = append(items, msg_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const setVT = `-- name: SetVT :many
-SELECT
-    msg_id::bigint AS msg_id,
-    read_ct::int AS read_ct,
-    enqueued_at::timestamptz AS enqueued_at,
-    vt::timestamptz AS vt,
-    message::jsonb AS message,
-    headers::jsonb AS headers
-FROM pgmq.set_vt(
-    $1,
-    $2::bigint,
-    $3::int
-)
-`
-
-type SetVTParams struct {
-	QueueName interface{} `json:"queue_name"`
-	MsgID     int64       `json:"msg_id"`
-	VtSeconds int32       `json:"vt_seconds"`
-}
-
-type SetVTRow struct {
-	MsgID      int64           `json:"msg_id"`
-	ReadCt     int32           `json:"read_ct"`
-	EnqueuedAt time.Time       `json:"enqueued_at"`
-	Vt         time.Time       `json:"vt"`
-	Message    json.RawMessage `json:"message"`
-	Headers    json.RawMessage `json:"headers"`
-}
-
-func (q *Queries) SetVT(ctx context.Context, arg SetVTParams) ([]SetVTRow, error) {
-	rows, err := q.db.Query(ctx, setVT, arg.QueueName, arg.MsgID, arg.VtSeconds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SetVTRow{}
-	for rows.Next() {
-		var i SetVTRow
-		if err := rows.Scan(
-			&i.MsgID,
-			&i.ReadCt,
-			&i.EnqueuedAt,
-			&i.Vt,
-			&i.Message,
-			&i.Headers,
 		); err != nil {
 			return nil, err
 		}

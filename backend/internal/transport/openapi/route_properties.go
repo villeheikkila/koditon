@@ -14,9 +14,7 @@ import (
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
 	"koditon/internal/sync/consumers"
-	syncjobs "koditon/internal/sync/jobs"
 )
 
 type propertySearchInput struct {
@@ -455,19 +453,11 @@ func (a *API) enqueueManagerCertificateExtraction(ctx context.Context, document 
 	if err != nil {
 		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate extraction payload: %w", err)
 	}
-	store := syncjobs.NewStore(a.logger, a.pool)
-	result, err := store.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        consumers.TaskTypeCanonicalExtractManagerCertificate,
-		EntityID:    "property_document:" + document.ID,
-		Priority:    int32(taskqueue.PriorityHigh),
-		MaxAttempts: 3,
-		Payload:     payload,
-	})
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalExtractManagerCertificate, "property_document:"+document.ID, payload)
 	if err != nil {
 		return propertyDocumentJobResult{}, err
 	}
-	return propertyDocumentJobResult{Document: document, JobID: result.Job.SyncJobID.String(), Queued: result.Enqueued}, nil
+	return propertyDocumentJobResult{Document: document, JobID: jobID, Queued: queued}, nil
 }
 
 func (a *API) enqueueManagerCertificateProjection(ctx context.Context, document properties.PropertyDocumentSummary) (propertyDocumentJobResult, error) {
@@ -475,19 +465,11 @@ func (a *API) enqueueManagerCertificateProjection(ctx context.Context, document 
 	if err != nil {
 		return propertyDocumentJobResult{}, fmt.Errorf("marshal manager certificate projection payload: %w", err)
 	}
-	store := syncjobs.NewStore(a.logger, a.pool)
-	result, err := store.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        consumers.TaskTypeCanonicalProjectManagerCertificate,
-		EntityID:    "property_document:" + document.ID,
-		Priority:    int32(taskqueue.PriorityHigh),
-		MaxAttempts: 3,
-		Payload:     payload,
-	})
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalProjectManagerCertificate, "property_document:"+document.ID, payload)
 	if err != nil {
 		return propertyDocumentJobResult{}, err
 	}
-	return propertyDocumentJobResult{Document: document, JobID: result.Job.SyncJobID.String(), Queued: result.Enqueued}, nil
+	return propertyDocumentJobResult{Document: document, JobID: jobID, Queued: queued}, nil
 }
 
 func (a *API) propertyDocumentDownloadHandler(ctx context.Context, input *propertyDocumentInput) (*propertyDocumentDownloadOutput, error) {

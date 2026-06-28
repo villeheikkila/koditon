@@ -10,12 +10,10 @@ sql:
       - db/queries/ads
       - db/queries/auth
       - db/queries/frontdoor
-      - db/queries/pgmq
       - db/queries/postal
       - db/queries/prices
       - db/queries/runtime
       - db/queries/shortcut
-      - db/queries/syncjobs
     gen:
       go:
         out: internal/db

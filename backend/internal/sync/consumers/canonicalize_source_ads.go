@@ -16,8 +16,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
-	syncjobs "koditon/internal/sync/jobs"
+	"koditon/internal/sync/workflows"
 )
 
 const (
@@ -35,12 +34,12 @@ type canonicalizeSourceAdPayload struct {
 	SourceID    string `json:"source_id,omitempty"`
 }
 
-func (c *Consumer) handleCanonicalizeSourceAdsFanout(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalizeSourceAdsFanout(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonicalize.source_ads_fanout"))
 	payload := canonicalizeSourceAdsFanoutPayload{Limit: 1000}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode canonicalize source ads fanout payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode canonicalize source ads fanout payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.Limit <= 0 || payload.Limit > 5000 {
@@ -88,7 +87,7 @@ UNION ALL
 			return fmt.Errorf("scan canonicalize source ad fanout row: %w", err)
 		}
 		scanned++
-		if err := c.enqueueCanonicalizeSourceAd(ctx, sourceTable, sourceID, int32(taskqueue.PriorityLow)); err != nil {
+		if err := c.enqueueCanonicalizeSourceAd(ctx, sourceTable, sourceID, int32(priorityLow)); err != nil {
 			return err
 		}
 		enqueued++
@@ -105,11 +104,11 @@ UNION ALL
 	return nil
 }
 
-func (c *Consumer) handleCanonicalizeSourceAd(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalizeSourceAd(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonicalize.source_ad"))
 	payload, err := decodeCanonicalizeSourceAdPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	switch payload.SourceTable {
 	case "frontdoor_ad":
@@ -119,14 +118,14 @@ func (c *Consumer) handleCanonicalizeSourceAd(ctx context.Context, logger *slog.
 	case "frontdoor_building_announcement":
 		return c.canonicalizeFrontdoorBuildingAnnouncement(ctx, logger, payload.SourceID)
 	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown source table %q", payload.SourceTable), "invalid source table")
+		return newPermanentError(fmt.Errorf("unknown source table %q", payload.SourceTable), "invalid source table")
 	}
 }
 
 func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context, logger *slog.Logger, sourceID string) error {
 	announcementID, err := uuid.Parse(sourceID)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("frontdoor announcement source id must be a uuid: %w", err), "invalid source id")
+		return newPermanentError(fmt.Errorf("frontdoor announcement source id must be a uuid: %w", err), "invalid source id")
 	}
 	announcement, err := c.queries.GetFrontdoorBuildingAnnouncementByID(ctx, announcementID)
 	if err != nil {
@@ -167,7 +166,7 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 	return nil
 }
 
-func decodeCanonicalizeSourceAdPayload(job db.SyncJob) (canonicalizeSourceAdPayload, error) {
+func decodeCanonicalizeSourceAdPayload(job syncJobEnvelope) (canonicalizeSourceAdPayload, error) {
 	var payload canonicalizeSourceAdPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -193,7 +192,7 @@ func decodeCanonicalizeSourceAdPayload(job db.SyncJob) (canonicalizeSourceAdPayl
 func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Logger, sourceID string) error {
 	frontdoorAdID, err := uuid.Parse(sourceID)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("frontdoor source id must be a uuid: %w", err), "invalid source id")
+		return newPermanentError(fmt.Errorf("frontdoor source id must be a uuid: %w", err), "invalid source id")
 	}
 	ad, err := c.queries.GetFrontdoorAdByID(ctx, frontdoorAdID)
 	if err != nil {
@@ -231,7 +230,7 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logger, sourceID string) error {
 	shortcutAdID, err := strconv.ParseInt(sourceID, 10, 64)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("shortcut source id must be an integer: %w", err), "invalid source id")
+		return newPermanentError(fmt.Errorf("shortcut source id must be an integer: %w", err), "invalid source id")
 	}
 	ad, err := c.queries.GetShortcutAdByID(ctx, shortcutAdID)
 	if err != nil {
@@ -277,13 +276,11 @@ func (c *Consumer) enqueueCanonicalizeSourceAd(ctx context.Context, sourceTable,
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ad payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalizeSourceAd,
-		EntityID:    fmt.Sprintf("%s:%s", sourceTable, sourceID),
-		Priority:    priority,
-		MaxAttempts: 3,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalizeSourceAd,
+		EntityID: fmt.Sprintf("%s:%s", sourceTable, sourceID),
+		Payload:  payload,
 	})
 	return err
 }
@@ -293,14 +290,11 @@ func (c *Consumer) enqueueCanonicalizeSourceAdsFanout(ctx context.Context, limit
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ads fanout payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalizeSourceAdsFanout,
-		EntityID:    fmt.Sprintf("canonical:source_ads:%d", runAfter.UnixNano()),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalizeSourceAdsFanout,
+		EntityID: fmt.Sprintf("canonical:source_ads:%d", runAfter.UnixNano()),
+		Payload:  payload,
 	})
 	return err
 }

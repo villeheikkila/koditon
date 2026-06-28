@@ -32,6 +32,7 @@ import (
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
+	"koditon/internal/sync/workflows"
 	"koditon/internal/transport/health"
 	server "koditon/internal/transport/httpserver"
 	mcpserver "koditon/internal/transport/mcp"
@@ -99,6 +100,58 @@ func run(
 		return fmt.Errorf("check schema: %w", err)
 	}
 	appLogger.DebugContext(ctx, "database connection established")
+	workflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB)
+	if err != nil {
+		return fmt.Errorf("create absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("absurd workflow client", func(context.Context) error {
+		return workflowClient.Close()
+	})
+	if err := workflows.EnsureQueues(ctx, workflowClient); err != nil {
+		return fmt.Errorf("ensure absurd workflow queues: %w", err)
+	}
+	canonicalLLMWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalLLM)
+	if err != nil {
+		return fmt.Errorf("create canonical llm absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("canonical llm absurd workflow client", func(context.Context) error {
+		return canonicalLLMWorkflowClient.Close()
+	})
+	postalWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePostal)
+	if err != nil {
+		return fmt.Errorf("create postal absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("postal absurd workflow client", func(context.Context) error {
+		return postalWorkflowClient.Close()
+	})
+	pricesWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePrices)
+	if err != nil {
+		return fmt.Errorf("create prices absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("prices absurd workflow client", func(context.Context) error {
+		return pricesWorkflowClient.Close()
+	})
+	frontdoorWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueFrontdoor)
+	if err != nil {
+		return fmt.Errorf("create frontdoor absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("frontdoor absurd workflow client", func(context.Context) error {
+		return frontdoorWorkflowClient.Close()
+	})
+	shortcutAPIWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutAPI)
+	if err != nil {
+		return fmt.Errorf("create shortcut api absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("shortcut api absurd workflow client", func(context.Context) error {
+		return shortcutAPIWorkflowClient.Close()
+	})
+	shortcutScraperWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutScraper)
+	if err != nil {
+		return fmt.Errorf("create shortcut scraper absurd workflow client: %w", err)
+	}
+	lifecycle.Defer("shortcut scraper absurd workflow client", func(context.Context) error {
+		return shortcutScraperWorkflowClient.Close()
+	})
 	if cfg.Mode.Consumer {
 		pricesService, err := prices.NewService(
 			pool,
@@ -135,6 +188,13 @@ func run(
 			frontdoorService,
 			postalService,
 			propertiesService,
+			frontdoorWorkflowClient,
+			shortcutAPIWorkflowClient,
+			shortcutScraperWorkflowClient,
+			workflowClient,
+			canonicalLLMWorkflowClient,
+			postalWorkflowClient,
+			pricesWorkflowClient,
 		)
 		consumerConfig := consumers.DefaultConfig()
 		if err := consumer.Start(ctx, consumerConfig); err != nil {

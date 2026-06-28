@@ -329,6 +329,43 @@ type SyncPostalCodePageResult struct {
 	Upserted     int64
 }
 
+type NeighborhoodPostalCodeTarget struct {
+	City       string
+	PostalCode string
+}
+
+type NeighborhoodPostalCodePage struct {
+	City          string
+	PostalCode    string
+	Page          int
+	NextPage      *int
+	Neighborhoods []string
+}
+
+type UpdateNeighborhoodPostalCodeResult struct {
+	City          string
+	PostalCode    string
+	Page          int
+	Neighborhoods int
+	Updated       int
+}
+
+type PostalCodeTransactionPage struct {
+	City         string
+	PostalCode   string
+	Page         int
+	NextPage     *int
+	Transactions []*client.TransactionEntity
+}
+
+type UpsertPostalCodeTransactionPageResult struct {
+	City         string
+	PostalCode   string
+	Page         int
+	Transactions int
+	Upserted     int64
+}
+
 func (s *Service) SyncNeighborhoodPostalCodes(ctx context.Context, progressFn func(SyncNeighborhoodPostalCodesProgress)) error {
 	cities, err := s.queries.ListPricesCities(ctx)
 	if err != nil {
@@ -354,6 +391,74 @@ func (s *Service) SyncNeighborhoodPostalCodes(ctx context.Context, progressFn fu
 		}
 	}
 	return nil
+}
+
+func (s *Service) ListNeighborhoodPostalCodeTargets(ctx context.Context) ([]NeighborhoodPostalCodeTarget, error) {
+	cities, err := s.queries.ListPricesCities(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list cities: %w", err)
+	}
+	var targets []NeighborhoodPostalCodeTarget
+	for _, city := range cities {
+		postalCodes, err := s.queries.ListPricesPostalCodesByCity(ctx, city.PricesCityID)
+		if err != nil {
+			return nil, fmt.Errorf("list postal codes for city %q: %w", city.PricesCityName, err)
+		}
+		for _, pc := range postalCodes {
+			targets = append(targets, NeighborhoodPostalCodeTarget{City: city.PricesCityName, PostalCode: pc.PricesPostalCodeCode})
+		}
+	}
+	return targets, nil
+}
+
+func (s *Service) FetchNeighborhoodPostalCodePage(ctx context.Context, cityName, postalCode string, page int) (NeighborhoodPostalCodePage, error) {
+	response, err := s.client.GetTransactionsForPage(ctx, &client.ApartmentSearchParams{
+		City:        cityName,
+		PostalCodes: []string{postalCode},
+		RenderType:  "renderTypeTable",
+	}, page)
+	if err != nil {
+		return NeighborhoodPostalCodePage{}, fmt.Errorf("fetch page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
+	}
+	seen := make(map[string]struct{})
+	neighborhoods := make([]string, 0, len(response.Apartments))
+	for _, tx := range response.Apartments {
+		name := util.TrimUnicodeSpace(tx.Neighborhood)
+		if name == "" {
+			continue
+		}
+		key := util.NormalizeString(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		neighborhoods = append(neighborhoods, name)
+	}
+	return NeighborhoodPostalCodePage{City: cityName, PostalCode: postalCode, Page: page, NextPage: response.NextPage, Neighborhoods: neighborhoods}, nil
+}
+
+func (s *Service) UpdateNeighborhoodPostalCodes(ctx context.Context, page NeighborhoodPostalCodePage) (UpdateNeighborhoodPostalCodeResult, error) {
+	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(page.City))
+	if err != nil {
+		return UpdateNeighborhoodPostalCodeResult{}, fmt.Errorf("upsert city %q: %w", page.City, err)
+	}
+	pcRows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams([]string{page.PostalCode}, cityRow.PricesCityID))
+	if err != nil {
+		return UpdateNeighborhoodPostalCodeResult{}, fmt.Errorf("upsert postal code %q for %q: %w", page.PostalCode, page.City, err)
+	}
+	var postalCodeID *uuid.UUID
+	if len(pcRows) > 0 {
+		pcID := pcRows[0].PricesPostalCodeID
+		postalCodeID = &pcID
+	}
+	updated := 0
+	for _, name := range page.Neighborhoods {
+		if err := s.queries.UpdateNeighborhoodPostalCode(ctx, db.UpdateNeighborhoodPostalCodeParams{PostalCodeID: postalCodeID, Name: name, CityID: cityRow.PricesCityID}); err != nil {
+			return UpdateNeighborhoodPostalCodeResult{}, fmt.Errorf("update neighborhood %q: %w", name, err)
+		}
+		updated++
+	}
+	return UpdateNeighborhoodPostalCodeResult{City: page.City, PostalCode: page.PostalCode, Page: page.Page, Neighborhoods: len(page.Neighborhoods), Updated: updated}, nil
 }
 
 func (s *Service) syncNeighborhoodsForPostalCode(
@@ -472,37 +577,65 @@ func (s *Service) SyncPostalCodeTransactions(ctx context.Context, cityName, post
 }
 
 func (s *Service) SyncPostalCodeTransactionPage(ctx context.Context, cityName, postalCode string, page int, progressFn func(SyncPostalCodeProgress)) (*SyncPostalCodePageResult, error) {
-	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(cityName))
+	fetched, err := s.FetchPostalCodeTransactionPage(ctx, cityName, postalCode, page)
 	if err != nil {
-		return nil, fmt.Errorf("upsert city %q: %w", cityName, err)
+		return nil, err
 	}
-	pcRows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams([]string{postalCode}, cityRow.PricesCityID))
+	upserted, err := s.UpsertPostalCodeTransactionPage(ctx, fetched)
 	if err != nil {
-		return nil, fmt.Errorf("upsert postal code %q for %q: %w", postalCode, cityName, err)
-	}
-	var postalCodeID uuid.UUID
-	if len(pcRows) > 0 {
-		postalCodeID = pcRows[0].PricesPostalCodeID
-	}
-	params := client.NewApartmentSearchParams(cityName)
-	params.PostalCodes = []string{postalCode}
-	response, err := s.client.GetTransactionsForPage(ctx, params, page)
-	if err != nil {
-		return nil, fmt.Errorf("fetch page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
-	}
-	upserted, err := s.upsertPostalCodeTransactionPage(ctx, cityRow.PricesCityID, postalCodeID, response.Apartments, s.nowFunc().Format("2006-01"))
-	if err != nil {
-		return nil, fmt.Errorf("upsert page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
+		return nil, err
 	}
 	if progressFn != nil {
-		progressFn(SyncPostalCodeProgress{City: cityName, PostalCode: postalCode, Page: page, Transactions: len(response.Apartments), Upserted: upserted})
+		progressFn(SyncPostalCodeProgress{City: cityName, PostalCode: postalCode, Page: page, Transactions: len(fetched.Transactions), Upserted: upserted.Upserted})
 	}
 	return &SyncPostalCodePageResult{
 		City:         cityName,
 		PostalCode:   postalCode,
 		Page:         page,
+		NextPage:     fetched.NextPage,
+		Transactions: len(fetched.Transactions),
+		Upserted:     upserted.Upserted,
+	}, nil
+}
+
+func (s *Service) FetchPostalCodeTransactionPage(ctx context.Context, cityName, postalCode string, page int) (PostalCodeTransactionPage, error) {
+	params := client.NewApartmentSearchParams(cityName)
+	params.PostalCodes = []string{postalCode}
+	response, err := s.client.GetTransactionsForPage(ctx, params, page)
+	if err != nil {
+		return PostalCodeTransactionPage{}, fmt.Errorf("fetch page %d for postal code %s in %q: %w", page, postalCode, cityName, err)
+	}
+	return PostalCodeTransactionPage{
+		City:         cityName,
+		PostalCode:   postalCode,
+		Page:         page,
 		NextPage:     response.NextPage,
-		Transactions: len(response.Apartments),
+		Transactions: response.Apartments,
+	}, nil
+}
+
+func (s *Service) UpsertPostalCodeTransactionPage(ctx context.Context, page PostalCodeTransactionPage) (UpsertPostalCodeTransactionPageResult, error) {
+	cityRow, err := s.queries.UpsertPricesCity(ctx, mapUpsertCityParams(page.City))
+	if err != nil {
+		return UpsertPostalCodeTransactionPageResult{}, fmt.Errorf("upsert city %q: %w", page.City, err)
+	}
+	pcRows, err := s.queries.UpsertPricesPostalCodesBulk(ctx, mapUpsertPostalCodesBulkParams([]string{page.PostalCode}, cityRow.PricesCityID))
+	if err != nil {
+		return UpsertPostalCodeTransactionPageResult{}, fmt.Errorf("upsert postal code %q for %q: %w", page.PostalCode, page.City, err)
+	}
+	var postalCodeID uuid.UUID
+	if len(pcRows) > 0 {
+		postalCodeID = pcRows[0].PricesPostalCodeID
+	}
+	upserted, err := s.upsertPostalCodeTransactionPage(ctx, cityRow.PricesCityID, postalCodeID, page.Transactions, s.nowFunc().Format("2006-01"))
+	if err != nil {
+		return UpsertPostalCodeTransactionPageResult{}, fmt.Errorf("upsert page %d for postal code %s in %q: %w", page.Page, page.PostalCode, page.City, err)
+	}
+	return UpsertPostalCodeTransactionPageResult{
+		City:         page.City,
+		PostalCode:   page.PostalCode,
+		Page:         page.Page,
+		Transactions: len(page.Transactions),
 		Upserted:     upserted,
 	}, nil
 }

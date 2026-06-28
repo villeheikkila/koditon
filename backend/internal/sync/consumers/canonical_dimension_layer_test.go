@@ -9,8 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"koditon/internal/db"
 )
 
 func TestDecodeDimensionLayerListingPayloadCarriesExpectedDirtyAt(t *testing.T) {
@@ -20,7 +18,7 @@ func TestDecodeDimensionLayerListingPayloadCarriesExpectedDirtyAt(t *testing.T) 
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
-	payload, err := decodeDimensionLayerListingPayload(db.SyncJob{SyncJobPayload: raw})
+	payload, err := decodeDimensionLayerListingPayload(syncJobEnvelope{SyncJobPayload: raw})
 	if err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}
@@ -39,7 +37,7 @@ func TestDecodeDirtyDimensionTargetPayloadCarriesExpectedDirtyAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
-	payload, err := decodeDirtyDimensionTargetPayload(db.SyncJob{SyncJobPayload: raw})
+	payload, err := decodeDirtyDimensionTargetPayload(syncJobEnvelope{SyncJobPayload: raw})
 	if err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}

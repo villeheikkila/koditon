@@ -9,15 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/earendil-works/absurd/sdks/go/absurd"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"koditon/internal/db"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
-	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/prices"
+	"koditon/internal/sync/workflows"
 )
 
 const (
@@ -72,14 +71,6 @@ type pricesMatchRunSummary struct {
 	Ambiguous  int32
 }
 
-func (c *Consumer) handlePricesTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := logging.With(c.logger,
-		slog.String("task_type", msg.Data.TaskType),
-		slog.String("entity_id", msg.Data.EntityID),
-	)
-	return c.handleSyncJobTask(ctx, "prices", logger, msg, c.runPricesSyncJob)
-}
-
 func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logger) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.cities_init"))
 	logger.InfoContext(ctx, "prices cities initialization started")
@@ -88,10 +79,9 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 		return err
 	}
 	if len(cities) > 0 {
-		pricesQueue := taskqueue.NewQueue(c.pool, "prices")
 		var enqueueErrors int
 		for _, city := range cities {
-			if enqErr := c.enqueuePricesTask(ctx, pricesQueue, taskqueue.EntityPrefixCity+city, TaskTypePricesSync); enqErr != nil {
+			if enqErr := c.enqueuePricesTask(ctx, nil, entityPrefixCity+city, TaskTypePricesSync); enqErr != nil {
 				enqueueErrors++
 			}
 		}
@@ -100,7 +90,7 @@ func (c *Consumer) handlePricesCitiesInit(ctx context.Context, logger *slog.Logg
 	return nil
 }
 
-func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, msg taskqueue.Message) error {
+func (c *Consumer) handlePricesSync(ctx context.Context, logger *slog.Logger, msg syncMessage) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.city_sync"))
 	logger.InfoContext(ctx, "prices city sync started")
 	if err := c.syncRunner.PricesSyncCityEntity(ctx, msg.Data.EntityID); err != nil {
@@ -136,7 +126,7 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger)
 	}
 	var enqueueErrors int
 	for _, city := range cities {
-		if err := c.enqueuePricesTask(ctx, nil, taskqueue.EntityPrefixCity+city, TaskTypePricesSync); err != nil {
+		if err := c.enqueuePricesTask(ctx, nil, entityPrefixCity+city, TaskTypePricesSync); err != nil {
 			enqueueErrors++
 		}
 	}
@@ -147,51 +137,24 @@ func (c *Consumer) handlePricesSyncAll(ctx context.Context, logger *slog.Logger)
 	return nil
 }
 
-func (c *Consumer) enqueuePricesTask(ctx context.Context, _ *taskqueue.Queue, entityID, taskType string) error {
-	_, err := c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "prices",
-		Kind:        taskType,
-		EntityID:    entityID,
-		Priority:    int32(taskqueue.PriorityNormal),
-		MaxAttempts: 3,
+func (c *Consumer) enqueuePricesTask(ctx context.Context, _ any, entityID, taskType string) error {
+	_, err := workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
+		Provider: "prices",
+		Kind:     taskType,
+		EntityID: entityID,
 	})
 	return err
 }
 
-func (c *Consumer) runPricesSyncJob(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
-	switch job.SyncJobKind {
-	case TaskTypePricesCitiesInit:
-		return c.handlePricesCitiesInit(ctx, logger)
-	case TaskTypePricesSync:
-		return c.handleDurablePricesCitySync(ctx, logger, job)
-	case TaskTypePricesPostalCodeSync:
-		return c.handleDurablePricesPostalCodeSync(ctx, logger, job)
-	case TaskTypePricesPostalCodePageSync:
-		return c.handleDurablePricesPostalCodePageSync(ctx, logger, job)
-	case TaskTypePricesNeighborhoodPostalCodeSync:
-		return c.handlePricesNeighborhoodPostalCodeSync(ctx, logger)
-	case TaskTypePricesSyncAll:
-		return c.handlePricesSyncAll(ctx, logger)
-	case TaskTypePricesMatchSaleListingsBackfill:
-		return c.handlePricesMatchSaleListingsBackfill(ctx, logger, job)
-	case TaskTypePricesMatchSaleListingsFanout:
-		return c.handlePricesMatchSaleListingsFanout(ctx, logger, job)
-	case TaskTypePricesMatchSaleListing:
-		return c.handlePricesMatchSaleListing(ctx, logger, job)
-	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown prices sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
-	}
-}
-
-func (c *Consumer) handleDurablePricesCitySync(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleDurablePricesCitySync(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.city_index"))
 	logger.InfoContext(ctx, "prices city index started")
 	entityType, cityName, err := parseJobEntity(job.SyncJobEntityID)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid prices city entity")
+		return newPermanentError(err, "invalid prices city entity")
 	}
 	if entityType != "city" {
-		return taskqueue.NewPermanentError(fmt.Errorf("expected city entity, got %s", entityType), "invalid prices city entity")
+		return newPermanentError(fmt.Errorf("expected city entity, got %s", entityType), "invalid prices city entity")
 	}
 	result, err := c.syncRunner.PricesSyncCityIndex(ctx, cityName, func(p prices.SyncCityProgress) {
 		c.updatePricesCheckpoint(ctx, job, map[string]any{
@@ -207,19 +170,7 @@ func (c *Consumer) handleDurablePricesCitySync(ctx context.Context, logger *slog
 	}
 	var enqueueErrors int
 	for _, postalCode := range result.PostalCodes {
-		payload, err := json.Marshal(pricesPostalCodePayload{City: result.City, PostalCode: postalCode, Page: 0})
-		if err != nil {
-			return fmt.Errorf("marshal prices postal code page payload: %w", err)
-		}
-		_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-			Provider:    "prices",
-			Kind:        TaskTypePricesPostalCodePageSync,
-			EntityID:    pricesPostalCodePageEntityID(result.City, postalCode, 0),
-			Priority:    int32(taskqueue.PriorityNormal),
-			MaxAttempts: 3,
-			Payload:     payload,
-		})
-		if err != nil {
+		if err := c.enqueuePricesPostalCodePage(ctx, pricesPostalCodePayload{City: result.City, PostalCode: postalCode, Page: 0}); err != nil {
 			enqueueErrors++
 		}
 	}
@@ -230,23 +181,23 @@ func (c *Consumer) handleDurablePricesCitySync(ctx context.Context, logger *slog
 	return nil
 }
 
-func (c *Consumer) handleDurablePricesPostalCodeSync(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleDurablePricesPostalCodeSync(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	var payload pricesPostalCodePayload
 	if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("decode prices postal code payload: %w", err), "invalid payload")
+		return newPermanentError(fmt.Errorf("decode prices postal code payload: %w", err), "invalid payload")
 	}
 	payload.Page = 0
 	return c.enqueuePricesPostalCodePage(ctx, payload)
 }
 
-func (c *Consumer) handleDurablePricesPostalCodePageSync(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleDurablePricesPostalCodePageSync(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.postal_code_sync"))
 	var payload pricesPostalCodePayload
 	if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("decode prices postal code page payload: %w", err), "invalid payload")
+		return newPermanentError(fmt.Errorf("decode prices postal code page payload: %w", err), "invalid payload")
 	}
 	if payload.City == "" || payload.PostalCode == "" {
-		return taskqueue.NewPermanentError(fmt.Errorf("city and postal_code are required"), "invalid payload")
+		return newPermanentError(fmt.Errorf("city and postal_code are required"), "invalid payload")
 	}
 	logger.InfoContext(ctx, "prices postal code page sync started", "city", payload.City, "postal_code", payload.PostalCode, "page", payload.Page)
 	result, err := c.syncRunner.PricesSyncPostalCodeTransactionPage(ctx, payload.City, payload.PostalCode, payload.Page, func(p prices.SyncPostalCodeProgress) {
@@ -277,23 +228,21 @@ func (c *Consumer) enqueuePricesPostalCodePage(ctx context.Context, payload pric
 	if err != nil {
 		return fmt.Errorf("marshal prices postal code page payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "prices",
-		Kind:        TaskTypePricesPostalCodePageSync,
-		EntityID:    pricesPostalCodePageEntityID(payload.City, payload.PostalCode, payload.Page),
-		Priority:    int32(taskqueue.PriorityNormal),
-		MaxAttempts: 3,
-		Payload:     raw,
+	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
+		Provider: "prices",
+		Kind:     TaskTypePricesPostalCodePageSync,
+		EntityID: pricesPostalCodePageEntityID(payload.City, payload.PostalCode, payload.Page),
+		Payload:  raw,
 	})
 	return err
 }
 
-func (c *Consumer) handlePricesMatchSaleListingsBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handlePricesMatchSaleListingsBackfill(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.match_sale_listings_backfill"))
 	payload := pricesMatchBackfillPayload{ScoreThreshold: 90, CompetitorMargin: 15}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode prices match backfill payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode prices match backfill payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.ScoreThreshold <= 0 {
@@ -326,12 +275,12 @@ func (c *Consumer) handlePricesMatchSaleListingsBackfill(ctx context.Context, lo
 	return nil
 }
 
-func (c *Consumer) handlePricesMatchSaleListingsFanout(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handlePricesMatchSaleListingsFanout(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.match_sale_listings_fanout"))
 	payload := pricesMatchFanoutPayload{Limit: 5000}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode prices match fanout payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode prices match fanout payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.Limit <= 0 || payload.Limit > 5000 {
@@ -372,11 +321,11 @@ LIMIT $1`, payload.Limit)
 	return nil
 }
 
-func (c *Consumer) handlePricesMatchSaleListing(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handlePricesMatchSaleListing(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.prices.match_sale_listing"))
 	payload, err := decodePricesMatchSaleListingPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	row, err := c.loadPricesMatchSaleListing(ctx, payload.SaleListingID)
 	if err != nil {
@@ -430,7 +379,7 @@ func (c *Consumer) handlePricesMatchSaleListing(ctx context.Context, logger *slo
 	return c.enqueuePricesMatchSaleListing(ctx, row.ID, row.AttemptCount+2, next)
 }
 
-func decodePricesMatchSaleListingPayload(job db.SyncJob) (pricesMatchSaleListingPayload, error) {
+func decodePricesMatchSaleListingPayload(job syncJobEnvelope) (pricesMatchSaleListingPayload, error) {
 	var payload pricesMatchSaleListingPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -514,20 +463,22 @@ func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, saleListin
 	if err != nil {
 		return fmt.Errorf("marshal prices sale listing match payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "prices",
-		Kind:        TaskTypePricesMatchSaleListing,
-		EntityID:    fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnRequest{
+		Provider:     "prices",
+		Kind:         TaskTypePricesMatchSaleListing,
+		EntityID:     fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
+		Payload:      payload,
+		Cancellation: &absurd.CancellationPolicy{MaxDuration: int64((pricesMatchMaxAge + pricesMatchRetryDelay).Seconds())},
 	})
 	return err
 }
 
 func pricesPostalCodePageEntityID(city, postalCode string, page int) string {
 	return fmt.Sprintf("city:%s:postal_code:%s:page:%d", city, postalCode, page)
+}
+
+func pricesNeighborhoodPostalCodeEntityID(city, postalCode string, page int) string {
+	return fmt.Sprintf("city:%s:postal_code:%s:neighborhood_page:%d", city, postalCode, page)
 }
 
 func parseJobEntity(entityID string) (string, string, error) {
@@ -538,10 +489,8 @@ func parseJobEntity(entityID string) (string, string, error) {
 	return entityType, value, nil
 }
 
-func (c *Consumer) updatePricesCheckpoint(ctx context.Context, job db.SyncJob, value map[string]any) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return
-	}
-	_ = c.syncJobs.UpdateCheckpoint(ctx, job, raw)
+func (c *Consumer) updatePricesCheckpoint(ctx context.Context, job syncJobEnvelope, value map[string]any) {
+	_ = ctx
+	_ = job
+	_ = value
 }

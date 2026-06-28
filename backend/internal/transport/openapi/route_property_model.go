@@ -18,9 +18,7 @@ import (
 
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
 	"koditon/internal/sync/consumers"
-	syncjobs "koditon/internal/sync/jobs"
 )
 
 type canonicalTargetInput struct {
@@ -2389,12 +2387,11 @@ func (a *API) enqueueTargetResolution(ctx context.Context, target CanonicalTarge
 	if err != nil {
 		return QueuedCanonicalJob{}, fmt.Errorf("marshal target resolution payload: %w", err)
 	}
-	store := syncjobs.NewStore(a.logger, a.pool)
-	result, err := store.Enqueue(ctx, syncjobs.EnqueueRequest{Provider: "canonical", Kind: consumers.TaskTypeCanonicalResolveDimensionTarget, EntityID: target.Type + ":" + target.ID, Priority: int32(taskqueue.PriorityHigh), MaxAttempts: 3, Payload: payload})
+	jobID, queued, err := a.spawnSyncWorkflow(ctx, "canonical", consumers.TaskTypeCanonicalResolveDimensionTarget, "dimension_target:"+target.Type+":"+target.ID, payload)
 	if err != nil {
 		return QueuedCanonicalJob{}, err
 	}
-	return QueuedCanonicalJob{JobID: result.Job.SyncJobID.String(), Queued: result.Enqueued}, nil
+	return QueuedCanonicalJob{JobID: jobID, Queued: queued}, nil
 }
 
 func documentTargetColumn(targetType string) (string, error) {

@@ -106,14 +106,12 @@ Output columns: period, description, type, area, price, €/m², postal code, ne
 
 ### sync — Enqueue and inspect durable sync jobs
 
-Mutating provider sync work must go through the durable `sync_jobs` queue. A consumer process must be running to execute queued work; `--watch` only polls job status.
+Mutating provider sync work must go through Absurd workflows. A consumer process must be running to execute queued work; `--watch` polls Absurd task status.
 
 ```
 ./cli sync enqueue <provider> <kind> <entity-id> [--watch] [--interval 2s] [--json]
-./cli sync status <job-id> [--json]
-./cli sync list [--status <status>] [--provider <provider>] [--kind <kind>] [--limit 25] [--json]
-./cli sync maintenance [--stale-after 35m] [--limit 25] [--json]
-./cli sync run [--workers 1] [--maintenance] [--maintenance-interval 1m] [--stale-after 35m] [--maintenance-limit 25]
+./cli sync status <task-id> [--json]
+./cli sync run [--workers 1] [--maintenance] [--maintenance-interval 1m]
 ```
 
 Common enqueue commands:
@@ -130,9 +128,7 @@ Common enqueue commands:
 Inspection and repair:
 
 ```bash
-./cli --json sync list --status failed --limit 10
-./cli --json sync status 00000000-0000-0000-0000-000000000000
-./cli --json sync maintenance
+./cli --json sync status <task-id>
 ./cli --json sync run --workers 1
 ```
 

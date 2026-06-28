@@ -10,6 +10,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/danielgtaylor/huma/v2 v2.37.3
+	github.com/earendil-works/absurd/sdks/go/absurd v0.4.0
 	github.com/go-webauthn/webauthn v0.17.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2

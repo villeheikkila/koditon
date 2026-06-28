@@ -1132,47 +1132,6 @@ type ShortcutToken struct {
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
-type SyncJob struct {
-	SyncJobID                uuid.UUID       `json:"sync_job_id"`
-	SyncJobProvider          string          `json:"sync_job_provider"`
-	SyncJobKind              string          `json:"sync_job_kind"`
-	SyncJobEntityID          string          `json:"sync_job_entity_id"`
-	SyncJobDedupKey          string          `json:"sync_job_dedup_key"`
-	SyncJobStatus            string          `json:"sync_job_status"`
-	SyncJobPriority          int32           `json:"sync_job_priority"`
-	SyncJobAttemptCount      int32           `json:"sync_job_attempt_count"`
-	SyncJobMaxAttempts       int32           `json:"sync_job_max_attempts"`
-	SyncJobRunAfter          time.Time       `json:"sync_job_run_after"`
-	SyncJobCapacityClass     string          `json:"sync_job_capacity_class"`
-	SyncJobPayload           json.RawMessage `json:"sync_job_payload"`
-	SyncJobCheckpoint        json.RawMessage `json:"sync_job_checkpoint"`
-	SyncJobResult            json.RawMessage `json:"sync_job_result"`
-	SyncJobLastError         *string         `json:"sync_job_last_error"`
-	SyncJobLastErrorCode     *string         `json:"sync_job_last_error_code"`
-	SyncJobLastHttpStatus    *int32          `json:"sync_job_last_http_status"`
-	SyncJobLastPgmqMessageID *int64          `json:"sync_job_last_pgmq_message_id"`
-	SyncJobClaimToken        *uuid.UUID      `json:"sync_job_claim_token"`
-	SyncJobCreatedAt         time.Time       `json:"sync_job_created_at"`
-	SyncJobUpdatedAt         time.Time       `json:"sync_job_updated_at"`
-	SyncJobLastEnqueuedAt    *time.Time      `json:"sync_job_last_enqueued_at"`
-	SyncJobLastStartedAt     *time.Time      `json:"sync_job_last_started_at"`
-	SyncJobLastFinishedAt    *time.Time      `json:"sync_job_last_finished_at"`
-}
-
-type SyncJobAttempt struct {
-	SyncJobAttemptID              int64           `json:"sync_job_attempt_id"`
-	SyncJobID                     uuid.UUID       `json:"sync_job_id"`
-	SyncJobAttemptQueueName       string          `json:"sync_job_attempt_queue_name"`
-	SyncJobAttemptMsgID           *int64          `json:"sync_job_attempt_msg_id"`
-	SyncJobAttemptNo              int32           `json:"sync_job_attempt_no"`
-	SyncJobAttemptStatus          string          `json:"sync_job_attempt_status"`
-	SyncJobAttemptErrorCode       *string         `json:"sync_job_attempt_error_code"`
-	SyncJobAttemptErrorDetail     *string         `json:"sync_job_attempt_error_detail"`
-	SyncJobAttemptPayloadSnapshot json.RawMessage `json:"sync_job_attempt_payload_snapshot"`
-	SyncJobAttemptCreatedAt       time.Time       `json:"sync_job_attempt_created_at"`
-	SyncJobAttemptFinishedAt      *time.Time      `json:"sync_job_attempt_finished_at"`
-}
-
 type User struct {
 	UserUuid                     uuid.UUID   `json:"user_uuid"`
 	UserFirstName                *string     `json:"user_first_name"`

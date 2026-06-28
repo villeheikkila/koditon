@@ -1401,62 +1401,6 @@ create table public.shortcut_tokens (
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
 
-create table public.sync_job_attempts (
-  sync_job_attempt_id bigint generated always as identity not null constraint sync_job_attempts_pkey primary key,
-  sync_job_id uuid not null constraint sync_job_attempts_sync_job_id_fkey references sync_jobs(sync_job_id) ON DELETE CASCADE,
-  sync_job_attempt_queue_name text not null,
-  sync_job_attempt_msg_id bigint,
-  sync_job_attempt_no integer not null,
-  sync_job_attempt_status text not null,
-  sync_job_attempt_error_code text,
-  sync_job_attempt_error_detail text,
-  sync_job_attempt_payload_snapshot jsonb,
-  sync_job_attempt_created_at timestamp with time zone default now() not null,
-  sync_job_attempt_finished_at timestamp with time zone,
-  constraint sync_job_attempts_payload_snapshot_object_check CHECK (((sync_job_attempt_payload_snapshot IS NULL) OR (jsonb_typeof(sync_job_attempt_payload_snapshot) = 'object'::text))),
-  constraint sync_job_attempts_status_check CHECK ((sync_job_attempt_status = ANY (ARRAY['running'::text, 'succeeded'::text, 'failed'::text, 'retry'::text, 'not_found'::text, 'noop'::text, 'skipped_lock'::text])))
-);
-
-CREATE INDEX idx_sync_job_attempts_job_created_at_desc ON public.sync_job_attempts USING btree (sync_job_id, sync_job_attempt_created_at DESC);
-
-create table public.sync_jobs (
-  sync_job_id uuid default uuid_generate_v4() not null constraint sync_jobs_pkey primary key,
-  sync_job_provider text not null,
-  sync_job_kind text not null,
-  sync_job_entity_id text not null,
-  sync_job_dedup_key text not null constraint sync_jobs_sync_job_dedup_key_key unique,
-  sync_job_status text default 'pending'::text not null,
-  sync_job_priority integer default 0 not null,
-  sync_job_attempt_count integer default 0 not null,
-  sync_job_max_attempts integer default 3 not null,
-  sync_job_run_after timestamp with time zone default now() not null,
-  sync_job_capacity_class text default 'default'::text not null,
-  sync_job_payload jsonb default '{}'::jsonb not null,
-  sync_job_checkpoint jsonb,
-  sync_job_result jsonb,
-  sync_job_last_error text,
-  sync_job_last_error_code text,
-  sync_job_last_http_status integer,
-  sync_job_last_pgmq_message_id bigint,
-  sync_job_claim_token uuid,
-  sync_job_created_at timestamp with time zone default now() not null,
-  sync_job_updated_at timestamp with time zone default now() not null,
-  sync_job_last_enqueued_at timestamp with time zone,
-  sync_job_last_started_at timestamp with time zone,
-  sync_job_last_finished_at timestamp with time zone,
-  constraint sync_jobs_attempt_count_check CHECK ((sync_job_attempt_count >= 0)),
-  constraint sync_jobs_checkpoint_object_check CHECK (((sync_job_checkpoint IS NULL) OR (jsonb_typeof(sync_job_checkpoint) = 'object'::text))),
-  constraint sync_jobs_max_attempts_check CHECK ((sync_job_max_attempts >= 1)),
-  constraint sync_jobs_payload_object_check CHECK ((jsonb_typeof(sync_job_payload) = 'object'::text)),
-  constraint sync_jobs_result_object_check CHECK (((sync_job_result IS NULL) OR (jsonb_typeof(sync_job_result) = 'object'::text))),
-  constraint sync_jobs_status_check CHECK ((sync_job_status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'succeeded'::text, 'failed'::text, 'not_found'::text, 'noop'::text, 'skipped_lock'::text])))
-);
-
-CREATE INDEX idx_sync_jobs_capacity_status ON public.sync_jobs USING btree (sync_job_capacity_class, sync_job_status);
-CREATE INDEX idx_sync_jobs_entity ON public.sync_jobs USING btree (sync_job_provider, sync_job_entity_id, sync_job_kind);
-CREATE INDEX idx_sync_jobs_kind_status_run_after ON public.sync_jobs USING btree (sync_job_kind, sync_job_status, sync_job_run_after);
-CREATE INDEX idx_sync_jobs_provider_status_run_after ON public.sync_jobs USING btree (sync_job_provider, sync_job_status, sync_job_run_after);
-
 create table public.user_devices (
   user_device_uuid uuid default gen_random_uuid() not null constraint user_devices_uuid_key unique,
   user_device_name text,

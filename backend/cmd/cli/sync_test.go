@@ -5,10 +5,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"koditon/cmd/cli/internal/cli"
-	"koditon/internal/db"
-	syncjobs "koditon/internal/sync/jobs"
 )
 
 func TestRootHelpListsCanonicalCommands(t *testing.T) {
@@ -66,9 +62,14 @@ func TestSyncHelpListsCanonicalSubcommands(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 	out := stdout.String()
-	for _, want := range []string{"enqueue", "status", "list", "maintenance", "run"} {
+	for _, want := range []string{"enqueue", "status", "run"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{"list", "maintenance"} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("did not expect %q in help:\n%s", unwanted, out)
 		}
 	}
 }
@@ -82,9 +83,14 @@ func TestSyncRunHelpListsWorkerFlags(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 	out := stdout.String()
-	for _, want := range []string{"--workers", "--maintenance", "--maintenance-interval", "--stale-after", "--maintenance-limit"} {
+	for _, want := range []string{"--workers", "--maintenance", "--maintenance-interval"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in help:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{"--stale-after", "--maintenance-limit"} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("did not expect %q in help:\n%s", unwanted, out)
 		}
 	}
 }
@@ -124,25 +130,7 @@ func TestValidateSyncJobTarget(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), "not valid") {
+	if !strings.Contains(err.Error(), "not implemented") {
 		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestFormatSyncJobSnapshot(t *testing.T) {
-	t.Parallel()
-	snapshot := syncjobs.JobSnapshot{Job: db.SyncJob{
-		SyncJobProvider:     "prices",
-		SyncJobKind:         "prices_sync",
-		SyncJobEntityID:     "city:Helsinki",
-		SyncJobStatus:       syncjobs.StatusPending,
-		SyncJobAttemptCount: 0,
-		SyncJobMaxAttempts:  3,
-	}}
-	got := cli.FormatSyncJobSnapshot(snapshot)
-	for _, want := range []string{"status=pending", "provider=prices", "kind=prices_sync", "entity=city:Helsinki", "attempts=0/3"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected %q in %q", want, got)
-		}
 	}
 }

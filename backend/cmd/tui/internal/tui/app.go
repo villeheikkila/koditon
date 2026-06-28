@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	syncflows "koditon/internal/sync/flows"
-	syncjobs "koditon/internal/sync/jobs"
+	"koditon/internal/sync/workflows"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -15,19 +15,19 @@ import (
 type AppOption func(*appConfig)
 
 type appConfig struct {
-	webBaseURL string
-	syncJobs   *syncjobs.Store
-	dbPool     *pgxpool.Pool
+	webBaseURL    string
+	workflowStore *workflows.Store
+	dbPool        *pgxpool.Pool
 }
 
 type appContext struct {
-	runner     *syncflows.Runner
-	syncJobs   *syncjobs.Store
-	dbPool     *pgxpool.Pool
-	styles     styles
-	runtime    *jobRuntime
-	subsystems []subsystem
-	webBaseURL string
+	runner        *syncflows.Runner
+	workflowStore *workflows.Store
+	dbPool        *pgxpool.Pool
+	styles        styles
+	runtime       *jobRuntime
+	subsystems    []subsystem
+	webBaseURL    string
 }
 
 type App struct {
@@ -51,8 +51,8 @@ func WithWebBaseURL(url string) AppOption {
 	return func(cfg *appConfig) { cfg.webBaseURL = url }
 }
 
-func WithSyncJobs(store *syncjobs.Store) AppOption {
-	return func(cfg *appConfig) { cfg.syncJobs = store }
+func WithWorkflows(store *workflows.Store) AppOption {
+	return func(cfg *appConfig) { cfg.workflowStore = store }
 }
 
 func WithDBPool(pool *pgxpool.Pool) AppOption {
@@ -66,7 +66,7 @@ func NewApp(runner *syncflows.Runner, opts ...AppOption) *App {
 			opt(&cfg)
 		}
 	}
-	ctx := &appContext{runner: runner, syncJobs: cfg.syncJobs, dbPool: cfg.dbPool, styles: defaultStyles(), runtime: newJobRuntime(), subsystems: buildSubsystems(), webBaseURL: cfg.webBaseURL}
+	ctx := &appContext{runner: runner, workflowStore: cfg.workflowStore, dbPool: cfg.dbPool, styles: defaultStyles(), runtime: newJobRuntime(), subsystems: buildSubsystems(), webBaseURL: cfg.webBaseURL}
 	home := newHomeScreen(ctx)
 	r := newRouter(home)
 	return &App{root: &rootModel{ctx: ctx, router: r}}

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"koditon/cmd/cli/internal/cli"
@@ -21,10 +20,10 @@ import (
 	"koditon/internal/platform/schema"
 	"koditon/internal/sync/consumers"
 	"koditon/internal/sync/frontdoor"
-	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
+	"koditon/internal/sync/workflows"
 )
 
 type commandOptions struct {
@@ -253,8 +252,6 @@ func newSyncCommand(opts *commandOptions) *cobra.Command {
 	}
 	cmd.AddCommand(newSyncEnqueueCommand(opts))
 	cmd.AddCommand(newSyncStatusCommand(opts))
-	cmd.AddCommand(newSyncListCommand(opts))
-	cmd.AddCommand(newSyncMaintenanceCommand(opts))
 	cmd.AddCommand(newSyncRunCommand(opts))
 	return cmd
 }
@@ -277,12 +274,12 @@ func newSyncEnqueueCommand(opts *commandOptions) *cobra.Command {
 			if err := validateSyncJobTarget(args[0], args[1]); err != nil {
 				return err
 			}
-			store, closeFn, err := setupSyncStore(opts.ctx)
+			store, closeFn, err := setupAbsurdSyncStore(opts.ctx)
 			if err != nil {
 				return err
 			}
 			defer closeFn()
-			return cli.RunSync(opts.ctx, store, cli.SyncFlags{
+			return cli.RunAbsurdSync(opts.ctx, store, cli.AbsurdSyncFlags{
 				Provider: args[0],
 				Kind:     args[1],
 				EntityID: args[2],
@@ -300,66 +297,18 @@ func newSyncEnqueueCommand(opts *commandOptions) *cobra.Command {
 
 func newSyncStatusCommand(opts *commandOptions) *cobra.Command {
 	return &cobra.Command{
-		Use:   "status <job-id>",
-		Short: "Show sync job status and attempts",
+		Use:   "status <task-id>",
+		Short: "Show sync task status",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			jobID, err := uuid.Parse(args[0])
-			if err != nil {
-				return fmt.Errorf("parse job id: %w", err)
-			}
-			store, closeFn, err := setupSyncStore(opts.ctx)
+			store, closeFn, err := setupAbsurdSyncStore(opts.ctx)
 			if err != nil {
 				return err
 			}
 			defer closeFn()
-			return cli.RunSyncStatus(opts.ctx, store, jobID, opts.json, opts.stdout)
+			return cli.RunAbsurdSyncStatus(opts.ctx, store, args[0], opts.json, opts.stdout)
 		},
 	}
-}
-
-func newSyncListCommand(opts *commandOptions) *cobra.Command {
-	var f cli.SyncListFlags
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List sync jobs",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			store, closeFn, err := setupSyncStore(opts.ctx)
-			if err != nil {
-				return err
-			}
-			defer closeFn()
-			f.JSON = opts.json
-			f.Out = opts.stdout
-			return cli.RunSyncList(opts.ctx, store, f)
-		},
-	}
-	cmd.Flags().StringVar(&f.Status, "status", "", "Filter by job status")
-	cmd.Flags().StringVar(&f.Provider, "provider", "", "Filter by provider")
-	cmd.Flags().StringVar(&f.Kind, "kind", "", "Filter by job kind")
-	cmd.Flags().IntVar(&f.Limit, "limit", 25, "Maximum jobs to return")
-	return cmd
-}
-
-func newSyncMaintenanceCommand(opts *commandOptions) *cobra.Command {
-	var f cli.SyncMaintenanceFlags
-	cmd := &cobra.Command{
-		Use:   "maintenance",
-		Short: "Recover stale sync job claims and reconcile pending jobs",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			store, closeFn, err := setupSyncStore(opts.ctx)
-			if err != nil {
-				return err
-			}
-			defer closeFn()
-			f.JSON = opts.json
-			f.Out = opts.stdout
-			return cli.RunSyncMaintenance(opts.ctx, store, f)
-		},
-	}
-	cmd.Flags().DurationVar(&f.StaleAfter, "stale-after", 35*time.Minute, "Recover in-progress jobs older than this")
-	cmd.Flags().IntVar(&f.Limit, "limit", 25, "Maximum jobs to process")
-	return cmd
 }
 
 func newSyncRunCommand(opts *commandOptions) *cobra.Command {
@@ -371,17 +320,12 @@ func newSyncRunCommand(opts *commandOptions) *cobra.Command {
 			if cfg.WorkerCount <= 0 {
 				return fmt.Errorf("--workers must be greater than zero")
 			}
-			if cfg.MaintenanceBatchLimit <= 0 {
-				return fmt.Errorf("--maintenance-limit must be greater than zero")
-			}
 			return runSyncConsumers(opts, cfg)
 		},
 	}
 	cmd.Flags().IntVar(&cfg.WorkerCount, "workers", cfg.WorkerCount, "Workers per sync queue")
-	cmd.Flags().BoolVar(&cfg.MaintenanceEnabled, "maintenance", cfg.MaintenanceEnabled, "Run periodic sync job maintenance")
+	cmd.Flags().BoolVar(&cfg.MaintenanceEnabled, "maintenance", cfg.MaintenanceEnabled, "Run periodic sync maintenance")
 	cmd.Flags().DurationVar(&cfg.MaintenanceInterval, "maintenance-interval", cfg.MaintenanceInterval, "Periodic maintenance interval")
-	cmd.Flags().DurationVar(&cfg.MaintenanceStaleAfter, "stale-after", cfg.MaintenanceStaleAfter, "Recover in-progress jobs older than this")
-	cmd.Flags().Int32Var(&cfg.MaintenanceBatchLimit, "maintenance-limit", cfg.MaintenanceBatchLimit, "Maximum jobs to process per maintenance pass")
 	return cmd
 }
 
@@ -405,7 +349,45 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
 	propertiesService := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
-	consumer := consumers.New(logger, pool, pricesService, shortcutService, frontdoorService, postalService, propertiesService)
+	workflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePostal)
+	if err != nil {
+		return fmt.Errorf("create postal absurd workflow client: %w", err)
+	}
+	defer func() { _ = workflowClient.Close() }()
+	if err := workflows.EnsureQueues(ctx, workflowClient); err != nil {
+		return fmt.Errorf("ensure absurd workflow queues: %w", err)
+	}
+	pricesWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePrices)
+	if err != nil {
+		return fmt.Errorf("create prices absurd workflow client: %w", err)
+	}
+	defer func() { _ = pricesWorkflowClient.Close() }()
+	frontdoorWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueFrontdoor)
+	if err != nil {
+		return fmt.Errorf("create frontdoor absurd workflow client: %w", err)
+	}
+	defer func() { _ = frontdoorWorkflowClient.Close() }()
+	shortcutAPIWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutAPI)
+	if err != nil {
+		return fmt.Errorf("create shortcut api absurd workflow client: %w", err)
+	}
+	defer func() { _ = shortcutAPIWorkflowClient.Close() }()
+	shortcutScraperWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutScraper)
+	if err != nil {
+		return fmt.Errorf("create shortcut scraper absurd workflow client: %w", err)
+	}
+	defer func() { _ = shortcutScraperWorkflowClient.Close() }()
+	canonicalWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB)
+	if err != nil {
+		return fmt.Errorf("create canonical absurd workflow client: %w", err)
+	}
+	defer func() { _ = canonicalWorkflowClient.Close() }()
+	canonicalLLMWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalLLM)
+	if err != nil {
+		return fmt.Errorf("create canonical llm absurd workflow client: %w", err)
+	}
+	defer func() { _ = canonicalLLMWorkflowClient.Close() }()
+	consumer := consumers.New(logger, pool, pricesService, shortcutService, frontdoorService, postalService, propertiesService, frontdoorWorkflowClient, shortcutAPIWorkflowClient, shortcutScraperWorkflowClient, canonicalWorkflowClient, canonicalLLMWorkflowClient, workflowClient, pricesWorkflowClient)
 	if err := consumer.Start(ctx, consumerConfig); err != nil {
 		return fmt.Errorf("start sync consumers: %w", err)
 	}
@@ -426,20 +408,26 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 	return nil
 }
 
-func setupSyncStore(ctx context.Context) (*syncjobs.Store, func(), error) {
-	pool, _, err := setup(ctx)
+func setupAbsurdSyncStore(ctx context.Context) (*workflows.Store, func(), error) {
+	pool, cfg, err := setup(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	return syncjobs.NewStore(nil, pool), pool.Close, nil
+	pool.Close()
+	app, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := workflows.EnsureQueues(ctx, app); err != nil {
+		_ = app.Close()
+		return nil, nil, err
+	}
+	return workflows.NewStore(app), func() { _ = app.Close() }, nil
 }
 
 func validateSyncJobTarget(provider, kind string) error {
-	if syncjobs.QueueNameForProvider(provider) == "" {
-		return fmt.Errorf("unknown sync provider %q", provider)
-	}
-	if !syncjobs.IsKnownJobKind(provider, kind) {
-		return fmt.Errorf("sync kind %q is not valid for provider %q", kind, provider)
+	if _, ok := workflows.FindDefinition(provider, kind); !ok {
+		return fmt.Errorf("sync kind %q is not implemented for provider %q", kind, provider)
 	}
 	return nil
 }

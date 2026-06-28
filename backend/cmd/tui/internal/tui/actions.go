@@ -10,8 +10,8 @@ import (
 	"time"
 
 	syncflows "koditon/internal/sync/flows"
-	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/prices"
+	"koditon/internal/sync/workflows"
 )
 
 type progressUpdate struct {
@@ -85,7 +85,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Full Sitemap Sync",
 					Description: "Queue frontdoor sitemap sync and watch the durable job",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sitemap_sync", EntityID: "frontdoor:sitemap"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "frontdoor", Kind: "frontdoor_sitemap_sync", EntityID: "frontdoor:sitemap"}})
 					},
 				},
 				{
@@ -104,7 +104,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Sync Buildings",
 					Description: "Queue frontdoor building-only sitemap fanout",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_buildings_sitemap_sync", EntityID: "frontdoor:buildings_sitemap"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "frontdoor", Kind: "frontdoor_buildings_sitemap_sync", EntityID: "frontdoor:buildings_sitemap"}})
 					},
 				},
 				{
@@ -113,7 +113,7 @@ func buildSubsystems() []subsystem {
 					Prompts:     []string{"friendly ad id"},
 					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "ad:" + strings.TrimSpace(inputs[0])
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
 					},
 				},
 				{
@@ -122,7 +122,7 @@ func buildSubsystems() []subsystem {
 					Prompts:     []string{"building housing company id"},
 					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "building:" + strings.TrimSpace(inputs[0])
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "frontdoor", Kind: "frontdoor_sync", EntityID: entityID}})
 					},
 				},
 			},
@@ -135,7 +135,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Full Sitemap Sync",
 					Description: "Queue shortcut sitemap sync and watch the durable job",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_sitemap_sync", EntityID: "shortcut:sitemap"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "shortcut", Kind: "shortcut_sitemap_sync", EntityID: "shortcut:sitemap"}})
 					},
 				},
 				{
@@ -154,7 +154,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Sync Buildings",
 					Description: "Queue shortcut building-only sitemap fanout",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_buildings_sitemap_sync", EntityID: "shortcut:buildings_sitemap"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "shortcut", Kind: "shortcut_buildings_sitemap_sync", EntityID: "shortcut:buildings_sitemap"}})
 					},
 				},
 				{
@@ -163,7 +163,7 @@ func buildSubsystems() []subsystem {
 					Prompts:     []string{"ad id"},
 					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "ad:" + strings.TrimSpace(inputs[0])
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
 					},
 				},
 				{
@@ -172,7 +172,7 @@ func buildSubsystems() []subsystem {
 					Prompts:     []string{"building uuid"},
 					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "building:" + strings.TrimSpace(inputs[0])
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "shortcut", Kind: "shortcut_scraper_sync", EntityID: entityID}})
 					},
 				},
 			},
@@ -185,7 +185,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Cities Init (Full Sync Now)",
 					Description: "Queue prices city initialization and watch the durable job",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_cities_init", EntityID: "prices:cities"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "prices", Kind: "prices_cities_init", EntityID: "prices:cities"}})
 					},
 				},
 				{
@@ -205,21 +205,21 @@ func buildSubsystems() []subsystem {
 					Title:       "Sync All",
 					Description: "Queue prices sync-all fanout",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_sync_all", EntityID: "prices:sync_all"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "prices", Kind: "prices_sync_all", EntityID: "prices:sync_all"}})
 					},
 				},
 				{
 					Title:       "Neighborhood Postal Code Sync",
 					Description: "Queue neighborhood->postal code mapping sync",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_neighborhood_postal_code_sync", EntityID: "prices:neighborhood_postal_codes"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "prices", Kind: "prices_neighborhood_postal_code_sync", EntityID: "prices:neighborhood_postal_codes"}})
 					},
 				},
 				{
 					Title:       "Queue Sale Listing Match Fanout",
 					Description: "Enqueue weekly transaction matching jobs for closed sale listings",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_match_sale_listings_fanout", EntityID: "prices:match_sale_listings"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "prices", Kind: "prices_match_sale_listings_fanout", EntityID: "prices:match_sale_listings"}})
 					},
 				},
 				{
@@ -229,7 +229,7 @@ func buildSubsystems() []subsystem {
 					UseCityPicker: true,
 					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
 						entityID := "city:" + strings.TrimSpace(inputs[0])
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "prices", Kind: "prices_sync", EntityID: entityID}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "prices", Kind: "prices_sync", EntityID: entityID}})
 					},
 				},
 				{
@@ -321,7 +321,7 @@ func buildSubsystems() []subsystem {
 					Title:       "Sync",
 					Description: "Queue postal data sync",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []syncjobs.EnqueueRequest{{Provider: "postal", Kind: "postal_sync", EntityID: "postal:all"}})
+						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnRequest{{Provider: "postal", Kind: "postal_sync", EntityID: "postal:all"}})
 					},
 				},
 			},

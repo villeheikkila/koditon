@@ -7,15 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/earendil-works/absurd/sdks/go/absurd"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"koditon/internal/db"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
 	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
-	syncjobs "koditon/internal/sync/jobs"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
@@ -24,17 +23,36 @@ import (
 type Consumer struct {
 	logger     *slog.Logger
 	syncRunner *syncflows.Runner
-	syncJobs   *syncjobs.Store
 	queries    *db.Queries
 	pool       *pgxpool.Pool
 
 	propertiesService *properties.Service
 
-	frontdoorPool *taskqueue.WorkerPool
-	shortcutPool  *taskqueue.WorkerPool
-	pricesPool    *taskqueue.WorkerPool
-	canonicalPool *taskqueue.WorkerPool
-	postalPool    *taskqueue.WorkerPool
+	frontdoorWorkflowClient       *absurd.Client
+	shortcutAPIWorkflowClient     *absurd.Client
+	shortcutScraperWorkflowClient *absurd.Client
+	canonicalWorkflowClient       *absurd.Client
+	canonicalLLMWorkflowClient    *absurd.Client
+	postalWorkflowClient          *absurd.Client
+	pricesWorkflowClient          *absurd.Client
+	frontdoorService              *frontdoor.Service
+	shortcutService               *shortcut.Service
+	postalService                 *postal.Service
+	pricesService                 *prices.Service
+	frontdoorWorkflowCancel       context.CancelFunc
+	frontdoorWorkflowDone         chan struct{}
+	shortcutAPIWorkflowCancel     context.CancelFunc
+	shortcutAPIWorkflowDone       chan struct{}
+	shortcutScraperWorkflowCancel context.CancelFunc
+	shortcutScraperWorkflowDone   chan struct{}
+	canonicalWorkflowCancel       context.CancelFunc
+	canonicalWorkflowDone         chan struct{}
+	canonicalLLMWorkflowCancel    context.CancelFunc
+	canonicalLLMWorkflowDone      chan struct{}
+	postalWorkflowCancel          context.CancelFunc
+	postalWorkflowDone            chan struct{}
+	pricesWorkflowCancel          context.CancelFunc
+	pricesWorkflowDone            chan struct{}
 
 	maintenanceCancel context.CancelFunc
 	maintenanceDone   chan struct{}
@@ -42,56 +60,59 @@ type Consumer struct {
 }
 
 type Config struct {
-	WorkerCount           int
-	MaintenanceEnabled    bool
-	MaintenanceInterval   time.Duration
-	MaintenanceStaleAfter time.Duration
-	MaintenanceBatchLimit int32
+	WorkerCount         int
+	MaintenanceEnabled  bool
+	MaintenanceInterval time.Duration
 }
 
 func DefaultConfig() Config {
 	return Config{
-		WorkerCount:           1,
-		MaintenanceEnabled:    true,
-		MaintenanceInterval:   time.Minute,
-		MaintenanceStaleAfter: 35 * time.Minute,
-		MaintenanceBatchLimit: 25,
+		WorkerCount:         1,
+		MaintenanceEnabled:  true,
+		MaintenanceInterval: time.Minute,
 	}
 }
 
-func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service, propertiesService *properties.Service) *Consumer {
+func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service, propertiesService *properties.Service, frontdoorWorkflowClient *absurd.Client, shortcutAPIWorkflowClient *absurd.Client, shortcutScraperWorkflowClient *absurd.Client, canonicalWorkflowClient *absurd.Client, canonicalLLMWorkflowClient *absurd.Client, postalWorkflowClient *absurd.Client, pricesWorkflowClient *absurd.Client) *Consumer {
 	return &Consumer{
-		logger:            logger,
-		syncRunner:        syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
-		syncJobs:          syncjobs.NewStore(logger, pool),
-		queries:           db.New(pool),
-		pool:              pool,
-		propertiesService: propertiesService,
+		logger:                        logger,
+		syncRunner:                    syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
+		queries:                       db.New(pool),
+		pool:                          pool,
+		propertiesService:             propertiesService,
+		frontdoorWorkflowClient:       frontdoorWorkflowClient,
+		shortcutAPIWorkflowClient:     shortcutAPIWorkflowClient,
+		shortcutScraperWorkflowClient: shortcutScraperWorkflowClient,
+		canonicalWorkflowClient:       canonicalWorkflowClient,
+		canonicalLLMWorkflowClient:    canonicalLLMWorkflowClient,
+		postalWorkflowClient:          postalWorkflowClient,
+		pricesWorkflowClient:          pricesWorkflowClient,
+		frontdoorService:              frontdoorService,
+		shortcutService:               shortcutService,
+		postalService:                 postalService,
+		pricesService:                 pricesService,
 	}
 }
 
 func (c *Consumer) Start(ctx context.Context, cfg Config) error {
-	frontdoorQueue := taskqueue.NewQueue(c.pool, "frontdoor")
-	shortcutQueue := taskqueue.NewQueue(c.pool, "shortcut")
-	pricesQueue := taskqueue.NewQueue(c.pool, "prices")
-	canonicalQueue := taskqueue.NewQueue(c.pool, "canonical")
-	postalQueue := taskqueue.NewQueue(c.pool, "postal")
-	frontdoorConfig := c.baseWorkerConfig()
-	shortcutConfig := c.baseWorkerConfig()
-	pricesConfig := c.baseWorkerConfig()
-	canonicalConfig := c.baseWorkerConfig()
-	postalConfig := c.baseWorkerConfig()
-	c.frontdoorPool = taskqueue.NewWorkerPool(cfg.WorkerCount, frontdoorQueue, c.handleFrontdoorTask, frontdoorConfig)
-	c.shortcutPool = taskqueue.NewWorkerPool(cfg.WorkerCount, shortcutQueue, c.handleShortcutTask, shortcutConfig)
-	c.pricesPool = taskqueue.NewWorkerPool(cfg.WorkerCount, pricesQueue, c.handlePricesTask, pricesConfig)
-	c.canonicalPool = taskqueue.NewWorkerPool(cfg.WorkerCount, canonicalQueue, c.handleCanonicalTask, canonicalConfig)
-	c.postalPool = taskqueue.NewWorkerPool(cfg.WorkerCount, postalQueue, c.handlePostalTask, postalConfig)
-
-	c.frontdoorPool.Start(ctx)
-	c.shortcutPool.Start(ctx)
-	c.pricesPool.Start(ctx)
-	c.canonicalPool.Start(ctx)
-	c.postalPool.Start(ctx)
+	if err := c.startPostalWorkflowWorker(ctx, cfg); err != nil {
+		return err
+	}
+	if err := c.startPricesWorkflowWorker(ctx, cfg); err != nil {
+		return err
+	}
+	if err := c.startFrontdoorWorkflowWorker(ctx, cfg); err != nil {
+		return err
+	}
+	if err := c.startShortcutWorkflowWorkers(ctx, cfg); err != nil {
+		return err
+	}
+	if err := c.startCanonicalWorkflowWorker(ctx, cfg); err != nil {
+		return err
+	}
+	if err := c.startCanonicalLLMWorkflowWorker(ctx, cfg); err != nil {
+		return err
+	}
 	if cfg.MaintenanceEnabled {
 		c.startMaintenance(ctx, cfg)
 	}
@@ -105,35 +126,47 @@ func (c *Consumer) Stop() {
 	if c.maintenanceCancel != nil {
 		c.maintenanceCancel()
 	}
-	if c.frontdoorPool != nil {
-		c.frontdoorPool.Stop()
+	if c.postalWorkflowCancel != nil {
+		c.postalWorkflowCancel()
 	}
-	if c.shortcutPool != nil {
-		c.shortcutPool.Stop()
+	if c.pricesWorkflowCancel != nil {
+		c.pricesWorkflowCancel()
 	}
-	if c.pricesPool != nil {
-		c.pricesPool.Stop()
+	if c.frontdoorWorkflowCancel != nil {
+		c.frontdoorWorkflowCancel()
 	}
-	if c.canonicalPool != nil {
-		c.canonicalPool.Stop()
+	if c.shortcutAPIWorkflowCancel != nil {
+		c.shortcutAPIWorkflowCancel()
 	}
-	if c.postalPool != nil {
-		c.postalPool.Stop()
+	if c.shortcutScraperWorkflowCancel != nil {
+		c.shortcutScraperWorkflowCancel()
 	}
-	if c.frontdoorPool != nil {
-		c.frontdoorPool.Wait()
+	if c.canonicalWorkflowCancel != nil {
+		c.canonicalWorkflowCancel()
 	}
-	if c.shortcutPool != nil {
-		c.shortcutPool.Wait()
+	if c.canonicalLLMWorkflowCancel != nil {
+		c.canonicalLLMWorkflowCancel()
 	}
-	if c.pricesPool != nil {
-		c.pricesPool.Wait()
+	if c.postalWorkflowDone != nil {
+		<-c.postalWorkflowDone
 	}
-	if c.canonicalPool != nil {
-		c.canonicalPool.Wait()
+	if c.pricesWorkflowDone != nil {
+		<-c.pricesWorkflowDone
 	}
-	if c.postalPool != nil {
-		c.postalPool.Wait()
+	if c.frontdoorWorkflowDone != nil {
+		<-c.frontdoorWorkflowDone
+	}
+	if c.shortcutAPIWorkflowDone != nil {
+		<-c.shortcutAPIWorkflowDone
+	}
+	if c.shortcutScraperWorkflowDone != nil {
+		<-c.shortcutScraperWorkflowDone
+	}
+	if c.canonicalWorkflowDone != nil {
+		<-c.canonicalWorkflowDone
+	}
+	if c.canonicalLLMWorkflowDone != nil {
+		<-c.canonicalLLMWorkflowDone
 	}
 	if c.maintenanceDone != nil {
 		<-c.maintenanceDone
@@ -141,24 +174,10 @@ func (c *Consumer) Stop() {
 	logging.With(c.logger, logging.Op("consumer.stop"), logging.Outcome(logging.OutcomeSuccess)).Info("consumer stopped")
 }
 
-func (c *Consumer) baseWorkerConfig() taskqueue.WorkerConfig {
-	cfg := taskqueue.DefaultWorkerConfig()
-	cfg.Logger = c.logger
-	cfg.TaskTimeout = 30 * time.Minute
-	cfg.VisibilityTimeout = 35 * time.Minute
-	return cfg
-}
-
 func (c *Consumer) startMaintenance(ctx context.Context, cfg Config) {
 	c.maintenanceOnce.Do(func() {
 		if cfg.MaintenanceInterval <= 0 {
 			cfg.MaintenanceInterval = time.Minute
-		}
-		if cfg.MaintenanceStaleAfter <= 0 {
-			cfg.MaintenanceStaleAfter = 35 * time.Minute
-		}
-		if cfg.MaintenanceBatchLimit <= 0 {
-			cfg.MaintenanceBatchLimit = 25
 		}
 		maintenanceCtx, cancel := context.WithCancel(ctx)
 		c.maintenanceCancel = cancel
@@ -169,7 +188,7 @@ func (c *Consumer) startMaintenance(ctx context.Context, cfg Config) {
 
 func (c *Consumer) runMaintenance(ctx context.Context, cfg Config) {
 	defer close(c.maintenanceDone)
-	logger := logging.With(c.logger, logging.Op("consumer.sync_job_maintenance"))
+	logger := logging.With(c.logger, logging.Op("consumer.sync_maintenance"))
 	c.runMaintenanceOnce(ctx, logger, cfg)
 	ticker := time.NewTicker(cfg.MaintenanceInterval)
 	defer ticker.Stop()
@@ -184,26 +203,6 @@ func (c *Consumer) runMaintenance(ctx context.Context, cfg Config) {
 }
 
 func (c *Consumer) runMaintenanceOnce(ctx context.Context, logger *slog.Logger, cfg Config) {
-	reaped, err := c.syncJobs.ReapStaleClaimsWithAttempts(ctx, cfg.MaintenanceStaleAfter, cfg.MaintenanceBatchLimit)
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-			return
-		}
-		logger.WarnContext(ctx, "sync job stale claim recovery failed", "error", err, "outcome", logging.OutcomeError)
-	} else if len(reaped.RecoveredJobs) > 0 || reaped.FinalizedAttempts > 0 {
-		logger.InfoContext(ctx, "sync job stale claims recovered", "jobs", len(reaped.RecoveredJobs), "attempts", reaped.FinalizedAttempts, "outcome", logging.OutcomeSuccess)
-	}
-	reconciled, err := c.syncJobs.ReconcilePendingJobs(ctx, cfg.MaintenanceBatchLimit)
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-			return
-		}
-		logger.WarnContext(ctx, "sync job pending reconciliation failed", "error", err, "outcome", logging.OutcomeError)
-		return
-	}
-	if reconciled.Scanned > 0 || reconciled.Reenqueued > 0 {
-		logger.InfoContext(ctx, "sync job pending reconciliation completed", "scanned", reconciled.Scanned, "reenqueued", reconciled.Reenqueued, "outcome", logging.OutcomeSuccess)
-	}
 	if err := c.enqueueDirtyDimensionTargetFanout(ctx); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
 			return

@@ -14,8 +14,7 @@ import (
 
 	"koditon/internal/db"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
-	syncjobs "koditon/internal/sync/jobs"
+	"koditon/internal/sync/workflows"
 )
 
 const (
@@ -53,12 +52,12 @@ type canonicalMatchRunSummary struct {
 	Ambiguous  int32
 }
 
-func (c *Consumer) handleCanonicalMatchSaleListingSourcesBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalMatchSaleListingSourcesBackfill(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_sources_backfill"))
 	payload := canonicalMatchBackfillPayload{ScoreThreshold: 95, CompetitorMargin: 10}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode canonical source match backfill payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode canonical source match backfill payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.ScoreThreshold <= 0 {
@@ -91,12 +90,12 @@ func (c *Consumer) handleCanonicalMatchSaleListingSourcesBackfill(ctx context.Co
 	return nil
 }
 
-func (c *Consumer) handleCanonicalMatchSaleListingSourcesFanout(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalMatchSaleListingSourcesFanout(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_sources_fanout"))
 	payload := canonicalMatchFanoutPayload{Limit: 5000}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode canonical source match fanout payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode canonical source match fanout payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.Limit <= 0 || payload.Limit > 5000 {
@@ -136,11 +135,11 @@ LIMIT $1`, payload.Limit)
 	return nil
 }
 
-func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalMatchSaleListingSource(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.match_sale_listing_source"))
 	payload, err := decodeCanonicalMatchSaleListingPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	row, err := c.loadCanonicalMatchSaleListing(ctx, payload.SaleListingID)
 	if err != nil {
@@ -191,7 +190,7 @@ func (c *Consumer) projectTypedHousingCompanyProfileForSaleListing(ctx context.C
 	return nil
 }
 
-func decodeCanonicalMatchSaleListingPayload(job db.SyncJob) (canonicalMatchSaleListingPayload, error) {
+func decodeCanonicalMatchSaleListingPayload(job syncJobEnvelope) (canonicalMatchSaleListingPayload, error) {
 	var payload canonicalMatchSaleListingPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -284,14 +283,11 @@ func (c *Consumer) enqueueCanonicalSourceMatchSaleListing(ctx context.Context, s
 	if err != nil {
 		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalMatchSaleListingSource,
-		EntityID:    fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalMatchSaleListingSource,
+		EntityID: fmt.Sprintf("sale_listing:%s:attempt:%d", saleListingID, attempt),
+		Payload:  payload,
 	})
 	return err
 }

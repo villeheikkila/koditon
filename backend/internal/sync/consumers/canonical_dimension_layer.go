@@ -12,8 +12,7 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
-	"koditon/internal/platform/taskqueue"
-	syncjobs "koditon/internal/sync/jobs"
+	"koditon/internal/sync/workflows"
 )
 
 const (
@@ -28,51 +27,6 @@ const (
 	TaskTypeCanonicalRebuildSpatialReadModel       = "canonical_rebuild_spatial_read_model"
 	TaskTypeCanonicalBackfillDetachedHouses        = "canonical_backfill_detached_houses"
 )
-
-func (c *Consumer) handleCanonicalTask(ctx context.Context, msg taskqueue.Message) error {
-	logger := logging.With(c.logger,
-		slog.String("task_type", msg.Data.TaskType),
-		slog.String("entity_id", msg.Data.EntityID),
-	)
-	return c.handleSyncJobTask(ctx, "canonical", logger, msg, c.runCanonicalSyncJob)
-}
-
-func (c *Consumer) runCanonicalSyncJob(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
-	switch job.SyncJobKind {
-	case TaskTypeCanonicalizeSourceAdsFanout:
-		return c.handleCanonicalizeSourceAdsFanout(ctx, logger, job)
-	case TaskTypeCanonicalizeSourceAd:
-		return c.handleCanonicalizeSourceAd(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSourcesBackfill:
-		return c.handleCanonicalMatchSaleListingSourcesBackfill(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSourcesFanout:
-		return c.handleCanonicalMatchSaleListingSourcesFanout(ctx, logger, job)
-	case TaskTypeCanonicalMatchSaleListingSource:
-		return c.handleCanonicalMatchSaleListingSource(ctx, logger, job)
-	case TaskTypeCanonicalRebuildDimensionLayerBackfill:
-		return c.handleCanonicalRebuildDimensionLayerBackfill(ctx, logger, job)
-	case TaskTypeCanonicalRebuildDimensionLayerListing:
-		return c.handleCanonicalRebuildDimensionLayerListing(ctx, logger, job)
-	case TaskTypeCanonicalResolveDirtyDimensionTargets:
-		return c.handleCanonicalResolveDirtyDimensionTargets(ctx, logger, job)
-	case TaskTypeCanonicalResolveDimensionTarget:
-		return c.handleCanonicalResolveDimensionTarget(ctx, logger, job)
-	case TaskTypeCanonicalExtractManagerCertificate:
-		return c.handleCanonicalExtractManagerCertificate(ctx, logger, job)
-	case TaskTypeCanonicalProjectManagerCertificate:
-		return c.handleCanonicalProjectManagerCertificate(ctx, logger, job)
-	case TaskTypeCanonicalBackfillTargetSources:
-		return c.handleCanonicalBackfillTargetSources(ctx, logger, job)
-	case TaskTypeCanonicalBackfillBuildingCoordinates:
-		return c.handleCanonicalBackfillBuildingCoordinates(ctx, logger, job)
-	case TaskTypeCanonicalRebuildSpatialReadModel:
-		return c.handleCanonicalRebuildSpatialReadModel(ctx, logger, job)
-	case TaskTypeCanonicalBackfillDetachedHouses:
-		return c.handleCanonicalBackfillDetachedHouses(ctx, logger, job)
-	default:
-		return taskqueue.NewPermanentError(fmt.Errorf("unknown canonical sync job kind: %s", job.SyncJobKind), "unrecognized sync job kind")
-	}
-}
 
 type dimensionLayerBackfillPayload struct {
 	BatchSize          int32  `json:"batch_size,omitempty"`
@@ -116,14 +70,14 @@ type dirtyDimensionTargetRow struct {
 	DirtyAt    time.Time
 }
 
-func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.extract_manager_certificate"))
 	if c.propertiesService == nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
+		return newPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
 	}
 	payload, err := decodeManagerCertificateDocumentPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	result, err := c.propertiesService.ExtractManagerCertificateSource(ctx, payload.PropertyDocumentID, payload.Model)
 	if err != nil {
@@ -131,7 +85,7 @@ func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context,
 	}
 	documentID, err := uuid.Parse(result.Document.ID)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("parse extracted document id: %w", err), "invalid result")
+		return newPermanentError(fmt.Errorf("parse extracted document id: %w", err), "invalid result")
 	}
 	if err := c.enqueueManagerCertificateProjection(ctx, documentID, time.Now()); err != nil {
 		return fmt.Errorf("enqueue manager certificate projection %s: %w", payload.PropertyDocumentID, err)
@@ -140,14 +94,14 @@ func (c *Consumer) handleCanonicalExtractManagerCertificate(ctx context.Context,
 	return nil
 }
 
-func (c *Consumer) handleCanonicalProjectManagerCertificate(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalProjectManagerCertificate(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.project_manager_certificate"))
 	if c.propertiesService == nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
+		return newPermanentError(fmt.Errorf("properties service is not configured"), "properties service missing")
 	}
 	payload, err := decodeManagerCertificateDocumentPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	result, err := c.propertiesService.ProjectManagerCertificateExtraction(ctx, payload.PropertyDocumentID)
 	if err != nil {
@@ -157,7 +111,7 @@ func (c *Consumer) handleCanonicalProjectManagerCertificate(ctx context.Context,
 	return nil
 }
 
-func (c *Consumer) handleCanonicalBackfillTargetSources(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalBackfillTargetSources(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.backfill_target_sources"))
 	tag, err := c.pool.Exec(ctx, `
 INSERT INTO public.property_target_sources (
@@ -208,7 +162,7 @@ ON CONFLICT (target_type, target_id, source_provider, source_kind, source_table,
 	return nil
 }
 
-func (c *Consumer) handleCanonicalBackfillBuildingCoordinates(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalBackfillBuildingCoordinates(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.backfill_building_coordinates"))
 	tag, err := c.pool.Exec(ctx, `
 UPDATE public.physical_buildings pb
@@ -248,18 +202,18 @@ WHERE pb.physical_building_id = coordinates.physical_building_id
 	return nil
 }
 
-func (c *Consumer) handleCanonicalRebuildSpatialReadModel(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalRebuildSpatialReadModel(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.rebuild_spatial_read_model"))
 	logger.InfoContext(ctx, "spatial read model is served by direct SQL", "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
-func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.backfill_detached_houses"))
 	payload := detachedHouseBackfillPayload{BatchSize: 1000}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode detached house backfill payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode detached house backfill payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.BatchSize <= 0 || payload.BatchSize > 5000 {
@@ -278,12 +232,12 @@ func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, lo
 	return nil
 }
 
-func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.rebuild_dimension_layer_backfill"))
 	payload := dimensionLayerBackfillPayload{BatchSize: 500}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode dimension layer backfill payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode dimension layer backfill payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.BatchSize <= 0 || payload.BatchSize > 5000 {
@@ -292,7 +246,7 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Cont
 	checkpoint := dimensionLayerBackfillCheckpoint{}
 	if len(job.SyncJobCheckpoint) > 0 {
 		if err := json.Unmarshal(job.SyncJobCheckpoint, &checkpoint); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode dimension layer backfill checkpoint: %w", err), "invalid checkpoint")
+			return newPermanentError(fmt.Errorf("decode dimension layer backfill checkpoint: %w", err), "invalid checkpoint")
 		}
 	}
 	var cursor *uuid.UUID
@@ -300,7 +254,7 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Cont
 	if cursorValue != "" {
 		parsed, err := uuid.Parse(cursorValue)
 		if err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("parse dimension layer checkpoint cursor: %w", err), "invalid checkpoint")
+			return newPermanentError(fmt.Errorf("parse dimension layer checkpoint cursor: %w", err), "invalid checkpoint")
 		}
 		cursor = &parsed
 	}
@@ -332,15 +286,15 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerBackfill(ctx context.Cont
 	return nil
 }
 
-func (c *Consumer) handleCanonicalRebuildDimensionLayerListing(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalRebuildDimensionLayerListing(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.rebuild_dimension_layer_listing"))
 	payload, err := decodeDimensionLayerListingPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	saleListingID, err := uuid.Parse(payload.SaleListingID)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("parse sale listing id: %w", err), "invalid payload")
+		return newPermanentError(fmt.Errorf("parse sale listing id: %w", err), "invalid payload")
 	}
 	result, err := c.rebuildDimensionLayerForListing(ctx, saleListingID, payload.ExpectedDirtyAt)
 	if err != nil {
@@ -350,12 +304,12 @@ func (c *Consumer) handleCanonicalRebuildDimensionLayerListing(ctx context.Conte
 	return nil
 }
 
-func (c *Consumer) handleCanonicalResolveDirtyDimensionTargets(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalResolveDirtyDimensionTargets(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.resolve_dirty_dimension_targets"))
 	payload := dirtyDimensionTargetsPayload{Limit: 1000}
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
-			return taskqueue.NewPermanentError(fmt.Errorf("decode dirty dimension targets payload: %w", err), "invalid payload")
+			return newPermanentError(fmt.Errorf("decode dirty dimension targets payload: %w", err), "invalid payload")
 		}
 	}
 	if payload.Limit <= 0 || payload.Limit > 5000 {
@@ -385,15 +339,15 @@ func (c *Consumer) handleCanonicalResolveDirtyDimensionTargets(ctx context.Conte
 	return nil
 }
 
-func (c *Consumer) handleCanonicalResolveDimensionTarget(ctx context.Context, logger *slog.Logger, job db.SyncJob) error {
+func (c *Consumer) handleCanonicalResolveDimensionTarget(ctx context.Context, logger *slog.Logger, job syncJobEnvelope) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.resolve_dimension_target"))
 	payload, err := decodeDirtyDimensionTargetPayload(job)
 	if err != nil {
-		return taskqueue.NewPermanentError(err, "invalid payload")
+		return newPermanentError(err, "invalid payload")
 	}
 	targetID, err := uuid.Parse(payload.TargetID)
 	if err != nil {
-		return taskqueue.NewPermanentError(fmt.Errorf("parse target id: %w", err), "invalid payload")
+		return newPermanentError(fmt.Errorf("parse target id: %w", err), "invalid payload")
 	}
 	result, err := c.queries.ResolveDimensionTarget(ctx, db.ResolveDimensionTargetParams{TargetType: payload.TargetType, TargetID: targetID, ExpectedDirtyAt: payload.ExpectedDirtyAt})
 	if err != nil {
@@ -435,13 +389,7 @@ func (c *Consumer) rebuildDimensionLayerForListing(ctx context.Context, saleList
 	if err := properties.ProjectListingRenovationEvents(ctx, c.pool, saleListingID); err != nil {
 		return nil, err
 	}
-	var result json.RawMessage
-	var err error
-	if expectedDirtyAt != nil {
-		result, err = c.queries.RebuildListingDimensionLayerAt(ctx, db.RebuildListingDimensionLayerAtParams{SaleListingID: saleListingID, ExpectedDirtyAt: expectedDirtyAt})
-	} else {
-		result, err = c.queries.RebuildListingDimensionLayer(ctx, saleListingID)
-	}
+	result, err := c.queries.RebuildListingDimensionLayerAt(ctx, db.RebuildListingDimensionLayerAtParams{SaleListingID: saleListingID, ExpectedDirtyAt: expectedDirtyAt})
 	if err != nil {
 		return nil, fmt.Errorf("rebuild listing dimension layer: %w", err)
 	}
@@ -453,14 +401,11 @@ func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListing
 	if err != nil {
 		return fmt.Errorf("marshal dimension layer listing payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalRebuildDimensionLayerListing,
-		EntityID:    fmt.Sprintf("sale_listing:%s", saleListingID),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalRebuildDimensionLayerListing,
+		EntityID: fmt.Sprintf("sale_listing:%s", saleListingID),
+		Payload:  payload,
 	})
 	return err
 }
@@ -470,14 +415,11 @@ func (c *Consumer) enqueueDimensionTarget(ctx context.Context, targetType string
 	if err != nil {
 		return fmt.Errorf("marshal dimension target payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalResolveDimensionTarget,
-		EntityID:    fmt.Sprintf("dimension_target:%s:%s", targetType, targetID),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalResolveDimensionTarget,
+		EntityID: fmt.Sprintf("dimension_target:%s:%s", targetType, targetID),
+		Payload:  payload,
 	})
 	return err
 }
@@ -487,13 +429,11 @@ func (c *Consumer) enqueueDirtyDimensionTargetFanout(ctx context.Context) error 
 	if err != nil {
 		return fmt.Errorf("marshal dirty dimension targets payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalResolveDirtyDimensionTargets,
-		EntityID:    "dimension_targets:dirty",
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalResolveDirtyDimensionTargets,
+		EntityID: "dimension_targets:dirty",
+		Payload:  payload,
 	})
 	return err
 }
@@ -503,14 +443,11 @@ func (c *Consumer) enqueueDimensionLayerBackfill(ctx context.Context, afterSaleL
 	if err != nil {
 		return fmt.Errorf("marshal dimension layer backfill payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalRebuildDimensionLayerBackfill,
-		EntityID:    fmt.Sprintf("dimension_layer_backfill:%s", afterSaleListingID),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalRebuildDimensionLayerBackfill,
+		EntityID: fmt.Sprintf("dimension_layer_backfill:%s", afterSaleListingID),
+		Payload:  payload,
 	})
 	return err
 }
@@ -520,14 +457,11 @@ func (c *Consumer) enqueueDetachedHouseBackfill(ctx context.Context, batchSize i
 	if err != nil {
 		return fmt.Errorf("marshal detached house backfill payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalBackfillDetachedHouses,
-		EntityID:    fmt.Sprintf("detached_house_backfill:%d", runAfter.UnixNano()),
-		Priority:    int32(taskqueue.PriorityLow),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalBackfillDetachedHouses,
+		EntityID: fmt.Sprintf("detached_house_backfill:%d", runAfter.UnixNano()),
+		Payload:  payload,
 	})
 	return err
 }
@@ -537,14 +471,11 @@ func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, docu
 	if err != nil {
 		return fmt.Errorf("marshal manager certificate projection payload: %w", err)
 	}
-	_, err = c.syncJobs.Enqueue(ctx, syncjobs.EnqueueRequest{
-		Provider:    "canonical",
-		Kind:        TaskTypeCanonicalProjectManagerCertificate,
-		EntityID:    fmt.Sprintf("property_document:%s", documentID),
-		Priority:    int32(taskqueue.PriorityHigh),
-		MaxAttempts: 3,
-		RunAfter:    runAfter,
-		Payload:     payload,
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnRequest{
+		Provider: "canonical",
+		Kind:     TaskTypeCanonicalProjectManagerCertificate,
+		EntityID: fmt.Sprintf("property_document:%s", documentID),
+		Payload:  payload,
 	})
 	return err
 }
@@ -582,7 +513,7 @@ func (c *Consumer) markDimensionTargetQueued(ctx context.Context, targetType str
 	return nil
 }
 
-func decodeManagerCertificateDocumentPayload(job db.SyncJob) (managerCertificateDocumentPayload, error) {
+func decodeManagerCertificateDocumentPayload(job syncJobEnvelope) (managerCertificateDocumentPayload, error) {
 	var payload managerCertificateDocumentPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -605,7 +536,7 @@ func decodeManagerCertificateDocumentPayload(job db.SyncJob) (managerCertificate
 	return payload, nil
 }
 
-func decodeDimensionLayerListingPayload(job db.SyncJob) (dimensionLayerListingPayload, error) {
+func decodeDimensionLayerListingPayload(job syncJobEnvelope) (dimensionLayerListingPayload, error) {
 	var payload dimensionLayerListingPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -628,7 +559,7 @@ func decodeDimensionLayerListingPayload(job db.SyncJob) (dimensionLayerListingPa
 	return payload, nil
 }
 
-func decodeDirtyDimensionTargetPayload(job db.SyncJob) (dirtyDimensionTargetPayload, error) {
+func decodeDirtyDimensionTargetPayload(job syncJobEnvelope) (dirtyDimensionTargetPayload, error) {
 	var payload dirtyDimensionTargetPayload
 	if len(job.SyncJobPayload) > 0 {
 		if err := json.Unmarshal(job.SyncJobPayload, &payload); err != nil {
@@ -653,10 +584,8 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (c *Consumer) updateSyncJobCheckpoint(ctx context.Context, job db.SyncJob, value any) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return
-	}
-	_ = c.syncJobs.UpdateCheckpoint(ctx, job, raw)
+func (c *Consumer) updateSyncJobCheckpoint(ctx context.Context, job syncJobEnvelope, value any) {
+	_ = ctx
+	_ = job
+	_ = value
 }

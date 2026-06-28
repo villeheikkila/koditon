@@ -8,63 +8,67 @@ import (
 	"strings"
 	"time"
 
-	"koditon/internal/platform/taskqueue"
-	syncjobs "koditon/internal/sync/jobs"
+	"koditon/internal/sync/workflows"
 )
 
-func enqueueAndWatchSyncJobs(ctx context.Context, app *appContext, report reportFn, jobs []syncjobs.EnqueueRequest) (actionResult, error) {
-	if app.syncJobs == nil {
-		return actionResult{}, fmt.Errorf("sync job store unavailable")
+type enqueuedSyncWork struct {
+	tasks []workflows.EnqueueResult
+}
+
+func enqueueAndWatchSyncJobs(ctx context.Context, app *appContext, report reportFn, jobs []workflows.SpawnRequest) (actionResult, error) {
+	if app.workflowStore == nil {
+		return actionResult{}, fmt.Errorf("sync workflow store unavailable")
 	}
 	if len(jobs) == 0 {
 		return actionResult{Output: "no sync jobs enqueued"}, nil
 	}
-	enqueued := make([]syncjobs.EnqueueResult, 0, len(jobs))
+	enqueued := enqueuedSyncWork{tasks: make([]workflows.EnqueueResult, 0, len(jobs))}
 	for _, job := range jobs {
-		if job.Priority == 0 {
-			job.Priority = int32(taskqueue.PriorityNormal)
-		}
 		if job.MaxAttempts == 0 {
 			job.MaxAttempts = 3
 		}
-		result, err := app.syncJobs.Enqueue(ctx, job)
+		if !workflows.IsImplemented(job.Provider, job.Kind) {
+			return actionResult{}, fmt.Errorf("sync kind %q is not implemented for provider %q", job.Kind, job.Provider)
+		}
+		result, err := app.workflowStore.Enqueue(ctx, job)
 		if err != nil {
 			return actionResult{}, err
 		}
-		enqueued = append(enqueued, result)
+		enqueued.tasks = append(enqueued.tasks, result)
 	}
-	report(progressUpdate{Message: fmt.Sprintf("Queued %d sync job(s)", len(enqueued)), Current: 0, Total: len(enqueued)})
+	total := len(enqueued.tasks)
+	report(progressUpdate{Message: fmt.Sprintf("Queued %d sync task(s)", total), Current: 0, Total: total})
 	return watchSyncJobs(ctx, app, report, enqueued)
 }
 
-func watchSyncJobs(ctx context.Context, app *appContext, report reportFn, enqueued []syncjobs.EnqueueResult) (actionResult, error) {
+func watchSyncJobs(ctx context.Context, app *appContext, report reportFn, enqueued enqueuedSyncWork) (actionResult, error) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	last := make(map[string]string, len(enqueued))
+	total := len(enqueued.tasks)
+	last := make(map[string]string, total)
 	for {
 		done := 0
 		var failed []string
-		for _, result := range enqueued {
-			snapshot, err := app.syncJobs.GetSnapshot(ctx, result.Job.SyncJobID)
+		for _, result := range enqueued.tasks {
+			snapshot, err := app.workflowStore.GetSnapshot(ctx, result.TaskID)
 			if err != nil {
 				return actionResult{}, err
 			}
-			job := snapshot.Job
-			statusLine := syncJobStatusLine(snapshot)
-			key := job.SyncJobID.String()
+			statusLine := syncTaskStatusLine(snapshot)
+			key := result.TaskID
 			if last[key] != statusLine {
-				report(progressUpdate{Message: statusLine, Current: done, Total: len(enqueued)})
+				report(progressUpdate{Message: statusLine, Current: done, Total: total})
 				last[key] = statusLine
 			}
-			if isFinalSyncJobStatus(job.SyncJobStatus) {
+			if snapshot.IsTerminal() {
 				done++
-				if job.SyncJobStatus != syncjobs.StatusSucceeded && job.SyncJobStatus != syncjobs.StatusNoop {
-					failed = append(failed, fmt.Sprintf("%s %s/%s: %s", job.SyncJobStatus, job.SyncJobKind, job.SyncJobEntityID, stringValue(job.SyncJobLastError)))
+				if snapshot.State != "completed" {
+					failed = append(failed, fmt.Sprintf("%s %s/%s: %s", snapshot.State, result.Kind, result.EntityID, string(snapshot.Failure)))
 				}
 			}
 		}
-		if done == len(enqueued) {
-			output := fmt.Sprintf("sync_jobs=%d completed=%d failed=%d", len(enqueued), done, len(failed))
+		if done == total {
+			output := fmt.Sprintf("sync_tasks=%d completed=%d failed=%d", total, done, len(failed))
 			if len(failed) > 0 {
 				return actionResult{Output: output}, errors.New(strings.Join(failed, "\n"))
 			}
@@ -78,17 +82,16 @@ func watchSyncJobs(ctx context.Context, app *appContext, report reportFn, enqueu
 	}
 }
 
-func syncJobStatusLine(snapshot syncjobs.JobSnapshot) string {
-	job := snapshot.Job
-	parts := []string{fmt.Sprintf("%s %s %s", job.SyncJobStatus, job.SyncJobKind, job.SyncJobEntityID)}
-	if len(job.SyncJobCheckpoint) > 0 {
-		parts = append(parts, "checkpoint="+compactJSON(job.SyncJobCheckpoint))
+func syncTaskStatusLine(snapshot workflows.Snapshot) string {
+	parts := []string{fmt.Sprintf("%s %s", snapshot.State, snapshot.TaskID)}
+	if snapshot.Queue != "" {
+		parts = append(parts, "queue="+snapshot.Queue)
 	}
-	if job.SyncJobLastError != nil {
-		parts = append(parts, "error="+*job.SyncJobLastError)
+	if len(snapshot.Result) > 0 {
+		parts = append(parts, "result="+compactJSON(snapshot.Result))
 	}
-	if len(snapshot.Attempts) > 0 {
-		parts = append(parts, fmt.Sprintf("attempt=%d/%d", snapshot.Attempts[0].SyncJobAttemptNo, job.SyncJobMaxAttempts))
+	if len(snapshot.Failure) > 0 {
+		parts = append(parts, "failure="+compactJSON(snapshot.Failure))
 	}
 	return strings.Join(parts, " ")
 }
@@ -106,20 +109,4 @@ func compactJSON(raw json.RawMessage) string {
 		return string(raw)
 	}
 	return string(compact)
-}
-
-func isFinalSyncJobStatus(status string) bool {
-	switch status {
-	case syncjobs.StatusSucceeded, syncjobs.StatusFailed, syncjobs.StatusNotFound, syncjobs.StatusNoop, syncjobs.StatusSkippedLock:
-		return true
-	default:
-		return false
-	}
-}
-
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }
