@@ -1293,8 +1293,15 @@ source_links AS (
         sl.sale_listing_native_id AS source_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
         COALESCE(sl.sale_listing_url, '') AS url,
+        CASE
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
+            ELSE false
+        END AS external_url_available,
         sl.sale_listing_last_seen_at AS last_seen_at
     FROM linked_listings sl
+    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1303,6 +1310,7 @@ source_links AS (
         sb.shortcut_building_external_id::text AS source_id,
         COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
         sb.shortcut_building_url AS url,
+        COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
         COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
     FROM linked_listings sl
     JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
@@ -1315,12 +1323,13 @@ source_links AS (
         fb.frontdoor_building_id::text AS source_id,
         COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
         fb.frontdoor_building_url AS url,
+        COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         fb.frontdoor_building_last_seen_at AS last_seen_at
     FROM linked_listings sl
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
-SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), last_seen_at
+SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
 ORDER BY label, provider, last_seen_at DESC NULLS LAST, title`, offeringID)
 	if err != nil {
@@ -1329,7 +1338,7 @@ ORDER BY label, provider, last_seen_at DESC NULLS LAST, title`, offeringID)
 	defer rows.Close()
 	for rows.Next() {
 		var link TargetSourceLink
-		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
 			return err
 		}
 		overview.Sources = append(overview.Sources, link)
@@ -1356,8 +1365,15 @@ source_links AS (
         sl.sale_listing_native_id AS source_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
         COALESCE(sl.sale_listing_url, '') AS url,
+        CASE
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
+            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
+            ELSE false
+        END AS external_url_available,
         sl.sale_listing_last_seen_at AS last_seen_at
     FROM linked_listings sl
+    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1366,6 +1382,7 @@ source_links AS (
         sb.shortcut_building_external_id::text AS source_id,
         COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
         sb.shortcut_building_url AS url,
+        COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
         COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
     FROM linked_listings sl
     JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
@@ -1378,12 +1395,13 @@ source_links AS (
         fb.frontdoor_building_id::text AS source_id,
         COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
         fb.frontdoor_building_url AS url,
+        COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         fb.frontdoor_building_last_seen_at AS last_seen_at
     FROM linked_listings sl
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
-SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), last_seen_at
+SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
 ORDER BY label, provider, last_seen_at DESC NULLS LAST, title
 LIMIT 500`, housingCompanyID)
@@ -1393,7 +1411,7 @@ LIMIT 500`, housingCompanyID)
 	defer rows.Close()
 	for rows.Next() {
 		var link TargetSourceLink
-		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.Label, &link.Provider, &link.Kind, &link.SourceID, &link.Title, &link.URL, &link.ExternalURLAvailable, &link.LastSeenAt); err != nil {
 			return err
 		}
 		overview.Sources = append(overview.Sources, link)
