@@ -2,6 +2,7 @@ package ads
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -408,5 +409,21 @@ func TestRawTransactionScope(t *testing.T) {
 				t.Fatalf("expected scope %s, got %s", tt.want, got)
 			}
 		})
+	}
+}
+
+func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
+	for _, want := range []string{
+		"'offering_source'::text AS match_type",
+		"pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text AS id",
+		"JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id",
+		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id",
+	} {
+		if !strings.Contains(addressRawTransactionsSQL, want) {
+			t.Fatalf("expected raw transaction SQL to include %q", want)
+		}
+	}
+	if strings.Contains(addressRawTransactionsSQL, "primary_listing.sale_listing_canonical_id") {
+		t.Fatal("expected raw transaction matches to use offering source rows instead of only the primary listing")
 	}
 }

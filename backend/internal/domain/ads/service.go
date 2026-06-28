@@ -1679,21 +1679,22 @@ SELECT
                 WHERE sl.prices_transaction_id = pt.prices_transaction_id
                 UNION ALL
                 SELECT
-                    'offering'::text AS match_type,
-                    po.property_offering_id::text AS id,
-                    COALESCE(primary_listing.sale_listing_canonical_id, '') AS canonical_id,
-                    COALESCE(primary_listing.sale_listing_source_provider, '') AS source,
-                    COALESCE(primary_listing.sale_listing_native_id, '') AS native_id,
-                    COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, po.property_offering_identity_key) AS headline,
-                    COALESCE(primary_listing.sale_listing_street_address, '') AS address,
-                    COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, '') AS city,
-                    COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, '') AS postal,
+                    'offering_source'::text AS match_type,
+                    pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text AS id,
+                    sl.sale_listing_canonical_id AS canonical_id,
+                    sl.sale_listing_source_provider AS source,
+                    sl.sale_listing_native_id AS native_id,
+                    COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
+                    COALESCE(sl.sale_listing_street_address, '') AS address,
+                    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
+                    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
                     pot.property_offering_transaction_link_status AS status,
                     pot.property_offering_transaction_link_method AS method,
                     pot.property_offering_transaction_link_score AS score
                 FROM public.property_offering_transactions pot
-                JOIN public.property_offerings po ON po.property_offering_id = pot.property_offering_id
-                LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+                JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id
+                    AND pos.property_offering_source_link_status <> 'rejected'
+                JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
                 WHERE pot.prices_transaction_id = pt.prices_transaction_id
                     AND pot.property_offering_transaction_link_status <> 'rejected'
                 LIMIT 8
