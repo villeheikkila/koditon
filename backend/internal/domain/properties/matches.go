@@ -70,7 +70,7 @@ review_rows AS (
     FROM latest_candidates c
     UNION ALL
     SELECT
-        pot.property_offering_transaction_id::text,
+        pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text,
         pot.property_offering_transaction_link_status,
         'offering'::text,
         pot.property_offering_transaction_link_method,

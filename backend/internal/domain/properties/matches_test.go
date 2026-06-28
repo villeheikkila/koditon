@@ -32,6 +32,7 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 		"'offering'::text",
 		"'direct'::text",
 		"FROM public.property_offering_transactions pot",
+		"pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text",
 		"JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id",
 		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id",
 		"pot.prices_transaction_id = $3::uuid",
