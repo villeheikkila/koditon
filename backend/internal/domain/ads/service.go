@@ -406,6 +406,16 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 		return AddressLookupResult{}, fmt.Errorf("address is required")
 	}
 	queryAddress, city, postal := normalizeAddressLookupInput(address, params.City, params.Postal)
+	if city == "" && postal != "" {
+		resolvedCity, err := s.lookupPostalCity(ctx, postal)
+		if err != nil {
+			return AddressLookupResult{}, err
+		}
+		if stripped := stripTrailingAddressCity(queryAddress, resolvedCity); stripped != queryAddress {
+			queryAddress = stripped
+			city = resolvedCity
+		}
+	}
 	source := normalizeSource(params.Source)
 	limit := params.PageSize
 	if limit <= 0 || limit > 100 {
@@ -1856,6 +1866,50 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 		}
 	}
 	return queryAddress, queryCity, queryPostal
+}
+
+func (s *Service) lookupPostalCity(ctx context.Context, postal string) (string, error) {
+	normalizedPostal := strings.TrimSpace(postal)
+	if normalizedPostal == "" {
+		return "", nil
+	}
+	var city string
+	err := s.db.QueryRow(ctx, `
+SELECT COALESCE(pm.postal_municipality_name_fi, '')
+FROM public.postal_postal_codes ppc
+JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+WHERE ppc.postal_postal_code_code = public.fnc__normalize_postal($1::text)
+ORDER BY pm.postal_municipality_name_fi
+LIMIT 1`, normalizedPostal).Scan(&city)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("lookup postal city: %w", err)
+	}
+	return strings.TrimSpace(city), nil
+}
+
+func stripTrailingAddressCity(address, city string) string {
+	trimmedAddress := strings.TrimSpace(address)
+	trimmedCity := strings.TrimSpace(city)
+	if trimmedAddress == "" || trimmedCity == "" {
+		return trimmedAddress
+	}
+	addressFields := strings.Fields(trimmedAddress)
+	cityFields := strings.Fields(trimmedCity)
+	if len(addressFields) <= len(cityFields) {
+		return trimmedAddress
+	}
+	addressTail := strings.Join(addressFields[len(addressFields)-len(cityFields):], " ")
+	if foldAddressText(addressTail) != foldAddressText(trimmedCity) {
+		return trimmedAddress
+	}
+	return strings.Join(addressFields[:len(addressFields)-len(cityFields)], " ")
+}
+
+func foldAddressText(value string) string {
+	return strings.NewReplacer("å", "a", "ä", "a", "ö", "o").Replace(strings.ToLower(strings.TrimSpace(value)))
 }
 
 func applyPastedPostalCity(value, city, postal string) (string, string) {
