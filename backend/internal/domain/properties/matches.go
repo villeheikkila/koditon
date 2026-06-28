@@ -82,8 +82,9 @@ review_rows AS (
         sl.sale_listing_id,
         pot.prices_transaction_id
     FROM public.property_offering_transactions pot
-    JOIN public.property_offerings po ON po.property_offering_id = pot.property_offering_id
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
+    JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id
+        AND pos.property_offering_source_link_status <> 'rejected'
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
     WHERE $3::uuid IS NOT NULL
         AND pot.property_offering_transaction_link_status <> 'rejected'
         AND pot.prices_transaction_id = $3::uuid
@@ -118,8 +119,9 @@ review_rows AS (
         AND NOT EXISTS (
             SELECT 1
             FROM public.property_offering_transactions pot
-            JOIN public.property_offerings po ON po.property_offering_id = pot.property_offering_id
-            WHERE po.primary_sale_listing_id = sl.sale_listing_id
+            JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id
+                AND pos.property_offering_source_link_status <> 'rejected'
+            WHERE pos.sale_listing_id = sl.sale_listing_id
                 AND pot.prices_transaction_id = sl.prices_transaction_id
                 AND pot.property_offering_transaction_link_status <> 'rejected'
         )
