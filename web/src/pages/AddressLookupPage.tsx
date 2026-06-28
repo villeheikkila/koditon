@@ -30,7 +30,7 @@ export default function AddressLookupPage() {
   const sourceCandidateCount = listings.reduce((count, listing) => count + (listing.source_candidates?.length ?? 0), 0)
   const offeringCount = offerings.length || new Set(listings.map(listing => listing.offering_id).filter(Boolean)).size
   const rawListings = viewMode === 'grouped' ? listings.filter(listing => !listing.offering_id) : listings
-  const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source } : undefined
+  const reviewLookup = body ? { address: body.address, city: body.city, postal: body.postal, source: body.source, pageSize: lookupParams?.page_size } : undefined
   function showMoreListings() {
     const next = new URLSearchParams(urlParams)
     next.set('page_size', '100')

@@ -2,13 +2,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useTransactionMatchCandidates, type TransactionMatchCandidate } from '../api/koditon'
-import { buildAddressLookupPath, sourceEntityPath, withAddressLookupContext, type AddressLookupInput } from '../lib/address-lookup'
+import { addressLookupInputFromParams, appendAddressLookupParams, buildAddressLookupPath, sourceEntityPath, withAddressLookupContext, type AddressLookupInput } from '../lib/address-lookup'
 
 export default function MatchesPage() {
   const [params] = useSearchParams()
   const transaction = params.get('transaction')?.trim() ?? ''
   const postal = params.get('postal')?.trim() ?? ''
-  const lookup = { address: params.get('lookup_address'), city: params.get('lookup_city'), postal: params.get('lookup_postal'), source: params.get('lookup_source') }
+  const lookup = addressLookupInputFromParams(params)
   const addressBackPath = buildAddressLookupPath(lookup) || '/address'
   const query = useTransactionMatchCandidates(
     { transaction: transaction || undefined, postal: transaction ? undefined : postal || undefined, limit: transaction ? 50 : 100 },
@@ -165,10 +165,7 @@ function transactionReviewPath(candidate: TransactionMatchCandidate, lookup: Add
   const params = new URLSearchParams()
   if (candidate.listing.postal) params.set('postal', candidate.listing.postal)
   params.set('transaction', candidate.transaction.id)
-  if (lookup.address?.trim()) params.set('lookup_address', lookup.address.trim())
-  if (lookup.city?.trim()) params.set('lookup_city', lookup.city.trim())
-  if (lookup.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
-  if (lookup.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
+  appendAddressLookupParams(params, lookup)
   return `/matches?${params.toString()}`
 }
 

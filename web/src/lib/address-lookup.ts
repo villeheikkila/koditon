@@ -5,6 +5,7 @@ export type AddressLookupInput = {
   city?: string | null
   postal?: string | null
   source?: string | null
+  pageSize?: number | string | null
 }
 
 export type SourceEntityInput = {
@@ -21,6 +22,8 @@ export function buildAddressLookupPath(input: AddressLookupInput) {
   if (input.postal?.trim()) params.set('postal', input.postal.trim())
   const source = input.source?.trim()
   if (source && source !== 'all') params.set('source', source)
+  const pageSize = normalizeLookupPageSize(input.pageSize)
+  if (pageSize && pageSize !== 50) params.set('page_size', String(pageSize))
   return `/address?${params.toString()}`
 }
 
@@ -30,6 +33,7 @@ export function addressLookupInputFromParams(params: URLSearchParams): AddressLo
     city: params.get('lookup_city'),
     postal: params.get('lookup_postal'),
     source: params.get('lookup_source'),
+    pageSize: params.get('lookup_page_size'),
   }
 }
 
@@ -38,6 +42,8 @@ export function appendAddressLookupParams(params: URLSearchParams, lookup?: Addr
   if (lookup?.city?.trim()) params.set('lookup_city', lookup.city.trim())
   if (lookup?.postal?.trim()) params.set('lookup_postal', lookup.postal.trim())
   if (lookup?.source?.trim() && lookup.source !== 'all') params.set('lookup_source', lookup.source.trim())
+  const pageSize = normalizeLookupPageSize(lookup?.pageSize)
+  if (pageSize && pageSize !== 50) params.set('lookup_page_size', String(pageSize))
 }
 
 export function withAddressLookupContext(path: string, lookup?: AddressLookupInput) {
@@ -78,6 +84,12 @@ function overviewFieldValue(fields: TargetOverviewField[], ...labels: string[]) 
 
 function normalizeFieldLabel(value: string) {
   return value.trim().toLowerCase().replaceAll('_', ' ')
+}
+
+function normalizeLookupPageSize(value: number | string | null | undefined) {
+  const number = Number(value)
+  if (number === 25 || number === 50 || number === 100) return number
+  return undefined
 }
 
 function canonicalKind(canonicalId: string) {
