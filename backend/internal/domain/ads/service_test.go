@@ -521,3 +521,20 @@ func TestAddressSourceCandidatesAreCappedPerSelectedListing(t *testing.T) {
 		t.Fatal("expected source candidate SQL to avoid a global first-100 cap")
 	}
 }
+
+func TestAddressRawTransactionsKeepLookupLinksOutsideHistoryCap(t *testing.T) {
+	for _, want := range []string{
+		"WITH raw_transactions",
+		"postal_history_rank",
+		"row_number() OVER (ORDER BY pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC) AS postal_history_rank",
+		"WHERE linked_to_lookup OR candidate_to_lookup OR postal_history_rank <= $5::int",
+		"ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, created_at DESC, price ASC",
+	} {
+		if !strings.Contains(addressRawTransactionsSQL, want) {
+			t.Fatalf("expected raw transaction SQL to include %q", want)
+		}
+	}
+	if strings.Contains(addressRawTransactionsSQL, "LIMIT $5::int") {
+		t.Fatal("expected raw transaction SQL to avoid a global limit that can hide lookup links")
+	}
+}

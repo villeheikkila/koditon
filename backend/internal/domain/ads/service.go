@@ -1620,6 +1620,34 @@ ORDER BY latest.selected_sale_listing_id, latest.property_offering_source_match_
 LIMIT 250`
 
 const addressRawTransactionsSQL = `
+WITH raw_transactions (
+    transaction_id,
+    description,
+    type,
+    category,
+    area,
+    price,
+    price_per_square_meter,
+    build_year,
+    floor,
+    elevator,
+    condition,
+    plot,
+    energy_class,
+    period_identifier,
+    city,
+    neighborhood,
+    postal,
+    created_at,
+    updated_at,
+    is_matched,
+    linked_to_lookup,
+    candidate_to_lookup,
+    matched_listing_count,
+    matched_offering_count,
+    matches,
+    postal_history_rank
+) AS (
 SELECT
     pt.prices_transaction_id,
     COALESCE(pt.prices_transaction_description, ''),
@@ -1728,7 +1756,8 @@ SELECT
             ) match
         ),
         '[]'::jsonb
-    ) AS matches
+    ) AS matches,
+    row_number() OVER (ORDER BY pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC) AS postal_history_rank
 FROM public.prices_transactions pt
 JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
@@ -1739,8 +1768,36 @@ LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_id = pn.price
 LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(COALESCE(pc.prices_city_name, pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
     AND (trim($2::text) = '' OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code, '') = public.fnc__normalize_postal($2::text))
-ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC
-LIMIT $5::int`
+)
+SELECT
+    transaction_id,
+    description,
+    type,
+    category,
+    area,
+    price,
+    price_per_square_meter,
+    build_year,
+    floor,
+    elevator,
+    condition,
+    plot,
+    energy_class,
+    period_identifier,
+    city,
+    neighborhood,
+    postal,
+    created_at,
+    updated_at,
+    is_matched,
+    linked_to_lookup,
+    candidate_to_lookup,
+    matched_listing_count,
+    matched_offering_count,
+    matches
+FROM raw_transactions
+WHERE linked_to_lookup OR candidate_to_lookup OR postal_history_rank <= $5::int
+ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, created_at DESC, price ASC`
 
 // shortcutAdPrefixes are URL path prefixes that identify shortcut ad pages.
 var shortcutAdPrefixes = []string{
