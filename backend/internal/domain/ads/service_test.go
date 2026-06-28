@@ -96,7 +96,7 @@ func TestNormalizeAddressLookupInputParsesAddressWithPostalOnly(t *testing.T) {
 
 func TestDecodeRawTransactionMatches(t *testing.T) {
 	score := int32(128)
-	matches, err := decodeRawTransactionMatches(json.RawMessage(`[{"type":"listing","id":"11111111-1111-1111-1111-111111111111","canonical_id":"frontdoor:ad:1","source":"frontdoor","native_id":"1","headline":"Askvägen 4","status":"auto_linked","score":128},{"type":"offering","id":"22222222-2222-2222-2222-222222222222","canonical_id":"shortcut:ad:2","source":"shortcut","native_id":"2","headline":"Askvägen 4 B","status":"auto_linked","method":"offering_source_listing","score":91}]`))
+	matches, err := decodeRawTransactionMatches(json.RawMessage(`[{"type":"listing","id":"11111111-1111-1111-1111-111111111111","canonical_id":"frontdoor:ad:1","source":"frontdoor","native_id":"1","headline":"Askvägen 4","status":"auto_linked","score":128},{"type":"offering_source","id":"22222222-2222-2222-2222-222222222222:33333333-3333-3333-3333-333333333333","canonical_id":"shortcut:ad:2","source":"shortcut","native_id":"2","headline":"Askvägen 4 B","status":"auto_linked","method":"offering_source_listing","score":91}]`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestDecodeRawTransactionMatches(t *testing.T) {
 		t.Fatalf("unexpected match: %+v", match)
 	}
 	offering := matches[1]
-	if offering.Type != "offering" || offering.ID != "22222222-2222-2222-2222-222222222222" || offering.Method != "offering_source_listing" || offering.Score == nil || *offering.Score != 91 {
+	if offering.Type != "offering_source" || offering.ID != "22222222-2222-2222-2222-222222222222:33333333-3333-3333-3333-333333333333" || offering.CanonicalID != "shortcut:ad:2" || offering.Method != "offering_source_listing" || offering.Score == nil || *offering.Score != 91 {
 		t.Fatalf("unexpected offering match: %+v", offering)
 	}
 	empty, err := decodeRawTransactionMatches(json.RawMessage(`null`))
