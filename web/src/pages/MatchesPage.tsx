@@ -114,7 +114,8 @@ function MatchCard({ candidate, lookup, currentTransaction }: { candidate: Trans
           <span className="matches-column-title">Match evidence</span>
           <DetailRows rows={[
             ['Score', candidate.score],
-            ['Link', [candidate.link_type, candidate.link_method].filter(Boolean).join(' / ')],
+            ['Link', [formatLinkType(candidate.link_type), formatLinkMethod(candidate.link_method)].filter(Boolean).join(' / ')],
+            ['Status', formatLinkStatus(candidate.status)],
             ['Confidence', candidate.confidence],
             ['Source ID', sourceIdentity(candidate.listing.source_provider, candidate.listing.native_id)],
             ['Delta', formatPercent(candidate.price_delta_percent)],
@@ -135,7 +136,29 @@ function MatchCard({ candidate, lookup, currentTransaction }: { candidate: Trans
 }
 
 function isLinkedReviewRow(candidate: TransactionMatchCandidate) {
-  return candidate.link_type === 'direct' || candidate.link_type === 'offering' || candidate.status === 'linked' || candidate.status === 'auto_linked'
+  return candidate.link_type === 'direct' || candidate.link_type === 'offering' || candidate.link_type === 'source_record' || candidate.status === 'linked' || candidate.status === 'auto_linked'
+}
+
+function formatLinkMethod(value?: string) {
+  return value?.trim().replaceAll('_', ' ') ?? ''
+}
+
+function formatLinkType(value?: string) {
+  const normalized = value?.trim()
+  if (normalized === 'direct') return 'Direct source'
+  if (normalized === 'offering') return 'Offering'
+  if (normalized === 'source_record') return 'Offering source'
+  if (normalized === 'candidate') return 'Candidate'
+  return formatLinkMethod(normalized)
+}
+
+function formatLinkStatus(value?: string) {
+  const normalized = value?.trim()
+  if (normalized === 'auto_linked') return 'Auto linked'
+  if (normalized === 'linked') return 'Linked'
+  if (normalized === 'candidate') return 'Candidate'
+  if (normalized === 'ambiguous') return 'Ambiguous'
+  return formatLinkMethod(normalized)
 }
 
 function transactionReviewPath(candidate: TransactionMatchCandidate, lookup: AddressLookupInput) {
