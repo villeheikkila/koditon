@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useAddressLookup, type AddressListing, type AddressRawTransaction, type AddressSourceCandidate, type AddressSourceRecord, type AddressTransactionLink } from '../api/koditon'
 import { buildAddressLookupPath, sourceEntityPath, type AddressLookupInput } from '../lib/address-lookup'
@@ -204,7 +205,7 @@ function ListingCard({ listing, lookup }: { listing: AddressListing; lookup?: Ad
         {listing.offering_id && <Link to={`/target/offering/${listing.offering_id}`}>Canonical offering</Link>}
         {sourcePath && <Link to={sourcePath}>Source detail</Link>}
         {postalReviewPath && <Link to={postalReviewPath}>Review postal candidates</Link>}
-        {listing.external_url_available && listing.url && <a href={listing.url} target="_blank" rel="noreferrer">Live source page</a>}
+        <LiveSourceLink available={listing.external_url_available} url={listing.url} />
       </div>
       {linkedTransactions.length > 0 && <TransactionTable title="Connected prices" transactions={linkedTransactions} sourceRecords={transactionSources} lookup={lookup} />}
       {candidateTransactions.length > 0 && <TransactionTable title="Candidate prices matches" transactions={candidateTransactions} sourceRecords={transactionSources} lookup={lookup} variant="candidate" />}
@@ -259,7 +260,7 @@ function SourceCandidateList({ candidates }: { candidates: AddressSourceCandidat
               {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
               {candidate.candidate_offering_id && <Link to={`/target/offering/${candidate.candidate_offering_id}`}>Candidate offering</Link>}
               {sourcePath && <Link to={sourcePath}>Source detail</Link>}
-              {candidate.external_url_available && candidate.url && <a href={candidate.url} target="_blank" rel="noreferrer">Live source page</a>}
+              <LiveSourceLink available={candidate.external_url_available} url={candidate.url} />
             </div>
           </div>
         )
@@ -294,7 +295,7 @@ function SourceRecordList({ records }: { records: AddressSourceRecord[] }) {
               {record.previous_asking_price != null && record.previous_asking_price !== record.asking_price && <span>Was {formatEUR(record.previous_asking_price)}</span>}
               {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
               {sourcePath && <Link to={sourcePath}>Source detail</Link>}
-              {record.external_url_available && record.url && <a href={record.url} target="_blank" rel="noreferrer">Live source page</a>}
+              <LiveSourceLink available={record.external_url_available} url={record.url} />
             </div>
             <SourceTexts texts={record.texts} compact />
           </div>

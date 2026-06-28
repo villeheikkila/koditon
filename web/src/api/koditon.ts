@@ -1181,7 +1181,7 @@ export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatus
 
 
 /**
- * Returns source listings for an address with direct prices links, canonical offering links, and current match candidates.
+ * Returns source listings for an address with connected prices links, raw prices history, source-specific offering matches, and current match candidates.
  * @summary Lookup listings and price links by address
  */
 export type addressLookupResponse200 = {

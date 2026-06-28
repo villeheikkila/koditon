@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import { useEntityDetail, type DetailFieldOutput, type EntityDetailOutputBody } from '../api/koditon'
 import { buildAddressLookupPath } from '../lib/address-lookup'
@@ -22,7 +23,7 @@ export default function SourceEntityPage({ kind }: { kind: SourceEntityKind }) {
           </div>
           <div className="source-entity-actions">
             {lookupPath && <Link to={lookupPath}>Address lookup</Link>}
-            {detail?.external_url_available && detail.url && <a href={detail.url} target="_blank" rel="noreferrer">Live source page</a>}
+            <LiveSourceLink available={detail?.external_url_available} url={detail?.url} />
           </div>
         </header>
         {detailQuery.isLoading && <div className="loading-state">Loading source detail</div>}

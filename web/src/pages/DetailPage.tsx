@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import LiveSourceLink from '../components/LiveSourceLink'
 import Nav from '../components/Nav'
 import {
   usePropertyDocumentsManagerCertificatesUpload,
@@ -181,7 +182,7 @@ function SourceLink({ source, index }: { source: NonNullable<TargetOverview['sou
       <small>{[source.external_id || source.source_id, formatDate(source.last_seen_at)].filter(Boolean).join(' / ')}</small>
       <div className="target-source-actions">
         {detailPath && <Link to={detailPath}>Source detail</Link>}
-        {source.external_url_available && source.url && <a href={source.url} target="_blank" rel="noreferrer">Live source page</a>}
+        <LiveSourceLink available={source.external_url_available} url={source.url} />
       </div>
     </div>
   )
