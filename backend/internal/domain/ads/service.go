@@ -1913,7 +1913,7 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 			queryAddress = street
 		}
 		queryCity, queryPostal = applyPastedPostalCity(rest, queryCity, queryPostal)
-		return queryAddress, queryCity, queryPostal
+		return finalizeAddressLookupInput(queryAddress, queryCity, queryPostal)
 	}
 	if matches := pastedAddressPostalCityRE.FindStringSubmatch(queryAddress); matches != nil {
 		if strings.TrimSpace(matches[1]) != "" {
@@ -1925,7 +1925,7 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 		if queryCity == "" {
 			queryCity = strings.TrimSpace(matches[3])
 		}
-		return queryAddress, queryCity, queryPostal
+		return finalizeAddressLookupInput(queryAddress, queryCity, queryPostal)
 	}
 	if matches := pastedAddressPostalRE.FindStringSubmatch(queryAddress); matches != nil {
 		if strings.TrimSpace(matches[1]) != "" {
@@ -1935,7 +1935,14 @@ func normalizeAddressLookupInput(address, city, postal string) (string, string, 
 			queryPostal = strings.TrimSpace(matches[2])
 		}
 	}
-	return queryAddress, queryCity, queryPostal
+	return finalizeAddressLookupInput(queryAddress, queryCity, queryPostal)
+}
+
+func finalizeAddressLookupInput(address, city, postal string) (string, string, string) {
+	if city != "" {
+		address = stripTrailingAddressCity(address, []string{city})
+	}
+	return address, city, postal
 }
 
 func (s *Service) lookupPostalCities(ctx context.Context, postal string) (string, []string, error) {

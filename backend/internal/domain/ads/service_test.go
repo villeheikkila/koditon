@@ -192,6 +192,19 @@ func TestNormalizeAddressLookupInputPreservesExplicitFilters(t *testing.T) {
 	}
 }
 
+func TestNormalizeAddressLookupInputStripsExplicitCityFromAddress(t *testing.T) {
+	address, city, postal := normalizeAddressLookupInput("Rieväkatu 8 A Tampere", "Tampere", "33540")
+	if address != "Rieväkatu 8 A" {
+		t.Fatalf("expected street address, got %s", address)
+	}
+	if city != "Tampere" {
+		t.Fatalf("expected city Tampere, got %s", city)
+	}
+	if postal != "33540" {
+		t.Fatalf("expected postal 33540, got %s", postal)
+	}
+}
+
 func TestBuildAddressLookupResultGroupsListingsAndDeduplicatesTransactions(t *testing.T) {
 	listingID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	offeringID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
