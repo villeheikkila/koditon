@@ -265,3 +265,33 @@ run = "npm run preview"
 description = "Generate API client with Orval"
 dir = "{{config_root}}/web"
 run = "npm run generate"
+
+[tasks."mcp:dev"]
+description = "Watch and rebuild the MCP server and app resources"
+dir = "{{config_root}}/mcp"
+run = "npm run dev"
+
+[tasks."mcp:dev:app"]
+description = "Watch and rebuild the MCP App HTML resource"
+dir = "{{config_root}}/mcp"
+run = "npm run dev:app"
+
+[tasks."mcp:dev:server"]
+description = "Watch and rebuild the MCP stdio server"
+dir = "{{config_root}}/mcp"
+run = "npm run dev:server"
+
+[tasks."mcp:serve"]
+description = "Run the built MCP stdio server"
+dir = "{{config_root}}/mcp"
+run = "npm run dev:mcp"
+
+[tasks."mcp:build"]
+description = "Build the TypeScript MCP server"
+dir = "{{config_root}}/mcp"
+run = "npm run build"
+
+[tasks."mcp:typecheck"]
+description = "Type-check the TypeScript MCP server"
+dir = "{{config_root}}/mcp"
+run = "npm run typecheck"

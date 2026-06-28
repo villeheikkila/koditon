@@ -43,7 +43,7 @@ export default function AddressLookupPage() {
             </div>
             {body && (
               <div className="address-lookup-stats">
-                <Metric label="Source listings" value={listings.length} />
+                <Metric label={body.has_more_listings ? 'Source listings shown' : 'Source listings'} value={body.has_more_listings ? `${listings.length} / ${body.listing_count}` : listings.length} />
                 <Metric label="Unaggregated" value={unaggregatedCount} />
                 <Metric label="Offerings" value={offeringCount} />
                 <Metric label="Source records" value={sourceRecordCount} />
@@ -356,7 +356,7 @@ function TransactionTable({ title, transactions, sourceRecords, lookup, variant 
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="model-metric">
       <span>{label}</span>

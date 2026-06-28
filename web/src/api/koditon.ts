@@ -303,6 +303,8 @@ export interface AddressLookupResult {
   readonly $schema?: string;
   address: string;
   city?: string;
+  has_more_listings: boolean;
+  listing_count: number;
   /** @nullable */
   listings: AddressListing[] | null;
   postal?: string;

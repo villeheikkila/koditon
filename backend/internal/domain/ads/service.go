@@ -68,6 +68,8 @@ type AddressLookupResult struct {
 	City            string                  `json:"city,omitempty"`
 	Postal          string                  `json:"postal,omitempty"`
 	Source          string                  `json:"source"`
+	ListingCount    int                     `json:"listing_count"`
+	HasMoreListings bool                    `json:"has_more_listings"`
 	Listings        []AddressListing        `json:"listings"`
 	RawTransactions []AddressRawTransaction `json:"raw_transactions"`
 }
@@ -429,7 +431,7 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	lookupRows := []addressLookupRow{}
 	for rows.Next() {
 		var row addressLookupRow
-		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges); err != nil {
+		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.ListingCount, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges); err != nil {
 			return AddressLookupResult{}, fmt.Errorf("scan address listing: %w", err)
 		}
 		lookupRows = append(lookupRows, row)
@@ -606,6 +608,7 @@ type addressLookupRow struct {
 	RenovationsPlannedText           string
 	AdditionalInfoText               string
 	ChargesText                      string
+	ListingCount                     int
 	TransactionID                    *uuid.UUID
 	LinkType                         string
 	LinkStatus                       string
@@ -725,6 +728,9 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 	seenSourceRecords := map[uuid.UUID]map[uuid.UUID]struct{}{}
 	seenTransactions := map[string]struct{}{}
 	for _, row := range rows {
+		if row.ListingCount > result.ListingCount {
+			result.ListingCount = row.ListingCount
+		}
 		if row.OfferingID != nil {
 			seen := seenSourceRecords[*row.OfferingID]
 			if seen == nil {
@@ -765,6 +771,10 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 			result.Listings[i].SourceRecords = slices.Clone(sourceRecordsByOffering[offeringID])
 		}
 	}
+	if result.ListingCount == 0 {
+		result.ListingCount = len(result.Listings)
+	}
+	result.HasMoreListings = result.ListingCount > len(result.Listings)
 	return result
 }
 
@@ -1284,7 +1294,8 @@ selected_listings AS (
                 sl.sale_listing_source_provider,
                 sl.sale_listing_source_kind,
                 sl.sale_listing_native_id
-        ) AS listing_rank
+        ) AS listing_rank,
+        count(*) OVER ()::integer AS listing_count
     FROM selected_listing_ids sli
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = sli.sale_listing_id
     LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
@@ -1464,6 +1475,7 @@ SELECT
     sl.renovations_planned_text,
     sl.additional_info_text,
     sl.charges_text,
+    sl.listing_count,
     pt.prices_transaction_id,
     COALESCE(dl.link_type, ''),
     COALESCE(dl.link_status, ''),

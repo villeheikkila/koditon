@@ -254,11 +254,14 @@ func TestBuildAddressLookupResultGroupsListingsAndDeduplicatesTransactions(t *te
 func TestBuildAddressLookupResultKeepsUnmatchedListings(t *testing.T) {
 	listingID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
 	rows := []addressLookupRow{
-		{ListingID: listingID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", Address: "Askvägen 4 G", City: "Maarianhamina", Postal: "22100"},
+		{ListingID: listingID, CanonicalID: "shortcut:ad:24063710", Source: "shortcut", Kind: "ad", NativeID: "24063710", Headline: "Askvägen 4 G", Address: "Askvägen 4 G", City: "Maarianhamina", Postal: "22100", ListingCount: 3},
 	}
 	result := buildAddressLookupResult("Askvägen 4", "Maarianhamina", "22100", "all", rows)
 	if len(result.Listings) != 1 {
 		t.Fatalf("expected 1 listing, got %d", len(result.Listings))
+	}
+	if result.ListingCount != 3 || !result.HasMoreListings {
+		t.Fatalf("expected truncated listing count, got count=%d more=%v", result.ListingCount, result.HasMoreListings)
 	}
 	listing := result.Listings[0]
 	if listing.CanonicalID != "shortcut:ad:24063710" {
