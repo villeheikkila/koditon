@@ -121,6 +121,7 @@ func (t *toolImpl) getListingDetailTool() *mcp.Tool {
 			IdempotentHint:  true,
 			OpenWorldHint:   new(false),
 		},
+		Meta: mcp.Meta{"ui": map[string]any{"resourceUri": listingsAppResourceURI}},
 	}
 }
 
