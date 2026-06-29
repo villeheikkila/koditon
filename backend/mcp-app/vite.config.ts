@@ -4,10 +4,10 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 export default defineConfig({
   root: "src",
   build: {
-    outDir: "../dist",
-    emptyOutDir: false,
+    outDir: "../../internal/transport/mcp/appdist",
+    emptyOutDir: true,
     rollupOptions: {
-      input: "src/mcp-app.html"
+      input: "mcp-app.html"
     }
   },
   plugins: [viteSingleFile()]

@@ -287,32 +287,19 @@ description = "Generate API client with Orval"
 dir = "{{config_root}}/web"
 run = "npm run generate"
 
-[tasks."mcp:dev"]
-description = "Watch and rebuild the MCP server and app resources"
-dir = "{{config_root}}/mcp"
+[tasks."backend:mcp-app:install"]
+description = "Install embedded MCP App dependencies"
+run = "mise -C {{config_root}}/backend run mcp-app:install"
+
+[tasks."backend:mcp-app:dev"]
+description = "Watch and rebuild the embedded MCP App"
+dir = "{{config_root}}/backend/mcp-app"
 run = "npm run dev"
 
-[tasks."mcp:dev:app"]
-description = "Watch and rebuild the MCP App HTML resource"
-dir = "{{config_root}}/mcp"
-run = "npm run dev:app"
+[tasks."backend:mcp-app:build"]
+description = "Build the embedded MCP App HTML resource"
+run = "mise -C {{config_root}}/backend run mcp-app:build"
 
-[tasks."mcp:dev:server"]
-description = "Watch and rebuild the MCP stdio server"
-dir = "{{config_root}}/mcp"
-run = "npm run dev:server"
-
-[tasks."mcp:serve"]
-description = "Run the built MCP stdio server"
-dir = "{{config_root}}/mcp"
-run = "npm run dev:mcp"
-
-[tasks."mcp:build"]
-description = "Build the TypeScript MCP server"
-dir = "{{config_root}}/mcp"
-run = "npm run build"
-
-[tasks."mcp:typecheck"]
-description = "Type-check the TypeScript MCP server"
-dir = "{{config_root}}/mcp"
-run = "npm run typecheck"
+[tasks."backend:mcp-app:typecheck"]
+description = "Type-check the embedded MCP App"
+run = "mise -C {{config_root}}/backend run mcp-app:typecheck"

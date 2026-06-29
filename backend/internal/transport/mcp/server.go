@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"koditon/internal/db"
@@ -46,12 +47,13 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "koditon-mcp",
 		Version: "1.0.0",
-	}, nil)
+	}, &mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{}})
 
 	impl := &toolImpl{
 		adsSvc:  ads.NewService(pool),
 		queries: db.New(pool),
 		config: toolImplConfig{
+			webBaseURL:           cfg.WebBaseURL,
 			shortcutSitemapBase:  cfg.Shortcut.SitemapBase,
 			frontdoorSitemapBase: cfg.Frontdoor.SitemapBase,
 		},
@@ -59,6 +61,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	}
 
 	toolSecurityScopes := map[string][]string{
+		"koditon_find_listings":                {auth.ScopeMCPCoreRead},
 		"koditon_search_listings":              {auth.ScopeMCPCoreRead},
 		"koditon_get_listing_detail":           {auth.ScopeMCPCoreRead},
 		"koditon_search_transactions":          {auth.ScopeMCPCoreRead},
@@ -69,6 +72,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 		"koditon_list_categories":              {auth.ScopeMCPCoreRead},
 	}
 
+	mcp.AddTool(server, impl.findListingsTool(), impl.findListings)
 	mcp.AddTool(server, impl.searchListingsTool(), impl.searchListings)
 	mcp.AddTool(server, impl.getListingDetailTool(), impl.getListingDetail)
 	mcp.AddTool(server, impl.searchTransactionsTool(), impl.searchTransactions)
@@ -77,11 +81,16 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	mcp.AddTool(server, impl.listCitiesTool(), impl.listCities)
 	mcp.AddTool(server, impl.listAvailableLocationsTool(), impl.listAvailableLocations)
 	mcp.AddTool(server, impl.listCategoriesTool(), impl.listCategories)
+	registerListingsAppResource(server, cfg.APIPublicBaseURL, cfg.WebBaseURL)
 
 	streamable := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return server
-	}, nil)
-	base := wrapToolsListSecuritySchemes(streamable, toolSecurityScopes)
+	}, &mcp.StreamableHTTPOptions{Stateless: true, CrossOriginProtection: mcpCrossOriginProtection(cfg)})
+	authConfigured := cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != ""
+	var base http.Handler = streamable
+	if authConfigured {
+		base = wrapToolsListSecuritySchemes(streamable, toolSecurityScopes)
+	}
 
 	resourceMetadataURL := strings.TrimRight(strings.TrimSpace(cfg.APIPublicBaseURL), "/") + "/.well-known/oauth-protected-resource/mcp"
 	requiredAudience := ""
@@ -90,7 +99,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	}
 
 	mcpHandler := base
-	if authSvc != nil {
+	if authSvc != nil && authConfigured {
 		mcpHandler = requireAuth(authSvc, []string{auth.ScopeMCPCoreRead}, requiredAudience, resourceMetadataURL, base)
 	}
 
@@ -143,6 +152,45 @@ var allowedCORSOrigins = []string{
 	"https://claude.ai",
 }
 
+var localMCPBrowserOrigins = []string{
+	"http://127.0.0.1:6274",
+	"http://127.0.0.1:6277",
+	"http://localhost:6274",
+	"http://localhost:6277",
+}
+
+func mcpCrossOriginProtection(cfg config.Config) *http.CrossOriginProtection {
+	protection := http.NewCrossOriginProtection()
+	for _, origin := range allowedCORSOrigins {
+		_ = protection.AddTrustedOrigin(origin)
+	}
+	for _, origin := range strings.Split(cfg.CORSAllowedOrigins, ",") {
+		if trimmed := strings.TrimSpace(origin); trimmed != "" {
+			_ = protection.AddTrustedOrigin(trimmed)
+		}
+	}
+	if origin := originFromRawURL(cfg.APIPublicBaseURL); origin != "" {
+		_ = protection.AddTrustedOrigin(origin)
+	}
+	if origin := originFromRawURL(cfg.WebBaseURL); origin != "" {
+		_ = protection.AddTrustedOrigin(origin)
+	}
+	if cfg.Environment.IsDevelopment() {
+		for _, origin := range localMCPBrowserOrigins {
+			_ = protection.AddTrustedOrigin(origin)
+		}
+	}
+	return protection
+}
+
+func originFromRawURL(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func setCORSHeaders(w http.ResponseWriter, r *http.Request, environment string) {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
@@ -164,7 +212,7 @@ func setCORSHeaders(w http.ResponseWriter, r *http.Request, environment string) 
 		w.Header().Set("Vary", "Origin")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Last-Event-ID")
 }
 
 func requireAuth(authService *auth.Service, requiredScopes []string, requiredAudience, resourceMetadataURL string, next http.Handler) http.Handler {

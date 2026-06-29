@@ -300,16 +300,33 @@ run = "go-mod-upgrade"
 
 # ---------- build ----------
 
+[tasks."mcp-app:install"]
+description = "Install MCP App dependencies"
+run = "npm --prefix mcp-app install"
+
+[tasks."mcp-app:typecheck"]
+description = "Type-check the embedded MCP App"
+run = "npm --prefix mcp-app run typecheck"
+
+[tasks."mcp-app:build"]
+description = "Build the embedded MCP App HTML resource"
+run = "npm --prefix mcp-app run build"
+
 [tasks.build]
 description = "Build production binary"
+depends = ["mcp-app:build"]
 env = { CGO_ENABLED = "0", GOCACHE = "/tmp/koditon-go-cache" }
 sources = [
   "cmd/**/*.go",
   "internal/**/*.go",
+  "mcp-app/src/**/*",
+  "mcp-app/package.json",
+  "mcp-app/package-lock.json",
+  "mcp-app/vite.config.ts",
   "go.mod",
   "go.sum",
 ]
-outputs = ["server"]
+outputs = ["server", "internal/transport/mcp/appdist/mcp-app.html"]
 run = "go build -o server ./cmd"
 
 [tasks.tui]

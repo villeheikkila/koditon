@@ -521,6 +521,7 @@ func (t *toolImpl) listCategories(ctx context.Context, _ *mcp.CallToolRequest, _
 // ---- detail resolution ---------------------------------------------------------
 
 type toolImplConfig struct {
+	webBaseURL           string
 	shortcutSitemapBase  string
 	frontdoorSitemapBase string
 }

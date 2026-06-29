@@ -109,3 +109,36 @@ func TestParseUUIDs(t *testing.T) {
 		}
 	})
 }
+
+func TestSourceEntityRouteMatchesWebRoutes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		kind string
+		want string
+	}{
+		{"ad", "listing"},
+		{"rental", "rental"},
+		{"building", "housing-company"},
+		{"announcement", "housing-company"},
+		{"", "listing"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			t.Parallel()
+			got := sourceEntityRoute(tt.kind)
+			if got != tt.want {
+				t.Fatalf("sourceEntityRoute(%q) = %q, want %q", tt.kind, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListingsAppWebPathUsesConfiguredBaseURL(t *testing.T) {
+	t.Parallel()
+	impl := &toolImpl{config: toolImplConfig{webBaseURL: "http://localhost:5173/"}}
+	got := impl.listingWebURL("frontdoor:ad:123", "ad", "")
+	want := "http://localhost:5173/listing/frontdoor:ad:123"
+	if got != want {
+		t.Fatalf("listingWebURL = %q, want %q", got, want)
+	}
+}

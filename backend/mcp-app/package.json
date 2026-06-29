@@ -1,0 +1,19 @@
+{
+  "name": "@koditon/mcp-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch --clearScreen false",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "vite": "^8.1.0",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}
