@@ -10,8 +10,8 @@ import (
 func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 	t.Parallel()
 	defs := AllDefinitions()
-	if len(defs) != 33 {
-		t.Fatalf("definition count = %d, want 33", len(defs))
+	if len(defs) != 27 {
+		t.Fatalf("definition count = %d, want 27", len(defs))
 	}
 	wantQueues := map[string]bool{
 		QueueFrontdoor:       false,
@@ -84,12 +84,12 @@ func TestIdempotencyKeyUsesTaskNameAndCanonicalParams(t *testing.T) {
 func TestCronSlotIdempotencyKeyUsesUTCMinuteSlot(t *testing.T) {
 	t.Parallel()
 	slot := time.Date(2026, 6, 28, 12, 30, 45, 0, time.FixedZone("EEST", 3*60*60))
-	a := CronSlotIdempotencyKey("prices_sync_all", "nightly-prices", slot)
-	b := CronSlotIdempotencyKey("prices_sync_all", "nightly-prices", slot.UTC().Truncate(time.Minute))
+	a := CronSlotIdempotencyKey("prices_match_sale_listings_fanout", "prices-match", slot)
+	b := CronSlotIdempotencyKey("prices_match_sale_listings_fanout", "prices-match", slot.UTC().Truncate(time.Minute))
 	if a != b {
 		t.Fatalf("cron slot keys differ: %q != %q", a, b)
 	}
-	if a == IdempotencyKey("prices_sync_all", json.RawMessage(`{}`)) {
+	if a == IdempotencyKey("prices_match_sale_listings_fanout", json.RawMessage(`{}`)) {
 		t.Fatalf("cron key should not collapse to default task idempotency key")
 	}
 }

@@ -2,39 +2,24 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/earendil-works/absurd/sdks/go/absurd"
 	"github.com/google/uuid"
 
 	"koditon/internal/domain/properties"
-	"koditon/internal/sync/workflows"
 )
 
 const (
-	TaskTypePricesCitiesInit                 = "prices_cities_init"
-	TaskTypePricesSync                       = "prices_sync"
-	TaskTypePricesPostalCodeSync             = "prices_postal_code_sync"
-	TaskTypePricesPostalCodePageSync         = "prices_postal_code_page_sync"
-	TaskTypePricesNeighborhoodPostalCodeSync = "prices_neighborhood_postal_code_sync"
-	TaskTypePricesSyncAll                    = "prices_sync_all"
-	TaskTypePricesMatchSaleListingsBackfill  = "prices_match_sale_listings_backfill"
-	TaskTypePricesMatchSaleListingsFanout    = "prices_match_sale_listings_fanout"
-	TaskTypePricesMatchSaleListing           = "prices_match_sale_listing"
+	TaskTypePricesMatchSaleListingsBackfill = "prices_match_sale_listings_backfill"
+	TaskTypePricesMatchSaleListingsFanout   = "prices_match_sale_listings_fanout"
+	TaskTypePricesMatchSaleListing          = "prices_match_sale_listing"
 
 	pricesMatchInitialDelay = 7 * 24 * time.Hour
 	pricesMatchRetryDelay   = 7 * 24 * time.Hour
 	pricesMatchMaxAge       = 4 * 30 * 24 * time.Hour
 )
-
-type pricesPostalCodePayload struct {
-	City       string `json:"city"`
-	PostalCode string `json:"postal_code"`
-	Page       int    `json:"page,omitempty"`
-}
 
 type pricesMatchFanoutPayload struct {
 	Limit int32 `json:"limit,omitempty"`
@@ -64,18 +49,6 @@ type pricesMatchRunSummary struct {
 	Candidates int32
 	AutoLinked int32
 	Ambiguous  int32
-}
-
-func (c *Consumer) enqueuePricesPostalCodePage(ctx context.Context, payload pricesPostalCodePayload) error {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal prices postal code page payload: %w", err)
-	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypePricesPostalCodePageSync,
-		Params:   raw,
-	})
-	return err
 }
 
 func (c *Consumer) loadPricesMatchSaleListing(ctx context.Context, saleListingID string) (pricesMatchSaleListingRow, error) {
@@ -131,27 +104,6 @@ WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID, 
 		return fmt.Errorf("update prices match state: %w", err)
 	}
 	return nil
-}
-
-func (c *Consumer) enqueuePricesMatchSaleListing(ctx context.Context, saleListingID string, attempt int32) error {
-	payload, err := json.Marshal(pricesMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
-	if err != nil {
-		return fmt.Errorf("marshal prices sale listing match payload: %w", err)
-	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName:     TaskTypePricesMatchSaleListing,
-		Params:       payload,
-		Cancellation: &absurd.CancellationPolicy{MaxDuration: int64((pricesMatchMaxAge + pricesMatchRetryDelay).Seconds())},
-	})
-	return err
-}
-
-func pricesPostalCodePageEntityID(city, postalCode string, page int) string {
-	return fmt.Sprintf("city:%s:postal_code:%s:page:%d", city, postalCode, page)
-}
-
-func pricesNeighborhoodPostalCodeEntityID(city, postalCode string, page int) string {
-	return fmt.Sprintf("city:%s:postal_code:%s:neighborhood_page:%d", city, postalCode, page)
 }
 
 func parseJobEntity(entityID string) (string, string, error) {

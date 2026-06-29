@@ -30,7 +30,6 @@ import (
 	"koditon/internal/sync/consumers"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 	"koditon/internal/sync/workflows"
 	"koditon/internal/transport/health"
@@ -153,14 +152,6 @@ func run(
 		return shortcutScraperWorkflowClient.Close()
 	})
 	if cfg.Mode.Consumer {
-		pricesService, err := prices.NewService(
-			pool,
-			cfg.Prices.BaseURL,
-			cfg.OpenRouter.APIKey,
-		)
-		if err != nil {
-			return fmt.Errorf("create prices service: %w", err)
-		}
 		shortcutService := shortcut.NewService(
 			pool,
 			logger,
@@ -183,7 +174,6 @@ func run(
 		consumer := consumers.New(
 			logger,
 			pool,
-			pricesService,
 			shortcutService,
 			frontdoorService,
 			postalService,

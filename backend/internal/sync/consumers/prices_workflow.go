@@ -14,17 +14,10 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/platform/logging"
-	syncprices "koditon/internal/sync/prices"
 	"koditon/internal/sync/workflows"
 )
 
 var pricesWorkflowKinds = []string{
-	TaskTypePricesCitiesInit,
-	TaskTypePricesSyncAll,
-	TaskTypePricesSync,
-	TaskTypePricesPostalCodeSync,
-	TaskTypePricesPostalCodePageSync,
-	TaskTypePricesNeighborhoodPostalCodeSync,
 	TaskTypePricesMatchSaleListingsBackfill,
 	TaskTypePricesMatchSaleListingsFanout,
 	TaskTypePricesMatchSaleListing,
@@ -32,12 +25,6 @@ var pricesWorkflowKinds = []string{
 
 type pricesFanoutResult struct {
 	Enqueued int `json:"enqueued"`
-}
-
-type pricesNeighborhoodPostalCodeWorkflowPayload struct {
-	City       string `json:"city,omitempty"`
-	PostalCode string `json:"postal_code,omitempty"`
-	Page       int    `json:"page,omitempty"`
 }
 
 type pricesMatchListingWorkflowResult struct {
@@ -54,9 +41,6 @@ type pricesMatchLoadedListing struct {
 func (c *Consumer) startPricesWorkflowWorker(ctx context.Context, cfg Config) error {
 	if c.pricesWorkflowClient == nil {
 		return errors.New("prices absurd workflow client is not configured")
-	}
-	if c.pricesService == nil {
-		return errors.New("prices service is not configured")
 	}
 	for _, kind := range pricesWorkflowKinds {
 		def, ok := workflows.FindDefinition(kind)
@@ -106,16 +90,6 @@ func (c *Consumer) handlePricesWorkflow(ctx context.Context, params json.RawMess
 	var result any
 	var err error
 	switch taskName {
-	case TaskTypePricesCitiesInit, TaskTypePricesSyncAll:
-		result, err = c.runPricesCitiesFanoutWorkflow(ctx, logger)
-	case TaskTypePricesSync:
-		result, err = c.runPricesCityWorkflow(ctx, logger, params)
-	case TaskTypePricesPostalCodeSync:
-		result, err = c.runPricesPostalCodeWorkflow(ctx, params)
-	case TaskTypePricesPostalCodePageSync:
-		result, err = c.runPricesPostalCodePageWorkflow(ctx, logger, params)
-	case TaskTypePricesNeighborhoodPostalCodeSync:
-		result, err = c.runPricesNeighborhoodPostalCodeWorkflow(ctx, logger, params)
 	case TaskTypePricesMatchSaleListingsBackfill:
 		result, err = c.runPricesMatchSaleListingsBackfillWorkflow(ctx, logger, params)
 	case TaskTypePricesMatchSaleListingsFanout:
@@ -133,225 +107,6 @@ func (c *Consumer) handlePricesWorkflow(ctx context.Context, params json.RawMess
 		return nil, fmt.Errorf("marshal prices workflow result: %w", err)
 	}
 	return raw, nil
-}
-
-func (c *Consumer) runPricesCitiesFanoutWorkflow(ctx context.Context, logger *slog.Logger) (pricesFanoutResult, error) {
-	cities, err := absurd.Step(ctx, "fetch-cities", func(ctx context.Context) ([]string, error) {
-		return c.pricesService.FetchCities(ctx)
-	})
-	if err != nil {
-		return pricesFanoutResult{}, err
-	}
-	return absurd.Step(ctx, "spawn-city-syncs", func(ctx context.Context) (pricesFanoutResult, error) {
-		enqueued := 0
-		for _, city := range cities {
-			city = strings.TrimSpace(city)
-			if city == "" {
-				continue
-			}
-			params, err := json.Marshal(map[string]string{"city": city})
-			if err != nil {
-				return pricesFanoutResult{}, err
-			}
-			if _, err := workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
-				TaskName: TaskTypePricesSync,
-				Params:   params,
-			}); err != nil {
-				return pricesFanoutResult{}, err
-			}
-			enqueued++
-		}
-		logger.InfoContext(ctx, "prices city sync tasks spawned", "count", enqueued, "outcome", logging.OutcomeSuccess)
-		return pricesFanoutResult{Enqueued: enqueued}, nil
-	})
-}
-
-func (c *Consumer) runPricesCityWorkflow(ctx context.Context, logger *slog.Logger, raw json.RawMessage) (syncprices.SyncCityIndexResult, error) {
-	var params struct {
-		City string `json:"city"`
-	}
-	if err := json.Unmarshal(raw, &params); err != nil {
-		return syncprices.SyncCityIndexResult{}, fmt.Errorf("decode prices city params: %w", err)
-	}
-	cityName := strings.TrimSpace(params.City)
-	if cityName == "" {
-		return syncprices.SyncCityIndexResult{}, fmt.Errorf("city is required")
-	}
-	result, err := absurd.Step(ctx, "sync-city-index", func(ctx context.Context) (syncprices.SyncCityIndexResult, error) {
-		result, err := c.pricesService.SyncCityIndex(ctx, cityName, func(p syncprices.SyncCityProgress) {
-			logger.DebugContext(ctx, "prices city index progress", "city", p.City, "step", p.Step, "count", p.Count, "page", p.Page, "details", p.Details)
-		})
-		if err != nil {
-			return syncprices.SyncCityIndexResult{}, err
-		}
-		return *result, nil
-	})
-	if err != nil {
-		return syncprices.SyncCityIndexResult{}, err
-	}
-	_, err = absurd.Step(ctx, "spawn-postal-code-pages", func(ctx context.Context) (pricesFanoutResult, error) {
-		enqueued := 0
-		for _, postalCode := range result.PostalCodes {
-			payload := pricesPostalCodePayload{City: result.City, PostalCode: postalCode, Page: 0}
-			if err := c.spawnPricesPostalCodePage(ctx, payload); err != nil {
-				return pricesFanoutResult{}, err
-			}
-			enqueued++
-		}
-		logger.InfoContext(ctx, "prices postal code page tasks spawned", "city", result.City, "count", enqueued, "outcome", logging.OutcomeSuccess)
-		return pricesFanoutResult{Enqueued: enqueued}, nil
-	})
-	if err != nil {
-		return syncprices.SyncCityIndexResult{}, err
-	}
-	return result, nil
-}
-
-func (c *Consumer) runPricesPostalCodeWorkflow(ctx context.Context, params json.RawMessage) (pricesFanoutResult, error) {
-	payload, err := decodePricesPostalCodeWorkflowPayload(params)
-	if err != nil {
-		return pricesFanoutResult{}, err
-	}
-	payload.Page = 0
-	return absurd.Step(ctx, "spawn-page-zero", func(ctx context.Context) (pricesFanoutResult, error) {
-		if err := c.spawnPricesPostalCodePage(ctx, payload); err != nil {
-			return pricesFanoutResult{}, err
-		}
-		return pricesFanoutResult{Enqueued: 1}, nil
-	})
-}
-
-func (c *Consumer) runPricesPostalCodePageWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (syncprices.SyncPostalCodePageResult, error) {
-	payload, err := decodePricesPostalCodeWorkflowPayload(params)
-	if err != nil {
-		return syncprices.SyncPostalCodePageResult{}, err
-	}
-	fetched, err := absurd.Step(ctx, "fetch-page", func(ctx context.Context) (syncprices.PostalCodeTransactionPage, error) {
-		return c.pricesService.FetchPostalCodeTransactionPage(ctx, payload.City, payload.PostalCode, payload.Page)
-	})
-	if err != nil {
-		return syncprices.SyncPostalCodePageResult{}, err
-	}
-	upserted, err := absurd.Step(ctx, "upsert-transactions", func(ctx context.Context) (syncprices.UpsertPostalCodeTransactionPageResult, error) {
-		return c.pricesService.UpsertPostalCodeTransactionPage(ctx, fetched)
-	})
-	if err != nil {
-		return syncprices.SyncPostalCodePageResult{}, err
-	}
-	result := syncprices.SyncPostalCodePageResult{
-		City:         fetched.City,
-		PostalCode:   fetched.PostalCode,
-		Page:         fetched.Page,
-		NextPage:     fetched.NextPage,
-		Transactions: upserted.Transactions,
-		Upserted:     upserted.Upserted,
-	}
-	if fetched.NextPage != nil {
-		_, err = absurd.Step(ctx, "spawn-next-page", func(ctx context.Context) (pricesFanoutResult, error) {
-			next := pricesPostalCodePayload{City: fetched.City, PostalCode: fetched.PostalCode, Page: *fetched.NextPage}
-			if err := c.spawnPricesPostalCodePage(ctx, next); err != nil {
-				return pricesFanoutResult{}, err
-			}
-			return pricesFanoutResult{Enqueued: 1}, nil
-		})
-		if err != nil {
-			return syncprices.SyncPostalCodePageResult{}, err
-		}
-	}
-	logger.InfoContext(ctx, "prices postal code page workflow completed", "city", result.City, "postal_code", result.PostalCode, "page", result.Page, "next_page", result.NextPage, "outcome", logging.OutcomeSuccess)
-	return result, nil
-}
-
-func (c *Consumer) spawnPricesPostalCodePage(ctx context.Context, payload pricesPostalCodePayload) error {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal prices postal code page payload: %w", err)
-	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypePricesPostalCodePageSync,
-		Params:   raw,
-	})
-	return err
-}
-
-func decodePricesPostalCodeWorkflowPayload(raw json.RawMessage) (pricesPostalCodePayload, error) {
-	var payload pricesPostalCodePayload
-	if len(raw) == 0 {
-		return pricesPostalCodePayload{}, errors.New("payload is required")
-	}
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return pricesPostalCodePayload{}, fmt.Errorf("decode prices postal code payload: %w", err)
-	}
-	if strings.TrimSpace(payload.City) == "" || strings.TrimSpace(payload.PostalCode) == "" {
-		return pricesPostalCodePayload{}, errors.New("city and postal_code are required")
-	}
-	payload.City = strings.TrimSpace(payload.City)
-	payload.PostalCode = strings.TrimSpace(payload.PostalCode)
-	return payload, nil
-}
-
-func (c *Consumer) runPricesNeighborhoodPostalCodeWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (any, error) {
-	payload, err := decodePricesNeighborhoodPostalCodeWorkflowPayload(params)
-	if err != nil {
-		return nil, err
-	}
-	if payload.City == "" && payload.PostalCode == "" {
-		targets, err := absurd.Step(ctx, "list-neighborhood-postal-code-targets", func(ctx context.Context) ([]syncprices.NeighborhoodPostalCodeTarget, error) {
-			return c.pricesService.ListNeighborhoodPostalCodeTargets(ctx)
-		})
-		if err != nil {
-			return nil, err
-		}
-		return absurd.Step(ctx, "spawn-neighborhood-postal-code-pages", func(ctx context.Context) (pricesFanoutResult, error) {
-			enqueued := 0
-			for _, target := range targets {
-				if err := c.spawnPricesNeighborhoodPostalCodePage(ctx, pricesNeighborhoodPostalCodeWorkflowPayload{City: target.City, PostalCode: target.PostalCode, Page: 0}); err != nil {
-					return pricesFanoutResult{}, err
-				}
-				enqueued++
-			}
-			logger.InfoContext(ctx, "prices neighborhood postal code page tasks spawned", "count", enqueued, "outcome", logging.OutcomeSuccess)
-			return pricesFanoutResult{Enqueued: enqueued}, nil
-		})
-	}
-	fetched, err := absurd.Step(ctx, "fetch-neighborhood-postal-code-page", func(ctx context.Context) (syncprices.NeighborhoodPostalCodePage, error) {
-		return c.pricesService.FetchNeighborhoodPostalCodePage(ctx, payload.City, payload.PostalCode, payload.Page)
-	})
-	if err != nil {
-		return nil, err
-	}
-	result, err := absurd.Step(ctx, "update-neighborhood-postal-codes", func(ctx context.Context) (syncprices.UpdateNeighborhoodPostalCodeResult, error) {
-		return c.pricesService.UpdateNeighborhoodPostalCodes(ctx, fetched)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if fetched.NextPage != nil {
-		_, err = absurd.Step(ctx, "spawn-next-neighborhood-page", func(ctx context.Context) (pricesFanoutResult, error) {
-			next := pricesNeighborhoodPostalCodeWorkflowPayload{City: fetched.City, PostalCode: fetched.PostalCode, Page: *fetched.NextPage}
-			if err := c.spawnPricesNeighborhoodPostalCodePage(ctx, next); err != nil {
-				return pricesFanoutResult{}, err
-			}
-			return pricesFanoutResult{Enqueued: 1}, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	logger.InfoContext(ctx, "prices neighborhood postal code page completed", "city", result.City, "postal_code", result.PostalCode, "page", result.Page, "updated", result.Updated, "next_page", fetched.NextPage, "outcome", logging.OutcomeSuccess)
-	return result, nil
-}
-
-func (c *Consumer) spawnPricesNeighborhoodPostalCodePage(ctx context.Context, payload pricesNeighborhoodPostalCodeWorkflowPayload) error {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal prices neighborhood postal code payload: %w", err)
-	}
-	_, err = workflows.Spawn(ctx, c.pricesWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypePricesNeighborhoodPostalCodeSync,
-		Params:   raw,
-	})
-	return err
 }
 
 func (c *Consumer) runPricesMatchSaleListingsBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (pricesMatchRunSummary, error) {
@@ -514,24 +269,6 @@ func (c *Consumer) updatePricesMatchStateStep(ctx context.Context, stepName stri
 		return struct{}{}, c.updatePricesMatchState(ctx, saleListingID, status, nextAttemptAt, runID, expiresAt)
 	})
 	return err
-}
-
-func decodePricesNeighborhoodPostalCodeWorkflowPayload(raw json.RawMessage) (pricesNeighborhoodPostalCodeWorkflowPayload, error) {
-	var payload pricesNeighborhoodPostalCodeWorkflowPayload
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return pricesNeighborhoodPostalCodeWorkflowPayload{}, fmt.Errorf("decode prices neighborhood postal code payload: %w", err)
-		}
-	}
-	payload.City = strings.TrimSpace(payload.City)
-	payload.PostalCode = strings.TrimSpace(payload.PostalCode)
-	if (payload.City == "") != (payload.PostalCode == "") {
-		return pricesNeighborhoodPostalCodeWorkflowPayload{}, fmt.Errorf("city and postal_code must be provided together")
-	}
-	if payload.Page < 0 {
-		payload.Page = 0
-	}
-	return payload, nil
 }
 
 func decodePricesMatchBackfillWorkflowPayload(raw json.RawMessage) (pricesMatchBackfillPayload, error) {

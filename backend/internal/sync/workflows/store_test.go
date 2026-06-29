@@ -59,7 +59,7 @@ func TestTaskSpawnerSpawnUsesTypedParams(t *testing.T) {
 	t.Parallel()
 	client := &fakeAbsurdClient{spawnedTask: absurd.SpawnResult{TaskID: "task-1", Created: true}}
 	spawner := NewTaskSpawner(client)
-	_, err := spawner.Spawn(context.Background(), "prices_sync", map[string]string{"city": "Helsinki"})
+	_, err := spawner.Spawn(context.Background(), "prices_match_sale_listing", map[string]string{"sale_listing_id": "018f8f7f-5af1-7b77-8c93-c5c9f6e4d8a1"})
 	if err != nil {
 		t.Fatalf("Spawn returned error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestTaskSpawnerSpawnUsesTypedParams(t *testing.T) {
 	if !ok {
 		t.Fatalf("spawn params type = %T, want json.RawMessage", client.spawnParams)
 	}
-	if string(raw) != `{"city":"Helsinki"}` {
+	if string(raw) != `{"sale_listing_id":"018f8f7f-5af1-7b77-8c93-c5c9f6e4d8a1"}` {
 		t.Fatalf("spawn params = %s", raw)
 	}
 	if client.spawnOpts.QueueName != QueuePrices {
@@ -80,11 +80,11 @@ func TestTaskSpawnerSpawnCronSlotUsesSlotIdempotency(t *testing.T) {
 	client := &fakeAbsurdClient{spawnedTask: absurd.SpawnResult{TaskID: "task-1", Created: true}}
 	spawner := NewTaskSpawner(client)
 	slot := time.Date(2026, 6, 28, 12, 30, 0, 0, time.UTC)
-	_, err := spawner.SpawnCronSlot(context.Background(), "prices_sync_all", nil, "prices-hourly", slot)
+	_, err := spawner.SpawnCronSlot(context.Background(), "prices_match_sale_listings_fanout", nil, "prices-match", slot)
 	if err != nil {
 		t.Fatalf("SpawnCronSlot returned error: %v", err)
 	}
-	want := CronSlotIdempotencyKey("prices_sync_all", "prices-hourly", slot)
+	want := CronSlotIdempotencyKey("prices_match_sale_listings_fanout", "prices-match", slot)
 	if client.spawnOpts.IdempotencyKey != want {
 		t.Fatalf("idempotency = %q, want %q", client.spawnOpts.IdempotencyKey, want)
 	}

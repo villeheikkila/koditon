@@ -16,7 +16,6 @@ import (
 	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 )
 
@@ -38,7 +37,6 @@ type Consumer struct {
 	frontdoorService              *frontdoor.Service
 	shortcutService               *shortcut.Service
 	postalService                 *postal.Service
-	pricesService                 *prices.Service
 	frontdoorWorkflowCancel       context.CancelFunc
 	frontdoorWorkflowDone         chan struct{}
 	shortcutAPIWorkflowCancel     context.CancelFunc
@@ -73,10 +71,10 @@ func DefaultConfig() Config {
 	}
 }
 
-func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service, propertiesService *properties.Service, frontdoorWorkflowClient *absurd.Client, shortcutAPIWorkflowClient *absurd.Client, shortcutScraperWorkflowClient *absurd.Client, canonicalWorkflowClient *absurd.Client, canonicalLLMWorkflowClient *absurd.Client, postalWorkflowClient *absurd.Client, pricesWorkflowClient *absurd.Client) *Consumer {
+func New(logger *slog.Logger, pool *pgxpool.Pool, shortcutService *shortcut.Service, frontdoorService *frontdoor.Service, postalService *postal.Service, propertiesService *properties.Service, frontdoorWorkflowClient *absurd.Client, shortcutAPIWorkflowClient *absurd.Client, shortcutScraperWorkflowClient *absurd.Client, canonicalWorkflowClient *absurd.Client, canonicalLLMWorkflowClient *absurd.Client, postalWorkflowClient *absurd.Client, pricesWorkflowClient *absurd.Client) *Consumer {
 	return &Consumer{
 		logger:                        logger,
-		syncRunner:                    syncflows.NewRunner(logger, nil, pricesService, shortcutService, frontdoorService, postalService),
+		syncRunner:                    syncflows.NewRunner(logger, nil, nil, shortcutService, frontdoorService, postalService),
 		queries:                       db.New(pool),
 		pool:                          pool,
 		propertiesService:             propertiesService,
@@ -90,7 +88,6 @@ func New(logger *slog.Logger, pool *pgxpool.Pool, pricesService *prices.Service,
 		frontdoorService:              frontdoorService,
 		shortcutService:               shortcutService,
 		postalService:                 postalService,
-		pricesService:                 pricesService,
 	}
 }
 

@@ -12,64 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countUnmatchedNeighborhoods = `-- name: CountUnmatchedNeighborhoods :one
-SELECT COUNT(*) as count
-FROM public.prices_neighborhoods
-WHERE prices_neighborhood_postal_postal_code_id IS NULL
-`
-
-func (q *Queries) CountUnmatchedNeighborhoods(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countUnmatchedNeighborhoods)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const getAvailablePostalCodesForMunicipality = `-- name: GetAvailablePostalCodesForMunicipality :many
-SELECT
-    ppc.postal_postal_code_id,
-    ppc.postal_postal_code_code,
-    ppc.postal_postal_code_name_fi,
-    pm.postal_municipality_name_fi
-FROM public.postal_postal_codes AS ppc
-JOIN public.postal_municipalities AS pm
-    ON ppc.postal_municipality_id = pm.postal_municipality_id
-WHERE pm.postal_municipality_name_fi = $1
-ORDER BY ppc.postal_postal_code_name_fi
-`
-
-type GetAvailablePostalCodesForMunicipalityRow struct {
-	PostalPostalCodeID       uuid.UUID `json:"postal_postal_code_id"`
-	PostalPostalCodeCode     string    `json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi   string    `json:"postal_postal_code_name_fi"`
-	PostalMunicipalityNameFi string    `json:"postal_municipality_name_fi"`
-}
-
-func (q *Queries) GetAvailablePostalCodesForMunicipality(ctx context.Context, municipalityName string) ([]GetAvailablePostalCodesForMunicipalityRow, error) {
-	rows, err := q.db.Query(ctx, getAvailablePostalCodesForMunicipality, municipalityName)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetAvailablePostalCodesForMunicipalityRow{}
-	for rows.Next() {
-		var i GetAvailablePostalCodesForMunicipalityRow
-		if err := rows.Scan(
-			&i.PostalPostalCodeID,
-			&i.PostalPostalCodeCode,
-			&i.PostalPostalCodeNameFi,
-			&i.PostalMunicipalityNameFi,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listAvailableMunicipalities = `-- name: ListAvailableMunicipalities :many
 SELECT DISTINCT
     pm.postal_municipality_id,
@@ -379,55 +321,6 @@ func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID uuid.U
 			&i.PricesCityID,
 			&i.PricesPostalCodeCreatedAt,
 			&i.PricesPostalCodeUpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUnmatchedNeighborhoodsBatch = `-- name: ListUnmatchedNeighborhoodsBatch :many
-SELECT
-    pn.prices_neighborhood_id,
-    pn.prices_neighborhood_name,
-    pn.prices_city_id,
-    pc.prices_city_name,
-    COUNT(*) OVER (PARTITION BY pn.prices_city_id) as unmatched_in_city
-FROM public.prices_neighborhoods AS pn
-LEFT JOIN public.prices_cities AS pc
-    ON pn.prices_city_id = pc.prices_city_id
-WHERE pn.prices_neighborhood_postal_postal_code_id IS NULL
-ORDER BY pc.prices_city_name, pn.prices_neighborhood_name
-LIMIT 50 OFFSET $1
-`
-
-type ListUnmatchedNeighborhoodsBatchRow struct {
-	PricesNeighborhoodID   uuid.UUID `json:"prices_neighborhood_id"`
-	PricesNeighborhoodName string    `json:"prices_neighborhood_name"`
-	PricesCityID           uuid.UUID `json:"prices_city_id"`
-	PricesCityName         *string   `json:"prices_city_name"`
-	UnmatchedInCity        int64     `json:"unmatched_in_city"`
-}
-
-func (q *Queries) ListUnmatchedNeighborhoodsBatch(ctx context.Context, batchOffset int32) ([]ListUnmatchedNeighborhoodsBatchRow, error) {
-	rows, err := q.db.Query(ctx, listUnmatchedNeighborhoodsBatch, batchOffset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListUnmatchedNeighborhoodsBatchRow{}
-	for rows.Next() {
-		var i ListUnmatchedNeighborhoodsBatchRow
-		if err := rows.Scan(
-			&i.PricesNeighborhoodID,
-			&i.PricesNeighborhoodName,
-			&i.PricesCityID,
-			&i.PricesCityName,
-			&i.UnmatchedInCity,
 		); err != nil {
 			return nil, err
 		}

@@ -37,37 +37,6 @@ SELECT
 FROM public.prices_cities
 ORDER BY prices_city_name;
 
--- name: ListUnmatchedNeighborhoodsBatch :many
-SELECT
-    pn.prices_neighborhood_id,
-    pn.prices_neighborhood_name,
-    pn.prices_city_id,
-    pc.prices_city_name,
-    COUNT(*) OVER (PARTITION BY pn.prices_city_id) as unmatched_in_city
-FROM public.prices_neighborhoods AS pn
-LEFT JOIN public.prices_cities AS pc
-    ON pn.prices_city_id = pc.prices_city_id
-WHERE pn.prices_neighborhood_postal_postal_code_id IS NULL
-ORDER BY pc.prices_city_name, pn.prices_neighborhood_name
-LIMIT 50 OFFSET sqlc.arg(batch_offset);
-
--- name: GetAvailablePostalCodesForMunicipality :many
-SELECT
-    ppc.postal_postal_code_id,
-    ppc.postal_postal_code_code,
-    ppc.postal_postal_code_name_fi,
-    pm.postal_municipality_name_fi
-FROM public.postal_postal_codes AS ppc
-JOIN public.postal_municipalities AS pm
-    ON ppc.postal_municipality_id = pm.postal_municipality_id
-WHERE pm.postal_municipality_name_fi = sqlc.arg(municipality_name)
-ORDER BY ppc.postal_postal_code_name_fi;
-
--- name: CountUnmatchedNeighborhoods :one
-SELECT COUNT(*) as count
-FROM public.prices_neighborhoods
-WHERE prices_neighborhood_postal_postal_code_id IS NULL;
-
 -- name: ListAvailableMunicipalities :many
 SELECT DISTINCT
     pm.postal_municipality_id,

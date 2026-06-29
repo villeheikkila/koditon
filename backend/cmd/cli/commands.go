@@ -16,12 +16,12 @@ import (
 	"koditon/cmd/cli/internal/cli"
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
+	"koditon/internal/domain/prices"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/schema"
 	"koditon/internal/sync/consumers"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 	"koditon/internal/sync/workflows"
 )
@@ -168,15 +168,12 @@ func newTransactionsCommand(opts *commandOptions) *cobra.Command {
 		Use:   "transactions",
 		Short: "Search price transactions",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			pool, cfg, err := setup(opts.ctx)
+			pool, _, err := setup(opts.ctx)
 			if err != nil {
 				return err
 			}
 			defer pool.Close()
-			pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
-			if err != nil {
-				return fmt.Errorf("create prices service: %w", err)
-			}
+			pricesService := prices.NewService(pool)
 			f.Out = opts.stdout
 			return cli.RunTransactions(opts.ctx, pricesService, f)
 		},
@@ -267,7 +264,7 @@ func newSyncSpawnCommand(opts *commandOptions) *cobra.Command {
 			`cli sync spawn frontdoor_sitemap_sync --json --watch`,
 			`cli sync spawn frontdoor_sync --params '{"source_type":"ad","source_id":"12345"}' --json --watch`,
 			`cli sync spawn shortcut_buildings_sitemap_sync --json`,
-			`cli sync spawn prices_sync --params '{"city":"Helsinki"}' --json --watch`,
+			`cli sync spawn prices_match_sale_listings_fanout --json --watch`,
 			`cli sync spawn postal_sync --json`,
 		}, "\n"),
 		Args: cobra.ExactArgs(1),
@@ -342,10 +339,6 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 		return fmt.Errorf("check schema: %w", err)
 	}
 	logger := slog.New(slog.NewTextHandler(opts.stderr, &slog.HandlerOptions{}))
-	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
-	if err != nil {
-		return fmt.Errorf("create prices service: %w", err)
-	}
 	shortcutService := shortcut.NewService(pool, logger, cfg.Shortcut.BaseURL, cfg.Shortcut.DocsBaseURL, cfg.Shortcut.AdBaseURL, cfg.Shortcut.UserAgent, cfg.Shortcut.SitemapBase)
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)
 	postalService := postal.NewService(pool)
@@ -388,7 +381,7 @@ func runSyncConsumers(opts *commandOptions, consumerConfig consumers.Config) err
 		return fmt.Errorf("create canonical llm absurd workflow client: %w", err)
 	}
 	defer func() { _ = canonicalLLMWorkflowClient.Close() }()
-	consumer := consumers.New(logger, pool, pricesService, shortcutService, frontdoorService, postalService, propertiesService, frontdoorWorkflowClient, shortcutAPIWorkflowClient, shortcutScraperWorkflowClient, canonicalWorkflowClient, canonicalLLMWorkflowClient, workflowClient, pricesWorkflowClient)
+	consumer := consumers.New(logger, pool, shortcutService, frontdoorService, postalService, propertiesService, frontdoorWorkflowClient, shortcutAPIWorkflowClient, shortcutScraperWorkflowClient, canonicalWorkflowClient, canonicalLLMWorkflowClient, workflowClient, pricesWorkflowClient)
 	if err := consumer.Start(ctx, consumerConfig); err != nil {
 		return fmt.Errorf("start sync consumers: %w", err)
 	}

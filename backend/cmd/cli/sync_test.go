@@ -111,7 +111,7 @@ func TestLegacySyncShorthandIsRejected(t *testing.T) {
 
 func TestValidateSyncTask(t *testing.T) {
 	t.Parallel()
-	if err := validateSyncTask("prices_sync", []byte(`{"city":"Helsinki"}`)); err != nil {
+	if err := validateSyncTask("prices_match_sale_listings_fanout", []byte(`{}`)); err != nil {
 		t.Fatalf("validateSyncTask returned error: %v", err)
 	}
 	if err := validateSyncTask("frontdoor_ad_data_hash_backfill", []byte(`{}`)); err != nil {

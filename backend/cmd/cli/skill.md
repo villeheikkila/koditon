@@ -120,8 +120,7 @@ Common spawn commands:
 ./cli --json sync spawn frontdoor_sitemap_sync --watch
 ./cli --json sync spawn frontdoor_sync --params '{"source_type":"ad","source_id":"12345"}' --watch
 ./cli --json sync spawn shortcut_buildings_sitemap_sync
-./cli --json sync spawn prices_sync --params '{"city":"Helsinki"}' --watch
-./cli --json sync spawn prices_sync_all
+./cli --json sync spawn prices_match_sale_listings_fanout --watch
 ./cli --json sync spawn postal_sync
 ```
 

@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 
 	"koditon/internal/domain/ads"
+	"koditon/internal/domain/prices"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 )
 
@@ -48,9 +48,9 @@ func (r *Runner) ShortcutSitemap(ctx context.Context) ([]string, []string, error
 }
 
 func (r *Runner) PricesFetchCities(ctx context.Context) ([]string, error) {
-	cities, err := r.pricesService.FetchCities(ctx)
+	cities, err := r.pricesService.ListCities(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("fetch cities: %w", err)
+		return nil, fmt.Errorf("list prices cities: %w", err)
 	}
 	return cities, nil
 }
@@ -119,62 +119,6 @@ func (r *Runner) ShortcutBackfillAdDataHashes(ctx context.Context, limit int32) 
 		return result.Scanned, result.Updated, result.Batches, fmt.Errorf("backfill shortcut ad data hashes: %w", err)
 	}
 	return result.Scanned, result.Updated, result.Batches, nil
-}
-
-func (r *Runner) PricesSyncCityEntity(ctx context.Context, entityID string) error {
-	return r.PricesSyncCityEntityWithProgress(ctx, entityID, nil)
-}
-
-func (r *Runner) PricesSyncCityEntityWithProgress(ctx context.Context, entityID string, progressFn func(prices.SyncCityProgress)) error {
-	entityType, cityName, err := parseEntityID(entityID)
-	if err != nil {
-		return err
-	}
-	if entityType != "city" {
-		return &EntityParseError{EntityID: entityID, Reason: fmt.Sprintf("expected city entity type for prices sync, got: %s", entityType)}
-	}
-	if err := r.pricesService.SyncCityWithProgress(ctx, cityName, progressFn); err != nil {
-		return fmt.Errorf("sync prices city %s: %w", cityName, err)
-	}
-	return nil
-}
-
-func (r *Runner) PricesSyncCityIndex(ctx context.Context, cityName string, progressFn func(prices.SyncCityProgress)) (*prices.SyncCityIndexResult, error) {
-	result, err := r.pricesService.SyncCityIndex(ctx, cityName, progressFn)
-	if err != nil {
-		return nil, fmt.Errorf("sync prices city index %s: %w", cityName, err)
-	}
-	return result, nil
-}
-
-func (r *Runner) PricesSyncPostalCodeTransactions(ctx context.Context, cityName, postalCode string, progressFn func(prices.SyncPostalCodeProgress)) error {
-	if err := r.pricesService.SyncPostalCodeTransactions(ctx, cityName, postalCode, progressFn); err != nil {
-		return fmt.Errorf("sync prices postal code %s/%s: %w", cityName, postalCode, err)
-	}
-	return nil
-}
-
-func (r *Runner) PricesSyncPostalCodeTransactionPage(ctx context.Context, cityName, postalCode string, page int, progressFn func(prices.SyncPostalCodeProgress)) (*prices.SyncPostalCodePageResult, error) {
-	result, err := r.pricesService.SyncPostalCodeTransactionPage(ctx, cityName, postalCode, page, progressFn)
-	if err != nil {
-		return nil, fmt.Errorf("sync prices postal code page %s/%s/%d: %w", cityName, postalCode, page, err)
-	}
-	return result, nil
-}
-
-func (r *Runner) PricesSyncAll(ctx context.Context, cfg prices.SyncAllConfig) (*prices.SyncAllResult, error) {
-	result, err := r.pricesService.SyncAll(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("sync all prices: %w", err)
-	}
-	return result, nil
-}
-
-func (r *Runner) PricesSyncNeighborhoodPostalCodes(ctx context.Context, progressFn func(prices.SyncNeighborhoodPostalCodesProgress)) error {
-	if err := r.pricesService.SyncNeighborhoodPostalCodes(ctx, progressFn); err != nil {
-		return fmt.Errorf("sync neighborhood postal codes: %w", err)
-	}
-	return nil
 }
 
 func (r *Runner) PricesSearchTransactionsByCityAndAddress(ctx context.Context, cityName, searchTerm string, limit int32) ([]prices.SearchTransactionsRow, error) {

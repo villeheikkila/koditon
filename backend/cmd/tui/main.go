@@ -13,11 +13,11 @@ import (
 
 	"koditon/cmd/tui/internal/tui"
 	"koditon/internal/domain/ads"
+	"koditon/internal/domain/prices"
 	"koditon/internal/platform/config"
 	syncflows "koditon/internal/sync/flows"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/shortcut"
 	"koditon/internal/sync/workflows"
 )
@@ -46,10 +46,7 @@ func run(ctx context.Context, stderr io.Writer) error {
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
-	pricesService, err := prices.NewService(pool, cfg.Prices.BaseURL, cfg.OpenRouter.APIKey)
-	if err != nil {
-		return fmt.Errorf("create prices service: %w", err)
-	}
+	pricesService := prices.NewService(pool)
 	adsService := ads.NewService(pool)
 	shortcutService := shortcut.NewService(pool, logger, cfg.Shortcut.BaseURL, cfg.Shortcut.DocsBaseURL, cfg.Shortcut.AdBaseURL, cfg.Shortcut.UserAgent, cfg.Shortcut.SitemapBase)
 	frontdoorService := frontdoor.NewService(pool, logger, cfg.Frontdoor.BaseURL, cfg.Frontdoor.UserAgent, cfg.Frontdoor.Cookie, cfg.Frontdoor.SitemapBase)

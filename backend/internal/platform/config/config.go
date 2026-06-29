@@ -82,8 +82,6 @@ type rawConfig struct {
 	AuthAppleWebServiceID   string `env:"AUTH_APPLE_WEB_SERVICE_ID" envDefault:""`
 	AuthAppleWebRedirectURI string `env:"AUTH_APPLE_WEB_REDIRECT_URI" envDefault:""`
 
-	PricesBaseURL string `env:"PRICES_BASE_URL" envDefault:""`
-
 	ShortcutBaseURL     string `env:"SHORTCUT_BASE_URL" envDefault:""`
 	ShortcutDocsBaseURL string `env:"SHORTCUT_DOCS_BASE_URL" envDefault:""`
 	ShortcutAdBaseURL   string `env:"SHORTCUT_AD_BASE_URL" envDefault:""`
@@ -163,9 +161,6 @@ func (r rawConfig) toConfig() Config {
 				WebRedirectURI: r.AuthAppleWebRedirectURI,
 			},
 		},
-		Prices: PricesConfig{
-			BaseURL: r.PricesBaseURL,
-		},
 		Shortcut: ShortcutConfig{
 			BaseURL:     r.ShortcutBaseURL,
 			DocsBaseURL: r.ShortcutDocsBaseURL,
@@ -216,7 +211,6 @@ type Config struct {
 	DatabaseURL              string
 	Database                 DatabaseConfig
 	Auth                     AuthConfig
-	Prices                   PricesConfig
 	Shortcut                 ShortcutConfig
 	Frontdoor                FrontdoorConfig
 	OpenRouter               OpenRouterConfig
@@ -298,10 +292,6 @@ func (m *AppMode) UnmarshalText(text []byte) error {
 	m.Consumer = consumerSet
 	m.API = apiSet
 	return nil
-}
-
-type PricesConfig struct {
-	BaseURL string
 }
 
 type ShortcutConfig struct {
@@ -431,7 +421,6 @@ func (c Config) validateAPI(errs *[]error) {
 }
 
 func (c Config) validateConsumer(errs *[]error) {
-	requireURL(errs, "PRICES_BASE_URL", c.Prices.BaseURL)
 	requireURL(errs, "SHORTCUT_BASE_URL", c.Shortcut.BaseURL)
 	requireURL(errs, "SHORTCUT_DOCS_BASE_URL", c.Shortcut.DocsBaseURL)
 	requireURL(errs, "SHORTCUT_AD_BASE_URL", c.Shortcut.AdBaseURL)

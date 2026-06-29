@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"koditon/internal/sync/prices"
+	"koditon/internal/domain/prices"
 )
 
 type TransactionsFlags struct {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"koditon/internal/domain/prices"
 	syncflows "koditon/internal/sync/flows"
-	"koditon/internal/sync/prices"
 	"koditon/internal/sync/workflows"
 )
 
@@ -175,40 +175,19 @@ func buildSubsystems() []subsystem {
 		},
 		{
 			Title:       "Prices",
-			Description: "Prices batch and city-level sync",
+			Description: "Stored transaction data and listing matches",
 			Actions: []action{
 				{
-					Title:       "Cities Init (Full Sync Now)",
-					Description: "Queue prices city initialization and watch the durable job",
-					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnTaskRequest{syncTask("prices_cities_init", nil)})
-					},
-				},
-				{
 					Title:       "Cities Discover",
-					Description: "Fetch available prices cities without syncing",
+					Description: "List cities with stored prices transactions",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						report(progressUpdate{Message: "Fetching prices cities..."})
+						report(progressUpdate{Message: "Loading stored prices cities..."})
 						cities, err := app.runner.PricesFetchCities(ctx)
 						if err != nil {
 							return actionResult{}, err
 						}
-						report(progressUpdate{Message: fmt.Sprintf("Discovered %d cities", len(cities))})
+						report(progressUpdate{Message: fmt.Sprintf("Loaded %d cities", len(cities))})
 						return actionResult{Output: fmt.Sprintf("cities=%d list=%s", len(cities), strings.Join(cities, ", "))}, nil
-					},
-				},
-				{
-					Title:       "Sync All",
-					Description: "Queue prices sync-all fanout",
-					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnTaskRequest{syncTask("prices_sync_all", nil)})
-					},
-				},
-				{
-					Title:       "Neighborhood Postal Code Sync",
-					Description: "Queue neighborhood->postal code mapping sync",
-					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnTaskRequest{syncTask("prices_neighborhood_postal_code_sync", nil)})
 					},
 				},
 				{
@@ -216,15 +195,6 @@ func buildSubsystems() []subsystem {
 					Description: "Enqueue weekly transaction matching jobs for closed sale listings",
 					Run: func(ctx context.Context, app *appContext, _ []string, report reportFn) (actionResult, error) {
 						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnTaskRequest{syncTask("prices_match_sale_listings_fanout", nil)})
-					},
-				},
-				{
-					Title:         "Sync City by Name",
-					Description:   "Queue prices data sync for one city",
-					Prompts:       []string{"city name"},
-					UseCityPicker: true,
-					Run: func(ctx context.Context, app *appContext, inputs []string, report reportFn) (actionResult, error) {
-						return enqueueAndWatchSyncJobs(ctx, app, report, []workflows.SpawnTaskRequest{syncTask("prices_sync", map[string]string{"city": strings.TrimSpace(inputs[0])})})
 					},
 				},
 				{
