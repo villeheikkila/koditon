@@ -69,7 +69,7 @@ registerAppResource(
           ui: {
             csp: {
               connectDomains: [apiBaseUrl, webBaseUrl],
-              resourceDomains: [apiBaseUrl, webBaseUrl, "https://*.frontdoor.com", "https://*.shortcut.fi"]
+              resourceDomains: [apiBaseUrl, webBaseUrl]
             },
             prefersBorder: true
           }
