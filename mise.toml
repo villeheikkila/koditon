@@ -19,7 +19,9 @@ sqlc = "latest"
 LOG_LEVEL = "debug"
 APP_ENV      = "development"
 WEB_BASE_URL = "http://localhost:5173"
+OTEL_ENABLED = "{{ env.OTEL_ENABLED | default(value='false') }}"
 OPENAI_API_KEY = { age = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzdmV4QkUycVM2NWEycEFaRGM2RGpPNDhmdkdSTUJrZzV1ZWRkZTRCYzJZCmU3VlZoM3oyb0RFOEl0MW5QY05ETU9RaFBuL2svL0pZQ2gwSFdzQUdENE0KLT4gXlotZ3JlYXNlIGw8CnN3ZFhDY0FXQi9qdlVFSkMxMGpzeTZPcDdJTWNmQQotLS0gVlhrcWhrK2daQ2dzQm1pMnJ2R0VIZXRPekE3eGJSZGR0YzExZjBPNHRuVQpi2+1k6QCJqul7gP30i9se1nbt7nbEZ8cp5qGQsl39R8E2mF76IQY0Z/433vA+J96sIgUbPG4bKTV97BqI2RPhLH0SIg0KS3cByiEbmwZe9dY1mN8OuAaEFAxKBo9SOSylcDwMRCm9flCYkuvzYjUoLTPBODuBZY3+Ld/Y7ANIdQ74Rgl0dHzYj67hhUoB+eH4/TsH5U4O/ERUQHHRuCw3QGLIQD4d7uia4CuJdeZxd1b2tzdH+q2XoWdo13iNu6ZhqAKC" }
+TRACEWAY_PROJECT_TOKEN = { age = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUk9ITDVnQ05PMjFrejM3MEs1L1U4Z1JtL2VUYWQ4cGdlSUIxL056MTNVCk1ISzBLdVBNTWowUVJKV3NmcURqWHBCMytROWtFZHFEemc2RDVYMVlZWHMKLT4gbk1DOnVDJy1ncmVhc2Ugb0B4VztFCnhieStJMEdyKzdINWg1bytuR1JwdFMwVndMMHg2SGs5TmttOVRLalBmSDBFSWdGeDIyaUVJb09pTUY5dE1oK1QKMXh2Z2NPSk45VE85MmRCN28xWTl2Y250WFZZCi0tLSBjYkZCbmlJcVhIa0s2SjMwYXo3YzZJSlVRbDVER1lFbzVSbWlDZHFkNk9RCmPD/aJYPLg2yFfF+TwOCBA4oLYL/6ZvoS2UvJwz1ftOe2bDKKIYri2OJ1Ymld0jRV3vNdFOKXuDUzxE5Cf7O+0" }
 
 [tasks.dev]
 description = "Start backend and web dev servers"
@@ -49,6 +51,19 @@ run = "docker compose -f docker-compose.yml ps"
 [tasks."infra:local:pull"]
 description = "Pull local Docker Compose images"
 run = "docker compose -f docker-compose.yml pull"
+
+[tasks."infra:local:traceway"]
+description = "Start local Postgres and Traceway"
+run = "docker compose --profile traceway -f docker-compose.yml up -d postgres traceway"
+
+[tasks."infra:local:traceway:collector"]
+description = "Start the local Traceway OTel collector (requires TRACEWAY_PROJECT_TOKEN)"
+depends = ["infra:local:traceway"]
+run = '''
+set -euo pipefail
+: "${TRACEWAY_PROJECT_TOKEN:?set TRACEWAY_PROJECT_TOKEN from the Traceway project Connection page}"
+docker compose --profile traceway -f docker-compose.yml up -d traceway-otel-collector
+'''
 
 [tasks."infra:local:ensure"]
 description = "Start local Docker Compose infrastructure if Postgres is not already running"
@@ -102,6 +117,12 @@ run = "echo 'backend preflight complete'"
 description = "Ensure local infra is ready and run backend server with hot reload"
 depends = ["backend:dev:preflight"]
 run = { task = "backend:dev:watch" }
+
+[tasks."backend:dev:traceway"]
+description = "Run backend with local Traceway OTLP export enabled"
+depends = ["infra:local:traceway:collector", "backend:db:wait"]
+run = "mise -C {{config_root}}/backend run dev"
+env = { OTEL_ENABLED = "true", OTEL_SERVICE_NAME = "koditon-backend", OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318", OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf" }
 
 [tasks."backend:build"]
 description = "Build production binary"

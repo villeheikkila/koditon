@@ -18,11 +18,13 @@ import (
 	"koditon/internal/domain/emailauth"
 	"koditon/internal/platform/config"
 	"koditon/internal/platform/logging"
+	"koditon/internal/platform/telemetry"
 	api "koditon/internal/transport/openapi"
 	"koditon/internal/transport/web"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Server struct {
@@ -110,6 +112,7 @@ func (s *Server) recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
+				telemetry.RecordSpanError(trace.SpanFromContext(r.Context()), fmt.Errorf("panic: %v", recovered), "request panicked")
 				s.logger.ErrorContext(
 					r.Context(),
 					"request panicked",
@@ -191,6 +194,9 @@ func (s *Server) rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Ha
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		reqCtx := telemetry.WithOperationHolder(r.Context())
+		telemetry.RecordHTTPStart(reqCtx)
+		r = r.WithContext(reqCtx)
 		requestLogger := logging.With(
 			s.logger,
 			logging.Op("request.handle"),
@@ -209,6 +215,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 		} else if rw.status >= 400 {
 			logLevel = slog.LevelWarn
 		}
+		telemetry.RecordHTTPEnd(r.Context(), rw.status, duration, r.Method)
 		requestLogger.LogAttrs(
 			r.Context(),
 			logLevel,

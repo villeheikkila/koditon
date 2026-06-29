@@ -27,6 +27,7 @@ import (
 	"koditon/internal/platform/runtimecfg"
 	"koditon/internal/platform/runtimekv"
 	"koditon/internal/platform/schema"
+	"koditon/internal/platform/telemetry"
 	"koditon/internal/sync/consumers"
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
@@ -42,6 +43,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Run starts the API and/or consumer application for the configured mode.
@@ -66,9 +68,12 @@ func run(
 		return err
 	}
 	logger := newLogger(stderr, cfg)
+	telemetryResult := telemetry.Bootstrap(ctx, telemetryConfig(cfg), string(cfg.Environment), logger.Handler(), logger)
+	logger = telemetryResult.Logger
 	appLogger := logging.With(logger.With("component", "app"), logging.Op("app.start"))
 	info := buildinfo.Current()
 	lifecycle := newLifecycle(appLogger)
+	lifecycle.Defer("telemetry", telemetryResult.Shutdown)
 	defer func() {
 		if runErr != nil {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
@@ -83,8 +88,9 @@ func run(
 		"version", info.Version,
 		"commit", info.Commit,
 		"build_time", info.BuildTime,
+		"otel_enabled", telemetryResult.Enabled,
 	)
-	pool, err := newDatabasePool(ctx, cfg)
+	pool, err := newDatabasePool(ctx, cfg, telemetryResult.Enabled)
 	if err != nil {
 		return err
 	}
@@ -98,8 +104,18 @@ func run(
 	if err := schema.Check(ctx, db.New(pool)); err != nil {
 		return fmt.Errorf("check schema: %w", err)
 	}
+	if telemetryResult.Enabled {
+		unregister, err := telemetry.RegisterPGXPoolMetrics(pool)
+		if err != nil {
+			appLogger.WarnContext(ctx, "register pgx pool telemetry failed", "error", err)
+		} else {
+			lifecycle.Defer("pgx pool telemetry", func(context.Context) error {
+				return unregister()
+			})
+		}
+	}
 	appLogger.DebugContext(ctx, "database connection established")
-	workflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB)
+	workflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalDB, logger)
 	if err != nil {
 		return fmt.Errorf("create absurd workflow client: %w", err)
 	}
@@ -109,42 +125,42 @@ func run(
 	if err := workflows.EnsureQueues(ctx, workflowClient); err != nil {
 		return fmt.Errorf("ensure absurd workflow queues: %w", err)
 	}
-	canonicalLLMWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalLLM)
+	canonicalLLMWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueCanonicalLLM, logger)
 	if err != nil {
 		return fmt.Errorf("create canonical llm absurd workflow client: %w", err)
 	}
 	lifecycle.Defer("canonical llm absurd workflow client", func(context.Context) error {
 		return canonicalLLMWorkflowClient.Close()
 	})
-	postalWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePostal)
+	postalWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePostal, logger)
 	if err != nil {
 		return fmt.Errorf("create postal absurd workflow client: %w", err)
 	}
 	lifecycle.Defer("postal absurd workflow client", func(context.Context) error {
 		return postalWorkflowClient.Close()
 	})
-	pricesWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePrices)
+	pricesWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueuePrices, logger)
 	if err != nil {
 		return fmt.Errorf("create prices absurd workflow client: %w", err)
 	}
 	lifecycle.Defer("prices absurd workflow client", func(context.Context) error {
 		return pricesWorkflowClient.Close()
 	})
-	frontdoorWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueFrontdoor)
+	frontdoorWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueFrontdoor, logger)
 	if err != nil {
 		return fmt.Errorf("create frontdoor absurd workflow client: %w", err)
 	}
 	lifecycle.Defer("frontdoor absurd workflow client", func(context.Context) error {
 		return frontdoorWorkflowClient.Close()
 	})
-	shortcutAPIWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutAPI)
+	shortcutAPIWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutAPI, logger)
 	if err != nil {
 		return fmt.Errorf("create shortcut api absurd workflow client: %w", err)
 	}
 	lifecycle.Defer("shortcut api absurd workflow client", func(context.Context) error {
 		return shortcutAPIWorkflowClient.Close()
 	})
-	shortcutScraperWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutScraper)
+	shortcutScraperWorkflowClient, err := workflows.NewClient(cfg.DatabaseURL, workflows.QueueShortcutScraper, logger)
 	if err != nil {
 		return fmt.Errorf("create shortcut scraper absurd workflow client: %w", err)
 	}
@@ -283,12 +299,17 @@ func run(
 		apiConfig := openapi.NewConfig("Koditon API", "0.1.0")
 		auth.RegisterSecurityScheme(&apiConfig, cfg.APIPublicBaseURL)
 		api := humago.New(mux, apiConfig)
+		api.UseMiddleware(telemetry.HumaOperationMiddleware())
 		if oauthHandler != nil {
 			oauthHandler.RegisterRoutes(api)
 		}
+		handler := srv.Handler(mux, api)
+		if telemetryResult.Enabled {
+			handler = otelhttp.NewHandler(handler, "http.server")
+		}
 		httpServer = &http.Server{
 			Addr:              net.JoinHostPort(cfg.Host, cfg.Port),
-			Handler:           srv.Handler(mux, api),
+			Handler:           handler,
 			ReadTimeout:       15 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 			WriteTimeout:      30 * time.Second,
@@ -343,16 +364,38 @@ func run(
 	return nil
 }
 
-func newDatabasePool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
+func telemetryConfig(cfg config.Config) *telemetry.Config {
+	if cfg.Telemetry == nil {
+		return nil
+	}
+	return &telemetry.Config{
+		ServiceName:  cfg.Telemetry.ServiceName,
+		Version:      cfg.Telemetry.ServiceVersion,
+		InstanceID:   cfg.Telemetry.ServiceInstanceID,
+		OTLPEndpoint: cfg.Telemetry.OTLPEndpoint,
+		OTLPProtocol: cfg.Telemetry.OTLPProtocol,
+		OTLPInsecure: cfg.Telemetry.OTLPInsecure,
+		OTLPHeaders:  cfg.Telemetry.OTLPHeaders,
+		Sampler:      cfg.Telemetry.Sampler,
+		SamplerArg:   cfg.Telemetry.SamplerArg,
+		SampleRatio:  cfg.Telemetry.SampleRatio,
+	}
+}
+
+func newDatabasePool(ctx context.Context, cfg config.Config, telemetryEnabledValues ...bool) (*pgxpool.Pool, error) {
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse database pool config: %w", err)
 	}
+	telemetryEnabled := len(telemetryEnabledValues) > 0 && telemetryEnabledValues[0]
 	poolCfg.MaxConns = cfg.Database.MaxConns
 	poolCfg.MinConns = cfg.Database.MinConns
 	poolCfg.MaxConnLifetime = cfg.Database.MaxConnLifetime
 	poolCfg.MaxConnIdleTime = cfg.Database.MaxConnIdleTime
 	poolCfg.HealthCheckPeriod = cfg.Database.HealthCheckPeriod
+	if telemetryEnabled {
+		poolCfg.ConnConfig.Tracer = telemetry.NewPGXTracer()
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create database pool: %w", err)
@@ -525,7 +568,7 @@ func productionEnvOverrides(check productionModeCheck, getenv func(string) strin
 			strings.TrimSpace(getenv("POSTGRES_PASSWORD")),
 		)
 	}
-	return map[string]string{
+	overrides := map[string]string{
 		"APP_HOST":             "0.0.0.0",
 		"APP_PORT":             "8080",
 		"APP_ENV":              "production",
@@ -534,6 +577,27 @@ func productionEnvOverrides(check productionModeCheck, getenv func(string) strin
 		"LOG_LEVEL":            "info",
 		"DATABASE_URL":         databaseURL,
 	}
+	for _, name := range []string{
+		"OTEL_ENABLED",
+		"OTEL_SDK_DISABLED",
+		"OTEL_SERVICE_NAME",
+		"OTEL_SERVICE_VERSION",
+		"OTEL_SERVICE_INSTANCE_ID",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_HEADERS",
+		"OTEL_OTLP_ENDPOINT",
+		"OTEL_OTLP_PROTOCOL",
+		"OTEL_OTLP_INSECURE",
+		"OTEL_TRACES_SAMPLER",
+		"OTEL_TRACES_SAMPLER_ARG",
+		"OTEL_SAMPLE_RATIO",
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			overrides[name] = value
+		}
+	}
+	return overrides
 }
 
 func mergedEnv(base, overrides map[string]string) map[string]string {

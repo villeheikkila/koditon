@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"koditon/internal/platform/telemetry"
+
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
@@ -53,7 +55,7 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("set algorithm: %w", err)
 	}
 	client := &Client{
-		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		httpClient:   telemetry.HTTPClient(30*time.Second, nil),
 		bundleID:     cfg.BundleID,
 		teamID:       cfg.TeamID,
 		privateKeyID: cfg.PrivateKeyID,

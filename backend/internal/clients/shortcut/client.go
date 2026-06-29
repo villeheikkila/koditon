@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"koditon/internal/platform/telemetry"
+
 	"golang.org/x/sync/singleflight"
 )
 
@@ -92,7 +94,7 @@ func NewClient(logger *slog.Logger, tokenLoad TokenLoader, tokenStore TokenStore
 		}).DialContext,
 	}
 	httpClient := &http.Client{
-		Transport: transport,
+		Transport: telemetry.HTTPTransport(transport),
 	}
 	return &Client{
 		httpClient:         httpClient,

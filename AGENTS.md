@@ -15,6 +15,11 @@ This repository contains multiple sub-projects with their own agent guidelines.
 - Use Chrome DevTools MCP for browser testing and web flow verification.
 - Use the PostgreSQL MCP connection for database inspection and SQL queries.
 
+## Commits
+
+- Use conventional commit subjects: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, or `docs:` followed by a lowercase imperative summary.
+- Keep the subject concise and focused on the committed change.
+
 ## Backend
 
 For guidelines on working with the Go backend, see [backend/AGENTS.md](./backend/AGENTS.md).

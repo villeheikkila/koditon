@@ -65,6 +65,21 @@ type rawConfig struct {
 	DBMaxIdleTime   time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"5m"`
 	DBHealthPeriod  time.Duration `env:"DB_HEALTH_CHECK_PERIOD" envDefault:"1m"`
 
+	TelemetryEnabled          bool    `env:"OTEL_ENABLED"`
+	TelemetrySDKDisabled      bool    `env:"OTEL_SDK_DISABLED"`
+	TelemetryServiceName      string  `env:"OTEL_SERVICE_NAME" envDefault:""`
+	TelemetryServiceVersion   string  `env:"OTEL_SERVICE_VERSION" envDefault:""`
+	TelemetryServiceInstance  string  `env:"OTEL_SERVICE_INSTANCE_ID" envDefault:""`
+	TelemetryExporterEndpoint string  `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:""`
+	TelemetryExporterProtocol string  `env:"OTEL_EXPORTER_OTLP_PROTOCOL" envDefault:""`
+	TelemetryExporterHeaders  string  `env:"OTEL_EXPORTER_OTLP_HEADERS" envDefault:""`
+	TelemetryOTLPEndpoint     string  `env:"OTEL_OTLP_ENDPOINT" envDefault:""`
+	TelemetryOTLPProtocol     string  `env:"OTEL_OTLP_PROTOCOL" envDefault:""`
+	TelemetryOTLPInsecure     bool    `env:"OTEL_OTLP_INSECURE"`
+	TelemetryTracesSampler    string  `env:"OTEL_TRACES_SAMPLER" envDefault:""`
+	TelemetryTracesSamplerArg string  `env:"OTEL_TRACES_SAMPLER_ARG" envDefault:""`
+	TelemetrySampleRatio      float64 `env:"OTEL_SAMPLE_RATIO"`
+
 	AuthJWTSigningKey    string        `env:"AUTH_JWT_SIGNING_KEY" envDefault:""`
 	AuthJWTIssuer        string        `env:"AUTH_JWT_ISSUER" envDefault:""`
 	AuthJWTUIDHashSalt   string        `env:"AUTH_UID_HASH_SALT" envDefault:""`
@@ -142,6 +157,7 @@ func (r rawConfig) toConfig() Config {
 			MaxConnIdleTime:   r.DBMaxIdleTime,
 			HealthCheckPeriod: r.DBHealthPeriod,
 		},
+		Telemetry: r.telemetryConfig(),
 		Auth: AuthConfig{
 			JWTSigningKey:    r.AuthJWTSigningKey,
 			JWTIssuer:        r.AuthJWTIssuer,
@@ -199,6 +215,85 @@ func (r rawConfig) toConfig() Config {
 	}
 }
 
+func (r rawConfig) telemetryConfig() *TelemetryConfig {
+	if !r.telemetryConfigured() {
+		return nil
+	}
+	return &TelemetryConfig{
+		ServiceName:       r.TelemetryServiceName,
+		ServiceVersion:    r.TelemetryServiceVersion,
+		ServiceInstanceID: r.TelemetryServiceInstance,
+		OTLPEndpoint: firstNonEmpty(
+			r.TelemetryExporterEndpoint,
+			r.TelemetryOTLPEndpoint,
+		),
+		OTLPProtocol: firstNonEmpty(
+			r.TelemetryExporterProtocol,
+			r.TelemetryOTLPProtocol,
+		),
+		OTLPInsecure: r.TelemetryOTLPInsecure,
+		OTLPHeaders:  parseOTLPHeaders(r.TelemetryExporterHeaders),
+		Sampler:      r.TelemetryTracesSampler,
+		SamplerArg:   r.TelemetryTracesSamplerArg,
+		SampleRatio:  r.telemetrySampleRatio(),
+	}
+}
+
+func (r rawConfig) telemetryConfigured() bool {
+	if r.TelemetrySDKDisabled {
+		return false
+	}
+	return r.TelemetryEnabled ||
+		strings.TrimSpace(r.TelemetryServiceName) != "" ||
+		strings.TrimSpace(r.TelemetryServiceVersion) != "" ||
+		strings.TrimSpace(r.TelemetryServiceInstance) != "" ||
+		strings.TrimSpace(r.TelemetryExporterEndpoint) != "" ||
+		strings.TrimSpace(r.TelemetryExporterProtocol) != "" ||
+		strings.TrimSpace(r.TelemetryExporterHeaders) != "" ||
+		strings.TrimSpace(r.TelemetryOTLPEndpoint) != "" ||
+		strings.TrimSpace(r.TelemetryOTLPProtocol) != "" ||
+		strings.TrimSpace(r.TelemetryTracesSampler) != "" ||
+		strings.TrimSpace(r.TelemetryTracesSamplerArg) != ""
+}
+
+func (r rawConfig) telemetrySampleRatio() float64 {
+	if strings.TrimSpace(r.TelemetryTracesSamplerArg) != "" {
+		return 1
+	}
+	if r.TelemetrySampleRatio != 0 {
+		return r.TelemetrySampleRatio
+	}
+	return 1
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func parseOTLPHeaders(value string) map[string]string {
+	headers := map[string]string{}
+	for _, part := range strings.Split(value, ",") {
+		key, val, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		val = strings.TrimSpace(val)
+		if key != "" && val != "" {
+			headers[key] = val
+		}
+	}
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
+}
+
 // Config is the structured application configuration. Its shape is stable; all
 // env-var parsing details live in rawConfig.
 type Config struct {
@@ -210,6 +305,7 @@ type Config struct {
 	Mode                     AppMode
 	DatabaseURL              string
 	Database                 DatabaseConfig
+	Telemetry                *TelemetryConfig
 	Auth                     AuthConfig
 	Shortcut                 ShortcutConfig
 	Frontdoor                FrontdoorConfig
@@ -231,6 +327,19 @@ type DatabaseConfig struct {
 	MaxConnLifetime   time.Duration
 	MaxConnIdleTime   time.Duration
 	HealthCheckPeriod time.Duration
+}
+
+type TelemetryConfig struct {
+	ServiceName       string
+	ServiceVersion    string
+	ServiceInstanceID string
+	OTLPEndpoint      string
+	OTLPProtocol      string
+	OTLPInsecure      bool
+	OTLPHeaders       map[string]string
+	Sampler           string
+	SamplerArg        string
+	SampleRatio       float64
 }
 
 func (c Config) SlogLevel() slog.Level {
@@ -384,6 +493,7 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL must be debug, info, warn, warning, or error"))
 	}
 	validateURL(&errs, "DATABASE_URL", c.DatabaseURL, "postgres", "postgresql")
+	c.validateTelemetry(&errs)
 	if c.Mode.API {
 		c.validateAPI(&errs)
 	}
@@ -394,6 +504,52 @@ func (c Config) Validate() error {
 	validateOptionalURL(&errs, "API_PUBLIC_BASE_URL", c.APIPublicBaseURL, "http", "https")
 	validateCORSOrigins(&errs, c.CORSAllowedOrigins)
 	return errors.Join(errs...)
+}
+
+func (c Config) validateTelemetry(errs *[]error) {
+	if c.Telemetry == nil {
+		return
+	}
+	protocol := strings.ToLower(strings.TrimSpace(c.Telemetry.OTLPProtocol))
+	switch protocol {
+	case "", "http", "http/protobuf", "grpc":
+	default:
+		*errs = append(*errs, fmt.Errorf("OTEL_EXPORTER_OTLP_PROTOCOL must be http/protobuf, http, or grpc"))
+	}
+	if protocol == "grpc" {
+		validateOptionalHostPort(errs, "OTEL_EXPORTER_OTLP_ENDPOINT", c.Telemetry.OTLPEndpoint)
+	} else {
+		validateOptionalURL(errs, "OTEL_EXPORTER_OTLP_ENDPOINT", c.Telemetry.OTLPEndpoint, "http", "https")
+	}
+	if c.Telemetry.SampleRatio < 0 || c.Telemetry.SampleRatio > 1 {
+		*errs = append(*errs, fmt.Errorf("OTEL_SAMPLE_RATIO must be between 0 and 1"))
+	}
+	if strings.TrimSpace(c.Telemetry.SamplerArg) != "" {
+		ratio, err := strconv.ParseFloat(strings.TrimSpace(c.Telemetry.SamplerArg), 64)
+		if err != nil || ratio < 0 || ratio > 1 {
+			*errs = append(*errs, fmt.Errorf("OTEL_TRACES_SAMPLER_ARG must be a number between 0 and 1"))
+		}
+	}
+}
+
+func validateOptionalHostPort(errs *[]error, name string, value string) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return
+	}
+	if !strings.Contains(trimmed, "://") {
+		if strings.Contains(trimmed, " ") || !strings.Contains(trimmed, ":") {
+			*errs = append(*errs, fmt.Errorf("%s must be a valid URL or host:port", name))
+		}
+		return
+	}
+	if parsed, err := url.Parse(trimmed); err == nil && parsed.Scheme != "" {
+		if parsed.Host == "" {
+			*errs = append(*errs, fmt.Errorf("%s must be a valid URL or host:port", name))
+		}
+		return
+	}
+	*errs = append(*errs, fmt.Errorf("%s must be a valid URL or host:port", name))
 }
 
 func (c Config) validateAPI(errs *[]error) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"koditon/internal/db"
+	"koditon/internal/platform/telemetry"
 )
 
 const (
@@ -137,7 +138,7 @@ func (e openAIManagerCertificateExtractor) doJSON(ctx context.Context, method st
 	}
 	client := e.client
 	if client == nil {
-		client = http.DefaultClient
+		client = telemetry.HTTPClient(0, nil)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

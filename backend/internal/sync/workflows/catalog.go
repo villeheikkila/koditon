@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/earendil-works/absurd/sdks/go/absurd"
+
+	"koditon/internal/platform/telemetry"
 )
 
 const (
@@ -145,6 +147,7 @@ func Spawn(ctx context.Context, app spawnClient, req SpawnTaskRequest) (absurd.S
 		IdempotencyKey: idempotencyKey,
 		RetryStrategy:  &absurd.RetryStrategy{Kind: "exponential", BaseSeconds: 5, Factor: 2, MaxSeconds: 300},
 		Cancellation:   cancellation,
+		Headers:        telemetry.InjectWorkflowTraceHeaders(ctx, nil),
 	})
 }
 

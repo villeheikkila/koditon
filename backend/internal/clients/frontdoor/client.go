@@ -16,6 +16,7 @@ import (
 
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/sitemap"
+	"koditon/internal/platform/telemetry"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
 )
 
@@ -92,7 +93,7 @@ func New(baseURL, userAgent, cookie, sitemapBaseURL string) *Client {
 	}
 	httpClient := &http.Client{
 		Timeout:   defaultRequestTimeout,
-		Transport: transport,
+		Transport: telemetry.HTTPTransport(transport),
 	}
 	return &Client{
 		httpClient:     httpClient,

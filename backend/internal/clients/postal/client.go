@@ -10,6 +10,8 @@ import (
 	"time"
 	"unicode"
 
+	"koditon/internal/platform/telemetry"
+
 	"golang.org/x/text/encoding/charmap"
 )
 
@@ -68,7 +70,8 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: defaultRequestTimeout,
+			Timeout:   defaultRequestTimeout,
+			Transport: telemetry.HTTPTransport(nil),
 		},
 	}
 }
