@@ -299,24 +299,38 @@ func normalizeOTLPProtocol(value string) string {
 }
 
 func traceHTTPExporterEndpointOption(endpoint string) otlptracehttp.Option {
-	if parsed, err := url.Parse(endpoint); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		return otlptracehttp.WithEndpointURL(endpoint)
+	if endpointURL := httpSignalEndpointURL(endpoint, "/v1/traces"); endpointURL != "" {
+		return otlptracehttp.WithEndpointURL(endpointURL)
 	}
 	return otlptracehttp.WithEndpoint(endpoint)
 }
 
 func logHTTPExporterEndpointOption(endpoint string) otlploghttp.Option {
-	if parsed, err := url.Parse(endpoint); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		return otlploghttp.WithEndpointURL(endpoint)
+	if endpointURL := httpSignalEndpointURL(endpoint, "/v1/logs"); endpointURL != "" {
+		return otlploghttp.WithEndpointURL(endpointURL)
 	}
 	return otlploghttp.WithEndpoint(endpoint)
 }
 
 func metricHTTPExporterEndpointOption(endpoint string) otlpmetrichttp.Option {
-	if parsed, err := url.Parse(endpoint); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		return otlpmetrichttp.WithEndpointURL(endpoint)
+	if endpointURL := httpSignalEndpointURL(endpoint, "/v1/metrics"); endpointURL != "" {
+		return otlpmetrichttp.WithEndpointURL(endpointURL)
 	}
 	return otlpmetrichttp.WithEndpoint(endpoint)
+}
+
+func httpSignalEndpointURL(endpoint, signalPath string) string {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	switch strings.TrimRight(parsed.Path, "/") {
+	case "", "/api/otel":
+		parsed.Path = strings.TrimRight(parsed.Path, "/") + signalPath
+		return parsed.String()
+	default:
+		return endpoint
+	}
 }
 
 func grpcEndpoint(endpoint string) string {
