@@ -86,7 +86,8 @@ func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, n
 			return nil, err
 		}
 		plot := emptyToNull(tx.Plot)
-		if _, err := parsePlotOwned(plot); err != nil {
+		plotOwned, err := parsePlotOwned(plot)
+		if err != nil {
 			return nil, err
 		}
 		energyClass := emptyToNull(tx.EnergyClass)
@@ -121,6 +122,7 @@ func mapUpsertTransactionsBulkParams(transactions []*client.TransactionEntity, n
 		params.Elevators = append(params.Elevators, elevator)
 		params.Conditions = append(params.Conditions, condition)
 		params.Plots = append(params.Plots, plot)
+		params.PlotOwneds = append(params.PlotOwneds, plotOwned != nil && *plotOwned)
 		params.EnergyClasses = append(params.EnergyClasses, energyClass)
 		params.Categories = append(params.Categories, category)
 		params.PeriodIdentifiers = append(params.PeriodIdentifiers, periodIdentifier)
@@ -160,9 +162,9 @@ func parsePlotOwned(value string) (*bool, error) {
 	switch key {
 	case "":
 		return nil, nil
-	case "oma", "own", "owned", "omistus", "omistettu":
+	case "1", "oma", "own", "owned", "omistus", "omistettu":
 		return boolPtr(true), nil
-	case "vuokra", "rent", "rented", "rental", "lease", "leased", "vuokralla", "vuokratontti", "optional_rental", "valinnainen_vuokratontti":
+	case "2", "3", "vuokra", "rent", "rented", "rental", "lease", "leased", "vuokralla", "vuokratontti", "optional_rental", "valinnainen_vuokratontti":
 		return boolPtr(false), nil
 	default:
 		return nil, fmt.Errorf("invalid plot ownership value: %q", value)

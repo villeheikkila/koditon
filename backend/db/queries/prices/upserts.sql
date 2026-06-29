@@ -79,6 +79,7 @@ INSERT INTO public.prices_transactions (
     prices_transaction_elevator,
     prices_transaction_condition,
     prices_transaction_plot,
+    prices_transaction_plot_owned,
     prices_transaction_energy_class,
     prices_transaction_category,
     prices_transaction_period_identifier,
@@ -96,6 +97,7 @@ INSERT INTO public.prices_transactions (
     sqlc.arg(elevator),
     NULLIF(sqlc.arg(condition), ''),
     NULLIF(sqlc.arg(plot), ''),
+    sqlc.arg(plot_owned),
     NULLIF(sqlc.arg(energy_class), ''),
     sqlc.arg(category),
     sqlc.arg(period_identifier),
@@ -119,7 +121,8 @@ ON CONFLICT (
     prices_transaction_category
 ) DO UPDATE
 SET prices_transaction_updated_at = now(),
-    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier,
+    prices_transaction_plot_owned = EXCLUDED.prices_transaction_plot_owned
 WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months'
 RETURNING *;
 
@@ -135,6 +138,7 @@ INSERT INTO public.prices_transactions (
     prices_transaction_elevator,
     prices_transaction_condition,
     prices_transaction_plot,
+    prices_transaction_plot_owned,
     prices_transaction_energy_class,
     prices_transaction_category,
     prices_transaction_period_identifier,
@@ -154,6 +158,7 @@ SELECT DISTINCT ON (
     elevators,
     NULLIF(conditions, ''),
     NULLIF(plots, ''),
+    CASE WHEN NULLIF(plots, '') IS NULL THEN NULL ELSE plot_owneds END,
     NULLIF(energy_classes, ''),
     categories,
     period_identifiers
@@ -168,6 +173,7 @@ SELECT DISTINCT ON (
     elevators,
     NULLIF(conditions, ''),
     NULLIF(plots, ''),
+    plot_owneds,
     NULLIF(energy_classes, ''),
     categories,
     period_identifiers,
@@ -185,6 +191,7 @@ FROM ROWS FROM (
     unnest(CAST(sqlc.arg(elevators) AS boolean[])),
     unnest(CAST(sqlc.arg(conditions) AS text[])),
     unnest(CAST(sqlc.arg(plots) AS text[])),
+    unnest(CAST(sqlc.arg(plot_owneds) AS boolean[])),
     unnest(CAST(sqlc.arg(energy_classes) AS text[])),
     unnest(CAST(sqlc.arg(categories) AS text[])),
     unnest(CAST(sqlc.arg(period_identifiers) AS text[])),
@@ -200,6 +207,7 @@ FROM ROWS FROM (
     elevators,
     conditions,
     plots,
+    plot_owneds,
     energy_classes,
     categories,
     period_identifiers,
@@ -221,7 +229,8 @@ ON CONFLICT (
     prices_transaction_category
 ) DO UPDATE
 SET prices_transaction_updated_at = now(),
-    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier,
+    prices_transaction_plot_owned = EXCLUDED.prices_transaction_plot_owned
 WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months';
 
 -- name: UpdateNeighborhoodPostalCode :exec

@@ -334,7 +334,7 @@ function SourceCandidateList({ candidates, lookup }: { candidates: AddressSource
       <span className="address-source-records-title">Candidate source matches</span>
       {candidates.map(candidate => {
         const sourcePath = sourceEntityPath({ canonicalId: candidate.canonical_id, kind: candidate.kind })
-        const lookupPath = buildAddressLookupPath({ address: candidate.address, city: candidate.city, postal: candidate.postal, source: candidate.source })
+        const lookupPath = buildAddressLookupPath({ address: candidate.address, city: candidate.city, postal: candidate.postal, source: candidate.source, pageSize: lookup?.pageSize })
         return (
           <div className="address-source-record" key={`${candidate.listing_id}:${candidate.candidate_offering_id}`}>
             <div>
@@ -373,7 +373,7 @@ function SourceRecordList({ records, lookup, title = 'Same offering source recor
     <div className="address-source-records">
       <span className="address-source-records-title">{title}</span>
       {records.map(record => {
-        const lookupPath = buildAddressLookupPath({ address: record.address, city: record.city, postal: record.postal, source: record.source })
+        const lookupPath = buildAddressLookupPath({ address: record.address, city: record.city, postal: record.postal, source: record.source, pageSize: lookup?.pageSize })
         const sourcePath = sourceEntityPath({ canonicalId: record.canonical_id, kind: record.kind })
         return (
           <div className="address-source-record" key={record.listing_id}>
@@ -679,7 +679,8 @@ function RawTransactionMatches({ transaction, candidateMatches, lookup }: { tran
       })}
       {candidateMatches.map(match => {
         const text = match.status ? `${match.label} (${match.status})` : match.label
-        return match.path ? <Link key={match.id} to={match.path}>{text}</Link> : <span key={match.id}>{text}</span>
+        const path = withAddressLookupContext(match.path, lookup)
+        return path ? <Link key={match.id} to={path}>{text}</Link> : <span key={match.id}>{text}</span>
       })}
     </span>
   )

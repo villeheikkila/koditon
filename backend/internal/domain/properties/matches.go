@@ -181,7 +181,7 @@ SELECT
     COALESCE(pt.prices_transaction_condition, ''),
     COALESCE(public.fnc__condition_match_code(pt.prices_transaction_condition), ''),
     COALESCE(pt.prices_transaction_plot, ''),
-    COALESCE(pt.prices_transaction_plot_owned, public.fnc__plot_owned(pt.prices_transaction_plot)),
+    pt.prices_transaction_plot_owned,
     COALESCE(pt.prices_transaction_energy_class, ''),
     COALESCE(public.fnc__prices_transaction_energy_match_code(pt.prices_transaction_energy_class), ''),
     COALESCE(pt.prices_transaction_period_identifier, ''),

@@ -11,8 +11,11 @@ func TestParsePlotOwned(t *testing.T) {
 		error bool
 	}{
 		{name: "empty", value: "", want: nil},
+		{name: "owned numeric", value: "1", want: boolPtr(true)},
 		{name: "owned finnish", value: "Oma", want: boolPtr(true)},
 		{name: "owned english", value: "owned", want: boolPtr(true)},
+		{name: "rented numeric", value: "2", want: boolPtr(false)},
+		{name: "rented numeric alternate", value: "3", want: boolPtr(false)},
 		{name: "rented finnish", value: "Vuokra", want: boolPtr(false)},
 		{name: "rented compound", value: "valinnainen vuokratontti", want: boolPtr(false)},
 		{name: "unknown", value: "asumisoikeus", error: true},

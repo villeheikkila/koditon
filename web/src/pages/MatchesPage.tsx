@@ -54,7 +54,7 @@ export default function MatchesPage() {
 
 function MatchCard({ candidate, lookup, currentTransaction }: { candidate: TransactionMatchCandidate; lookup: AddressLookupInput; currentTransaction: string }) {
   const detailPath = sourceEntityPath({ canonicalId: candidate.listing.canonical_id })
-  const lookupPath = buildAddressLookupPath({ address: candidate.listing.street_address, city: candidate.listing.city, postal: candidate.listing.postal, source: candidate.listing.source_provider })
+  const lookupPath = buildAddressLookupPath({ address: candidate.listing.street_address, city: candidate.listing.city, postal: candidate.listing.postal, source: candidate.listing.source_provider, pageSize: lookup.pageSize })
   const transactionPath = currentTransaction === candidate.transaction.id ? '' : transactionReviewPath(candidate, lookup)
   return (
     <article className="matches-card">

@@ -248,6 +248,7 @@ INSERT INTO public.prices_transactions (
     prices_transaction_elevator,
     prices_transaction_condition,
     prices_transaction_plot,
+    prices_transaction_plot_owned,
     prices_transaction_energy_class,
     prices_transaction_category,
     prices_transaction_period_identifier,
@@ -265,10 +266,11 @@ INSERT INTO public.prices_transactions (
     $8,
     NULLIF($9, ''),
     NULLIF($10, ''),
-    NULLIF($11, ''),
-    $12,
+    $11,
+    NULLIF($12, ''),
     $13,
     $14,
+    $15,
     now(),
     now()
 )
@@ -288,7 +290,8 @@ ON CONFLICT (
     prices_transaction_category
 ) DO UPDATE
 SET prices_transaction_updated_at = now(),
-    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier,
+    prices_transaction_plot_owned = EXCLUDED.prices_transaction_plot_owned
 WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months'
 RETURNING prices_transaction_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_period_identifier, prices_transaction_created_at, prices_transaction_updated_at, prices_transaction_category, prices_neighborhood_id, prices_transaction_plot_owned
 `
@@ -304,6 +307,7 @@ type UpsertPricesTransactionParams struct {
 	Elevator            bool        `json:"elevator"`
 	Condition           interface{} `json:"condition"`
 	Plot                interface{} `json:"plot"`
+	PlotOwned           *bool       `json:"plot_owned"`
 	EnergyClass         interface{} `json:"energy_class"`
 	Category            string      `json:"category"`
 	PeriodIdentifier    string      `json:"period_identifier"`
@@ -322,6 +326,7 @@ func (q *Queries) UpsertPricesTransaction(ctx context.Context, arg UpsertPricesT
 		arg.Elevator,
 		arg.Condition,
 		arg.Plot,
+		arg.PlotOwned,
 		arg.EnergyClass,
 		arg.Category,
 		arg.PeriodIdentifier,
@@ -363,6 +368,7 @@ INSERT INTO public.prices_transactions (
     prices_transaction_elevator,
     prices_transaction_condition,
     prices_transaction_plot,
+    prices_transaction_plot_owned,
     prices_transaction_energy_class,
     prices_transaction_category,
     prices_transaction_period_identifier,
@@ -382,6 +388,7 @@ SELECT DISTINCT ON (
     elevators,
     NULLIF(conditions, ''),
     NULLIF(plots, ''),
+    CASE WHEN NULLIF(plots, '') IS NULL THEN NULL ELSE plot_owneds END,
     NULLIF(energy_classes, ''),
     categories,
     period_identifiers
@@ -396,6 +403,7 @@ SELECT DISTINCT ON (
     elevators,
     NULLIF(conditions, ''),
     NULLIF(plots, ''),
+    plot_owneds,
     NULLIF(energy_classes, ''),
     categories,
     period_identifiers,
@@ -413,10 +421,11 @@ FROM ROWS FROM (
     unnest(CAST($8 AS boolean[])),
     unnest(CAST($9 AS text[])),
     unnest(CAST($10 AS text[])),
-    unnest(CAST($11 AS text[])),
+    unnest(CAST($11 AS boolean[])),
     unnest(CAST($12 AS text[])),
     unnest(CAST($13 AS text[])),
-    unnest(CAST($14 AS uuid[]))
+    unnest(CAST($14 AS text[])),
+    unnest(CAST($15 AS uuid[]))
 ) AS t(
     descriptions,
     types,
@@ -428,6 +437,7 @@ FROM ROWS FROM (
     elevators,
     conditions,
     plots,
+    plot_owneds,
     energy_classes,
     categories,
     period_identifiers,
@@ -449,7 +459,8 @@ ON CONFLICT (
     prices_transaction_category
 ) DO UPDATE
 SET prices_transaction_updated_at = now(),
-    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier
+    prices_transaction_period_identifier = EXCLUDED.prices_transaction_period_identifier,
+    prices_transaction_plot_owned = EXCLUDED.prices_transaction_plot_owned
 WHERE prices_transactions.prices_transaction_updated_at >= now() - interval '12 months'
 `
 
@@ -464,6 +475,7 @@ type UpsertPricesTransactionsBulkParams struct {
 	Elevators            []bool      `json:"elevators"`
 	Conditions           []string    `json:"conditions"`
 	Plots                []string    `json:"plots"`
+	PlotOwneds           []bool      `json:"plot_owneds"`
 	EnergyClasses        []string    `json:"energy_classes"`
 	Categories           []string    `json:"categories"`
 	PeriodIdentifiers    []string    `json:"period_identifiers"`
@@ -482,6 +494,7 @@ func (q *Queries) UpsertPricesTransactionsBulk(ctx context.Context, arg UpsertPr
 		arg.Elevators,
 		arg.Conditions,
 		arg.Plots,
+		arg.PlotOwneds,
 		arg.EnergyClasses,
 		arg.Categories,
 		arg.PeriodIdentifiers,
