@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "traceway": {
+      "source": "tracewayapp/traceway",
+      "sourceType": "github",
+      "skillPath": "skills/traceway/SKILL.md",
+      "computedHash": "921c3a3e462741e00a7cadab228fa72b767cf1eba5b6d5429d6ad8fbe3f5651c"
+    },
+    "traceway-setup": {
+      "source": "tracewayapp/traceway",
+      "sourceType": "github",
+      "skillPath": "skills/traceway-setup/SKILL.md",
+      "computedHash": "0fa8d4764703c82ab1dffd852eac2153958f8a0ca5b32fc19218803f95cebe2b"
+    }
+  }
+}
