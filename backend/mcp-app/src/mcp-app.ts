@@ -35,7 +35,7 @@ type ListingRow = {
   transactions: PriceTransaction[];
 };
 type SearchResult = {
-  mode: "address" | "search";
+  mode: "address" | "search" | "transaction";
   web_url: string;
   rows: ListingRow[];
   transactions: PriceTransaction[];
@@ -248,7 +248,7 @@ async function showDetail(canonicalID: string): Promise<void> {
   detailState = { canonicalID: id, loading: true };
   render();
   try {
-    const response = await app.callServerTool({ name: "koditon_get_listing_detail", arguments: { id } });
+    const response = await app.callServerTool({ name: "koditon_get_property_detail", arguments: { id } });
     if (response.isError) throw new Error(contentText(response.content) || "Detail tool returned an error.");
     const detail = normalizeDetail(response.structuredContent, response.content);
     detailState = { canonicalID: id, loading: false, detail };
@@ -277,7 +277,19 @@ function applyHostContext(ctx: ReturnType<typeof app.getHostContext>): void {
 }
 function normalizeResult(value: unknown): SearchResult {
   if (typeof value === "object" && value != null && "rows" in value) {
-    return value as SearchResult;
+    const raw = value as Partial<SearchResult>;
+    const rows = Array.isArray(raw.rows) ? raw.rows.map((row) => ({ ...row, transactions: Array.isArray(row.transactions) ? row.transactions : [] })) : [];
+    const transactions = Array.isArray(raw.transactions) ? raw.transactions : rows.flatMap((row) => row.transactions);
+    return {
+      mode: raw.mode ?? "search",
+      web_url: raw.web_url ?? "",
+      rows,
+      transactions,
+      total: raw.total ?? rows.length,
+      page: raw.page ?? 1,
+      page_size: raw.page_size ?? rows.length,
+      summary: raw.summary ?? "Structured property results returned."
+    };
   }
   return { mode: "search", web_url: "", rows: [], transactions: [], total: 0, page: 1, page_size: 25, summary: "No structured result was returned." };
 }
