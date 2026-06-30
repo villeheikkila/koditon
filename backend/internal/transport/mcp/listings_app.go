@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"koditon/internal/domain/ads"
 
@@ -52,18 +53,32 @@ type listingsAppResult struct {
 
 type listingAppRow struct {
 	CanonicalID          string                   `json:"canonical_id"`
+	NativeID             string                   `json:"native_id,omitempty"`
+	ListingID            string                   `json:"listing_id,omitempty"`
+	OfferingID           string                   `json:"offering_id,omitempty"`
+	GroupingID           string                   `json:"grouping_id,omitempty"`
 	Source               string                   `json:"source"`
 	Kind                 string                   `json:"kind"`
 	Title                string                   `json:"title"`
 	Address              string                   `json:"address,omitempty"`
 	City                 string                   `json:"city,omitempty"`
 	Postal               string                   `json:"postal,omitempty"`
+	Latitude             *float64                 `json:"latitude,omitempty"`
+	Longitude            *float64                 `json:"longitude,omitempty"`
 	Price                *int64                   `json:"price,omitempty"`
 	Area                 *float64                 `json:"area,omitempty"`
 	RoomLayout           string                   `json:"room_layout,omitempty"`
 	URL                  string                   `json:"url,omitempty"`
 	ExternalURLAvailable bool                     `json:"external_url_available,omitempty"`
 	WebURL               string                   `json:"web_url"`
+	FirstSeenAt          *time.Time               `json:"first_seen_at,omitempty"`
+	LastSeenAt           *time.Time               `json:"last_seen_at,omitempty"`
+	PriceChanged         *bool                    `json:"price_changed,omitempty"`
+	MatchStatus          string                   `json:"match_status,omitempty"`
+	MatchMethod          string                   `json:"match_method,omitempty"`
+	MatchScore           *int32                   `json:"match_score,omitempty"`
+	InsightCount         int32                    `json:"insight_count,omitempty"`
+	InsightTopSeverity   string                   `json:"insight_top_severity,omitempty"`
 	Transactions         []priceTransactionAppRow `json:"transactions"`
 }
 
@@ -181,7 +196,7 @@ func (t *toolImpl) mapUnifiedListingAppRow(row ads.UnifiedEntityRow, includePric
 	if includePrices && strings.TrimSpace(row.PriceMatchTransactionID) != "" {
 		transactions = append(transactions, priceTransactionAppRow{TransactionID: strings.TrimSpace(row.PriceMatchTransactionID), ID: strings.TrimSpace(row.PriceMatchTransactionID), Price: row.PriceMatchPrice, Confidence: firstNonEmpty(row.PriceMatchStatus, row.PriceMatchScope, row.PriceMatchMethod)})
 	}
-	return listingAppRow{CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, Title: firstNonEmpty(row.Headline, row.Address, row.CanonicalID), Address: row.Address, City: row.City, Postal: row.Postal, Price: row.Price, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, WebURL: t.listingWebURL(row.CanonicalID, row.Kind, row.OfferingID), Transactions: transactions}
+	return listingAppRow{CanonicalID: row.CanonicalID, NativeID: row.NativeID, ListingID: row.ListingID, OfferingID: row.OfferingID, GroupingID: firstNonEmpty(row.HousingCompanyID, row.HousingCompanyName), Source: row.Source, Kind: row.Kind, Title: firstNonEmpty(row.Headline, row.Address, row.CanonicalID), Address: row.Address, City: row.City, Postal: row.Postal, Latitude: row.Latitude, Longitude: row.Longitude, Price: row.Price, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, WebURL: t.listingWebURL(row.CanonicalID, row.Kind, row.OfferingID), LastSeenAt: &row.LastSeenAt, MatchStatus: firstNonEmpty(row.LinkStatus, row.PriceMatchStatus), MatchMethod: firstNonEmpty(row.LinkMethod, row.PriceMatchMethod), MatchScore: firstInt32Ptr(row.LinkScore, row.PriceMatchScore), InsightCount: row.InsightCount, InsightTopSeverity: row.InsightTopSeverity, Transactions: transactions}
 }
 
 func (t *toolImpl) mapAddressListingAppRow(row ads.AddressListing) listingAppRow {
@@ -189,7 +204,8 @@ func (t *toolImpl) mapAddressListingAppRow(row ads.AddressListing) listingAppRow
 	for _, transaction := range row.Transactions {
 		transactions = append(transactions, mapLinkedAddressTransactionAppRow(transaction))
 	}
-	return listingAppRow{CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, Title: firstNonEmpty(row.Headline, row.Address, row.CanonicalID), Address: row.Address, City: row.City, Postal: row.Postal, Price: firstInt64Ptr(row.AskingPrice, row.DebtFreePrice), Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, WebURL: t.listingWebURL(row.CanonicalID, row.Kind, row.OfferingID), Transactions: transactions}
+	priceChanged := boolPtr(row.PreviousAskingPrice != nil || row.PreviousDebtFreePrice != nil)
+	return listingAppRow{CanonicalID: row.CanonicalID, NativeID: row.NativeID, ListingID: row.ListingID, OfferingID: row.OfferingID, GroupingID: firstNonEmpty(row.HousingCompanyID, row.HousingCompanyName), Source: row.Source, Kind: row.Kind, Title: firstNonEmpty(row.Headline, row.Address, row.CanonicalID), Address: row.Address, City: row.City, Postal: row.Postal, Latitude: row.Latitude, Longitude: row.Longitude, Price: firstInt64Ptr(row.AskingPrice, row.DebtFreePrice), Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, WebURL: t.listingWebURL(row.CanonicalID, row.Kind, row.OfferingID), FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PriceChanged: priceChanged, MatchStatus: firstNonEmpty(row.SourceMatchStatus, row.PriceMatchStatus), InsightCount: int32(len(row.Insights)), Transactions: transactions}
 }
 
 func mapLinkedAddressTransactionAppRow(row ads.AddressTransactionLink) priceTransactionAppRow {
@@ -369,4 +385,17 @@ func firstInt64Ptr(values ...*int64) *int64 {
 		}
 	}
 	return nil
+}
+
+func firstInt32Ptr(values ...*int32) *int32 {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

@@ -1629,6 +1629,8 @@ SELECT
     sl.sale_listing_street_address AS ad_address,
     sl.sale_listing_city AS ad_city,
     sl.sale_listing_postal AS ad_postal,
+    sl.sale_listing_latitude AS ad_latitude,
+    sl.sale_listing_longitude AS ad_longitude,
     sl.sale_listing_asking_price AS ad_price,
     COALESCE(sl.sale_listing_area_value, 0::float8) AS ad_area,
     COALESCE(sl.sale_listing_room_layout, '')::text AS ad_room_layout,
@@ -1674,6 +1676,8 @@ type GetFrontdoorAdUnifiedDetailRow struct {
 	AdAddress                           *string         `json:"ad_address"`
 	AdCity                              *string         `json:"ad_city"`
 	AdPostal                            *string         `json:"ad_postal"`
+	AdLatitude                          *float64        `json:"ad_latitude"`
+	AdLongitude                         *float64        `json:"ad_longitude"`
 	AdPrice                             *int64          `json:"ad_price"`
 	AdArea                              *float64        `json:"ad_area"`
 	AdRoomLayout                        string          `json:"ad_room_layout"`
@@ -1714,6 +1718,8 @@ func (q *Queries) GetFrontdoorAdUnifiedDetail(ctx context.Context, externalID st
 		&i.AdAddress,
 		&i.AdCity,
 		&i.AdPostal,
+		&i.AdLatitude,
+		&i.AdLongitude,
 		&i.AdPrice,
 		&i.AdArea,
 		&i.AdRoomLayout,
@@ -1772,6 +1778,8 @@ SELECT
     fb.frontdoor_building_postcode,
     fb.frontdoor_building_post_area,
     fb.frontdoor_building_municipality,
+    fb.frontdoor_building_latitude,
+    fb.frontdoor_building_longitude,
     fb.frontdoor_building_energy_certificate_code,
     jsonb_build_object(
         'announcement_id', fba.frontdoor_building_announcement_id,
@@ -1832,6 +1840,8 @@ type GetFrontdoorAnnouncementUnifiedDetailRow struct {
 	FrontdoorBuildingPostcode                    *string         `json:"frontdoor_building_postcode"`
 	FrontdoorBuildingPostArea                    *string         `json:"frontdoor_building_post_area"`
 	FrontdoorBuildingMunicipality                *string         `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingLatitude                    *float64        `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                   *float64        `json:"frontdoor_building_longitude"`
 	FrontdoorBuildingEnergyCertificateCode       *string         `json:"frontdoor_building_energy_certificate_code"`
 	RawJson                                      json.RawMessage `json:"raw_json"`
 }
@@ -1866,6 +1876,8 @@ func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, ann
 		&i.FrontdoorBuildingPostcode,
 		&i.FrontdoorBuildingPostArea,
 		&i.FrontdoorBuildingMunicipality,
+		&i.FrontdoorBuildingLatitude,
+		&i.FrontdoorBuildingLongitude,
 		&i.FrontdoorBuildingEnergyCertificateCode,
 		&i.RawJson,
 	)
@@ -2570,6 +2582,8 @@ SELECT
     COALESCE(sl.sale_listing_street_address, public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data), sb.shortcut_building_address) AS ad_address,
     COALESCE(sl.sale_listing_city, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '')) AS ad_city,
     COALESCE(sl.sale_listing_postal, NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '')) AS ad_postal,
+    COALESCE(sl.sale_listing_latitude, sb.shortcut_building_latitude) AS ad_latitude,
+    COALESCE(sl.sale_listing_longitude, sb.shortcut_building_longitude) AS ad_longitude,
     COALESCE(sl.sale_listing_room_layout, sa.shortcut_ad_data #>> '{adData,roomConfiguration}')::text AS ad_room_layout,
     COALESCE(sl.sale_listing_asking_price, COALESCE(public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,priceSell}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,price}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}'), public.fnc__try_parse_bigint(sa.shortcut_ad_data #>> '{priceData,rentPerDay}'))) AS ad_price,
     COALESCE(sl.sale_listing_area_value, COALESCE(public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,size}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeTotal}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeLiving}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,sizeMin}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}'), public.fnc__try_parse_float8(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}')), 0::float8) AS ad_area,
@@ -2617,6 +2631,8 @@ type GetShortcutAdUnifiedDetailRow struct {
 	AdAddress                          *string         `json:"ad_address"`
 	AdCity                             *string         `json:"ad_city"`
 	AdPostal                           *string         `json:"ad_postal"`
+	AdLatitude                         *float64        `json:"ad_latitude"`
+	AdLongitude                        *float64        `json:"ad_longitude"`
 	AdRoomLayout                       string          `json:"ad_room_layout"`
 	AdPrice                            *int64          `json:"ad_price"`
 	AdArea                             *float64        `json:"ad_area"`
@@ -2662,6 +2678,8 @@ func (q *Queries) GetShortcutAdUnifiedDetail(ctx context.Context, adID int64) (G
 		&i.AdAddress,
 		&i.AdCity,
 		&i.AdPostal,
+		&i.AdLatitude,
+		&i.AdLongitude,
 		&i.AdRoomLayout,
 		&i.AdPrice,
 		&i.AdArea,
@@ -3735,6 +3753,8 @@ WITH unified AS (
         ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id,
         COALESCE(linked.sale_listing_id::text, '') AS listing_id,
         COALESCE(linked.property_offering_id::text, '') AS offering_id,
+        linked.latitude,
+        linked.longitude,
         COALESCE(linked.link_status, '') AS link_status,
         COALESCE(linked.link_method, '') AS link_method,
         linked.link_score::int4 AS link_score,
@@ -3757,6 +3777,8 @@ WITH unified AS (
         SELECT
             sl.sale_listing_id,
             pos.property_offering_id,
+            sl.sale_listing_latitude AS latitude,
+            sl.sale_listing_longitude AS longitude,
             pos.property_offering_source_link_status AS link_status,
             pos.property_offering_source_link_method AS link_method,
             pos.property_offering_source_link_score AS link_score
@@ -3783,6 +3805,8 @@ WITH unified AS (
         ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
         ''::text AS listing_id,
         ''::text AS offering_id,
+        sb.shortcut_building_latitude AS latitude,
+        sb.shortcut_building_longitude AS longitude,
         ''::text AS link_status,
         ''::text AS link_method,
         NULL::int4 AS link_score,
@@ -3808,6 +3832,8 @@ WITH unified AS (
         sl.sale_listing_id::text AS canonical_id,
         sl.sale_listing_id::text AS listing_id,
         COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        sl.sale_listing_latitude AS latitude,
+        sl.sale_listing_longitude AS longitude,
         COALESCE(pos.property_offering_source_link_status, '') AS link_status,
         COALESCE(pos.property_offering_source_link_method, '') AS link_method,
         pos.property_offering_source_link_score::int4 AS link_score,
@@ -3846,6 +3872,8 @@ WITH unified AS (
         sl.sale_listing_id::text AS canonical_id,
         sl.sale_listing_id::text AS listing_id,
         COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        sl.sale_listing_latitude AS latitude,
+        sl.sale_listing_longitude AS longitude,
         COALESCE(pos.property_offering_source_link_status, '') AS link_status,
         COALESCE(pos.property_offering_source_link_method, '') AS link_method,
         pos.property_offering_source_link_score::int4 AS link_score,
@@ -3885,6 +3913,8 @@ WITH unified AS (
         ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
         ''::text AS listing_id,
         ''::text AS offering_id,
+        fb.frontdoor_building_latitude AS latitude,
+        fb.frontdoor_building_longitude AS longitude,
         ''::text AS link_status,
         ''::text AS link_method,
         NULL::int4 AS link_score,
@@ -3903,7 +3933,7 @@ WITH unified AS (
         NULL::timestamptz AS published_at
     FROM public.frontdoor_buildings fb
 ), filtered AS (
-    SELECT source, kind, native_id, canonical_id, listing_id, offering_id, link_status, link_method, link_score, external_url_available, headline, address, city, postal, price, area, room_layout, url, last_seen_at, searchable, listing_type, published_at
+    SELECT source, kind, native_id, canonical_id, listing_id, offering_id, latitude, longitude, link_status, link_method, link_score, external_url_available, headline, address, city, postal, price, area, room_layout, url, last_seen_at, searchable, listing_type, published_at
     FROM unified u
     WHERE ($4 = 'all' OR u.source = $4)
       AND ($5 = 'all' OR u.kind = $5)
@@ -3926,6 +3956,8 @@ SELECT
     u.canonical_id::text AS canonical_id,
     u.listing_id::text AS listing_id,
     u.offering_id::text AS offering_id,
+    u.latitude,
+    u.longitude,
     COALESCE(hc.housing_company_id::text, '')::text AS housing_company_id,
     COALESCE(hc.housing_company_name, '') AS housing_company_name,
     u.link_status,
@@ -4035,6 +4067,8 @@ type SearchUnifiedEntitiesRow struct {
 	CanonicalID             string    `json:"canonical_id"`
 	ListingID               string    `json:"listing_id"`
 	OfferingID              string    `json:"offering_id"`
+	Latitude                *float64  `json:"latitude"`
+	Longitude               *float64  `json:"longitude"`
 	HousingCompanyID        string    `json:"housing_company_id"`
 	HousingCompanyName      string    `json:"housing_company_name"`
 	LinkStatus              string    `json:"link_status"`
@@ -4093,6 +4127,8 @@ func (q *Queries) SearchUnifiedEntities(ctx context.Context, arg SearchUnifiedEn
 			&i.CanonicalID,
 			&i.ListingID,
 			&i.OfferingID,
+			&i.Latitude,
+			&i.Longitude,
 			&i.HousingCompanyID,
 			&i.HousingCompanyName,
 			&i.LinkStatus,

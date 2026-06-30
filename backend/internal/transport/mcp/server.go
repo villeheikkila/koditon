@@ -64,6 +64,8 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 		"koditon_find_listings":                {auth.ScopeMCPCoreRead},
 		"koditon_query_properties":             {auth.ScopeMCPCoreRead},
 		"koditon_get_property_detail":          {auth.ScopeMCPCoreRead},
+		"koditon_compare_properties":           {auth.ScopeMCPCoreRead},
+		"koditon_get_property_market_context":  {auth.ScopeMCPCoreRead},
 		"koditon_search_listings":              {auth.ScopeMCPCoreRead},
 		"koditon_get_listing_detail":           {auth.ScopeMCPCoreRead},
 		"koditon_search_transactions":          {auth.ScopeMCPCoreRead},
@@ -77,6 +79,8 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 	mcp.AddTool(server, impl.findListingsTool(), impl.findListings)
 	mcp.AddTool(server, impl.queryPropertiesTool(), impl.queryProperties)
 	mcp.AddTool(server, impl.getPropertyDetailTool(), impl.getPropertyDetail)
+	mcp.AddTool(server, impl.comparePropertiesTool(), impl.compareProperties)
+	mcp.AddTool(server, impl.getPropertyMarketContextTool(), impl.getPropertyMarketContext)
 	mcp.AddTool(server, impl.searchListingsTool(), impl.searchListings)
 	mcp.AddTool(server, impl.getListingDetailTool(), impl.getListingDetail)
 	mcp.AddTool(server, impl.searchTransactionsTool(), impl.searchTransactions)

@@ -64,6 +64,8 @@ type UnifiedEntityRow struct {
 	Address                 string
 	City                    string
 	Postal                  string
+	Latitude                *float64
+	Longitude               *float64
 	Price                   *int64
 	Area                    *float64
 	RoomLayout              string
@@ -100,6 +102,8 @@ type AddressOffering struct {
 	Address              string                   `json:"address,omitempty"`
 	City                 string                   `json:"city,omitempty"`
 	Postal               string                   `json:"postal,omitempty"`
+	Latitude             *float64                 `json:"latitude,omitempty"`
+	Longitude            *float64                 `json:"longitude,omitempty"`
 	AskingPrice          *int64                   `json:"asking_price,omitempty"`
 	DebtFreePrice        *int64                   `json:"debt_free_price,omitempty"`
 	Area                 *float64                 `json:"area,omitempty"`
@@ -127,6 +131,8 @@ type AddressListing struct {
 	Address               string                   `json:"address"`
 	City                  string                   `json:"city,omitempty"`
 	Postal                string                   `json:"postal,omitempty"`
+	Latitude              *float64                 `json:"latitude,omitempty"`
+	Longitude             *float64                 `json:"longitude,omitempty"`
 	AskingPrice           *int64                   `json:"asking_price,omitempty"`
 	DebtFreePrice         *int64                   `json:"debt_free_price,omitempty"`
 	Area                  *float64                 `json:"area,omitempty"`
@@ -168,6 +174,8 @@ type AddressSourceRecord struct {
 	Address               string               `json:"address,omitempty"`
 	City                  string               `json:"city,omitempty"`
 	Postal                string               `json:"postal,omitempty"`
+	Latitude              *float64             `json:"latitude,omitempty"`
+	Longitude             *float64             `json:"longitude,omitempty"`
 	AskingPrice           *int64               `json:"asking_price,omitempty"`
 	DebtFreePrice         *int64               `json:"debt_free_price,omitempty"`
 	Area                  *float64             `json:"area,omitempty"`
@@ -356,6 +364,8 @@ type UnifiedCanonicalFields struct {
 	Address              string
 	City                 string
 	Postal               string
+	Latitude             *float64
+	Longitude            *float64
 	Price                *int64
 	Area                 *float64
 	RoomLayout           string
@@ -381,6 +391,8 @@ type NormalizedDetailFields struct {
 	StreetAddress            string   `json:"street_address,omitempty"`
 	City                     string   `json:"city,omitempty"`
 	Postal                   string   `json:"postal,omitempty"`
+	Latitude                 *float64 `json:"latitude,omitempty"`
+	Longitude                *float64 `json:"longitude,omitempty"`
 	AskingPrice              *int64   `json:"asking_price,omitempty"`
 	DebtFreePrice            *int64   `json:"debt_free_price,omitempty"`
 	DebtShareAmount          *int64   `json:"debt_share_amount,omitempty"`
@@ -496,6 +508,8 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 			Address:                 strings.TrimSpace(row.Address),
 			City:                    strings.TrimSpace(row.City),
 			Postal:                  strings.TrimSpace(row.Postal),
+			Latitude:                row.Latitude,
+			Longitude:               row.Longitude,
 			Price:                   int64Ptr(row.Price),
 			Area:                    float64Ptr(row.Area),
 			RoomLayout:              strings.TrimSpace(row.RoomLayout),
@@ -571,7 +585,7 @@ func (s *Service) LookupAddress(ctx context.Context, params AddressLookupParams)
 	lookupRows := []addressLookupRow{}
 	for rows.Next() {
 		var row addressLookupRow
-		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.HousingCompanyID, &row.HousingCompanyName, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.InsightsJSON, &row.ListingCount, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges, &row.SourceRecordInsightsJSON); err != nil {
+		if err := rows.Scan(&row.ListingID, &row.CanonicalID, &row.Source, &row.Kind, &row.NativeID, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Latitude, &row.Longitude, &row.AskingPrice, &row.DebtFreePrice, &row.Area, &row.RoomLayout, &row.URL, &row.ExternalURLAvailable, &row.FirstSeenAt, &row.LastSeenAt, &row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &row.PreviousAskingPrice, &row.PreviousDebtFreePrice, &row.PriceMatchStatus, &row.SourceMatchStatus, &row.OfferingID, &row.HousingCompanyID, &row.HousingCompanyName, &row.AvailabilityText, &row.RenovationsDoneText, &row.RenovationsPlannedText, &row.AdditionalInfoText, &row.ChargesText, &row.InsightsJSON, &row.ListingCount, &row.TransactionID, &row.LinkType, &row.LinkStatus, &row.LinkMethod, &row.Score, &row.Confidence, &row.PriceDeltaPercent, &row.Reasons, &row.TransactionDescription, &row.TransactionType, &row.TransactionCategory, &row.TransactionArea, &row.TransactionPrice, &row.TransactionPricePerM2, &row.TransactionBuildYear, &row.TransactionFloor, &row.TransactionElevator, &row.TransactionCondition, &row.TransactionPlot, &row.TransactionEnergyClass, &row.TransactionPeriodIdentifier, &row.TransactionCity, &row.TransactionNeighborhood, &row.TransactionPostal, &row.TransactionCreatedAt, &row.TransactionUpdatedAt, &row.SourceRecordListingID, &row.SourceRecordCanonicalID, &row.SourceRecordSource, &row.SourceRecordKind, &row.SourceRecordNativeID, &row.SourceRecordHeadline, &row.SourceRecordAddress, &row.SourceRecordCity, &row.SourceRecordPostal, &row.SourceRecordLatitude, &row.SourceRecordLongitude, &row.SourceRecordAskingPrice, &row.SourceRecordDebtFreePrice, &row.SourceRecordArea, &row.SourceRecordRoomLayout, &row.SourceRecordURL, &row.SourceRecordExternalURLAvailable, &row.SourceRecordFirstSeenAt, &row.SourceRecordLastSeenAt, &row.SourceRecordUpdatedAt, &row.SourceRecordPreviousAsk, &row.SourceRecordPreviousDebt, &row.SourceRecordLinkStatus, &row.SourceRecordLinkMethod, &row.SourceRecordLinkScore, &row.SourceRecordAvailability, &row.SourceRecordRenovationsDone, &row.SourceRecordRenovationsPlan, &row.SourceRecordAdditionalInfo, &row.SourceRecordCharges, &row.SourceRecordInsightsJSON); err != nil {
 			return AddressLookupResult{}, fmt.Errorf("scan address listing: %w", err)
 		}
 		lookupRows = append(lookupRows, row)
@@ -612,7 +626,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut ad detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), ExternalURLAvailable: strings.TrimSpace(row.ShortcutAdUrl) != "" && row.ShortcutAdLastSeenAt.After(time.Now().AddDate(0, 0, -7)), LastSeenAt: row.ShortcutAdLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), strconv.FormatInt(row.ShortcutAdID, 10)), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Latitude: row.AdLatitude, Longitude: row.AdLongitude, Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.ShortcutAdUrl), ExternalURLAvailable: strings.TrimSpace(row.ShortcutAdUrl) != "" && row.ShortcutAdLastSeenAt.After(time.Now().AddDate(0, 0, -7)), LastSeenAt: row.ShortcutAdLastSeenAt}}
 			detail.Normalized = normalizedFromShortcutAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "Ad Type", Value: row.ShortcutAdType}, {Label: "Building ID", Value: ptrUUIDToString(row.ShortcutBuildingID)}, {Label: "Building External ID", Value: formatInt64Ptr(row.ShortcutBuildingExternalID)}, {Label: "Building Address", Value: valueOrEmpty(row.ShortcutBuildingAddress)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building URL", Value: valueOrEmpty(row.ShortcutBuildingUrl)}}
 			detail.Related = []DetailField{{Label: "Building Listings", Value: strconv.FormatInt(row.BuildingListingCount, 10)}, {Label: "Building Rentals", Value: strconv.FormatInt(row.BuildingRentalCount, 10)}}
@@ -631,7 +645,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get shortcut building detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.ShortcutBuildingAddress), valueOrEmpty(row.ShortcutBuildingHousingCompany), formatInt64Value(row.ShortcutBuildingExternalID)), Address: valueOrEmpty(row.ShortcutBuildingAddress), URL: strings.TrimSpace(row.ShortcutBuildingUrl), ExternalURLAvailable: row.ShortcutBuildingPageNotFound != nil && !*row.ShortcutBuildingPageNotFound, LastSeenAt: firstTimeValue(row.ShortcutBuildingUpdatedAt, row.ShortcutBuildingProcessedAt)}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.ShortcutBuildingAddress), valueOrEmpty(row.ShortcutBuildingHousingCompany), formatInt64Value(row.ShortcutBuildingExternalID)), Address: valueOrEmpty(row.ShortcutBuildingAddress), Latitude: row.ShortcutBuildingLatitude, Longitude: row.ShortcutBuildingLongitude, URL: strings.TrimSpace(row.ShortcutBuildingUrl), ExternalURLAvailable: row.ShortcutBuildingPageNotFound != nil && !*row.ShortcutBuildingPageNotFound, LastSeenAt: firstTimeValue(row.ShortcutBuildingUpdatedAt, row.ShortcutBuildingProcessedAt)}}
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt64Value(row.ShortcutBuildingExternalID)}, {Label: "Housing Company", Value: valueOrEmpty(row.ShortcutBuildingHousingCompany)}, {Label: "Building Type", Value: valueOrEmpty(row.ShortcutBuildingBuildingType)}, {Label: "Building Subtype", Value: valueOrEmpty(row.ShortcutBuildingBuildingSubtype)}, {Label: "Construction Year", Value: formatInt32(row.ShortcutBuildingConstructionYear)}, {Label: "Floor Count", Value: formatInt32(row.ShortcutBuildingFloorCount)}, {Label: "Apartment Count", Value: formatInt32(row.ShortcutBuildingApartmentCount)}, {Label: "Heating System", Value: valueOrEmpty(row.ShortcutBuildingHeatingSystem)}, {Label: "Building Material", Value: valueOrEmpty(row.ShortcutBuildingBuildingMaterial)}, {Label: "Plot Type", Value: valueOrEmpty(row.ShortcutBuildingPlotType)}, {Label: "Wall Structure", Value: valueOrEmpty(row.ShortcutBuildingWallStructure)}, {Label: "Heat Source", Value: valueOrEmpty(row.ShortcutBuildingHeatSource)}, {Label: "Has Elevator", Value: valueOrEmpty(row.ShortcutBuildingHasElevator)}, {Label: "Has Sauna", Value: valueOrEmpty(row.ShortcutBuildingHasSauna)}, {Label: "Latitude", Value: formatFloat64Ptr(row.ShortcutBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.ShortcutBuildingLongitude)}, {Label: "Page Not Found", Value: formatBoolPtr(row.ShortcutBuildingPageNotFound)}}
 			detail.Related = []DetailField{{Label: "Linked Ads", Value: strconv.FormatInt(row.AdCount, 10)}, {Label: "Listings", Value: strconv.FormatInt(row.ListingCount, 10)}, {Label: "Rentals", Value: strconv.FormatInt(row.RentalCount, 10)}}
 			detail.Raw = buildRawPayload(row.RawJson)
@@ -650,7 +664,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor ad detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), ExternalURLAvailable: !row.FrontdoorAdPageNotFound, LastSeenAt: row.FrontdoorAdLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.AdAddress), row.FrontdoorAdExternalID), Address: valueOrEmpty(row.AdAddress), City: valueOrEmpty(row.AdCity), Postal: valueOrEmpty(row.AdPostal), Latitude: row.AdLatitude, Longitude: row.AdLongitude, Price: row.AdPrice, Area: row.AdArea, RoomLayout: strings.TrimSpace(row.AdRoomLayout), URL: strings.TrimSpace(row.FrontdoorAdUrl), ExternalURLAvailable: !row.FrontdoorAdPageNotFound, LastSeenAt: row.FrontdoorAdLastSeenAt}}
 			detail.Normalized = normalizedFromFrontdoorAdDetail(canonicalID, source, kind, detail.Canonical, row)
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: row.FrontdoorAdExternalID}, {Label: "Property Type", Value: strings.TrimSpace(row.AdPropertyType)}, {Label: "Condition", Value: strings.TrimSpace(row.AdCondition)}, {Label: "Page Not Found", Value: formatBool(row.FrontdoorAdPageNotFound)}}
 			detail.Raw = buildRawPayload(row.FrontdoorAdData)
@@ -668,7 +682,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor announcement detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), formatInt32(row.FrontdoorBuildingAnnouncementExternalID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine2)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingAnnouncementLocation), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), Price: float64ToInt64Ptr(row.FrontdoorBuildingAnnouncementSearchPrice), Area: row.FrontdoorBuildingAnnouncementArea, RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), URL: valueOrEmpty(row.FrontdoorBuildingUrl), ExternalURLAvailable: boolPtrValue(row.FrontdoorBuildingAnnouncementPublished), LastSeenAt: row.FrontdoorBuildingAnnouncementLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID), formatInt32(row.FrontdoorBuildingAnnouncementExternalID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine1), valueOrEmpty(row.FrontdoorBuildingAnnouncementAddressLine2)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingAnnouncementLocation), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), Latitude: row.FrontdoorBuildingLatitude, Longitude: row.FrontdoorBuildingLongitude, Price: float64ToInt64Ptr(row.FrontdoorBuildingAnnouncementSearchPrice), Area: row.FrontdoorBuildingAnnouncementArea, RoomLayout: valueOrEmpty(row.FrontdoorBuildingAnnouncementRoomStructure), URL: valueOrEmpty(row.FrontdoorBuildingUrl), ExternalURLAvailable: boolPtrValue(row.FrontdoorBuildingAnnouncementPublished), LastSeenAt: row.FrontdoorBuildingAnnouncementLastSeenAt}}
 			detail.SourceSpecific = []DetailField{{Label: "External ID", Value: formatInt32(row.FrontdoorBuildingAnnouncementExternalID)}, {Label: "Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementFriendlyID)}, {Label: "Property Type", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertyType)}, {Label: "Property Subtype", Value: valueOrEmpty(row.FrontdoorBuildingAnnouncementPropertySubtype)}, {Label: "Published", Value: formatBoolPtr(row.FrontdoorBuildingAnnouncementPublished)}}
 			detail.Related = []DetailField{{Label: "Building ID", Value: row.FrontdoorBuildingID.String()}, {Label: "Housing Company ID", Value: formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Building Street", Value: valueOrEmpty(row.FrontdoorBuildingStreetAddress)}, {Label: "Building House #", Value: valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, {Label: "Building Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Building Municipality", Value: valueOrEmpty(row.FrontdoorBuildingMunicipality)}}
 			detail.Raw = buildRawPayload(row.RawJson)
@@ -686,7 +700,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 				}
 				return UnifiedEntityDetail{}, fmt.Errorf("get frontdoor building detail: %w", err)
 			}
-			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingCompanyName), strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingMunicipality), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), URL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: row.FrontdoorBuildingLastSeenAt}}
+			detail := UnifiedEntityDetail{Canonical: UnifiedCanonicalFields{CanonicalID: canonicalID, Source: source, Kind: kind, NativeID: nativeID, Headline: firstNonEmpty(valueOrEmpty(row.FrontdoorBuildingCompanyName), strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)), Address: strings.TrimSpace(strings.Join([]string{valueOrEmpty(row.FrontdoorBuildingStreetAddress), valueOrEmpty(row.FrontdoorBuildingHouseNumber)}, " ")), City: valueOrEmpty(row.FrontdoorBuildingMunicipality), Postal: valueOrEmpty(row.FrontdoorBuildingPostcode), Latitude: row.FrontdoorBuildingLatitude, Longitude: row.FrontdoorBuildingLongitude, URL: valueOrEmpty(row.FrontdoorBuildingUrl), LastSeenAt: row.FrontdoorBuildingLastSeenAt}}
 			detail.SourceSpecific = []DetailField{{Label: "Company", Value: valueOrEmpty(row.FrontdoorBuildingCompanyName)}, {Label: "Business ID", Value: valueOrEmpty(row.FrontdoorBuildingBusinessID)}, {Label: "Housing Company ID", Value: formatInt64Ptr(row.FrontdoorBuildingHousingCompanyID)}, {Label: "Housing Friendly ID", Value: valueOrEmpty(row.FrontdoorBuildingHousingCompanyFriendlyID)}, {Label: "Apartment Count", Value: formatInt32(row.FrontdoorBuildingApartmentCount)}, {Label: "Floor Count", Value: formatInt32(row.FrontdoorBuildingFloorCount)}, {Label: "Build Year", Value: formatInt32(row.FrontdoorBuildingBuildYear)}, {Label: "Has Elevator", Value: formatBoolPtr(row.FrontdoorBuildingHasElevator)}, {Label: "Has Sauna", Value: formatBoolPtr(row.FrontdoorBuildingHasSauna)}, {Label: "Energy Certificate", Value: valueOrEmpty(row.FrontdoorBuildingEnergyCertificateCode)}, {Label: "Heating", Value: valueOrEmpty(row.FrontdoorBuildingHeating)}, {Label: "Post Area", Value: valueOrEmpty(row.FrontdoorBuildingPostArea)}, {Label: "Latitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLatitude)}, {Label: "Longitude", Value: formatFloat64Ptr(row.FrontdoorBuildingLongitude)}}
 			detail.Related = []DetailField{{Label: "Announcement Count", Value: strconv.FormatInt(row.AnnouncementCount, 10)}}
 			detail.Raw = buildRawPayload(row.FrontdoorBuildingData)
@@ -728,6 +742,8 @@ type addressLookupRow struct {
 	Address                          string
 	City                             string
 	Postal                           string
+	Latitude                         *float64
+	Longitude                        *float64
 	AskingPrice                      *int64
 	DebtFreePrice                    *int64
 	Area                             *float64
@@ -788,6 +804,8 @@ type addressLookupRow struct {
 	SourceRecordAddress              string
 	SourceRecordCity                 string
 	SourceRecordPostal               string
+	SourceRecordLatitude             *float64
+	SourceRecordLongitude            *float64
 	SourceRecordAskingPrice          *int64
 	SourceRecordDebtFreePrice        *int64
 	SourceRecordArea                 *float64
@@ -883,10 +901,10 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 				seenSourceRecords[*row.OfferingID] = seen
 			}
 			sourceRecordID := row.ListingID
-			sourceRecord := AddressSourceRecord{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), Insights: parseAddressInsights(row.InsightsJSON)}
+			sourceRecord := AddressSourceRecord{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, Latitude: row.Latitude, Longitude: row.Longitude, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), Insights: parseAddressInsights(row.InsightsJSON)}
 			if row.SourceRecordListingID != nil {
 				sourceRecordID = *row.SourceRecordListingID
-				sourceRecord = AddressSourceRecord{ListingID: row.SourceRecordListingID.String(), CanonicalID: row.SourceRecordCanonicalID, Source: row.SourceRecordSource, Kind: row.SourceRecordKind, NativeID: row.SourceRecordNativeID, Headline: row.SourceRecordHeadline, Address: row.SourceRecordAddress, City: row.SourceRecordCity, Postal: row.SourceRecordPostal, AskingPrice: row.SourceRecordAskingPrice, DebtFreePrice: row.SourceRecordDebtFreePrice, Area: row.SourceRecordArea, RoomLayout: row.SourceRecordRoomLayout, URL: row.SourceRecordURL, ExternalURLAvailable: row.SourceRecordExternalURLAvailable, FirstSeenAt: row.SourceRecordFirstSeenAt, LastSeenAt: row.SourceRecordLastSeenAt, UpdatedAt: row.SourceRecordUpdatedAt, PreviousAskingPrice: row.SourceRecordPreviousAsk, PreviousDebtFreePrice: row.SourceRecordPreviousDebt, LinkStatus: row.SourceRecordLinkStatus, LinkMethod: row.SourceRecordLinkMethod, LinkScore: row.SourceRecordLinkScore, Texts: addressListingTexts(row.SourceRecordAvailability, row.SourceRecordRenovationsDone, row.SourceRecordRenovationsPlan, row.SourceRecordAdditionalInfo, row.SourceRecordCharges), Insights: parseAddressInsights(row.SourceRecordInsightsJSON)}
+				sourceRecord = AddressSourceRecord{ListingID: row.SourceRecordListingID.String(), CanonicalID: row.SourceRecordCanonicalID, Source: row.SourceRecordSource, Kind: row.SourceRecordKind, NativeID: row.SourceRecordNativeID, Headline: row.SourceRecordHeadline, Address: row.SourceRecordAddress, City: row.SourceRecordCity, Postal: row.SourceRecordPostal, Latitude: row.SourceRecordLatitude, Longitude: row.SourceRecordLongitude, AskingPrice: row.SourceRecordAskingPrice, DebtFreePrice: row.SourceRecordDebtFreePrice, Area: row.SourceRecordArea, RoomLayout: row.SourceRecordRoomLayout, URL: row.SourceRecordURL, ExternalURLAvailable: row.SourceRecordExternalURLAvailable, FirstSeenAt: row.SourceRecordFirstSeenAt, LastSeenAt: row.SourceRecordLastSeenAt, UpdatedAt: row.SourceRecordUpdatedAt, PreviousAskingPrice: row.SourceRecordPreviousAsk, PreviousDebtFreePrice: row.SourceRecordPreviousDebt, LinkStatus: row.SourceRecordLinkStatus, LinkMethod: row.SourceRecordLinkMethod, LinkScore: row.SourceRecordLinkScore, Texts: addressListingTexts(row.SourceRecordAvailability, row.SourceRecordRenovationsDone, row.SourceRecordRenovationsPlan, row.SourceRecordAdditionalInfo, row.SourceRecordCharges), Insights: parseAddressInsights(row.SourceRecordInsightsJSON)}
 			}
 			if _, ok := seen[sourceRecordID]; !ok {
 				seen[sourceRecordID] = struct{}{}
@@ -895,7 +913,7 @@ func buildAddressLookupResult(address, city, postal, source string, rows []addre
 		}
 		listingIndex, ok := index[row.ListingID]
 		if !ok {
-			listing := AddressListing{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, HousingCompanyID: uuidPtrString(row.HousingCompanyID), HousingCompanyName: row.HousingCompanyName, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, PriceMatchStatus: row.PriceMatchStatus, SourceMatchStatus: row.SourceMatchStatus, OfferingID: uuidPtrString(row.OfferingID), Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), SourceRecords: []AddressSourceRecord{}, SourceCandidates: []AddressSourceCandidate{}, Transactions: []AddressTransactionLink{}, Insights: parseAddressInsights(row.InsightsJSON)}
+			listing := AddressListing{ListingID: row.ListingID.String(), CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, HousingCompanyID: uuidPtrString(row.HousingCompanyID), HousingCompanyName: row.HousingCompanyName, Headline: row.Headline, Address: row.Address, City: row.City, Postal: row.Postal, Latitude: row.Latitude, Longitude: row.Longitude, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, PreviousAskingPrice: row.PreviousAskingPrice, PreviousDebtFreePrice: row.PreviousDebtFreePrice, PriceMatchStatus: row.PriceMatchStatus, SourceMatchStatus: row.SourceMatchStatus, OfferingID: uuidPtrString(row.OfferingID), Texts: addressListingTexts(row.AvailabilityText, row.RenovationsDoneText, row.RenovationsPlannedText, row.AdditionalInfoText, row.ChargesText), SourceRecords: []AddressSourceRecord{}, SourceCandidates: []AddressSourceCandidate{}, Transactions: []AddressTransactionLink{}, Insights: parseAddressInsights(row.InsightsJSON)}
 			result.Listings = append(result.Listings, listing)
 			listingIndex = len(result.Listings) - 1
 			index[row.ListingID] = listingIndex
@@ -938,7 +956,7 @@ func addressOfferings(listings []AddressListing) []AddressOffering {
 		offeringIndex, ok := index[listing.OfferingID]
 		if !ok {
 			representative := representativeAddressSourceRecord(sourceRecords)
-			out = append(out, AddressOffering{OfferingID: listing.OfferingID, HousingCompanyID: listing.HousingCompanyID, HousingCompanyName: listing.HousingCompanyName, Headline: firstNonEmpty(representative.Headline, listing.Headline, representative.Address, listing.OfferingID), Address: firstNonEmpty(representative.Address, listing.Address), City: firstNonEmpty(representative.City, listing.City), Postal: firstNonEmpty(representative.Postal, listing.Postal), AskingPrice: firstInt64(representative.AskingPrice, listing.AskingPrice), DebtFreePrice: firstInt64(representative.DebtFreePrice, listing.DebtFreePrice), Area: firstFloat64(representative.Area, listing.Area), RoomLayout: firstNonEmpty(representative.RoomLayout, listing.RoomLayout), FirstSeenAt: earliestTimePtr(representative.FirstSeenAt, listing.FirstSeenAt), LastSeenAt: latestTimePtr(representative.LastSeenAt, listing.LastSeenAt), SourceRecords: []AddressSourceRecord{}, Transactions: []AddressTransactionLink{}, Representative: representative})
+			out = append(out, AddressOffering{OfferingID: listing.OfferingID, HousingCompanyID: listing.HousingCompanyID, HousingCompanyName: listing.HousingCompanyName, Headline: firstNonEmpty(representative.Headline, listing.Headline, representative.Address, listing.OfferingID), Address: firstNonEmpty(representative.Address, listing.Address), City: firstNonEmpty(representative.City, listing.City), Postal: firstNonEmpty(representative.Postal, listing.Postal), Latitude: firstFloat64(representative.Latitude, listing.Latitude), Longitude: firstFloat64(representative.Longitude, listing.Longitude), AskingPrice: firstInt64(representative.AskingPrice, listing.AskingPrice), DebtFreePrice: firstInt64(representative.DebtFreePrice, listing.DebtFreePrice), Area: firstFloat64(representative.Area, listing.Area), RoomLayout: firstNonEmpty(representative.RoomLayout, listing.RoomLayout), FirstSeenAt: earliestTimePtr(representative.FirstSeenAt, listing.FirstSeenAt), LastSeenAt: latestTimePtr(representative.LastSeenAt, listing.LastSeenAt), SourceRecords: []AddressSourceRecord{}, Transactions: []AddressTransactionLink{}, Representative: representative})
 			offeringIndex = len(out) - 1
 			index[listing.OfferingID] = offeringIndex
 		}
@@ -1612,6 +1630,8 @@ selected_listings AS (
         COALESCE(sl.sale_listing_street_address, '') AS address,
         COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
         COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
+        sl.sale_listing_latitude,
+        sl.sale_listing_longitude,
         sl.sale_listing_asking_price,
         sl.sale_listing_debt_free_price,
         sl.sale_listing_area_value,
@@ -1699,6 +1719,8 @@ offering_source_records AS (
         COALESCE(sr.sale_listing_street_address, '') AS address,
         COALESCE(sr.sale_listing_city, sr.sale_listing_city_norm, '') AS city,
         COALESCE(sr.sale_listing_postal, sr.sale_listing_postal_norm, '') AS postal,
+        sr.sale_listing_latitude,
+        sr.sale_listing_longitude,
         sr.sale_listing_asking_price,
         sr.sale_listing_debt_free_price,
         sr.sale_listing_area_value,
@@ -1843,6 +1865,8 @@ SELECT
     sl.address,
     sl.city,
     sl.postal,
+    sl.sale_listing_latitude,
+    sl.sale_listing_longitude,
     sl.sale_listing_asking_price,
     sl.sale_listing_debt_free_price,
     sl.sale_listing_area_value,
@@ -1903,6 +1927,8 @@ SELECT
     COALESCE(osr.address, ''),
     COALESCE(osr.city, ''),
     COALESCE(osr.postal, ''),
+    osr.sale_listing_latitude,
+    osr.sale_listing_longitude,
     osr.sale_listing_asking_price,
     osr.sale_listing_debt_free_price,
     osr.sale_listing_area_value,
@@ -2596,6 +2622,8 @@ func normalizedFromShortcutAdDetail(canonicalID, source, kind string, canonical 
 		StreetAddress:            canonical.Address,
 		City:                     canonical.City,
 		Postal:                   canonical.Postal,
+		Latitude:                 canonical.Latitude,
+		Longitude:                canonical.Longitude,
 		AskingPrice:              row.AdPrice,
 		DebtFreePrice:            int64Path(payload, "priceData", "priceDebtFree"),
 		DebtShareAmount:          int64Path(payload, "priceData", "debtShare"),
@@ -2633,6 +2661,8 @@ func normalizedFromFrontdoorAdDetail(canonicalID, source, kind string, canonical
 		StreetAddress:            canonical.Address,
 		City:                     canonical.City,
 		Postal:                   canonical.Postal,
+		Latitude:                 canonical.Latitude,
+		Longitude:                canonical.Longitude,
 		AskingPrice:              row.AdPrice,
 		DebtFreePrice:            int64Path(payload, "debfFreePrice"),
 		DebtShareAmount:          int64Path(payload, "debtShareAmount"),
@@ -2886,7 +2916,7 @@ func parseAddressInsights(raw json.RawMessage) []AddressInsight {
 }
 
 func addressSourceRecordFromListing(listing AddressListing) AddressSourceRecord {
-	return AddressSourceRecord{ListingID: listing.ListingID, CanonicalID: listing.CanonicalID, Source: listing.Source, Kind: listing.Kind, NativeID: listing.NativeID, Headline: listing.Headline, Address: listing.Address, City: listing.City, Postal: listing.Postal, AskingPrice: listing.AskingPrice, DebtFreePrice: listing.DebtFreePrice, Area: listing.Area, RoomLayout: listing.RoomLayout, URL: listing.URL, ExternalURLAvailable: listing.ExternalURLAvailable, FirstSeenAt: listing.FirstSeenAt, LastSeenAt: listing.LastSeenAt, UpdatedAt: listing.UpdatedAt, PreviousAskingPrice: listing.PreviousAskingPrice, PreviousDebtFreePrice: listing.PreviousDebtFreePrice, Texts: listing.Texts, Insights: listing.Insights}
+	return AddressSourceRecord{ListingID: listing.ListingID, CanonicalID: listing.CanonicalID, Source: listing.Source, Kind: listing.Kind, NativeID: listing.NativeID, Headline: listing.Headline, Address: listing.Address, City: listing.City, Postal: listing.Postal, Latitude: listing.Latitude, Longitude: listing.Longitude, AskingPrice: listing.AskingPrice, DebtFreePrice: listing.DebtFreePrice, Area: listing.Area, RoomLayout: listing.RoomLayout, URL: listing.URL, ExternalURLAvailable: listing.ExternalURLAvailable, FirstSeenAt: listing.FirstSeenAt, LastSeenAt: listing.LastSeenAt, UpdatedAt: listing.UpdatedAt, PreviousAskingPrice: listing.PreviousAskingPrice, PreviousDebtFreePrice: listing.PreviousDebtFreePrice, Texts: listing.Texts, Insights: listing.Insights}
 }
 
 func addressOfferingInsights(records []AddressSourceRecord) []AddressInsight {

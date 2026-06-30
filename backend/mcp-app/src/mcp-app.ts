@@ -18,6 +18,7 @@ type PriceTransaction = {
   confidence?: string;
 };
 type ListingRow = {
+  id?: string;
   canonical_id: string;
   source: string;
   kind: string;
@@ -25,6 +26,8 @@ type ListingRow = {
   address?: string;
   city?: string;
   postal?: string;
+  latitude?: number;
+  longitude?: number;
   price?: number;
   area?: number;
   room_layout?: string;
@@ -33,8 +36,14 @@ type ListingRow = {
   web_url: string;
   thumbnail_url?: string;
   transactions: PriceTransaction[];
+  facts?: Record<string, unknown>;
+  costs?: Record<string, unknown>;
+  location?: Record<string, unknown>;
+  market?: Record<string, unknown>;
+  data_quality?: { completeness?: number; missing_fields?: string[]; warnings?: string[] };
 };
 type SearchResult = {
+  view?: string;
   mode: "address" | "search" | "transaction";
   web_url: string;
   rows: ListingRow[];
@@ -49,6 +58,11 @@ type DetailField = {
   value?: string;
 };
 type ListingDetail = {
+  view?: string;
+  title?: string;
+  overview?: DetailField[];
+  reports?: Array<{ title?: string; items?: string[] }>;
+  data_quality?: { completeness?: number; missing_fields?: string[]; warnings?: string[] };
   canonical?: Record<string, unknown>;
   canonical_extra?: DetailField[];
   source_specific?: DetailField[];
@@ -62,29 +76,74 @@ type DetailState = {
   error?: string;
   detail?: ListingDetail;
 };
+type ComparisonResult = {
+  view: "comparison";
+  summary: string;
+  rows: ListingRow[];
+  ranking: Array<{ id?: string; rank?: number; score?: number; reasons?: string[] }>;
+  tradeoffs: string[];
+  missing_data_warnings: string[];
+};
+type MarketContextResult = {
+  view: "market_context";
+  summary: string;
+  subject?: ListingRow;
+  market?: Record<string, unknown>;
+  data_quality?: { completeness?: number; missing_fields?: string[]; warnings?: string[] };
+};
+type MapPoint = {
+  id: string;
+  title: string;
+  lng: number;
+  lat: number;
+  selected?: boolean;
+};
 
 const root = document.getElementById("app");
 const app = new App({ name: "Koditon Listings", version: "0.1.0" }, {}, { autoResize: true });
 let result: SearchResult | undefined;
 let detailState: DetailState | undefined;
+let comparison: ComparisonResult | undefined;
+let marketContext: MarketContextResult | undefined;
 
 app.ontoolresult = (params) => {
   if (params.isError) {
     renderError("Listing search failed.", contentText(params.content));
     return;
   }
-  if (!isSearchResult(params.structuredContent)) {
+  const view = structuredView(params.structuredContent);
+  if (view === "comparison") {
+    comparison = normalizeComparison(params.structuredContent);
+    result = undefined;
+    detailState = undefined;
+    marketContext = undefined;
+    renderComparison();
+    return;
+  }
+  if (view === "market_context") {
+    marketContext = normalizeMarketContext(params.structuredContent);
+    result = undefined;
+    detailState = undefined;
+    comparison = undefined;
+    renderMarketContext();
+    return;
+  }
+  if (view === "detail" || !isSearchResult(params.structuredContent)) {
     const detail = normalizeDetail(params.structuredContent, params.content);
     if (detail.canonical || detail.normalized) {
       const canonicalID = stringValue(detail.canonical?.canonical_id) || "detail";
       result = undefined;
       detailState = { canonicalID, loading: false, detail };
+      comparison = undefined;
+      marketContext = undefined;
       renderStandaloneDetail();
       return;
     }
   }
   result = normalizeResult(params.structuredContent);
   detailState = undefined;
+  comparison = undefined;
+  marketContext = undefined;
   render();
 };
 app.ontoolinput = () => renderLoading();
@@ -112,6 +171,7 @@ function render(): void {
         <div><span>Linked</span><strong>${formatNumber(rows.filter((row) => row.transactions.length > 0).length)}</strong></div>
         <div><span>Sales</span><strong>${formatNumber(result.transactions.length)}</strong></div>
       </div>
+      ${renderMap(rows.flatMap((row) => rowMapPoint(row, detailState?.canonicalID === row.canonical_id) ?? []), "Map")}
       <div class="workspace">
         ${rows.length > 0 ? `<div class="list">${rows.map(renderRow).join("")}</div>` : `<div class="empty">No listings matched this query.</div>`}
         ${renderDetailPanel()}
@@ -133,6 +193,64 @@ function render(): void {
       detailState = undefined;
       render();
     });
+  });
+}
+function renderComparison(): void {
+  if (!root || !comparison) return;
+  root.innerHTML = `
+    <section class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Comparison</p>
+          <h1>Properties</h1>
+          <p class="summary">${escapeHTML(comparison.summary)}</p>
+        </div>
+      </header>
+      <div class="metrics">
+        <div><span>Rows</span><strong>${formatNumber(comparison.rows.length)}</strong></div>
+        <div><span>Ranked</span><strong>${formatNumber(comparison.ranking.length)}</strong></div>
+        <div><span>Warnings</span><strong>${formatNumber(comparison.missing_data_warnings.length)}</strong></div>
+      </div>
+      <div class="workspace workspace--single">
+        ${renderMap(comparison.rows.flatMap((row) => rowMapPoint(row) ?? []), "Map")}
+        <div class="list">${comparison.rows.map(renderComparisonRow).join("")}</div>
+      </div>
+      ${comparison.tradeoffs.length > 0 ? `<section class="sales"><h2>Tradeoffs</h2>${comparison.tradeoffs.map((item) => `<div class="sale-row"><div><strong>${escapeHTML(item)}</strong></div></div>`).join("")}</section>` : ""}
+    </section>
+  `;
+  root.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) => {
+    button.addEventListener("click", () => openURL(button.dataset.open));
+  });
+}
+function renderComparisonRow(row: ListingRow): string {
+  const rank = comparison?.ranking.find((item) => item.id === (row.id || row.canonical_id));
+  const reasons = rank?.reasons?.join(" · ") ?? "";
+  return renderRow({ ...row, transactions: row.transactions ?? [] }).replace("</article>", `${reasons ? `<div class="comparison-note">#${rank?.rank ?? ""} ${escapeHTML(reasons)}</div>` : ""}</article>`);
+}
+function renderMarketContext(): void {
+  if (!root || !marketContext) return;
+  const sales = Array.isArray(marketContext.market?.comparable_sales) ? marketContext.market.comparable_sales as PriceTransaction[] : [];
+  root.innerHTML = `
+    <section class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Market context</p>
+          <h1>Comparable sales</h1>
+          <p class="summary">${escapeHTML(marketContext.summary)}</p>
+        </div>
+      </header>
+      <div class="metrics">
+        <div><span>Comps</span><strong>${formatNumber(sales.length)}</strong></div>
+        <div><span>Median EUR/m2</span><strong>${escapeHTML(formatPricePerM2(numberValue(marketContext.market?.median_price_per_m2)) || "n/a")}</strong></div>
+        <div><span>Confidence</span><strong>${escapeHTML(stringValue(marketContext.market?.confidence) || "low")}</strong></div>
+      </div>
+      ${renderMap(marketContext.subject ? [rowMapPoint(marketContext.subject, true)].filter((point): point is MapPoint => Boolean(point)) : [], "Subject location")}
+      ${marketContext.subject ? `<div class="list">${renderRow(marketContext.subject)}</div>` : ""}
+      ${sales.length > 0 ? `<section class="sales"><h2>Comparable sales</h2>${sales.slice(0, 12).map(renderTransaction).join("")}</section>` : `<div class="empty">No comparable sales returned.</div>`}
+    </section>
+  `;
+  root.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) => {
+    button.addEventListener("click", () => openURL(button.dataset.open));
   });
 }
 function renderRow(row: ListingRow): string {
@@ -186,10 +304,12 @@ function renderDetailPanel(): string {
         ["Address", stringValue(canonical.address) || stringValue(normalized.street_address)],
         ["City", stringValue(canonical.city) || stringValue(normalized.city)],
         ["Postal", stringValue(canonical.postal) || stringValue(normalized.postal)],
+        ["Coordinates", formatCoordinates(detailCoordinates(detail))],
         ["Price", formatEUR(numberValue(canonical.price) ?? numberValue(normalized.asking_price) ?? numberValue(normalized.debt_free_price))],
         ["Area", formatArea(numberValue(canonical.area) ?? numberValue(normalized.area_m2))],
         ["Rooms", stringValue(canonical.room_layout) || stringValue(normalized.room_layout)]
       ])}
+      ${renderMap(detailMapPoints(detail), "Location")}
       ${renderFields("Source facts", detail.source_specific)}
       ${renderFields("Canonical", detail.canonical_extra)}
       ${renderFields("Related", detail.related)}
@@ -278,9 +398,10 @@ function applyHostContext(ctx: ReturnType<typeof app.getHostContext>): void {
 function normalizeResult(value: unknown): SearchResult {
   if (typeof value === "object" && value != null && "rows" in value) {
     const raw = value as Partial<SearchResult>;
-    const rows = Array.isArray(raw.rows) ? raw.rows.map((row) => ({ ...row, transactions: Array.isArray(row.transactions) ? row.transactions : [] })) : [];
+    const rows = Array.isArray(raw.rows) ? raw.rows.map(normalizeListingRow) : [];
     const transactions = Array.isArray(raw.transactions) ? raw.transactions : rows.flatMap((row) => row.transactions);
     return {
+      view: raw.view,
       mode: raw.mode ?? "search",
       web_url: raw.web_url ?? "",
       rows,
@@ -296,6 +417,64 @@ function normalizeResult(value: unknown): SearchResult {
 function isSearchResult(value: unknown): value is SearchResult {
   return isObject(value) && "rows" in value;
 }
+function normalizeListingRow(value: unknown): ListingRow {
+  const raw = isObject(value) ? value : {};
+  const location = isObject(raw.location) ? raw.location : {};
+  const facts = isObject(raw.facts) ? raw.facts : {};
+  const costs = isObject(raw.costs) ? raw.costs : {};
+  const links = isObject(raw.links) ? raw.links : {};
+  const media = isObject(raw.media) ? raw.media : {};
+  return {
+    ...raw,
+    id: stringValue(raw.id),
+    canonical_id: stringValue(raw.canonical_id) || stringValue(raw.id) || "property",
+    source: stringValue(raw.source),
+    kind: stringValue(raw.kind),
+    title: stringValue(raw.title) || stringValue(raw.id) || "Property",
+    address: stringValue(raw.address) || stringValue(location.address),
+    city: stringValue(raw.city) || stringValue(location.city),
+    postal: stringValue(raw.postal) || stringValue(location.postal),
+    latitude: numberValue(raw.latitude) ?? coordinateAt(location.coordinates, 1),
+    longitude: numberValue(raw.longitude) ?? coordinateAt(location.coordinates, 0),
+    price: numberValue(raw.price) ?? numberValue(facts.price) ?? numberValue(costs.asking_price),
+    area: numberValue(raw.area) ?? numberValue(facts.area_m2),
+    room_layout: stringValue(raw.room_layout) || stringValue(facts.rooms),
+    url: stringValue(raw.url) || stringValue(links.source),
+    external_url_available: Boolean(raw.external_url_available || links.source),
+    web_url: stringValue(raw.web_url) || stringValue(links.web),
+    thumbnail_url: stringValue(raw.thumbnail_url) || stringValue(media.thumbnail_url),
+    transactions: Array.isArray(raw.transactions) ? raw.transactions as PriceTransaction[] : [],
+    facts,
+    costs,
+    location,
+    market: isObject(raw.market) ? raw.market : {},
+    data_quality: isObject(raw.data_quality) ? raw.data_quality as ListingRow["data_quality"] : undefined
+  };
+}
+function normalizeComparison(value: unknown): ComparisonResult {
+  const raw = isObject(value) ? value : {};
+  return {
+    view: "comparison",
+    summary: stringValue(raw.summary) || "Property comparison returned.",
+    rows: Array.isArray(raw.rows) ? raw.rows.map(normalizeListingRow) : [],
+    ranking: Array.isArray(raw.ranking) ? raw.ranking as ComparisonResult["ranking"] : [],
+    tradeoffs: Array.isArray(raw.tradeoffs) ? raw.tradeoffs.map(String) : [],
+    missing_data_warnings: Array.isArray(raw.missing_data_warnings) ? raw.missing_data_warnings.map(String) : []
+  };
+}
+function normalizeMarketContext(value: unknown): MarketContextResult {
+  const raw = isObject(value) ? value : {};
+  return {
+    view: "market_context",
+    summary: stringValue(raw.summary) || "Market context returned.",
+    subject: raw.subject ? normalizeListingRow(raw.subject) : undefined,
+    market: isObject(raw.market) ? raw.market : {},
+    data_quality: isObject(raw.data_quality) ? raw.data_quality as MarketContextResult["data_quality"] : undefined
+  };
+}
+function structuredView(value: unknown): string {
+  return isObject(value) ? stringValue(value.view) : "";
+}
 function normalizeDetail(structuredContent: unknown, content: unknown): ListingDetail {
   if (isObject(structuredContent) && ("canonical" in structuredContent || "normalized" in structuredContent)) return structuredContent as ListingDetail;
   const text = contentText(content);
@@ -306,6 +485,76 @@ function normalizeDetail(structuredContent: unknown, content: unknown): ListingD
   } catch {
     return {};
   }
+}
+function renderMap(points: MapPoint[], title: string): string {
+  if (points.length === 0) return "";
+  const box = mapBounds(points);
+  const markers = points.map((point) => {
+    const x = project(point.lng, box.west, box.east);
+    const y = 100 - project(point.lat, box.south, box.north);
+    return `<g class="${point.selected ? "map-marker map-marker--selected" : "map-marker"}" transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"><circle r="${point.selected ? 4.8 : 3.8}"></circle><title>${escapeHTML(point.title)}</title></g>`;
+  }).join("");
+  const labels = points.slice(0, 4).map((point) => `<li><span></span>${escapeHTML(point.title)} <em>${escapeHTML(formatCoordinates([point.lng, point.lat]))}</em></li>`).join("");
+  return `
+    <section class="map-panel">
+      <div class="map-head"><h2>${escapeHTML(title)}</h2><span>${formatNumber(points.length)} marker${points.length === 1 ? "" : "s"}</span></div>
+      <svg viewBox="0 0 100 100" role="img" aria-label="${escapeAttr(title)}">
+        <defs><pattern id="map-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" stroke-width="0.35"/></pattern></defs>
+        <rect width="100" height="100" rx="3" fill="url(#map-grid)"></rect>
+        <path d="M8 74 C22 63 30 79 42 66 S65 49 91 57" fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.32"></path>
+        <path d="M14 22 C30 30 42 18 55 31 S79 42 90 29" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.24"></path>
+        ${markers}
+      </svg>
+      <ol>${labels}</ol>
+    </section>
+  `;
+}
+function rowMapPoint(row: ListingRow, selected = false): MapPoint | undefined {
+  if (row.longitude == null || row.latitude == null) return undefined;
+  if (!isValidCoordinate(row.longitude, row.latitude)) return undefined;
+  return { id: row.id || row.canonical_id, title: row.title || row.canonical_id, lng: row.longitude, lat: row.latitude, selected };
+}
+function detailMapPoints(detail: ListingDetail): MapPoint[] {
+  const coordinates = detailCoordinates(detail);
+  if (!coordinates) return [];
+  const canonical = detail.canonical ?? {};
+  return [{ id: stringValue(canonical.canonical_id) || "detail", title: detail.title || stringValue(canonical.headline) || "Property", lng: coordinates[0], lat: coordinates[1], selected: true }];
+}
+function detailCoordinates(detail: ListingDetail): [number, number] | undefined {
+  const record = detail as Record<string, unknown>;
+  const location = isObject(record.location) ? record.location : {};
+  const canonical = detail.canonical ?? {};
+  const normalized = detail.normalized ?? {};
+  const lng = coordinateAt(location.coordinates, 0) ?? numberValue(canonical.longitude) ?? numberValue(normalized.longitude);
+  const lat = coordinateAt(location.coordinates, 1) ?? numberValue(canonical.latitude) ?? numberValue(normalized.latitude);
+  if (lng == null || lat == null || !isValidCoordinate(lng, lat)) return undefined;
+  return [lng, lat];
+}
+function mapBounds(points: MapPoint[]): { west: number; south: number; east: number; north: number } {
+  const lngs = points.map((point) => point.lng);
+  const lats = points.map((point) => point.lat);
+  const west = Math.min(...lngs);
+  const east = Math.max(...lngs);
+  const south = Math.min(...lats);
+  const north = Math.max(...lats);
+  const lngPad = Math.max((east - west) * 0.15, 0.01);
+  const latPad = Math.max((north - south) * 0.15, 0.01);
+  return { west: west - lngPad, east: east + lngPad, south: south - latPad, north: north + latPad };
+}
+function project(value: number, min: number, max: number): number {
+  if (max === min) return 50;
+  return ((value - min) / (max - min)) * 86 + 7;
+}
+function coordinateAt(value: unknown, index: number): number | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return numberValue(value[index]);
+}
+function isValidCoordinate(lng: number, lat: number): boolean {
+  return lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+}
+function formatCoordinates(value: [number, number] | undefined): string {
+  if (!value) return "";
+  return `${value[1].toFixed(5)}, ${value[0].toFixed(5)}`;
 }
 function contentText(content: unknown): string {
   if (!Array.isArray(content)) return "";

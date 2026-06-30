@@ -40,8 +40,8 @@ func TestBuildPropertyDetailResultUsesTypedJSONFields(t *testing.T) {
 
 func TestPropertyFacetsCountsTypedRows(t *testing.T) {
 	t.Parallel()
-	rows := []propertySummary{
-		{Source: "frontdoor", Kind: "ad", City: "Helsinki", Transactions: []propertyTransaction{{ID: "tx1"}}},
+	rows := []PropertySummary{
+		{Source: "frontdoor", Kind: "ad", City: "Helsinki", Transactions: []ComparableSale{{ID: "tx1"}}},
 		{Source: "frontdoor", Kind: "ad", City: "Helsinki"},
 		{Source: "shortcut", Kind: "building", City: "Espoo", Insights: propertyInsightSummary{Count: 2}},
 	}
