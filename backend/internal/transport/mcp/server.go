@@ -18,10 +18,12 @@ import (
 	"koditon/internal/platform/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const maxMCPRequestBodyBytes = 1 << 20 // 1 MiB
+const mcpCodeUnauthorized = -32001
 
 type Handler struct {
 	mcpHandler               http.Handler
@@ -44,71 +46,28 @@ func New(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, authSvc *au
 		logger = slog.Default()
 	}
 
-	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "koditon-mcp",
-		Version: "1.0.0",
-	}, &mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{}})
-
-	impl := &toolImpl{
-		adsSvc:  ads.NewService(pool),
-		queries: db.New(pool),
-		config: toolImplConfig{
-			webBaseURL:           cfg.WebBaseURL,
-			shortcutSitemapBase:  cfg.Shortcut.SitemapBase,
-			frontdoorSitemapBase: cfg.Frontdoor.SitemapBase,
-		},
-		logger: logger.With("component", "mcpserver"),
-	}
-
-	toolSecurityScopes := map[string][]string{
-		"koditon_find_listings":                {auth.ScopeMCPCoreRead},
-		"koditon_query_properties":             {auth.ScopeMCPCoreRead},
-		"koditon_get_property_detail":          {auth.ScopeMCPCoreRead},
-		"koditon_compare_properties":           {auth.ScopeMCPCoreRead},
-		"koditon_get_property_market_context":  {auth.ScopeMCPCoreRead},
-		"koditon_search_listings":              {auth.ScopeMCPCoreRead},
-		"koditon_get_listing_detail":           {auth.ScopeMCPCoreRead},
-		"koditon_search_transactions":          {auth.ScopeMCPCoreRead},
-		"koditon_search_transactions_advanced": {auth.ScopeMCPCoreRead},
-		"koditon_match_ads_from_transaction":   {auth.ScopeMCPCoreRead},
-		"koditon_list_cities":                  {auth.ScopeMCPCoreRead},
-		"koditon_list_available_locations":     {auth.ScopeMCPCoreRead},
-		"koditon_list_categories":              {auth.ScopeMCPCoreRead},
-	}
-
-	mcp.AddTool(server, impl.findListingsTool(), impl.findListings)
-	mcp.AddTool(server, impl.queryPropertiesTool(), impl.queryProperties)
-	mcp.AddTool(server, impl.getPropertyDetailTool(), impl.getPropertyDetail)
-	mcp.AddTool(server, impl.comparePropertiesTool(), impl.compareProperties)
-	mcp.AddTool(server, impl.getPropertyMarketContextTool(), impl.getPropertyMarketContext)
-	mcp.AddTool(server, impl.searchListingsTool(), impl.searchListings)
-	mcp.AddTool(server, impl.getListingDetailTool(), impl.getListingDetail)
-	mcp.AddTool(server, impl.searchTransactionsTool(), impl.searchTransactions)
-	mcp.AddTool(server, impl.searchTransactionsAdvancedTool(), impl.searchTransactionsAdvanced)
-	mcp.AddTool(server, impl.matchAdsFromTransactionTool(), impl.matchAdsFromTransaction)
-	mcp.AddTool(server, impl.listCitiesTool(), impl.listCities)
-	mcp.AddTool(server, impl.listAvailableLocationsTool(), impl.listAvailableLocations)
-	mcp.AddTool(server, impl.listCategoriesTool(), impl.listCategories)
-	registerListingsAppResource(server, cfg.APIPublicBaseURL, cfg.WebBaseURL)
+	runtime := newMCPRuntime(pool, cfg, logger)
 
 	streamable := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
-		return server
+		return runtime.server
 	}, &mcp.StreamableHTTPOptions{Stateless: true, CrossOriginProtection: mcpCrossOriginProtection(cfg)})
 	authConfigured := cfg.APIPublicBaseURL != "" && cfg.Auth.OAuthCookieKey != ""
 	var base http.Handler = streamable
 	if authConfigured {
-		base = wrapToolsListSecuritySchemes(streamable, toolSecurityScopes)
+		base = wrapToolsListSecuritySchemes(streamable, runtime.toolSecurityScopes)
 	}
 
 	resourceMetadataURL := strings.TrimRight(strings.TrimSpace(cfg.APIPublicBaseURL), "/") + "/.well-known/oauth-protected-resource/mcp"
 	requiredAudience := ""
 	if cfg.APIPublicBaseURL != "" {
-		requiredAudience = auth.CanonicalProtectedResource(cfg.APIPublicBaseURL)
+		protectedResource := mcpProtectedResourceMetadata(cfg.APIPublicBaseURL, []string{auth.ScopeMCPCoreRead})
+		requiredAudience = protectedResource.Resource
 	}
 
 	mcpHandler := base
 	if authSvc != nil && authConfigured {
-		mcpHandler = requireAuth(authSvc, []string{auth.ScopeMCPCoreRead}, requiredAudience, resourceMetadataURL, base)
+		bearerOptions := mcpBearerTokenOptions(resourceMetadataURL, []string{auth.ScopeMCPCoreRead})
+		mcpHandler = requireAuth(authSvc, bearerOptions.Scopes, requiredAudience, bearerOptions.ResourceMetadataURL, base)
 	}
 
 	return &Handler{
@@ -264,7 +223,7 @@ func writeMCPRequestError(w http.ResponseWriter, status int, message string) {
 		"jsonrpc": "2.0",
 		"id":      nil,
 		"error": map[string]any{
-			"code":    -32600,
+			"code":    jsonrpc.CodeInvalidRequest,
 			"message": message,
 		},
 	}
@@ -286,7 +245,7 @@ func writeAuthError(w http.ResponseWriter, r *http.Request, requestBody []byte, 
 		"jsonrpc": "2.0",
 		"id":      nil,
 		"error": map[string]any{
-			"code":    -32001,
+			"code":    mcpCodeUnauthorized,
 			"message": message,
 			"data":    errData,
 		},
