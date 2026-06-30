@@ -164,6 +164,22 @@ func TestHandleProtectedResourceMetadataUsesCanonicalResource(t *testing.T) {
 	}
 }
 
+func TestHandleProtectedResourceMetadataAllowsPreflight(t *testing.T) {
+	t.Parallel()
+	h := &Handler{
+		publicAPIBaseURL: "https://api.example.com/",
+		scopesSupported:  []string{auth.ScopeMCPCoreRead},
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodOptions, "/.well-known/oauth-protected-resource/mcp", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want *", got)
+	}
+}
+
 func TestRecoverMalformedOAuthPath(t *testing.T) {
 	t.Parallel()
 

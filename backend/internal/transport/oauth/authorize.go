@@ -166,6 +166,10 @@ func (h *Handler) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to prepare oauth authorization handoff", http.StatusInternalServerError)
 		return
 	}
+	if webAuthorizeURL := h.webAuthorizeURL(token); webAuthorizeURL != "" {
+		http.Redirect(w, r, webAuthorizeURL, http.StatusFound)
+		return
+	}
 	h.renderAuthorizeHandoffPage(w, handoff, token)
 }
 

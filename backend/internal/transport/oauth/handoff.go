@@ -310,10 +310,6 @@ func (h *Handler) renderAuthorizeHandoffPage(w http.ResponseWriter, handoff *oau
 		return
 	}
 	clientName, clientLogoURL := h.resolveHandoffClientBranding(context.Background(), handoff)
-	webAuthorizeURL := ""
-	if h.webBaseURL != "" {
-		webAuthorizeURL = strings.TrimRight(h.webBaseURL, "/") + "/oauth/authorize?handoff_token=" + url.QueryEscape(token)
-	}
 	data := authorizeHandoffPageData{
 		HandoffID:       handoff.ID,
 		ClientName:      clientName,
@@ -325,9 +321,16 @@ func (h *Handler) renderAuthorizeHandoffPage(w http.ResponseWriter, handoff *oau
 		AppOpenURL:      appOpenURL,
 		QRCodeSVG:       qrCodeSVG,
 		StatusURL:       h.publicAPIBaseURL + "/oauth/authorize/handoff/status?id=" + url.QueryEscape(handoff.ID),
-		WebAuthorizeURL: webAuthorizeURL,
+		WebAuthorizeURL: h.webAuthorizeURL(token),
 	}
 	_ = authorizeHandoffTemplate.Execute(w, data)
+}
+
+func (h *Handler) webAuthorizeURL(token string) string {
+	if strings.TrimSpace(h.webBaseURL) == "" {
+		return ""
+	}
+	return strings.TrimRight(h.webBaseURL, "/") + "/oauth/authorize?handoff_token=" + url.QueryEscape(token)
 }
 
 func (h *Handler) handleAuthorizeHandoffPage(w http.ResponseWriter, r *http.Request) {

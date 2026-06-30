@@ -61,7 +61,7 @@ export default function App() {
         <Route path="/map" element={<MapPage />} />
         <Route path="/prices" element={authenticated ? <DashboardPage onSignOut={handleSignOut} /> : <SignInPage onSignIn={handleSignIn} />} />
         <Route path="/matches" element={authenticated ? <MatchesPage /> : <SignInPage onSignIn={handleSignIn} />} />
-        <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
+        <Route path="/oauth/authorize" element={<OAuthAuthorizePage authenticated={authenticated} onSignIn={handleSignIn} />} />
         <Route path="/email/confirm/:token" element={<EmailConfirmPage onSignIn={handleSignIn} />} />
 
         <Route path="/" element={<Navigate to="/address" replace />} />

@@ -17,6 +17,8 @@ import (
 	"koditon/internal/platform/runtimecfg"
 
 	"github.com/google/uuid"
+	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
 const (
@@ -123,9 +125,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
-	case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource":
+	case (r.Method == http.MethodGet || r.Method == http.MethodOptions) && r.URL.Path == "/.well-known/oauth-protected-resource":
 		h.handleProtectedResourceMetadata(w, r)
-	case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/mcp":
+	case (r.Method == http.MethodGet || r.Method == http.MethodOptions) && r.URL.Path == "/.well-known/oauth-protected-resource/mcp":
 		h.handleProtectedResourceMetadata(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-authorization-server":
 		h.handleAuthorizationServerMetadata(w, r)
@@ -266,15 +268,14 @@ func (h *Handler) handleJWKS(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(buf)
 }
 
-func (h *Handler) handleProtectedResourceMetadata(w http.ResponseWriter, _ *http.Request) {
-	metadata := map[string]any{
-		"resource":                 auth.CanonicalProtectedResource(h.publicAPIBaseURL),
-		"authorization_servers":    []string{h.publicAPIBaseURL},
-		"scopes_supported":         h.scopesSupported,
-		"bearer_methods_supported": []string{"header"},
-		"resource_name":            "Koditon MCP",
-	}
-	writeJSON(w, http.StatusOK, metadata)
+func (h *Handler) handleProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
+	mcpauth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
+		Resource:               auth.CanonicalProtectedResource(h.publicAPIBaseURL),
+		AuthorizationServers:   []string{h.publicAPIBaseURL},
+		ScopesSupported:        append([]string(nil), h.scopesSupported...),
+		BearerMethodsSupported: []string{"header"},
+		ResourceName:           "Koditon MCP",
+	}).ServeHTTP(w, r)
 }
 
 func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, _ *http.Request) {

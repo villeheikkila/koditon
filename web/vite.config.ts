@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/auth': 'http://localhost:8080',
+      '/oauth/authorize/handoff': 'http://localhost:8080',
       '/healthz': 'http://localhost:8080',
     },
   },

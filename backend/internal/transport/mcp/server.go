@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,10 +15,10 @@ import (
 	"koditon/internal/db"
 	"koditon/internal/domain/ads"
 	"koditon/internal/domain/auth"
-	"koditon/internal/domain/authz"
 	"koditon/internal/platform/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -183,6 +184,8 @@ func setCORSHeaders(w http.ResponseWriter, r *http.Request, environment string) 
 }
 
 func requireAuth(authService *auth.Service, requiredScopes []string, requiredAudience, resourceMetadataURL string, next http.Handler) http.Handler {
+	verifier := mcpTokenVerifier(authService, requiredAudience)
+	options := mcpBearerTokenOptions(resourceMetadataURL, requiredScopes)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var bodyCopy []byte
 		if r.Body != nil {
@@ -200,22 +203,83 @@ func requireAuth(authService *auth.Service, requiredScopes []string, requiredAud
 			}
 			r.Body = io.NopCloser(bytes.NewReader(bodyCopy))
 		}
-
-		authorization := strings.TrimSpace(r.Header.Get("Authorization"))
-		result, verifyErr := authz.VerifyAuthorization(r.Context(), authService, authorization, requiredScopes, requiredAudience)
-		if verifyErr != nil {
-			if challenge := auth.BuildBearerChallenge(verifyErr.Status, verifyErr.Message, resourceMetadataURL, requiredScopes...); challenge != "" {
+		nextCalled := false
+		authWriter := &mcpAuthResponseWriter{ResponseWriter: w, header: make(http.Header), nextCalled: func() bool { return nextCalled }}
+		protected := mcpauth.RequireBearerToken(verifier, options)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+			if bodyCopy != nil {
+				r.Body = io.NopCloser(bytes.NewReader(bodyCopy))
+			}
+			next.ServeHTTP(w, r.WithContext(mcpAuthContext(r.Context())))
+		}))
+		protected.ServeHTTP(authWriter, r)
+		if !nextCalled && authWriter.status != 0 {
+			if challenge := authWriter.header.Get("WWW-Authenticate"); challenge != "" {
 				w.Header().Set("WWW-Authenticate", challenge)
 			}
-			writeAuthError(w, r, bodyCopy, verifyErr.Status, verifyErr.Message, w.Header().Get("WWW-Authenticate"))
+			writeAuthError(w, r, bodyCopy, authWriter.status, strings.TrimSpace(authWriter.body.String()), authWriter.header.Get("WWW-Authenticate"))
 			return
 		}
-
-		if bodyCopy != nil {
-			r.Body = io.NopCloser(bytes.NewReader(bodyCopy))
-		}
-		next.ServeHTTP(w, r.WithContext(result.Context))
 	})
+}
+
+const mcpTokenInfoClaimsKey = "koditon.auth.claims"
+
+func mcpTokenVerifier(authService *auth.Service, requiredAudience string) mcpauth.TokenVerifier {
+	return func(ctx context.Context, token string, _ *http.Request) (*mcpauth.TokenInfo, error) {
+		claims, err := authService.VerifyAccessToken(ctx, token)
+		if err != nil {
+			return nil, mcpInvalidTokenError(mapAccessTokenVerifierMessage(err))
+		}
+		if strings.TrimSpace(requiredAudience) != "" && strings.TrimSpace(claims.Audience) != strings.TrimSpace(requiredAudience) {
+			return nil, mcpInvalidTokenError("invalid token audience")
+		}
+		return &mcpauth.TokenInfo{
+			Scopes:     auth.LimitScopes(auth.ScopesForRoles(claims.Roles), claims.Scopes),
+			Expiration: claims.ExpiresAt,
+			UserID:     claims.UserID.String(),
+			Extra: map[string]any{
+				mcpTokenInfoClaimsKey: claims,
+				"session_id":          claims.SessionID.String(),
+				"audience":            claims.Audience,
+			},
+		}, nil
+	}
+}
+
+func mcpAuthContext(ctx context.Context) context.Context {
+	tokenInfo := mcpauth.TokenInfoFromContext(ctx)
+	if tokenInfo == nil || tokenInfo.Extra == nil {
+		return ctx
+	}
+	claims, ok := tokenInfo.Extra[mcpTokenInfoClaimsKey].(*auth.AccessTokenClaims)
+	if !ok {
+		return ctx
+	}
+	return auth.WithClaims(ctx, claims)
+}
+
+func mcpInvalidTokenError(message string) error {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return mcpauth.ErrInvalidToken
+	}
+	return fmt.Errorf("%s: %w", message, mcpauth.ErrInvalidToken)
+}
+
+func mapAccessTokenVerifierMessage(err error) string {
+	switch {
+	case errors.Is(err, auth.ErrTokenExpired):
+		return "token expired"
+	case errors.Is(err, auth.ErrSessionRevoked):
+		return "session revoked"
+	case errors.Is(err, auth.ErrTokenRevoked):
+		return "token revoked"
+	case errors.Is(err, auth.ErrInvalidToken):
+		return "invalid token"
+	default:
+		return "invalid token"
+	}
 }
 
 func writeMCPRequestError(w http.ResponseWriter, status int, message string) {
@@ -362,6 +426,49 @@ func (r *bufferedResponse) Write(data []byte) (int, error) {
 		r.status = http.StatusOK
 	}
 	return r.body.Write(data)
+}
+
+type mcpAuthResponseWriter struct {
+	http.ResponseWriter
+	header     http.Header
+	body       bytes.Buffer
+	status     int
+	nextCalled func() bool
+}
+
+func (w *mcpAuthResponseWriter) Header() http.Header {
+	if w.nextCalled != nil && w.nextCalled() {
+		return w.ResponseWriter.Header()
+	}
+	return w.header
+}
+
+func (w *mcpAuthResponseWriter) WriteHeader(statusCode int) {
+	if w.nextCalled != nil && w.nextCalled() {
+		copyHeader(w.ResponseWriter.Header(), w.header)
+		w.ResponseWriter.WriteHeader(statusCode)
+		return
+	}
+	w.status = statusCode
+}
+
+func (w *mcpAuthResponseWriter) Write(data []byte) (int, error) {
+	if w.nextCalled != nil && w.nextCalled() {
+		copyHeader(w.ResponseWriter.Header(), w.header)
+		return w.ResponseWriter.Write(data)
+	}
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.body.Write(data)
+}
+
+func copyHeader(dst, src http.Header) {
+	for name, values := range src {
+		for _, value := range values {
+			dst.Add(name, value)
+		}
+	}
 }
 
 type toolImpl struct {
