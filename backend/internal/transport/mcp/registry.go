@@ -46,19 +46,19 @@ func (r mcpRuntime) registerFeatures(cfg config.Config) {
 }
 
 func (r mcpRuntime) registerTools() {
-	mcp.AddTool(r.server, r.impl.findListingsTool(), r.impl.findListings)
-	mcp.AddTool(r.server, r.impl.queryPropertiesTool(), r.impl.queryProperties)
-	mcp.AddTool(r.server, r.impl.getPropertyDetailTool(), r.impl.getPropertyDetail)
-	mcp.AddTool(r.server, r.impl.comparePropertiesTool(), r.impl.compareProperties)
-	mcp.AddTool(r.server, r.impl.getPropertyMarketContextTool(), r.impl.getPropertyMarketContext)
-	mcp.AddTool(r.server, r.impl.searchListingsTool(), r.impl.searchListings)
-	mcp.AddTool(r.server, r.impl.getListingDetailTool(), r.impl.getListingDetail)
-	mcp.AddTool(r.server, r.impl.searchTransactionsTool(), r.impl.searchTransactions)
-	mcp.AddTool(r.server, r.impl.searchTransactionsAdvancedTool(), r.impl.searchTransactionsAdvanced)
-	mcp.AddTool(r.server, r.impl.matchAdsFromTransactionTool(), r.impl.matchAdsFromTransaction)
-	mcp.AddTool(r.server, r.impl.listCitiesTool(), r.impl.listCities)
-	mcp.AddTool(r.server, r.impl.listAvailableLocationsTool(), r.impl.listAvailableLocations)
-	mcp.AddTool(r.server, r.impl.listCategoriesTool(), r.impl.listCategories)
+	addTracedTool(r.server, r.impl.findListingsTool(), r.impl.findListings)
+	addTracedTool(r.server, r.impl.queryPropertiesTool(), r.impl.queryProperties)
+	addTracedTool(r.server, r.impl.getPropertyDetailTool(), r.impl.getPropertyDetail)
+	addTracedTool(r.server, r.impl.comparePropertiesTool(), r.impl.compareProperties)
+	addTracedTool(r.server, r.impl.getPropertyMarketContextTool(), r.impl.getPropertyMarketContext)
+	addTracedTool(r.server, r.impl.searchListingsTool(), r.impl.searchListings)
+	addTracedTool(r.server, r.impl.getListingDetailTool(), r.impl.getListingDetail)
+	addTracedTool(r.server, r.impl.searchTransactionsTool(), r.impl.searchTransactions)
+	addTracedTool(r.server, r.impl.searchTransactionsAdvancedTool(), r.impl.searchTransactionsAdvanced)
+	addTracedTool(r.server, r.impl.matchAdsFromTransactionTool(), r.impl.matchAdsFromTransaction)
+	addTracedTool(r.server, r.impl.listCitiesTool(), r.impl.listCities)
+	addTracedTool(r.server, r.impl.listAvailableLocationsTool(), r.impl.listAvailableLocations)
+	addTracedTool(r.server, r.impl.listCategoriesTool(), r.impl.listCategories)
 }
 
 func mcpToolSecurityScopes() map[string][]string {
