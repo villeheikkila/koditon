@@ -3,8 +3,10 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"koditon/internal/platform/logging"
 	"koditon/internal/platform/telemetry"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -15,23 +17,27 @@ import (
 
 const mcpTracerName = "koditon/internal/transport/mcp"
 
-func addTracedTool[In, Out any](server *mcp.Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) {
-	mcp.AddTool(server, tool, traceToolHandler(tool, handler))
+func addTracedTool[In, Out any](server *mcp.Server, tool *mcp.Tool, logger *slog.Logger, handler mcp.ToolHandlerFor[In, Out]) {
+	mcp.AddTool(server, tool, traceToolHandler(tool, logger, handler))
 }
 
-func traceToolHandler[In, Out any](tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) mcp.ToolHandlerFor[In, Out] {
+func traceToolHandler[In, Out any](tool *mcp.Tool, logger *slog.Logger, handler mcp.ToolHandlerFor[In, Out]) mcp.ToolHandlerFor[In, Out] {
 	toolName := "unknown"
 	if tool != nil && tool.Name != "" {
 		toolName = tool.Name
 	}
+	logger = logging.With(logger, logging.Op("mcp.tool.call"), slog.String("mcp.operation", "tools/call"), slog.String("mcp.tool.name", toolName))
 	return func(ctx context.Context, request *mcp.CallToolRequest, input In) (result *mcp.CallToolResult, output Out, err error) {
 		ctx, span := telemetry.Tracer(mcpTracerName).Start(ctx, "mcp.tool "+toolName, trace.WithSpanKind(trace.SpanKindServer), trace.WithAttributes(attribute.String("mcp.operation", "tools/call"), attribute.String("mcp.tool.name", toolName)))
 		startedAt := time.Now()
+		logger.InfoContext(ctx, "mcp tool started")
 		defer func() {
+			duration := time.Since(startedAt)
 			if recovered := recover(); recovered != nil {
 				err = fmt.Errorf("panic: %v", recovered)
 				telemetry.RecordSpanError(span, err, "mcp tool panicked")
-				span.SetAttributes(attribute.String("mcp.tool.status", "panic"), attribute.Int64("mcp.tool.duration_ms", time.Since(startedAt).Milliseconds()))
+				span.SetAttributes(attribute.String("mcp.tool.status", "panic"), attribute.Int64("mcp.tool.duration_ms", duration.Milliseconds()))
+				logger.ErrorContext(ctx, "mcp tool panicked", logging.Error(err), slog.String("mcp.tool.status", "panic"), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 				span.End()
 				panic(recovered)
 			}
@@ -39,13 +45,16 @@ func traceToolHandler[In, Out any](tool *mcp.Tool, handler mcp.ToolHandlerFor[In
 			if err != nil {
 				status = "error"
 				telemetry.RecordSpanError(span, err, "mcp tool failed")
+				logger.ErrorContext(ctx, "mcp tool completed", logging.Error(err), slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 			} else if result != nil && result.IsError {
 				status = "tool_error"
 				span.SetStatus(codes.Error, "mcp tool returned an error result")
+				logger.WarnContext(ctx, "mcp tool completed", slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 			} else {
 				span.SetStatus(codes.Ok, "")
+				logger.InfoContext(ctx, "mcp tool completed", slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeSuccess))
 			}
-			span.SetAttributes(attribute.String("mcp.tool.status", status), attribute.Int64("mcp.tool.duration_ms", time.Since(startedAt).Milliseconds()))
+			span.SetAttributes(attribute.String("mcp.tool.status", status), attribute.Int64("mcp.tool.duration_ms", duration.Milliseconds()))
 			span.End()
 		}()
 		return handler(ctx, request, input)

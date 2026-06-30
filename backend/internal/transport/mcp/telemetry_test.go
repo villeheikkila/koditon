@@ -3,6 +3,8 @@ package mcpserver
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,7 +23,7 @@ func TestTraceToolHandlerRecordsToolSpan(t *testing.T) {
 		otel.SetTracerProvider(previous)
 		_ = provider.Shutdown(context.Background())
 	})
-	handler := traceToolHandler(&mcp.Tool{Name: "koditon_test_tool"}, func(context.Context, *mcp.CallToolRequest, emptyInput) (*mcp.CallToolResult, struct{}, error) {
+	handler := traceToolHandler(&mcp.Tool{Name: "koditon_test_tool"}, discardLogger(), func(context.Context, *mcp.CallToolRequest, emptyInput) (*mcp.CallToolResult, struct{}, error) {
 		return &mcp.CallToolResult{}, struct{}{}, nil
 	})
 	if _, _, err := handler(context.Background(), &mcp.CallToolRequest{}, emptyInput{}); err != nil {
@@ -48,7 +50,7 @@ func TestTraceToolHandlerMarksToolError(t *testing.T) {
 		otel.SetTracerProvider(previous)
 		_ = provider.Shutdown(context.Background())
 	})
-	handler := traceToolHandler(&mcp.Tool{Name: "koditon_error_tool"}, func(context.Context, *mcp.CallToolRequest, emptyInput) (*mcp.CallToolResult, struct{}, error) {
+	handler := traceToolHandler(&mcp.Tool{Name: "koditon_error_tool"}, discardLogger(), func(context.Context, *mcp.CallToolRequest, emptyInput) (*mcp.CallToolResult, struct{}, error) {
 		result := &mcp.CallToolResult{}
 		result.SetError(errors.New("bad input"))
 		return result, struct{}{}, nil
@@ -63,4 +65,8 @@ func TestTraceToolHandlerMarksToolError(t *testing.T) {
 	if spans[0].Status.Code != codes.Error {
 		t.Fatalf("span status = %v, want Error", spans[0].Status.Code)
 	}
+}
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
