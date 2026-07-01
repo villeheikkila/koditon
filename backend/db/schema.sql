@@ -664,26 +664,6 @@ create table public.property_dimension_dirty_targets (
 
 CREATE INDEX idx_property_dimension_dirty_targets_queue ON public.property_dimension_dirty_targets USING btree (dirty_at) WHERE ((resolved_at IS NULL) OR (resolved_at < dirty_at));
 
-create table public.property_dimension_manual_overrides (
-  property_dimension_manual_override_id uuid default gen_random_uuid() not null constraint property_dimension_manual_overrides_pkey primary key,
-  target_type text not null,
-  target_id uuid not null,
-  dimension_key text not null,
-  value jsonb not null,
-  value_kind text not null,
-  unit text,
-  reason text not null,
-  created_by text not null,
-  valid_from date,
-  valid_until date,
-  created_at timestamp with time zone default now() not null,
-  revoked_at timestamp with time zone,
-  constraint property_dimension_manual_overrides_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
-  constraint property_dimension_manual_overrides_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
-);
-
-CREATE UNIQUE INDEX idx_property_dimension_manual_overrides_active ON public.property_dimension_manual_overrides USING btree (target_type, target_id, dimension_key) WHERE (revoked_at IS NULL);
-
 create table public.property_dimension_projection_runs (
   property_dimension_projection_run_id uuid default gen_random_uuid() not null constraint property_dimension_projection_runs_pkey primary key,
   projection_type text not null,
@@ -1086,25 +1066,6 @@ create table public.property_units (
 
 CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
 CREATE INDEX idx_property_units_physical_building ON public.property_units USING btree (physical_building_id);
-
-create table public.property_valuation_runs (
-  property_valuation_run_id uuid default gen_random_uuid() not null constraint property_valuation_runs_pkey primary key,
-  property_offering_id uuid constraint property_valuation_runs_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE SET NULL,
-  property_unit_id uuid constraint property_valuation_runs_property_unit_id_fkey references property_units(property_unit_id) ON DELETE SET NULL,
-  housing_company_id uuid constraint property_valuation_runs_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE SET NULL,
-  property_valuation_run_model_version text not null,
-  property_valuation_run_market_value_low bigint,
-  property_valuation_run_market_value_high bigint,
-  property_valuation_run_risk_adjusted_value_low bigint,
-  property_valuation_run_risk_adjusted_value_high bigint,
-  property_valuation_run_recommended_offer_low bigint,
-  property_valuation_run_recommended_offer_high bigint,
-  property_valuation_run_verdict text not null,
-  property_valuation_run_confidence text not null,
-  property_valuation_run_reasons jsonb default '[]'::jsonb not null,
-  property_valuation_run_missing_evidence text[] default ARRAY[]::text[] not null,
-  property_valuation_run_created_at timestamp with time zone default now() not null
-);
 
 create table public.role_feature_flags (
   flag_id bigint not null constraint role_feature_flags_flag_id_fkey references feature_flags(flag_id) ON DELETE CASCADE,
