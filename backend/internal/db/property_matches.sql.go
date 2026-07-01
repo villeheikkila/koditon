@@ -15,7 +15,16 @@ import (
 const listTransactionMatchCandidates = `-- name: ListTransactionMatchCandidates :many
 WITH latest_candidates AS (
     SELECT DISTINCT ON (c.sale_listing_id, c.prices_transaction_id)
-        c.sale_listing_prices_transaction_match_candidate_id, c.sale_listing_prices_transaction_match_run_id, c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_score, c.sale_listing_prices_transaction_match_confidence, c.sale_listing_prices_transaction_match_status, c.sale_listing_prices_transaction_match_reasons, c.sale_listing_prices_transaction_match_price_delta_percent, c.sale_listing_prices_transaction_match_created_at
+        c.sale_listing_prices_transaction_match_candidate_id,
+        c.sale_listing_prices_transaction_match_run_id,
+        c.sale_listing_id,
+        c.prices_transaction_id,
+        c.sale_listing_prices_transaction_match_score,
+        c.sale_listing_prices_transaction_match_confidence,
+        c.sale_listing_prices_transaction_match_status,
+        c.sale_listing_prices_transaction_match_reasons,
+        c.sale_listing_prices_transaction_match_price_delta_percent,
+        c.sale_listing_prices_transaction_match_created_at
     FROM public.sale_listing_prices_transaction_match_candidates c
     ORDER BY c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_created_at DESC
 ),
@@ -204,29 +213,29 @@ type ListTransactionMatchCandidatesParams struct {
 }
 
 type ListTransactionMatchCandidatesRow struct {
-	ID                                   string          `json:"id"`
-	Status                               string          `json:"status"`
-	LinkType                             string          `json:"link_type"`
-	LinkMethod                           string          `json:"link_method"`
-	LatestScore                          int32           `json:"latest_score"`
-	Confidence                           string          `json:"confidence"`
+	ID                                   *string         `json:"id"`
+	Status                               *string         `json:"status"`
+	LinkType                             *string         `json:"link_type"`
+	LinkMethod                           *string         `json:"link_method"`
+	Score                                *int32          `json:"score"`
+	Confidence                           *string         `json:"confidence"`
 	PriceDeltaPercent                    *float64        `json:"price_delta_percent"`
 	Reasons                              json.RawMessage `json:"reasons"`
-	CreatedAt                            string          `json:"created_at"`
-	ListingID                            string          `json:"listing_id"`
-	OfferingID                           string          `json:"offering_id"`
+	CreatedAt                            *string         `json:"created_at"`
+	ListingID                            *string         `json:"listing_id"`
+	OfferingID                           *string         `json:"offering_id"`
 	SaleListingCanonicalID               string          `json:"sale_listing_canonical_id"`
 	SaleListingSourceProvider            string          `json:"sale_listing_source_provider"`
 	SaleListingNativeID                  string          `json:"sale_listing_native_id"`
-	ListingUrl                           string          `json:"listing_url"`
-	ExternalUrlAvailable                 bool            `json:"external_url_available"`
-	ListingHeadline                      string          `json:"listing_headline"`
-	ListingStreetAddress                 string          `json:"listing_street_address"`
-	ListingCity                          string          `json:"listing_city"`
-	ListingPostal                        string          `json:"listing_postal"`
-	ListingRoomLayout                    string          `json:"listing_room_layout"`
-	ListingCondition                     string          `json:"listing_condition"`
-	ListingConditionMatchCode            string          `json:"listing_condition_match_code"`
+	ListingUrl                           *string         `json:"listing_url"`
+	ExternalUrlAvailable                 *bool           `json:"external_url_available"`
+	ListingHeadline                      *string         `json:"listing_headline"`
+	ListingStreetAddress                 *string         `json:"listing_street_address"`
+	ListingCity                          *string         `json:"listing_city"`
+	ListingPostal                        *string         `json:"listing_postal"`
+	ListingRoomLayout                    *string         `json:"listing_room_layout"`
+	ListingCondition                     *string         `json:"listing_condition"`
+	ListingConditionMatchCode            *string         `json:"listing_condition_match_code"`
 	SaleListingAreaValue                 *float64        `json:"sale_listing_area_value"`
 	SaleListingAskingPrice               *int64          `json:"sale_listing_asking_price"`
 	SaleListingPricePerM2                *float64        `json:"sale_listing_price_per_m2"`
@@ -234,30 +243,30 @@ type ListTransactionMatchCandidatesRow struct {
 	SaleListingFloorLevel                *int32          `json:"sale_listing_floor_level"`
 	SaleListingTotalFloors               *int32          `json:"sale_listing_total_floors"`
 	SaleListingElevator                  *bool           `json:"sale_listing_elevator"`
-	ListingEnergyMatchCode               string          `json:"listing_energy_match_code"`
-	ListingEnergyLabel                   string          `json:"listing_energy_label"`
-	ListingPlotOwnershipRaw              string          `json:"listing_plot_ownership_raw"`
+	ListingEnergyMatchCode               *string         `json:"listing_energy_match_code"`
+	ListingEnergyLabel                   *string         `json:"listing_energy_label"`
+	ListingPlotOwnershipRaw              *string         `json:"listing_plot_ownership_raw"`
 	SaleListingPlotOwned                 *bool           `json:"sale_listing_plot_owned"`
-	ListingFirstSeenAt                   string          `json:"listing_first_seen_at"`
-	ListingLastSeenAt                    string          `json:"listing_last_seen_at"`
-	TransactionIDText                    string          `json:"transaction_id_text"`
-	TransactionDescription               string          `json:"transaction_description"`
-	TransactionType                      string          `json:"transaction_type"`
-	TransactionCategory                  string          `json:"transaction_category"`
+	ListingFirstSeenAt                   *string         `json:"listing_first_seen_at"`
+	ListingLastSeenAt                    *string         `json:"listing_last_seen_at"`
+	TransactionIDText                    *string         `json:"transaction_id_text"`
+	TransactionDescription               *string         `json:"transaction_description"`
+	TransactionType                      *string         `json:"transaction_type"`
+	TransactionCategory                  *string         `json:"transaction_category"`
 	PricesTransactionArea                float64         `json:"prices_transaction_area"`
 	PricesTransactionPrice               int32           `json:"prices_transaction_price"`
 	PricesTransactionPricePerSquareMeter int32           `json:"prices_transaction_price_per_square_meter"`
 	PricesTransactionBuildYear           int32           `json:"prices_transaction_build_year"`
-	TransactionFloor                     string          `json:"transaction_floor"`
+	TransactionFloor                     *string         `json:"transaction_floor"`
 	PricesTransactionElevator            bool            `json:"prices_transaction_elevator"`
-	TransactionCondition                 string          `json:"transaction_condition"`
-	TransactionConditionMatchCode        string          `json:"transaction_condition_match_code"`
-	TransactionPlot                      string          `json:"transaction_plot"`
+	TransactionCondition                 *string         `json:"transaction_condition"`
+	TransactionConditionMatchCode        *string         `json:"transaction_condition_match_code"`
+	TransactionPlot                      *string         `json:"transaction_plot"`
 	PricesTransactionPlotOwned           *bool           `json:"prices_transaction_plot_owned"`
-	TransactionEnergyClass               string          `json:"transaction_energy_class"`
-	TransactionEnergyMatchCode           string          `json:"transaction_energy_match_code"`
-	TransactionPeriodIdentifier          string          `json:"transaction_period_identifier"`
-	TransactionCreatedAt                 string          `json:"transaction_created_at"`
+	TransactionEnergyClass               *string         `json:"transaction_energy_class"`
+	TransactionEnergyMatchCode           *string         `json:"transaction_energy_match_code"`
+	TransactionPeriodIdentifier          *string         `json:"transaction_period_identifier"`
+	TransactionCreatedAt                 *string         `json:"transaction_created_at"`
 }
 
 func (q *Queries) ListTransactionMatchCandidates(ctx context.Context, arg ListTransactionMatchCandidatesParams) ([]ListTransactionMatchCandidatesRow, error) {
@@ -279,7 +288,7 @@ func (q *Queries) ListTransactionMatchCandidates(ctx context.Context, arg ListTr
 			&i.Status,
 			&i.LinkType,
 			&i.LinkMethod,
-			&i.LatestScore,
+			&i.Score,
 			&i.Confidence,
 			&i.PriceDeltaPercent,
 			&i.Reasons,
@@ -343,13 +352,31 @@ func (q *Queries) ListTransactionMatchCandidates(ctx context.Context, arg ListTr
 const listTransactionMatchPostals = `-- name: ListTransactionMatchPostals :many
 WITH latest AS (
     SELECT DISTINCT ON (c.sale_listing_id, c.prices_transaction_id)
-        c.sale_listing_prices_transaction_match_candidate_id, c.sale_listing_prices_transaction_match_run_id, c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_score, c.sale_listing_prices_transaction_match_confidence, c.sale_listing_prices_transaction_match_status, c.sale_listing_prices_transaction_match_reasons, c.sale_listing_prices_transaction_match_price_delta_percent, c.sale_listing_prices_transaction_match_created_at
+        c.sale_listing_prices_transaction_match_candidate_id,
+        c.sale_listing_prices_transaction_match_run_id,
+        c.sale_listing_id,
+        c.prices_transaction_id,
+        c.sale_listing_prices_transaction_match_score,
+        c.sale_listing_prices_transaction_match_confidence,
+        c.sale_listing_prices_transaction_match_status,
+        c.sale_listing_prices_transaction_match_reasons,
+        c.sale_listing_prices_transaction_match_price_delta_percent,
+        c.sale_listing_prices_transaction_match_created_at
     FROM public.sale_listing_prices_transaction_match_candidates c
     ORDER BY c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_created_at DESC
 ),
 potential AS (
     SELECT
-        latest.sale_listing_prices_transaction_match_candidate_id, latest.sale_listing_prices_transaction_match_run_id, latest.sale_listing_id, latest.prices_transaction_id, latest.sale_listing_prices_transaction_match_score, latest.sale_listing_prices_transaction_match_confidence, latest.sale_listing_prices_transaction_match_status, latest.sale_listing_prices_transaction_match_reasons, latest.sale_listing_prices_transaction_match_price_delta_percent, latest.sale_listing_prices_transaction_match_created_at,
+        latest.sale_listing_prices_transaction_match_candidate_id,
+        latest.sale_listing_prices_transaction_match_run_id,
+        latest.sale_listing_id,
+        latest.prices_transaction_id,
+        latest.sale_listing_prices_transaction_match_score,
+        latest.sale_listing_prices_transaction_match_confidence,
+        latest.sale_listing_prices_transaction_match_status,
+        latest.sale_listing_prices_transaction_match_reasons,
+        latest.sale_listing_prices_transaction_match_price_delta_percent,
+        latest.sale_listing_prices_transaction_match_created_at,
         sl.sale_listing_postal_norm AS postal
     FROM latest
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
@@ -391,16 +418,16 @@ LIMIT $1::int
 
 type ListTransactionMatchPostalsRow struct {
 	Postal           *string `json:"postal"`
-	PostalNameFi     string  `json:"postal_name_fi"`
-	MunicipalityName string  `json:"municipality_name"`
-	CandidateCount   int64   `json:"candidate_count"`
-	ListingCount     int64   `json:"listing_count"`
-	TransactionCount int64   `json:"transaction_count"`
-	HighCount        int64   `json:"high_count"`
-	MediumCount      int64   `json:"medium_count"`
-	LowCount         int64   `json:"low_count"`
-	AmbiguousCount   int64   `json:"ambiguous_count"`
-	LatestAt         string  `json:"latest_at"`
+	PostalNameFi     *string `json:"postal_name_fi"`
+	MunicipalityName *string `json:"municipality_name"`
+	CandidateCount   *int64  `json:"candidate_count"`
+	ListingCount     *int64  `json:"listing_count"`
+	TransactionCount *int64  `json:"transaction_count"`
+	HighCount        *int64  `json:"high_count"`
+	MediumCount      *int64  `json:"medium_count"`
+	LowCount         *int64  `json:"low_count"`
+	AmbiguousCount   *int64  `json:"ambiguous_count"`
+	LatestAt         *string `json:"latest_at"`
 }
 
 func (q *Queries) ListTransactionMatchPostals(ctx context.Context, limitCount int32) ([]ListTransactionMatchPostalsRow, error) {

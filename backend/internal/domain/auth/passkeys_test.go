@@ -51,7 +51,7 @@ func TestFinishPasskeyAuthentication_SuccessCreatesSessionAndUpdatesPasskey(t *t
 	if resp.SessionID == uuid.Nil {
 		t.Fatal("expected a session id")
 	}
-	session, err := queries.GetSessionByID(ctx, resp.SessionID)
+	session, err := queries.GetSessionByID(ctx, &resp.SessionID)
 	if err != nil {
 		t.Fatalf("load session: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestFinishPasskeyAuthentication_SuccessCreatesSessionAndUpdatesPasskey(t *t
 		t.Fatalf("expected empty user agent, got %q", *session.DeviceSessionUserAgent)
 	}
 
-	passkeys, err := queries.ListPasskeysByUserID(ctx, userID)
+	passkeys, err := queries.ListPasskeysByUserID(ctx, &userID)
 	if err != nil {
 		t.Fatalf("list passkeys: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestFinishPasskeyAuthentication_SanitizesSessionUserAgent(t *testing.T) {
 		t.Fatalf("finish passkey auth: %v", err)
 	}
 
-	session, err := queries.GetSessionByID(ctx, resp.SessionID)
+	session, err := queries.GetSessionByID(ctx, &resp.SessionID)
 	if err != nil {
 		t.Fatalf("load session: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestFinishPasskeyRegistration_CreatesIdentityAndPasskey(t *testing.T) {
 		t.Fatal("expected credential id")
 	}
 
-	passkeys, err := queries.ListPasskeysByUserID(ctx, userID)
+	passkeys, err := queries.ListPasskeysByUserID(ctx, &userID)
 	if err != nil {
 		t.Fatalf("list passkeys: %v", err)
 	}
@@ -282,12 +282,13 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseForExistingPasskeyAccoun
 	userID := createAuthTestUser(t, ctx, pool, queries)
 	email := "email-passkey@example.com"
 	emailProvider := string(AuthProviderEmail)
+	emailVerified := true
 	emailIdentity, err := queries.CreateIdentity(ctx, db.CreateIdentityParams{
-		UserUuid:                  userID,
-		UserIdentityProvider:      emailProvider,
-		UserIdentityExternalID:    email,
+		UserUuid:                  &userID,
+		UserIdentityProvider:      &emailProvider,
+		UserIdentityExternalID:    &email,
 		UserIdentityEmail:         &email,
-		UserIdentityEmailVerified: true,
+		UserIdentityEmailVerified: &emailVerified,
 		UserIdentityData:          []byte(`{"source":"email"}`),
 	})
 	if err != nil {
@@ -296,9 +297,9 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseForExistingPasskeyAccoun
 	passkeyProvider := string(AuthProviderPasskey)
 	externalID := uuid.NewString()
 	passkeyIdentity, err := queries.CreateIdentity(ctx, db.CreateIdentityParams{
-		UserUuid:               userID,
-		UserIdentityProvider:   passkeyProvider,
-		UserIdentityExternalID: externalID,
+		UserUuid:               &userID,
+		UserIdentityProvider:   &passkeyProvider,
+		UserIdentityExternalID: &externalID,
 		UserIdentityData:       []byte(`{"source":"test"}`),
 	})
 	if err != nil {
@@ -311,16 +312,17 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseForExistingPasskeyAccoun
 	rawCredentialID := []byte("credential-a")
 	credentialID := base64.RawURLEncoding.EncodeToString(rawCredentialID)
 	attestationType := "none"
+	signCount := int64(1)
 	if _, err := queries.CreatePasskey(ctx, db.CreatePasskeyParams{
-		UserUuid:                      userID,
-		UserIdentityUuid:              passkeyIdentity.UserIdentityUuid,
+		UserUuid:                      &userID,
+		UserIdentityUuid:              &passkeyIdentity.UserIdentityUuid,
 		UserPasskeyCredentialID:       rawCredentialID,
-		UserPasskeyCredentialIDB64url: credentialID,
+		UserPasskeyCredentialIDB64url: &credentialID,
 		UserPasskeyPublicKey:          []byte("public-key"),
-		UserPasskeyAttestationType:    attestationType,
+		UserPasskeyAttestationType:    &attestationType,
 		UserPasskeyTransports:         []string{"internal"},
 		UserPasskeyUserHandle:         []byte("user-handle-a"),
-		UserPasskeySignCount:          1,
+		UserPasskeySignCount:          &signCount,
 		UserPasskeyLastUsedAt:         nil,
 	}); err != nil {
 		t.Fatalf("create passkey: %v", err)
@@ -361,9 +363,9 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseWithoutPasskeys(t *testi
 	passkeyProvider := string(AuthProviderPasskey)
 	externalID := uuid.NewString()
 	passkeyIdentity, err := queries.CreateIdentity(ctx, db.CreateIdentityParams{
-		UserUuid:               userID,
-		UserIdentityProvider:   passkeyProvider,
-		UserIdentityExternalID: externalID,
+		UserUuid:               &userID,
+		UserIdentityProvider:   &passkeyProvider,
+		UserIdentityExternalID: &externalID,
 		UserIdentityData:       []byte(`{"source":"test"}`),
 	})
 	if err != nil {
@@ -372,16 +374,17 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseWithoutPasskeys(t *testi
 	rawCredentialID := []byte("credential-b")
 	credentialID := base64.RawURLEncoding.EncodeToString(rawCredentialID)
 	attestationType := "none"
+	signCount := int64(1)
 	if _, err := queries.CreatePasskey(ctx, db.CreatePasskeyParams{
-		UserUuid:                      userID,
-		UserIdentityUuid:              passkeyIdentity.UserIdentityUuid,
+		UserUuid:                      &userID,
+		UserIdentityUuid:              &passkeyIdentity.UserIdentityUuid,
 		UserPasskeyCredentialID:       rawCredentialID,
-		UserPasskeyCredentialIDB64url: credentialID,
+		UserPasskeyCredentialIDB64url: &credentialID,
 		UserPasskeyPublicKey:          []byte("public-key"),
-		UserPasskeyAttestationType:    attestationType,
+		UserPasskeyAttestationType:    &attestationType,
 		UserPasskeyTransports:         []string{"internal"},
 		UserPasskeyUserHandle:         []byte("user-handle-b"),
-		UserPasskeySignCount:          1,
+		UserPasskeySignCount:          &signCount,
 		UserPasskeyLastUsedAt:         nil,
 	}); err != nil {
 		t.Fatalf("create passkey: %v", err)
@@ -526,9 +529,9 @@ func createPasskeyAuthFixture(
 	provider := string(AuthProviderPasskey)
 	externalID := uuid.NewString()
 	identity, err := queries.CreateIdentity(ctx, db.CreateIdentityParams{
-		UserUuid:               userID,
-		UserIdentityProvider:   provider,
-		UserIdentityExternalID: externalID,
+		UserUuid:               &userID,
+		UserIdentityProvider:   &provider,
+		UserIdentityExternalID: &externalID,
 		UserIdentityData:       []byte(`{"source":"test"}`),
 	})
 	if err != nil {
@@ -541,19 +544,20 @@ func createPasskeyAuthFixture(
 	name := "Primary Passkey"
 	backupEligible := true
 	backupState := false
+	signCount := int64(1)
 	flags := int32(
 		wbauthn.NewCredentialFlags(protocol.FlagUserPresent | protocol.FlagUserVerified | protocol.FlagBackupEligible).ProtocolValue(),
 	)
 	if _, err := queries.CreatePasskey(ctx, db.CreatePasskeyParams{
-		UserUuid:                      userID,
-		UserIdentityUuid:              identity.UserIdentityUuid,
+		UserUuid:                      &userID,
+		UserIdentityUuid:              &identity.UserIdentityUuid,
 		UserPasskeyCredentialID:       rawCredentialID,
-		UserPasskeyCredentialIDB64url: credentialID,
+		UserPasskeyCredentialIDB64url: &credentialID,
 		UserPasskeyPublicKey:          []byte("public-key"),
-		UserPasskeyAttestationType:    attestationType,
+		UserPasskeyAttestationType:    &attestationType,
 		UserPasskeyTransports:         []string{"internal"},
 		UserPasskeyUserHandle:         []byte("user-handle-a"),
-		UserPasskeySignCount:          1,
+		UserPasskeySignCount:          &signCount,
 		UserPasskeyFlags:              &flags,
 		UserPasskeyAaguid:             uuidPtr(uuid.MustParse("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")),
 		UserPasskeyName:               &name,
@@ -584,9 +588,9 @@ func createPasskeyChallenge(
 	}
 
 	params := db.CreateWebauthnChallengeParams{
-		AuthWebauthnChallengeFlow:       flow,
+		AuthWebauthnChallengeFlow:       &flow,
 		AuthWebauthnChallengeSession:    sessionJSON,
-		AuthWebauthnChallengeExpiresAt:  expiresAt,
+		AuthWebauthnChallengeExpiresAt:  &expiresAt,
 		AuthWebauthnChallengeUserHandle: []byte("user-handle-a"),
 		AuthWebauthnChallengeDeviceID:   nil,
 		UserUuid:                        nil,

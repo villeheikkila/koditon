@@ -66,11 +66,11 @@ func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, saleListin
 	if err != nil {
 		return canonicalMatchSaleListingRow{}, fmt.Errorf("parse sale listing id: %w", err)
 	}
-	result, err := c.queries.LoadCanonicalMatchSaleListing(ctx, id)
+	result, err := c.queries.LoadCanonicalMatchSaleListing(ctx, &id)
 	if err != nil {
 		return canonicalMatchSaleListingRow{}, err
 	}
-	return canonicalMatchSaleListingRow{ID: result.ID, LinkMethod: result.LinkMethod, LinkStatus: result.LinkStatus, Status: result.SaleListingSourceMatchStatus, AttemptCount: result.SaleListingSourceMatchAttemptCount}, nil
+	return canonicalMatchSaleListingRow{ID: stringValue(result.ID), LinkMethod: &result.LinkMethod, LinkStatus: &result.LinkStatus, Status: result.SaleListingSourceMatchStatus, AttemptCount: result.SaleListingSourceMatchAttemptCount}, nil
 }
 
 func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, saleListingID string) (canonicalMatchRunSummary, error) {
@@ -83,7 +83,7 @@ func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, sa
 	if err != nil {
 		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match: %w", err)
 	}
-	return canonicalMatchRunSummary{RunID: summary.RunID, Candidates: summary.Candidates, AutoLinked: summary.AutoLinked, Ambiguous: summary.Ambiguous}, nil
+	return canonicalMatchRunSummary{RunID: stringValue(summary.RunID), Candidates: int32Value(summary.Candidates), AutoLinked: int32Value(summary.AutoLinked), Ambiguous: int32Value(summary.Ambiguous)}, nil
 }
 
 func (c *Consumer) runCanonicalSourceMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (canonicalMatchRunSummary, error) {
@@ -92,7 +92,21 @@ func (c *Consumer) runCanonicalSourceMatchBackfill(ctx context.Context, scoreThr
 	if err != nil {
 		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match backfill: %w", err)
 	}
-	return canonicalMatchRunSummary{RunID: summary.RunID, Candidates: summary.Candidates, AutoLinked: summary.AutoLinked, Ambiguous: summary.Ambiguous}, nil
+	return canonicalMatchRunSummary{RunID: stringValue(summary.RunID), Candidates: int32Value(summary.Candidates), AutoLinked: int32Value(summary.AutoLinked), Ambiguous: int32Value(summary.Ambiguous)}, nil
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func int32Value(value *int32) int32 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func (c *Consumer) updateCanonicalSourceMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string) error {

@@ -14,15 +14,15 @@ SELECT
     now(),
     now()
 FROM ROWS FROM (
-    unnest(CAST(sqlc.arg(codes) AS text[])),
-    unnest(CAST(sqlc.arg(names_fi) AS text[])),
-    unnest(CAST(sqlc.arg(names_sv) AS text[]))
+    unnest(CAST(@codes AS text[])),
+    unnest(CAST(@names_fi AS text[])),
+    unnest(CAST(@names_sv AS text[]))
 ) AS t(codes, names_fi, names_sv)
 ON CONFLICT (postal_ad_area_code) DO UPDATE
 SET postal_ad_area_name_fi = EXCLUDED.postal_ad_area_name_fi,
     postal_ad_area_name_sv = EXCLUDED.postal_ad_area_name_sv,
     postal_ad_area_updated_at = now()
-RETURNING *;
+RETURNING postal_ad_area_id, postal_ad_area_code, postal_ad_area_name_fi, postal_ad_area_name_sv, postal_ad_area_created_at, postal_ad_area_updated_at;
 
 -- Municipalities
 -- name: UpsertPostalMunicipalitiesBulk :many
@@ -42,17 +42,17 @@ SELECT
     now(),
     now()
 FROM ROWS FROM (
-    unnest(CAST(sqlc.arg(codes) AS text[])),
-    unnest(CAST(sqlc.arg(names_fi) AS text[])),
-    unnest(CAST(sqlc.arg(names_sv) AS text[])),
-    unnest(CAST(sqlc.arg(language_ratio_codes) AS text[]))
+    unnest(CAST(@codes AS text[])),
+    unnest(CAST(@names_fi AS text[])),
+    unnest(CAST(@names_sv AS text[])),
+    unnest(CAST(@language_ratio_codes AS text[]))
 ) AS t(codes, names_fi, names_sv, language_ratio_codes)
 ON CONFLICT (postal_municipality_code) DO UPDATE
 SET postal_municipality_name_fi = EXCLUDED.postal_municipality_name_fi,
     postal_municipality_name_sv = EXCLUDED.postal_municipality_name_sv,
     postal_municipality_language_ratio_code = EXCLUDED.postal_municipality_language_ratio_code,
     postal_municipality_updated_at = now()
-RETURNING *;
+RETURNING postal_municipality_id, postal_municipality_code, postal_municipality_name_fi, postal_municipality_name_sv, postal_municipality_language_ratio_code, postal_municipality_created_at, postal_municipality_updated_at;
 
 -- Postal Codes
 -- name: UpsertPostalPostalCodesBulk :execrows
@@ -86,17 +86,17 @@ SELECT
     now(),
     now()
 FROM ROWS FROM (
-    unnest(CAST(sqlc.arg(dates) AS date[])),
-    unnest(CAST(sqlc.arg(codes) AS text[])),
-    unnest(CAST(sqlc.arg(names_fi) AS text[])),
-    unnest(CAST(sqlc.arg(names_sv) AS text[])),
-    unnest(CAST(sqlc.arg(abbrs_fi) AS text[])),
-    unnest(CAST(sqlc.arg(abbrs_sv) AS text[])),
-    unnest(CAST(sqlc.arg(neighborhoods_fi) AS text[])),
-    unnest(CAST(sqlc.arg(valids_from) AS date[])),
-    unnest(CAST(sqlc.arg(type_codes) AS text[])),
-    unnest(CAST(sqlc.arg(ad_area_ids) AS uuid[])),
-    unnest(CAST(sqlc.arg(municipality_ids) AS uuid[]))
+    unnest(CAST(@dates AS date[])),
+    unnest(CAST(@codes AS text[])),
+    unnest(CAST(@names_fi AS text[])),
+    unnest(CAST(@names_sv AS text[])),
+    unnest(CAST(@abbrs_fi AS text[])),
+    unnest(CAST(@abbrs_sv AS text[])),
+    unnest(CAST(@neighborhoods_fi AS text[])),
+    unnest(CAST(@valids_from AS date[])),
+    unnest(CAST(@type_codes AS text[])),
+    unnest(CAST(@ad_area_ids AS uuid[])),
+    unnest(CAST(@municipality_ids AS uuid[]))
 ) AS t(
     dates,
     codes,
@@ -170,5 +170,5 @@ JOIN public.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
 JOIN public.prices_transactions AS pt
     ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
-WHERE ppc.postal_municipality_id = sqlc.arg(municipality_id)
+WHERE ppc.postal_municipality_id = @municipality_id
 ORDER BY ppc.postal_postal_code_code;

@@ -24,9 +24,9 @@ where user_id = (
   and user_passkey_revoked_at is null
 `
 
-func (q *Queries) CountActivePasskeysByUserID(ctx context.Context, userUuid uuid.UUID) (int64, error) {
+func (q *Queries) CountActivePasskeysByUserID(ctx context.Context, userUuid *uuid.UUID) (*int64, error) {
 	row := q.db.QueryRow(ctx, countActivePasskeysByUserID, userUuid)
-	var active_count int64
+	var active_count *int64
 	err := row.Scan(&active_count)
 	return active_count, err
 }
@@ -105,15 +105,15 @@ returning
 `
 
 type CreatePasskeyParams struct {
-	UserUuid                      uuid.UUID  `json:"user_uuid"`
-	UserIdentityUuid              uuid.UUID  `json:"user_identity_uuid"`
+	UserUuid                      *uuid.UUID `json:"user_uuid"`
+	UserIdentityUuid              *uuid.UUID `json:"user_identity_uuid"`
 	UserPasskeyCredentialID       []byte     `json:"user_passkey_credential_id"`
-	UserPasskeyCredentialIDB64url string     `json:"user_passkey_credential_id_b64url"`
+	UserPasskeyCredentialIDB64url *string    `json:"user_passkey_credential_id_b64url"`
 	UserPasskeyPublicKey          []byte     `json:"user_passkey_public_key"`
-	UserPasskeyAttestationType    string     `json:"user_passkey_attestation_type"`
+	UserPasskeyAttestationType    *string    `json:"user_passkey_attestation_type"`
 	UserPasskeyTransports         []string   `json:"user_passkey_transports"`
 	UserPasskeyUserHandle         []byte     `json:"user_passkey_user_handle"`
-	UserPasskeySignCount          int64      `json:"user_passkey_sign_count"`
+	UserPasskeySignCount          *int64     `json:"user_passkey_sign_count"`
 	UserPasskeyFlags              *int32     `json:"user_passkey_flags"`
 	UserPasskeyAaguid             *uuid.UUID `json:"user_passkey_aaguid"`
 	UserPasskeyName               *string    `json:"user_passkey_name"`
@@ -124,8 +124,8 @@ type CreatePasskeyParams struct {
 
 type CreatePasskeyRow struct {
 	UserPasskeyUuid               uuid.UUID  `json:"user_passkey_uuid"`
-	UserUuid                      uuid.UUID  `json:"user_uuid"`
-	UserIdentityUuid              uuid.UUID  `json:"user_identity_uuid"`
+	UserUuid                      *uuid.UUID `json:"user_uuid"`
+	UserIdentityUuid              *uuid.UUID `json:"user_identity_uuid"`
 	UserPasskeyCredentialID       []byte     `json:"user_passkey_credential_id"`
 	UserPasskeyCredentialIDB64url string     `json:"user_passkey_credential_id_b64url"`
 	UserPasskeyPublicKey          []byte     `json:"user_passkey_public_key"`
@@ -223,8 +223,8 @@ where user_passkey_credential_id = $1
 
 type GetPasskeyByCredentialIDRow struct {
 	UserPasskeyUuid               uuid.UUID  `json:"user_passkey_uuid"`
-	UserUuid                      uuid.UUID  `json:"user_uuid"`
-	UserIdentityUuid              uuid.UUID  `json:"user_identity_uuid"`
+	UserUuid                      *uuid.UUID `json:"user_uuid"`
+	UserIdentityUuid              *uuid.UUID `json:"user_identity_uuid"`
 	UserPasskeyCredentialID       []byte     `json:"user_passkey_credential_id"`
 	UserPasskeyCredentialIDB64url string     `json:"user_passkey_credential_id_b64url"`
 	UserPasskeyPublicKey          []byte     `json:"user_passkey_public_key"`
@@ -312,8 +312,8 @@ type GetPasskeyByUserHandleAndCredentialIDParams struct {
 
 type GetPasskeyByUserHandleAndCredentialIDRow struct {
 	UserPasskeyUuid               uuid.UUID  `json:"user_passkey_uuid"`
-	UserUuid                      uuid.UUID  `json:"user_uuid"`
-	UserIdentityUuid              uuid.UUID  `json:"user_identity_uuid"`
+	UserUuid                      *uuid.UUID `json:"user_uuid"`
+	UserIdentityUuid              *uuid.UUID `json:"user_identity_uuid"`
 	UserPasskeyCredentialID       []byte     `json:"user_passkey_credential_id"`
 	UserPasskeyCredentialIDB64url string     `json:"user_passkey_credential_id_b64url"`
 	UserPasskeyPublicKey          []byte     `json:"user_passkey_public_key"`
@@ -400,8 +400,8 @@ order by user_passkey_created_at desc
 
 type ListPasskeysByUserIDRow struct {
 	UserPasskeyUuid               uuid.UUID  `json:"user_passkey_uuid"`
-	UserUuid                      uuid.UUID  `json:"user_uuid"`
-	UserIdentityUuid              uuid.UUID  `json:"user_identity_uuid"`
+	UserUuid                      *uuid.UUID `json:"user_uuid"`
+	UserIdentityUuid              *uuid.UUID `json:"user_identity_uuid"`
 	UserPasskeyCredentialID       []byte     `json:"user_passkey_credential_id"`
 	UserPasskeyCredentialIDB64url string     `json:"user_passkey_credential_id_b64url"`
 	UserPasskeyPublicKey          []byte     `json:"user_passkey_public_key"`
@@ -420,7 +420,7 @@ type ListPasskeysByUserIDRow struct {
 	UserPasskeyRevokedAt          *time.Time `json:"user_passkey_revoked_at"`
 }
 
-func (q *Queries) ListPasskeysByUserID(ctx context.Context, userUuid uuid.UUID) ([]ListPasskeysByUserIDRow, error) {
+func (q *Queries) ListPasskeysByUserID(ctx context.Context, userUuid *uuid.UUID) ([]ListPasskeysByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, listPasskeysByUserID, userUuid)
 	if err != nil {
 		return nil, err
@@ -504,8 +504,8 @@ select
 `
 
 type RevokePasskeyByCredentialB64ForUserParams struct {
-	UserUuid                 uuid.UUID `json:"user_uuid"`
-	TargetCredentialIDB64url string    `json:"target_credential_id_b64url"`
+	UserUuid                 *uuid.UUID `json:"user_uuid"`
+	TargetCredentialIDB64url *string    `json:"target_credential_id_b64url"`
 }
 
 func (q *Queries) RevokePasskeyByCredentialB64ForUser(ctx context.Context, arg RevokePasskeyByCredentialB64ForUserParams) (string, error) {
@@ -527,7 +527,7 @@ where user_passkey_credential_id = $3
 `
 
 type UpdatePasskeyUsageParams struct {
-	UserPasskeySignCount    int64  `json:"user_passkey_sign_count"`
+	UserPasskeySignCount    *int64 `json:"user_passkey_sign_count"`
 	UserPasskeyBackupState  *bool  `json:"user_passkey_backup_state"`
 	UserPasskeyCredentialID []byte `json:"user_passkey_credential_id"`
 }

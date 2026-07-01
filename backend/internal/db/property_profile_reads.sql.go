@@ -62,33 +62,33 @@ LEFT JOIN public.dimension_profiles hcp ON hcp.target_type = 'housing_company'
 type GetCanonicalBuildingProfileForSaleListingRow struct {
 	PhysicalBuildingID           *uuid.UUID `json:"physical_building_id"`
 	BuildingHousingCompanyID     uuid.UUID  `json:"building_housing_company_id"`
-	BuildYear                    int32      `json:"build_year"`
-	FloorCount                   int32      `json:"floor_count"`
-	ApartmentCount               int32      `json:"apartment_count"`
-	EnergyClass                  string     `json:"energy_class"`
-	HeatingMethod                string     `json:"heating_method"`
-	Material                     string     `json:"material"`
-	RoofType                     string     `json:"roof_type"`
-	RoofMaterial                 string     `json:"roof_material"`
-	Elevator                     bool       `json:"elevator"`
-	BuildingConfidence           string     `json:"building_confidence"`
-	BuildingResolvedAt           *time.Time `json:"building_resolved_at"`
+	BuildYear                    *int32     `json:"build_year"`
+	FloorCount                   *int32     `json:"floor_count"`
+	ApartmentCount               *int32     `json:"apartment_count"`
+	EnergyClass                  *string    `json:"energy_class"`
+	HeatingMethod                *string    `json:"heating_method"`
+	Material                     *string    `json:"material"`
+	RoofType                     *string    `json:"roof_type"`
+	RoofMaterial                 *string    `json:"roof_material"`
+	Elevator                     *bool      `json:"elevator"`
+	BuildingConfidence           *string    `json:"building_confidence"`
+	BuildingResolvedAt           time.Time  `json:"building_resolved_at"`
 	HousingCompanyID             uuid.UUID  `json:"housing_company_id"`
-	HousingCompanyName           string     `json:"housing_company_name"`
-	BusinessID                   string     `json:"business_id"`
+	HousingCompanyName           *string    `json:"housing_company_name"`
+	BusinessID                   *string    `json:"business_id"`
 	HousingCompanyBuildYear      *int32     `json:"housing_company_build_year"`
-	HousingCompanyApartmentCount int32      `json:"housing_company_apartment_count"`
-	PlotOwnershipType            string     `json:"plot_ownership_type"`
-	HousingCompanyEnergyClass    string     `json:"housing_company_energy_class"`
-	MaintenanceRisk              string     `json:"maintenance_risk"`
-	FinancialRisk                string     `json:"financial_risk"`
-	RepairBacklogRisk            string     `json:"repair_backlog_risk"`
-	HousingCompanyConfidence     string     `json:"housing_company_confidence"`
-	HousingCompanyResolvedAt     *time.Time `json:"housing_company_resolved_at"`
+	HousingCompanyApartmentCount *int32     `json:"housing_company_apartment_count"`
+	PlotOwnershipType            *string    `json:"plot_ownership_type"`
+	HousingCompanyEnergyClass    *string    `json:"housing_company_energy_class"`
+	MaintenanceRisk              *string    `json:"maintenance_risk"`
+	FinancialRisk                *string    `json:"financial_risk"`
+	RepairBacklogRisk            *string    `json:"repair_backlog_risk"`
+	HousingCompanyConfidence     *string    `json:"housing_company_confidence"`
+	HousingCompanyResolvedAt     time.Time  `json:"housing_company_resolved_at"`
 }
 
-func (q *Queries) GetCanonicalBuildingProfileForSaleListing(ctx context.Context, sourceID uuid.UUID) (GetCanonicalBuildingProfileForSaleListingRow, error) {
-	row := q.db.QueryRow(ctx, getCanonicalBuildingProfileForSaleListing, sourceID)
+func (q *Queries) GetCanonicalBuildingProfileForSaleListing(ctx context.Context, dollar_1 *uuid.UUID) (GetCanonicalBuildingProfileForSaleListingRow, error) {
+	row := q.db.QueryRow(ctx, getCanonicalBuildingProfileForSaleListing, dollar_1)
 	var i GetCanonicalBuildingProfileForSaleListingRow
 	err := row.Scan(
 		&i.PhysicalBuildingID,
@@ -174,40 +174,40 @@ JOIN public.dimension_profiles p ON p.target_type = 'unit'
 type GetDimensionApartmentProfileForSaleListingRow struct {
 	HousingCompanyID         uuid.UUID `json:"housing_company_id"`
 	PropertyUnitID           uuid.UUID `json:"property_unit_id"`
-	AreaM2                   float64   `json:"area_m2"`
-	LivingAreaM2             float64   `json:"living_area_m2"`
-	RoomLayout               string    `json:"room_layout"`
-	RoomCount                int32     `json:"room_count"`
-	BedroomCount             int32     `json:"bedroom_count"`
-	FloorLevel               int32     `json:"floor_level"`
-	TotalFloors              int32     `json:"total_floors"`
-	KitchenType              string    `json:"kitchen_type"`
-	LayoutQuality            string    `json:"layout_quality"`
-	AwkwardLayout            bool      `json:"awkward_layout"`
-	Condition                string    `json:"condition"`
-	KitchenCondition         string    `json:"kitchen_condition"`
-	BathroomCondition        string    `json:"bathroom_condition"`
-	SurfaceRenovationNeed    bool      `json:"surface_renovation_need"`
-	ModernizationNeed        bool      `json:"modernization_need"`
-	Sauna                    bool      `json:"sauna"`
-	Balcony                  bool      `json:"balcony"`
-	BalconyGlazing           bool      `json:"balcony_glazing"`
-	ParkingType              string    `json:"parking_type"`
-	StorageQuality           string    `json:"storage_quality"`
-	ViewQuality              string    `json:"view_quality"`
-	NoiseRisk                bool      `json:"noise_risk"`
-	Accessibility            string    `json:"accessibility"`
-	MaintenanceChargeMonthly float64   `json:"maintenance_charge_monthly"`
-	CapitalChargeMonthly     float64   `json:"capital_charge_monthly"`
-	TotalChargeMonthly       float64   `json:"total_charge_monthly"`
-	DebtShareEur             int64     `json:"debt_share_eur"`
-	ShareholderLiability     string    `json:"shareholder_liability"`
-	Confidence               string    `json:"confidence"`
+	AreaM2                   *float64  `json:"area_m2"`
+	LivingAreaM2             *float64  `json:"living_area_m2"`
+	RoomLayout               *string   `json:"room_layout"`
+	RoomCount                *int32    `json:"room_count"`
+	BedroomCount             *int32    `json:"bedroom_count"`
+	FloorLevel               *int32    `json:"floor_level"`
+	TotalFloors              *int32    `json:"total_floors"`
+	KitchenType              *string   `json:"kitchen_type"`
+	LayoutQuality            *string   `json:"layout_quality"`
+	AwkwardLayout            *bool     `json:"awkward_layout"`
+	Condition                *string   `json:"condition"`
+	KitchenCondition         *string   `json:"kitchen_condition"`
+	BathroomCondition        *string   `json:"bathroom_condition"`
+	SurfaceRenovationNeed    *bool     `json:"surface_renovation_need"`
+	ModernizationNeed        *bool     `json:"modernization_need"`
+	Sauna                    *bool     `json:"sauna"`
+	Balcony                  *bool     `json:"balcony"`
+	BalconyGlazing           *bool     `json:"balcony_glazing"`
+	ParkingType              *string   `json:"parking_type"`
+	StorageQuality           *string   `json:"storage_quality"`
+	ViewQuality              *string   `json:"view_quality"`
+	NoiseRisk                *bool     `json:"noise_risk"`
+	Accessibility            *string   `json:"accessibility"`
+	MaintenanceChargeMonthly *float64  `json:"maintenance_charge_monthly"`
+	CapitalChargeMonthly     *float64  `json:"capital_charge_monthly"`
+	TotalChargeMonthly       *float64  `json:"total_charge_monthly"`
+	DebtShareEur             *int64    `json:"debt_share_eur"`
+	ShareholderLiability     *string   `json:"shareholder_liability"`
+	Confidence               *string   `json:"confidence"`
 	ResolvedAt               time.Time `json:"resolved_at"`
 }
 
-func (q *Queries) GetDimensionApartmentProfileForSaleListing(ctx context.Context, sourceID uuid.UUID) (GetDimensionApartmentProfileForSaleListingRow, error) {
-	row := q.db.QueryRow(ctx, getDimensionApartmentProfileForSaleListing, sourceID)
+func (q *Queries) GetDimensionApartmentProfileForSaleListing(ctx context.Context, dollar_1 *uuid.UUID) (GetDimensionApartmentProfileForSaleListingRow, error) {
+	row := q.db.QueryRow(ctx, getDimensionApartmentProfileForSaleListing, dollar_1)
 	var i GetDimensionApartmentProfileForSaleListingRow
 	err := row.Scan(
 		&i.HousingCompanyID,
@@ -288,16 +288,16 @@ ORDER BY
 `
 
 type ListSaleListingQualityScoresRow struct {
-	TargetType string          `json:"target_type"`
-	Dimension  string          `json:"dimension"`
-	Value      int32           `json:"value"`
-	Confidence string          `json:"confidence"`
+	TargetType *string         `json:"target_type"`
+	Dimension  *string         `json:"dimension"`
+	Value      *int32          `json:"value"`
+	Confidence *string         `json:"confidence"`
 	Reasons    json.RawMessage `json:"reasons"`
 	ResolvedAt time.Time       `json:"resolved_at"`
 }
 
-func (q *Queries) ListSaleListingQualityScores(ctx context.Context, sourceID uuid.UUID) ([]ListSaleListingQualityScoresRow, error) {
-	rows, err := q.db.Query(ctx, listSaleListingQualityScores, sourceID)
+func (q *Queries) ListSaleListingQualityScores(ctx context.Context, dollar_1 *uuid.UUID) ([]ListSaleListingQualityScoresRow, error) {
+	rows, err := q.db.Query(ctx, listSaleListingQualityScores, dollar_1)
 	if err != nil {
 		return nil, err
 	}

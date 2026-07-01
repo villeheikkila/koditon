@@ -46,12 +46,12 @@ returning
 `
 
 type ConsumeOAuthAuthorizationCodeParams struct {
-	OauthAuthorizationCodeCodeHash            string `json:"oauth_authorization_code_code_hash"`
-	OauthClientID                             string `json:"oauth_client_id"`
-	OauthAuthorizationCodeRedirectUri         string `json:"oauth_authorization_code_redirect_uri"`
-	OauthAuthorizationCodeAudience            string `json:"oauth_authorization_code_audience"`
-	OauthAuthorizationCodeCodeChallenge       string `json:"oauth_authorization_code_code_challenge"`
-	OauthAuthorizationCodeCodeChallengeMethod string `json:"oauth_authorization_code_code_challenge_method"`
+	OauthAuthorizationCodeCodeHash            *string `json:"oauth_authorization_code_code_hash"`
+	OauthClientID                             *string `json:"oauth_client_id"`
+	OauthAuthorizationCodeRedirectUri         *string `json:"oauth_authorization_code_redirect_uri"`
+	OauthAuthorizationCodeAudience            *string `json:"oauth_authorization_code_audience"`
+	OauthAuthorizationCodeCodeChallenge       *string `json:"oauth_authorization_code_code_challenge"`
+	OauthAuthorizationCodeCodeChallengeMethod *string `json:"oauth_authorization_code_code_challenge_method"`
 }
 
 type ConsumeOAuthAuthorizationCodeRow struct {
@@ -137,15 +137,15 @@ returning
 `
 
 type CreateOAuthAuthorizationCodeParams struct {
-	OauthAuthorizationCodeCodeHash            string    `json:"oauth_authorization_code_code_hash"`
-	OauthClientID                             string    `json:"oauth_client_id"`
-	UserUuid                                  uuid.UUID `json:"user_uuid"`
-	OauthAuthorizationCodeRedirectUri         string    `json:"oauth_authorization_code_redirect_uri"`
-	OauthAuthorizationCodeScopes              []string  `json:"oauth_authorization_code_scopes"`
-	OauthAuthorizationCodeAudience            string    `json:"oauth_authorization_code_audience"`
-	OauthAuthorizationCodeCodeChallenge       string    `json:"oauth_authorization_code_code_challenge"`
-	OauthAuthorizationCodeCodeChallengeMethod string    `json:"oauth_authorization_code_code_challenge_method"`
-	OauthAuthorizationCodeExpiresAt           time.Time `json:"oauth_authorization_code_expires_at"`
+	OauthAuthorizationCodeCodeHash            *string    `json:"oauth_authorization_code_code_hash"`
+	OauthClientID                             *string    `json:"oauth_client_id"`
+	UserUuid                                  *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationCodeRedirectUri         *string    `json:"oauth_authorization_code_redirect_uri"`
+	OauthAuthorizationCodeScopes              []string   `json:"oauth_authorization_code_scopes"`
+	OauthAuthorizationCodeAudience            *string    `json:"oauth_authorization_code_audience"`
+	OauthAuthorizationCodeCodeChallenge       *string    `json:"oauth_authorization_code_code_challenge"`
+	OauthAuthorizationCodeCodeChallengeMethod *string    `json:"oauth_authorization_code_code_challenge_method"`
+	OauthAuthorizationCodeExpiresAt           *time.Time `json:"oauth_authorization_code_expires_at"`
 }
 
 type CreateOAuthAuthorizationCodeRow struct {
@@ -231,13 +231,13 @@ returning
 `
 
 type CreateOAuthRefreshTokenParams struct {
-	OauthRefreshTokenTokenHash   string     `json:"oauth_refresh_token_token_hash"`
-	OauthClientID                string     `json:"oauth_client_id"`
-	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	OauthRefreshTokenTokenHash   *string    `json:"oauth_refresh_token_token_hash"`
+	OauthClientID                *string    `json:"oauth_client_id"`
+	UserUuid                     *uuid.UUID `json:"user_uuid"`
 	DeviceSessionUuid            *uuid.UUID `json:"device_session_uuid"`
 	OauthRefreshTokenScopes      []string   `json:"oauth_refresh_token_scopes"`
-	OauthRefreshTokenAudience    string     `json:"oauth_refresh_token_audience"`
-	OauthRefreshTokenExpiresAt   time.Time  `json:"oauth_refresh_token_expires_at"`
+	OauthRefreshTokenAudience    *string    `json:"oauth_refresh_token_audience"`
+	OauthRefreshTokenExpiresAt   *time.Time `json:"oauth_refresh_token_expires_at"`
 	OauthRefreshTokenRotatedFrom *uuid.UUID `json:"oauth_refresh_token_rotated_from"`
 }
 
@@ -321,7 +321,7 @@ type GetOAuthRefreshTokenByHashForUpdateRow struct {
 	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
 }
 
-func (q *Queries) GetOAuthRefreshTokenByHashForUpdate(ctx context.Context, oauthRefreshTokenTokenHash string) (GetOAuthRefreshTokenByHashForUpdateRow, error) {
+func (q *Queries) GetOAuthRefreshTokenByHashForUpdate(ctx context.Context, oauthRefreshTokenTokenHash *string) (GetOAuthRefreshTokenByHashForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthRefreshTokenByHashForUpdate, oauthRefreshTokenTokenHash)
 	var i GetOAuthRefreshTokenByHashForUpdateRow
 	err := row.Scan(
@@ -376,14 +376,14 @@ order by max(active_tokens.oauth_refresh_token_updated_at) desc, active_tokens.o
 `
 
 type ListOAuthAppConnectionsByUserIDRow struct {
-	OauthClientID          string    `json:"oauth_client_id"`
-	OauthDynamicClientName string    `json:"oauth_dynamic_client_name"`
-	ConnectedAt            time.Time `json:"connected_at"`
-	LastUsedAt             time.Time `json:"last_used_at"`
-	Scopes                 []string  `json:"scopes"`
+	OauthClientID          string     `json:"oauth_client_id"`
+	OauthDynamicClientName *string    `json:"oauth_dynamic_client_name"`
+	ConnectedAt            *time.Time `json:"connected_at"`
+	LastUsedAt             *time.Time `json:"last_used_at"`
+	Scopes                 []string   `json:"scopes"`
 }
 
-func (q *Queries) ListOAuthAppConnectionsByUserID(ctx context.Context, userUuid uuid.UUID) ([]ListOAuthAppConnectionsByUserIDRow, error) {
+func (q *Queries) ListOAuthAppConnectionsByUserID(ctx context.Context, userUuid *uuid.UUID) ([]ListOAuthAppConnectionsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, listOAuthAppConnectionsByUserID, userUuid)
 	if err != nil {
 		return nil, err
@@ -420,7 +420,7 @@ where
   and oauth_refresh_token_expires_at > now()
 `
 
-func (q *Queries) RevokeAllOAuthRefreshTokensByUserID(ctx context.Context, userUuid uuid.UUID) error {
+func (q *Queries) RevokeAllOAuthRefreshTokensByUserID(ctx context.Context, userUuid *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeAllOAuthRefreshTokensByUserID, userUuid)
 	return err
 }
@@ -438,8 +438,8 @@ where
 `
 
 type RevokeAllOAuthRefreshTokensByUserIDAndClientIDParams struct {
-	UserUuid      uuid.UUID `json:"user_uuid"`
-	OauthClientID string    `json:"oauth_client_id"`
+	UserUuid      *uuid.UUID `json:"user_uuid"`
+	OauthClientID *string    `json:"oauth_client_id"`
 }
 
 func (q *Queries) RevokeAllOAuthRefreshTokensByUserIDAndClientID(ctx context.Context, arg RevokeAllOAuthRefreshTokensByUserIDAndClientIDParams) (int64, error) {
@@ -489,7 +489,7 @@ type RevokeOAuthRefreshTokenByHashRow struct {
 	OauthRefreshTokenUpdatedAt   time.Time  `json:"oauth_refresh_token_updated_at"`
 }
 
-func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefreshTokenTokenHash string) (RevokeOAuthRefreshTokenByHashRow, error) {
+func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefreshTokenTokenHash *string) (RevokeOAuthRefreshTokenByHashRow, error) {
 	row := q.db.QueryRow(ctx, revokeOAuthRefreshTokenByHash, oauthRefreshTokenTokenHash)
 	var i RevokeOAuthRefreshTokenByHashRow
 	err := row.Scan(
@@ -535,8 +535,8 @@ returning
 `
 
 type RevokeOAuthRefreshTokenByHashAndClientIDParams struct {
-	OauthRefreshTokenTokenHash string `json:"oauth_refresh_token_token_hash"`
-	OauthClientID              string `json:"oauth_client_id"`
+	OauthRefreshTokenTokenHash *string `json:"oauth_refresh_token_token_hash"`
+	OauthClientID              *string `json:"oauth_client_id"`
 }
 
 type RevokeOAuthRefreshTokenByHashAndClientIDRow struct {

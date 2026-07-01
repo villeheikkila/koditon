@@ -19,9 +19,11 @@ import (
 	"koditon/internal/domain/valuation"
 )
 
-var ErrNotFound = errors.New("property not found")
-var ErrRenovationExtractorNotConfigured = errors.New("renovation extractor not configured")
-var ErrManagerCertificateExtractorNotConfigured = errors.New("manager certificate extractor not configured")
+var (
+	ErrNotFound                                 = errors.New("property not found")
+	ErrRenovationExtractorNotConfigured         = errors.New("renovation extractor not configured")
+	ErrManagerCertificateExtractorNotConfigured = errors.New("manager certificate extractor not configured")
+)
 
 type Service struct {
 	db                           db.DBTX
@@ -127,61 +129,61 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 }
 
 func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.UUID) (SaleListing, error) {
-	row, err := s.queries.GetPropertySourceOfferingDetail(ctx, saleListingID)
+	row, err := s.queries.GetPropertySourceOfferingDetail(ctx, &saleListingID)
 	if err != nil {
 		return SaleListing{}, mapNotFound(err)
 	}
 	var listing SaleListing
 	listing.ID = row.SaleListingID.String()
-	listing.Headline = row.Headline
+	listing.Headline = valueOrEmpty(row.Headline)
 	listing.Unit.Location = Location{
-		StreetAddress: row.StreetAddress,
-		City:          row.City,
-		Postal:        row.Postal,
+		StreetAddress: valueOrEmpty(row.StreetAddress),
+		City:          valueOrEmpty(row.City),
+		Postal:        valueOrEmpty(row.Postal),
 		Latitude:      row.SaleListingLatitude,
 		Longitude:     row.SaleListingLongitude,
 	}
-	listing.Unit.PropertyType = displayPropertyType(row.PropertyTypeRaw)
-	listing.Unit.RoomLayout = row.RoomLayout
+	listing.Unit.PropertyType = displayPropertyType(valueOrEmpty(row.PropertyTypeRaw))
+	listing.Unit.RoomLayout = valueOrEmpty(row.RoomLayout)
 	listing.Unit.RoomsCount = row.SaleListingRoomsCount
 	listing.Unit.AreaM2 = row.SaleListingAreaValue
 	listing.Unit.LivingAreaM2 = row.SaleListingLivingAreaValue
 	listing.Unit.TotalAreaM2 = row.SaleListingTotalAreaValue
 	listing.Unit.OtherAreaM2 = row.SaleListingOtherAreaValue
 	listing.Unit.FloorLevel = row.SaleListingFloorLevel
-	listing.Unit.Condition = displayCondition(row.Condition)
+	listing.Unit.Condition = displayCondition(valueOrEmpty(row.Condition))
 	listing.Unit.BedroomsCount = row.SaleListingBedroomsCount
 	listing.Unit.Sauna = row.SaleListingSauna
 	listing.Unit.Balcony = row.SaleListingBalcony
-	listing.Unit.Parking = row.ParkingText
-	listing.Unit.KitchenDescription = row.KitchenDescriptionText
-	listing.Unit.BathroomDescription = row.BathroomDescriptionText
-	listing.Unit.StorageDescription = row.StorageDescriptionText
-	listing.Unit.FloorMaterialsDescription = row.FloorMaterialsDescriptionText
-	listing.Unit.WallMaterialsDescription = row.WallMaterialsDescriptionText
-	listing.Unit.BalconyDescription = row.BalconyDescriptionText
-	listing.Unit.SaunaDescription = row.SaunaDescriptionText
-	listing.Unit.ViewsDescription = row.ViewsDescriptionText
+	listing.Unit.Parking = valueOrEmpty(row.ParkingText)
+	listing.Unit.KitchenDescription = valueOrEmpty(row.KitchenDescriptionText)
+	listing.Unit.BathroomDescription = valueOrEmpty(row.BathroomDescriptionText)
+	listing.Unit.StorageDescription = valueOrEmpty(row.StorageDescriptionText)
+	listing.Unit.FloorMaterialsDescription = valueOrEmpty(row.FloorMaterialsDescriptionText)
+	listing.Unit.WallMaterialsDescription = valueOrEmpty(row.WallMaterialsDescriptionText)
+	listing.Unit.BalconyDescription = valueOrEmpty(row.BalconyDescriptionText)
+	listing.Unit.SaunaDescription = valueOrEmpty(row.SaunaDescriptionText)
+	listing.Unit.ViewsDescription = valueOrEmpty(row.ViewsDescriptionText)
 	listing.Unit.Appliances = row.Appliances
 	listing.Unit.Features = row.Features
 	listing.Building.Location = listing.Unit.Location
 	listing.Building.Elevator = row.SaleListingElevator
-	listing.Building.HousingCompany = row.HousingCompanyName
-	listing.Building.BusinessID = row.HousingCompanyBusinessID
+	listing.Building.HousingCompany = valueOrEmpty(row.HousingCompanyName)
+	listing.Building.BusinessID = valueOrEmpty(row.HousingCompanyBusinessID)
 	listing.Building.BuildYear = row.SaleListingBuildYear
 	listing.Building.FloorCount = row.SaleListingTotalFloors
 	listing.Building.ApartmentCount = row.SaleListingApartmentCount
-	listing.Building.EnergyClass = displayEnergyClass(row.EnergyEfficiencyLabel, row.EnergyClass)
-	listing.Building.BuildingMaterial = row.BuildingMaterial
-	listing.Building.Heating = row.HeatingSystem
-	listing.Building.RoofType = row.RoofType
-	listing.Building.RoofMaterial = row.RoofMaterial
-	listing.Building.CarStorage = row.CarStorageText
-	listing.Building.OtherInfo = row.BuildingOtherInfoText
-	listing.Site.PlotType = firstNonEmpty(row.PlotTypeRaw, row.PlotTypeCode)
+	listing.Building.EnergyClass = displayEnergyClass(valueOrEmpty(row.EnergyEfficiencyLabel), valueOrEmpty(row.EnergyClass))
+	listing.Building.BuildingMaterial = valueOrEmpty(row.BuildingMaterial)
+	listing.Building.Heating = valueOrEmpty(row.HeatingSystem)
+	listing.Building.RoofType = valueOrEmpty(row.RoofType)
+	listing.Building.RoofMaterial = valueOrEmpty(row.RoofMaterial)
+	listing.Building.CarStorage = valueOrEmpty(row.CarStorageText)
+	listing.Building.OtherInfo = valueOrEmpty(row.BuildingOtherInfoText)
+	listing.Site.PlotType = firstNonEmpty(valueOrEmpty(row.PlotTypeRaw), valueOrEmpty(row.PlotTypeCode))
 	listing.Site.PlotAreaM2 = row.SaleListingPlotAreaValue
-	listing.Site.Services = row.ServicesText
-	listing.Site.Transport = row.TransportText
+	listing.Site.Services = valueOrEmpty(row.ServicesText)
+	listing.Site.Transport = valueOrEmpty(row.TransportText)
 	if row.SaleListingPlotOwned != nil {
 		if *row.SaleListingPlotOwned {
 			listing.Site.PlotOwnershipType = "owned"
@@ -203,26 +205,26 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 		MaintenanceMonthly: row.SaleListingMaintenanceChargeMonthly,
 		TotalMonthly:       row.SaleListingTotalChargeMonthly,
 		Water:              row.SaleListingWaterCharge,
-		Notes:              row.ChargesText,
+		Notes:              valueOrEmpty(row.ChargesText),
 	}
-	listing.Commercial.FeesInfo = row.ChargesText
+	listing.Commercial.FeesInfo = valueOrEmpty(row.ChargesText)
 	listing.Source = ListingSource{
 		Provider:    row.SaleListingSourceProvider,
 		Kind:        row.SaleListingSourceKind,
-		URL:         row.Url,
-		OriginalURL: row.Url,
+		URL:         valueOrEmpty(row.Url),
+		OriginalURL: valueOrEmpty(row.Url),
 		FirstSeenAt: row.SaleListingFirstSeenAt,
 		LastSeenAt:  row.SaleListingLastSeenAt,
 		PublishedAt: row.SaleListingPublishedAt,
 	}
 	listing.Texts = TextSections{
-		Description:        row.DescriptionText,
-		Availability:       row.AvailabilityText,
-		RenovationsDone:    row.RenovationsDoneText,
-		RenovationsPlanned: row.RenovationsPlannedText,
-		AdditionalInfo:     row.AdditionalInfoText,
-		Charges:            row.ChargesText,
-		Building:           firstNonEmpty(row.BuildingDescriptionText, row.BuildingOtherInfoText),
+		Description:        valueOrEmpty(row.DescriptionText),
+		Availability:       valueOrEmpty(row.AvailabilityText),
+		RenovationsDone:    valueOrEmpty(row.RenovationsDoneText),
+		RenovationsPlanned: valueOrEmpty(row.RenovationsPlannedText),
+		AdditionalInfo:     valueOrEmpty(row.AdditionalInfoText),
+		Charges:            valueOrEmpty(row.ChargesText),
+		Building:           firstNonEmpty(valueOrEmpty(row.BuildingDescriptionText), valueOrEmpty(row.BuildingOtherInfoText)),
 	}
 	if row.SaleListingSourceKind == "announcement" {
 		listing.Commercial.IsCompanyAnnouncement = ptrBool(true)
@@ -252,12 +254,12 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 }
 
 func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.queries.ListPropertySourceOfferingInsights(ctx, saleListingID)
+	rows, err := s.queries.ListPropertySourceOfferingInsights(ctx, &saleListingID)
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.PropertySourceOfferingInsightKey, Value: row.PropertySourceOfferingInsightValue, Direction: row.PropertySourceOfferingInsightDirection, Severity: row.PropertySourceOfferingInsightSeverity, Confidence: float64(row.PropertySourceOfferingInsightConfidence) / 100, Source: row.PropertySourceOfferingInsightSourceField, Explanation: row.PropertySourceOfferingInsightText})
+		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.PropertySourceOfferingInsightKey, Value: valueOrEmpty(row.PropertySourceOfferingInsightValue), Direction: row.PropertySourceOfferingInsightDirection, Severity: row.PropertySourceOfferingInsightSeverity, Confidence: float64(ptrInt32Value(row.PropertySourceOfferingInsightConfidence)) / 100, Source: valueOrEmpty(row.PropertySourceOfferingInsightSourceField), Explanation: valueOrEmpty(row.PropertySourceOfferingInsightText)})
 	}
 	return nil
 }
@@ -268,19 +270,18 @@ func (s *Service) enrichSaleListingPropertyClaims(ctx context.Context, listing *
 		return err
 	}
 	for _, target := range targets {
-		rows, err := s.queries.ListPropertyClaimsForEntity(ctx, db.ListPropertyClaimsForEntityParams{EntityType: target.entityType, EntityID: target.entityID})
+		rows, err := s.queries.ListPropertyClaimsForEntity(ctx, db.ListPropertyClaimsForEntityParams{EntityType: &target.entityType, EntityID: &target.entityID})
 		if err != nil {
 			return err
 		}
 		for _, row := range rows {
-			fact := valuation.ValuationFact{Section: row.PropertyClaimNamespace, Key: row.PropertyClaimKey, ValueKind: row.PropertyClaimValueKind, ValueText: row.PropertyClaimValueText, Confidence: float64(row.PropertyClaimConfidence) / 100, Source: row.PropertyClaimSourceField, Evidence: row.PropertyClaimEvidenceText, Model: row.PropertyClaimModel, Prompt: row.PropertyClaimPromptVersion}
-			if row.PropertyClaimValueKind == "number" {
-				value := row.PropertyClaimValueNumber
-				fact.ValueNumber = &value
+			valueKind := valueOrEmpty(row.PropertyClaimValueKind)
+			fact := valuation.ValuationFact{Section: valueOrEmpty(row.PropertyClaimNamespace), Key: valueOrEmpty(row.PropertyClaimKey), ValueKind: valueKind, ValueText: valueOrEmpty(row.PropertyClaimValueText), Confidence: float64(ptrInt32Value(row.PropertyClaimConfidence)) / 100, Source: valueOrEmpty(row.PropertyClaimSourceField), Evidence: valueOrEmpty(row.PropertyClaimEvidenceText), Model: valueOrEmpty(row.PropertyClaimModel), Prompt: valueOrEmpty(row.PropertyClaimPromptVersion)}
+			if valueKind == "number" {
+				fact.ValueNumber = row.PropertyClaimValueNumber
 			}
-			if row.PropertyClaimValueKind == "bool" {
-				value := row.PropertyClaimValueBool
-				fact.ValueBool = &value
+			if valueKind == "bool" {
+				fact.ValueBool = row.PropertyClaimValueBool
 			}
 			listing.ValuationInputs.Facts = append(listing.ValuationInputs.Facts, fact)
 		}
@@ -572,7 +573,7 @@ func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase str
 		if err != nil {
 			return Rental{}, fmt.Errorf("parse shortcut ad id: %w", err)
 		}
-		row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, adID)
+		row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, &adID)
 		if err != nil {
 			return Rental{}, mapNotFound(err)
 		}
@@ -585,7 +586,7 @@ func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase str
 		if err != nil {
 			return Rental{}, fmt.Errorf("parse frontdoor announcement id: %w", err)
 		}
-		row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, announcementID)
+		row, err := s.queries.GetFrontdoorAnnouncementUnifiedDetail(ctx, &announcementID)
 		if err != nil {
 			return Rental{}, mapNotFound(err)
 		}
@@ -622,7 +623,7 @@ func (s *Service) BuildingByID(ctx context.Context, input string, shortcutBase s
 		if err != nil {
 			return Building{}, fmt.Errorf("parse shortcut building id: %w", err)
 		}
-		row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, buildingID)
+		row, err := s.queries.GetShortcutBuildingUnifiedDetail(ctx, &buildingID)
 		if err != nil {
 			return Building{}, mapNotFound(err)
 		}
@@ -632,7 +633,7 @@ func (s *Service) BuildingByID(ctx context.Context, input string, shortcutBase s
 		if err != nil {
 			return Building{}, fmt.Errorf("parse frontdoor building id: %w", err)
 		}
-		row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, buildingID)
+		row, err := s.queries.GetFrontdoorBuildingUnifiedDetail(ctx, &buildingID)
 		if err != nil {
 			return Building{}, mapNotFound(err)
 		}

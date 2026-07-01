@@ -205,13 +205,14 @@ func (c *Consumer) runCanonicalizeSourceAdsFanoutWorkflow(ctx context.Context, l
 		return canonicalFanoutResult{}, err
 	}
 	result, err := absurd.Step(ctx, "scan-and-spawn-source-ads", func(ctx context.Context) (canonicalFanoutResult, error) {
-		rows, err := c.queries.ListCanonicalizeSourceAdsFanout(ctx, db.ListCanonicalizeSourceAdsFanoutParams{Version: currentSourceAdCanonicalizationVersion, LimitCount: payload.Limit})
+		version := currentSourceAdCanonicalizationVersion
+		rows, err := c.queries.ListCanonicalizeSourceAdsFanout(ctx, db.ListCanonicalizeSourceAdsFanoutParams{Version: &version, LimitCount: &payload.Limit})
 		if err != nil {
 			return canonicalFanoutResult{}, fmt.Errorf("list source ads for canonicalization: %w", err)
 		}
 		enqueued := 0
 		for _, row := range rows {
-			if err := c.enqueueCanonicalizeSourceAd(ctx, row.SourceTable, row.SourceID, 0); err != nil {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, stringValue(row.SourceTable), stringValue(row.SourceID), 0); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			enqueued++
@@ -282,13 +283,13 @@ func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *
 		return canonicalFanoutResult{}, err
 	}
 	return absurd.Step(ctx, "scan-and-spawn-listings", func(ctx context.Context) (canonicalFanoutResult, error) {
-		rows, err := c.queries.ListCanonicalMatchFanoutListings(ctx, payload.Limit)
+		rows, err := c.queries.ListCanonicalMatchFanoutListings(ctx, &payload.Limit)
 		if err != nil {
 			return canonicalFanoutResult{}, fmt.Errorf("list sale listings for canonical source matching: %w", err)
 		}
 		enqueued := 0
 		for _, row := range rows {
-			if err := c.spawnCanonicalSourceMatchSaleListing(ctx, row.SaleListingID, row.AttemptCount+1); err != nil {
+			if err := c.spawnCanonicalSourceMatchSaleListing(ctx, stringValue(row.SaleListingID), int32Value(row.AttemptCount)+1); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			enqueued++
@@ -507,7 +508,8 @@ func (c *Consumer) runCanonicalBackfillDetachedHousesWorkflow(ctx context.Contex
 		return detachedHouseBackfillResult{}, err
 	}
 	count, err := absurd.Step(ctx, "backfill-detached-property-houses", func(ctx context.Context) (int32, error) {
-		return c.queries.BackfillDetachedPropertyHouses(ctx, payload.BatchSize)
+		count, err := c.queries.BackfillDetachedPropertyHouses(ctx, payload.BatchSize)
+		return int32Value(count), err
 	})
 	if err != nil {
 		return detachedHouseBackfillResult{}, fmt.Errorf("backfill detached property houses: %w", err)

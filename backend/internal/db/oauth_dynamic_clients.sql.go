@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 const createOAuthDynamicClient = `-- name: CreateOAuthDynamicClient :one
@@ -45,6 +46,17 @@ returning
 `
 
 type CreateOAuthDynamicClientParams struct {
+	OauthDynamicClientID                      *string         `json:"oauth_dynamic_client_id"`
+	OauthDynamicClientType                    *string         `json:"oauth_dynamic_client_type"`
+	OauthDynamicClientRedirectUris            []string        `json:"oauth_dynamic_client_redirect_uris"`
+	OauthDynamicClientScopes                  []string        `json:"oauth_dynamic_client_scopes"`
+	OauthDynamicClientTokenEndpointAuthMethod *string         `json:"oauth_dynamic_client_token_endpoint_auth_method"`
+	OauthDynamicClientName                    *string         `json:"oauth_dynamic_client_name"`
+	OauthDynamicClientMetadata                json.RawMessage `json:"oauth_dynamic_client_metadata"`
+	OauthDynamicClientIssuedAt                *time.Time      `json:"oauth_dynamic_client_issued_at"`
+}
+
+type CreateOAuthDynamicClientRow struct {
 	OauthDynamicClientID                      string          `json:"oauth_dynamic_client_id"`
 	OauthDynamicClientType                    string          `json:"oauth_dynamic_client_type"`
 	OauthDynamicClientRedirectUris            []string        `json:"oauth_dynamic_client_redirect_uris"`
@@ -52,10 +64,13 @@ type CreateOAuthDynamicClientParams struct {
 	OauthDynamicClientTokenEndpointAuthMethod string          `json:"oauth_dynamic_client_token_endpoint_auth_method"`
 	OauthDynamicClientName                    *string         `json:"oauth_dynamic_client_name"`
 	OauthDynamicClientMetadata                json.RawMessage `json:"oauth_dynamic_client_metadata"`
-	OauthDynamicClientIssuedAt                interface{}     `json:"oauth_dynamic_client_issued_at"`
+	OauthDynamicClientIssuedAt                time.Time       `json:"oauth_dynamic_client_issued_at"`
+	OauthDynamicClientDisabledAt              *time.Time      `json:"oauth_dynamic_client_disabled_at"`
+	OauthDynamicClientCreatedAt               time.Time       `json:"oauth_dynamic_client_created_at"`
+	OauthDynamicClientUpdatedAt               time.Time       `json:"oauth_dynamic_client_updated_at"`
 }
 
-func (q *Queries) CreateOAuthDynamicClient(ctx context.Context, arg CreateOAuthDynamicClientParams) (OauthDynamicClient, error) {
+func (q *Queries) CreateOAuthDynamicClient(ctx context.Context, arg CreateOAuthDynamicClientParams) (CreateOAuthDynamicClientRow, error) {
 	row := q.db.QueryRow(ctx, createOAuthDynamicClient,
 		arg.OauthDynamicClientID,
 		arg.OauthDynamicClientType,
@@ -66,7 +81,7 @@ func (q *Queries) CreateOAuthDynamicClient(ctx context.Context, arg CreateOAuthD
 		arg.OauthDynamicClientMetadata,
 		arg.OauthDynamicClientIssuedAt,
 	)
-	var i OauthDynamicClient
+	var i CreateOAuthDynamicClientRow
 	err := row.Scan(
 		&i.OauthDynamicClientID,
 		&i.OauthDynamicClientType,
@@ -103,9 +118,23 @@ where
   and oauth_dynamic_client_disabled_at is null
 `
 
-func (q *Queries) GetOAuthDynamicClientByID(ctx context.Context, oauthDynamicClientID string) (OauthDynamicClient, error) {
+type GetOAuthDynamicClientByIDRow struct {
+	OauthDynamicClientID                      string          `json:"oauth_dynamic_client_id"`
+	OauthDynamicClientType                    string          `json:"oauth_dynamic_client_type"`
+	OauthDynamicClientRedirectUris            []string        `json:"oauth_dynamic_client_redirect_uris"`
+	OauthDynamicClientScopes                  []string        `json:"oauth_dynamic_client_scopes"`
+	OauthDynamicClientTokenEndpointAuthMethod string          `json:"oauth_dynamic_client_token_endpoint_auth_method"`
+	OauthDynamicClientName                    *string         `json:"oauth_dynamic_client_name"`
+	OauthDynamicClientMetadata                json.RawMessage `json:"oauth_dynamic_client_metadata"`
+	OauthDynamicClientIssuedAt                time.Time       `json:"oauth_dynamic_client_issued_at"`
+	OauthDynamicClientDisabledAt              *time.Time      `json:"oauth_dynamic_client_disabled_at"`
+	OauthDynamicClientCreatedAt               time.Time       `json:"oauth_dynamic_client_created_at"`
+	OauthDynamicClientUpdatedAt               time.Time       `json:"oauth_dynamic_client_updated_at"`
+}
+
+func (q *Queries) GetOAuthDynamicClientByID(ctx context.Context, oauthDynamicClientID *string) (GetOAuthDynamicClientByIDRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthDynamicClientByID, oauthDynamicClientID)
-	var i OauthDynamicClient
+	var i GetOAuthDynamicClientByIDRow
 	err := row.Scan(
 		&i.OauthDynamicClientID,
 		&i.OauthDynamicClientType,

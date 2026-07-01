@@ -22,7 +22,7 @@ returning
   auth_signup_email_target_email
 `
 
-func (q *Queries) ConsumeActiveSignupEmailTokenByHash(ctx context.Context, authSignupEmailTokenHash string) (string, error) {
+func (q *Queries) ConsumeActiveSignupEmailTokenByHash(ctx context.Context, authSignupEmailTokenHash *string) (string, error) {
 	row := q.db.QueryRow(ctx, consumeActiveSignupEmailTokenByHash, authSignupEmailTokenHash)
 	var auth_signup_email_target_email string
 	err := row.Scan(&auth_signup_email_target_email)
@@ -46,9 +46,9 @@ returning
 `
 
 type CreateSignupEmailTokenParams struct {
-	AuthSignupEmailTargetEmail string    `json:"auth_signup_email_target_email"`
-	AuthSignupEmailTokenHash   string    `json:"auth_signup_email_token_hash"`
-	AuthSignupEmailExpiresAt   time.Time `json:"auth_signup_email_expires_at"`
+	AuthSignupEmailTargetEmail *string    `json:"auth_signup_email_target_email"`
+	AuthSignupEmailTokenHash   *string    `json:"auth_signup_email_token_hash"`
+	AuthSignupEmailExpiresAt   *time.Time `json:"auth_signup_email_expires_at"`
 }
 
 type CreateSignupEmailTokenRow struct {
@@ -79,9 +79,9 @@ order by
 limit 1
 `
 
-func (q *Queries) GetSignupEmailTokenStatusByHash(ctx context.Context, authSignupEmailTokenHash string) (string, error) {
+func (q *Queries) GetSignupEmailTokenStatusByHash(ctx context.Context, authSignupEmailTokenHash *string) (*string, error) {
 	row := q.db.QueryRow(ctx, getSignupEmailTokenStatusByHash, authSignupEmailTokenHash)
-	var token_status string
+	var token_status *string
 	err := row.Scan(&token_status)
 	return token_status, err
 }
@@ -96,7 +96,7 @@ where
   and auth_signup_email_consumed_at is null
 `
 
-func (q *Queries) InvalidateActiveSignupEmailTokensForEmail(ctx context.Context, authSignupEmailTargetEmail string) error {
+func (q *Queries) InvalidateActiveSignupEmailTokensForEmail(ctx context.Context, authSignupEmailTargetEmail *string) error {
 	_, err := q.db.Exec(ctx, invalidateActiveSignupEmailTokensForEmail, authSignupEmailTargetEmail)
 	return err
 }

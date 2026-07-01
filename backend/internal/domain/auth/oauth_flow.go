@@ -84,16 +84,17 @@ func (s *Service) CreateOAuthAuthorizationCode(ctx context.Context, req OAuthCre
 	audience := strings.TrimSpace(req.Audience)
 	codeChallenge := strings.TrimSpace(req.CodeChallenge)
 	codeChallengeMethod := strings.TrimSpace(req.CodeChallengeMethod)
+	expiresAt := time.Now().Add(OAuthAuthorizationCodeTTL)
 	if _, err := s.queries.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            codeHash,
-		OauthClientID:                             clientID,
-		UserUuid:                                  req.UserID,
-		OauthAuthorizationCodeRedirectUri:         redirectURI,
+		OauthAuthorizationCodeCodeHash:            &codeHash,
+		OauthClientID:                             &clientID,
+		UserUuid:                                  &req.UserID,
+		OauthAuthorizationCodeRedirectUri:         &redirectURI,
 		OauthAuthorizationCodeScopes:              req.Scopes,
-		OauthAuthorizationCodeAudience:            audience,
-		OauthAuthorizationCodeCodeChallenge:       codeChallenge,
-		OauthAuthorizationCodeCodeChallengeMethod: codeChallengeMethod,
-		OauthAuthorizationCodeExpiresAt:           time.Now().Add(OAuthAuthorizationCodeTTL),
+		OauthAuthorizationCodeAudience:            &audience,
+		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
+		OauthAuthorizationCodeExpiresAt:           &expiresAt,
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)
 	}
@@ -113,12 +114,12 @@ func (s *Service) ExchangeOAuthAuthorizationCode(ctx context.Context, req OAuthE
 	audience := strings.TrimSpace(req.Audience)
 	codeChallengeMethod := "S256"
 	row, err := s.queries.ConsumeOAuthAuthorizationCode(ctx, db.ConsumeOAuthAuthorizationCodeParams{
-		OauthAuthorizationCodeCodeHash:            codeHash,
-		OauthClientID:                             clientID,
-		OauthAuthorizationCodeRedirectUri:         redirectURI,
-		OauthAuthorizationCodeAudience:            audience,
-		OauthAuthorizationCodeCodeChallenge:       codeChallenge,
-		OauthAuthorizationCodeCodeChallengeMethod: codeChallengeMethod,
+		OauthAuthorizationCodeCodeHash:            &codeHash,
+		OauthClientID:                             &clientID,
+		OauthAuthorizationCodeRedirectUri:         &redirectURI,
+		OauthAuthorizationCodeAudience:            &audience,
+		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
+		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -259,14 +260,16 @@ func createOAuthRefreshToken(ctx context.Context, queries *db.Queries, clientID 
 	if sessionID != uuid.Nil {
 		sessionIDValue = &sessionID
 	}
+	tokenHash := hashSHA256Hex(refreshToken)
+	audienceValue := strings.TrimSpace(audience)
 	if _, err := queries.CreateOAuthRefreshToken(ctx, db.CreateOAuthRefreshTokenParams{
-		OauthRefreshTokenTokenHash:   hashSHA256Hex(refreshToken),
-		OauthClientID:                clientID,
-		UserUuid:                     userID,
+		OauthRefreshTokenTokenHash:   &tokenHash,
+		OauthClientID:                &clientID,
+		UserUuid:                     &userID,
 		DeviceSessionUuid:            sessionIDValue,
 		OauthRefreshTokenScopes:      scopes,
-		OauthRefreshTokenAudience:    strings.TrimSpace(audience),
-		OauthRefreshTokenExpiresAt:   expiresAt,
+		OauthRefreshTokenAudience:    &audienceValue,
+		OauthRefreshTokenExpiresAt:   &expiresAt,
 		OauthRefreshTokenRotatedFrom: rotatedFromValue,
 	}); err != nil {
 		return "", time.Time{}, err

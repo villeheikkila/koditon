@@ -57,7 +57,7 @@ type CountGroupedOfferingsParams struct {
 	PublishedBefore *time.Time `json:"published_before"`
 }
 
-func (q *Queries) CountGroupedOfferings(ctx context.Context, arg CountGroupedOfferingsParams) (int64, error) {
+func (q *Queries) CountGroupedOfferings(ctx context.Context, arg CountGroupedOfferingsParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, countGroupedOfferings,
 		arg.Source,
 		arg.Kind,
@@ -71,9 +71,9 @@ func (q *Queries) CountGroupedOfferings(ctx context.Context, arg CountGroupedOff
 		arg.PublishedAfter,
 		arg.PublishedBefore,
 	)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var count *int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const lookupAddressListings = `-- name: LookupAddressListings :many
@@ -242,7 +242,44 @@ selected_listings AS (
     CROSS JOIN lookup_input li
 ),
 limited_listings AS (
-    SELECT sale_listing_id, sale_listing_canonical_id, sale_listing_source_provider, sale_listing_source_kind, sale_listing_native_id, headline, address, city, postal, sale_listing_latitude, sale_listing_longitude, sale_listing_asking_price, sale_listing_debt_free_price, sale_listing_area_value, room_layout, url, external_url_available, sale_listing_first_seen_at, sale_listing_last_seen_at, sale_listing_published_at, sale_listing_created_at, sale_listing_updated_at, sale_listing_previous_asking_price, sale_listing_previous_debt_free_price, prices_match_status, source_match_status, property_offering_id, housing_company_id, housing_company_name, availability_text, renovations_done_text, renovations_planned_text, additional_info_text, charges_text, insights_json, listing_rank, listing_count
+    SELECT
+        sale_listing_id,
+        sale_listing_canonical_id,
+        sale_listing_source_provider,
+        sale_listing_source_kind,
+        sale_listing_native_id,
+        headline,
+        address,
+        city,
+        postal,
+        sale_listing_latitude,
+        sale_listing_longitude,
+        sale_listing_asking_price,
+        sale_listing_debt_free_price,
+        sale_listing_area_value,
+        room_layout,
+        url,
+        external_url_available,
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        sale_listing_published_at,
+        sale_listing_created_at,
+        sale_listing_updated_at,
+        sale_listing_previous_asking_price,
+        sale_listing_previous_debt_free_price,
+        prices_match_status,
+        source_match_status,
+        property_offering_id,
+        housing_company_id,
+        housing_company_name,
+        availability_text,
+        renovations_done_text,
+        renovations_planned_text,
+        additional_info_text,
+        charges_text,
+        insights_json,
+        listing_rank,
+        listing_count
     FROM selected_listings
     WHERE listing_rank <= $5::int
 ),
@@ -414,7 +451,16 @@ links AS (
 ),
 dedup_links AS (
     SELECT DISTINCT ON (sale_listing_id, prices_transaction_id)
-        sale_listing_id, prices_transaction_id, link_type, link_status, link_method, score, confidence, price_delta_percent, reasons, link_rank
+        sale_listing_id,
+        prices_transaction_id,
+        link_type,
+        link_status,
+        link_method,
+        score,
+        confidence,
+        price_delta_percent,
+        reasons,
+        link_rank
     FROM links
     ORDER BY sale_listing_id, prices_transaction_id, link_rank, score DESC NULLS LAST
 )
@@ -532,99 +578,99 @@ type LookupAddressListingsParams struct {
 }
 
 type LookupAddressListingsRow struct {
-	SaleListingID                          uuid.UUID       `json:"sale_listing_id"`
-	SaleListingCanonicalID                 string          `json:"sale_listing_canonical_id"`
-	SaleListingSourceProvider              string          `json:"sale_listing_source_provider"`
-	SaleListingSourceKind                  string          `json:"sale_listing_source_kind"`
-	SaleListingNativeID                    string          `json:"sale_listing_native_id"`
-	Headline                               string          `json:"headline"`
-	Address                                string          `json:"address"`
-	City                                   string          `json:"city"`
-	Postal                                 string          `json:"postal"`
-	SaleListingLatitude                    *float64        `json:"sale_listing_latitude"`
-	SaleListingLongitude                   *float64        `json:"sale_listing_longitude"`
-	SaleListingAskingPrice                 *int64          `json:"sale_listing_asking_price"`
-	SaleListingDebtFreePrice               *int64          `json:"sale_listing_debt_free_price"`
-	SaleListingAreaValue                   *float64        `json:"sale_listing_area_value"`
-	RoomLayout                             string          `json:"room_layout"`
-	Url                                    string          `json:"url"`
-	ExternalUrlAvailable                   bool            `json:"external_url_available"`
-	SaleListingFirstSeenAt                 *time.Time      `json:"sale_listing_first_seen_at"`
-	SaleListingLastSeenAt                  *time.Time      `json:"sale_listing_last_seen_at"`
-	SaleListingPublishedAt                 *time.Time      `json:"sale_listing_published_at"`
-	SaleListingCreatedAt                   time.Time       `json:"sale_listing_created_at"`
-	SaleListingUpdatedAt                   time.Time       `json:"sale_listing_updated_at"`
-	SaleListingPreviousAskingPrice         *int64          `json:"sale_listing_previous_asking_price"`
-	SaleListingPreviousDebtFreePrice       *int64          `json:"sale_listing_previous_debt_free_price"`
-	PricesMatchStatus                      string          `json:"prices_match_status"`
-	SourceMatchStatus                      string          `json:"source_match_status"`
-	PropertyOfferingID                     *uuid.UUID      `json:"property_offering_id"`
-	HousingCompanyID                       *uuid.UUID      `json:"housing_company_id"`
-	HousingCompanyName                     string          `json:"housing_company_name"`
-	AvailabilityText                       string          `json:"availability_text"`
-	RenovationsDoneText                    string          `json:"renovations_done_text"`
-	RenovationsPlannedText                 string          `json:"renovations_planned_text"`
-	AdditionalInfoText                     string          `json:"additional_info_text"`
-	ChargesText                            string          `json:"charges_text"`
-	InsightsJson                           json.RawMessage `json:"insights_json"`
-	ListingCount                           int32           `json:"listing_count"`
-	PricesTransactionID                    *uuid.UUID      `json:"prices_transaction_id"`
-	LinkType                               string          `json:"link_type"`
-	LinkStatus                             string          `json:"link_status"`
-	LinkMethod                             string          `json:"link_method"`
-	Score                                  *int32          `json:"score"`
-	Confidence                             string          `json:"confidence"`
-	PriceDeltaPercent                      *float64        `json:"price_delta_percent"`
-	Reasons                                json.RawMessage `json:"reasons"`
-	PricesTransactionDescription           string          `json:"prices_transaction_description"`
-	PricesTransactionType                  string          `json:"prices_transaction_type"`
-	PricesTransactionCategory              string          `json:"prices_transaction_category"`
-	PricesTransactionArea                  *float64        `json:"prices_transaction_area"`
-	PtPricesTransactionPrice               int64           `json:"pt_prices_transaction_price"`
-	PtPricesTransactionPricePerSquareMeter int64           `json:"pt_prices_transaction_price_per_square_meter"`
-	PricesTransactionBuildYear             *int32          `json:"prices_transaction_build_year"`
-	PricesTransactionFloor                 string          `json:"prices_transaction_floor"`
-	PricesTransactionElevator              *bool           `json:"prices_transaction_elevator"`
-	PricesTransactionCondition             string          `json:"prices_transaction_condition"`
-	PricesTransactionPlot                  string          `json:"prices_transaction_plot"`
-	PricesTransactionEnergyClass           string          `json:"prices_transaction_energy_class"`
-	PricesTransactionPeriodIdentifier      string          `json:"prices_transaction_period_identifier"`
-	PricesCityName                         string          `json:"prices_city_name"`
-	PricesNeighborhoodName                 string          `json:"prices_neighborhood_name"`
-	PricesPostalCodeCode                   string          `json:"prices_postal_code_code"`
-	PricesTransactionCreatedAt             *time.Time      `json:"prices_transaction_created_at"`
-	PricesTransactionUpdatedAt             *time.Time      `json:"prices_transaction_updated_at"`
-	SaleListingID_2                        *uuid.UUID      `json:"sale_listing_id_2"`
-	SaleListingCanonicalID_2               string          `json:"sale_listing_canonical_id_2"`
-	SaleListingSourceProvider_2            string          `json:"sale_listing_source_provider_2"`
-	SaleListingSourceKind_2                string          `json:"sale_listing_source_kind_2"`
-	SaleListingNativeID_2                  string          `json:"sale_listing_native_id_2"`
-	Headline_2                             string          `json:"headline_2"`
-	Address_2                              string          `json:"address_2"`
-	City_2                                 string          `json:"city_2"`
-	Postal_2                               string          `json:"postal_2"`
-	SaleListingLatitude_2                  *float64        `json:"sale_listing_latitude_2"`
-	SaleListingLongitude_2                 *float64        `json:"sale_listing_longitude_2"`
-	SaleListingAskingPrice_2               *int64          `json:"sale_listing_asking_price_2"`
-	SaleListingDebtFreePrice_2             *int64          `json:"sale_listing_debt_free_price_2"`
-	SaleListingAreaValue_2                 *float64        `json:"sale_listing_area_value_2"`
-	RoomLayout_2                           string          `json:"room_layout_2"`
-	Url_2                                  string          `json:"url_2"`
-	ExternalUrlAvailable_2                 bool            `json:"external_url_available_2"`
-	SaleListingFirstSeenAt_2               *time.Time      `json:"sale_listing_first_seen_at_2"`
-	SaleListingLastSeenAt_2                *time.Time      `json:"sale_listing_last_seen_at_2"`
-	SaleListingUpdatedAt_2                 *time.Time      `json:"sale_listing_updated_at_2"`
-	SaleListingPreviousAskingPrice_2       *int64          `json:"sale_listing_previous_asking_price_2"`
-	SaleListingPreviousDebtFreePrice_2     *int64          `json:"sale_listing_previous_debt_free_price_2"`
-	SourceLinkStatus                       string          `json:"source_link_status"`
-	SourceLinkMethod                       string          `json:"source_link_method"`
-	PropertyOfferingSourceLinkScore        *int32          `json:"property_offering_source_link_score"`
-	AvailabilityText_2                     string          `json:"availability_text_2"`
-	RenovationsDoneText_2                  string          `json:"renovations_done_text_2"`
-	RenovationsPlannedText_2               string          `json:"renovations_planned_text_2"`
-	AdditionalInfoText_2                   string          `json:"additional_info_text_2"`
-	ChargesText_2                          string          `json:"charges_text_2"`
-	InsightsJson_2                         json.RawMessage `json:"insights_json_2"`
+	SaleListingID                        uuid.UUID       `json:"sale_listing_id"`
+	SaleListingCanonicalID               string          `json:"sale_listing_canonical_id"`
+	SaleListingSourceProvider            string          `json:"sale_listing_source_provider"`
+	SaleListingSourceKind                string          `json:"sale_listing_source_kind"`
+	SaleListingNativeID                  string          `json:"sale_listing_native_id"`
+	Headline                             *string         `json:"headline"`
+	Address                              *string         `json:"address"`
+	City                                 *string         `json:"city"`
+	Postal                               *string         `json:"postal"`
+	SaleListingLatitude                  *float64        `json:"sale_listing_latitude"`
+	SaleListingLongitude                 *float64        `json:"sale_listing_longitude"`
+	SaleListingAskingPrice               *int64          `json:"sale_listing_asking_price"`
+	SaleListingDebtFreePrice             *int64          `json:"sale_listing_debt_free_price"`
+	SaleListingAreaValue                 *float64        `json:"sale_listing_area_value"`
+	RoomLayout                           *string         `json:"room_layout"`
+	Url                                  *string         `json:"url"`
+	ExternalUrlAvailable                 *bool           `json:"external_url_available"`
+	SaleListingFirstSeenAt               *time.Time      `json:"sale_listing_first_seen_at"`
+	SaleListingLastSeenAt                *time.Time      `json:"sale_listing_last_seen_at"`
+	SaleListingPublishedAt               *time.Time      `json:"sale_listing_published_at"`
+	SaleListingCreatedAt                 time.Time       `json:"sale_listing_created_at"`
+	SaleListingUpdatedAt                 time.Time       `json:"sale_listing_updated_at"`
+	SaleListingPreviousAskingPrice       *int64          `json:"sale_listing_previous_asking_price"`
+	SaleListingPreviousDebtFreePrice     *int64          `json:"sale_listing_previous_debt_free_price"`
+	PricesMatchStatus                    *string         `json:"prices_match_status"`
+	SourceMatchStatus                    *string         `json:"source_match_status"`
+	PropertyOfferingID                   *uuid.UUID      `json:"property_offering_id"`
+	HousingCompanyID                     uuid.UUID       `json:"housing_company_id"`
+	HousingCompanyName                   *string         `json:"housing_company_name"`
+	AvailabilityText                     *string         `json:"availability_text"`
+	RenovationsDoneText                  *string         `json:"renovations_done_text"`
+	RenovationsPlannedText               *string         `json:"renovations_planned_text"`
+	AdditionalInfoText                   *string         `json:"additional_info_text"`
+	ChargesText                          *string         `json:"charges_text"`
+	InsightsJson                         json.RawMessage `json:"insights_json"`
+	ListingCount                         *int32          `json:"listing_count"`
+	PricesTransactionID                  uuid.UUID       `json:"prices_transaction_id"`
+	Coalesce                             *string         `json:"coalesce"`
+	Coalesce_2                           *string         `json:"coalesce_2"`
+	Coalesce_3                           *string         `json:"coalesce_3"`
+	Score                                *int32          `json:"score"`
+	Coalesce_4                           *string         `json:"coalesce_4"`
+	PriceDeltaPercent                    *float64        `json:"price_delta_percent"`
+	Coalesce_5                           json.RawMessage `json:"coalesce_5"`
+	Coalesce_6                           *string         `json:"coalesce_6"`
+	Coalesce_7                           *string         `json:"coalesce_7"`
+	Coalesce_8                           *string         `json:"coalesce_8"`
+	PricesTransactionArea                float64         `json:"prices_transaction_area"`
+	PricesTransactionPrice               *int64          `json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter *int64          `json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32           `json:"prices_transaction_build_year"`
+	Coalesce_9                           *string         `json:"coalesce_9"`
+	PricesTransactionElevator            bool            `json:"prices_transaction_elevator"`
+	Coalesce_10                          *string         `json:"coalesce_10"`
+	Coalesce_11                          *string         `json:"coalesce_11"`
+	Coalesce_12                          *string         `json:"coalesce_12"`
+	Coalesce_13                          *string         `json:"coalesce_13"`
+	Coalesce_14                          *string         `json:"coalesce_14"`
+	Coalesce_15                          *string         `json:"coalesce_15"`
+	Coalesce_16                          *string         `json:"coalesce_16"`
+	PricesTransactionCreatedAt           time.Time       `json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time       `json:"prices_transaction_updated_at"`
+	SaleListingID_2                      uuid.UUID       `json:"sale_listing_id_2"`
+	Coalesce_17                          *string         `json:"coalesce_17"`
+	Coalesce_18                          *string         `json:"coalesce_18"`
+	Coalesce_19                          *string         `json:"coalesce_19"`
+	Coalesce_20                          *string         `json:"coalesce_20"`
+	Coalesce_21                          *string         `json:"coalesce_21"`
+	Coalesce_22                          *string         `json:"coalesce_22"`
+	Coalesce_23                          *string         `json:"coalesce_23"`
+	Coalesce_24                          *string         `json:"coalesce_24"`
+	SaleListingLatitude_2                *float64        `json:"sale_listing_latitude_2"`
+	SaleListingLongitude_2               *float64        `json:"sale_listing_longitude_2"`
+	SaleListingAskingPrice_2             *int64          `json:"sale_listing_asking_price_2"`
+	SaleListingDebtFreePrice_2           *int64          `json:"sale_listing_debt_free_price_2"`
+	SaleListingAreaValue_2               *float64        `json:"sale_listing_area_value_2"`
+	Coalesce_25                          *string         `json:"coalesce_25"`
+	Coalesce_26                          *string         `json:"coalesce_26"`
+	Coalesce_27                          *bool           `json:"coalesce_27"`
+	SaleListingFirstSeenAt_2             *time.Time      `json:"sale_listing_first_seen_at_2"`
+	SaleListingLastSeenAt_2              *time.Time      `json:"sale_listing_last_seen_at_2"`
+	SaleListingUpdatedAt_2               time.Time       `json:"sale_listing_updated_at_2"`
+	SaleListingPreviousAskingPrice_2     *int64          `json:"sale_listing_previous_asking_price_2"`
+	SaleListingPreviousDebtFreePrice_2   *int64          `json:"sale_listing_previous_debt_free_price_2"`
+	Coalesce_28                          *string         `json:"coalesce_28"`
+	Coalesce_29                          *string         `json:"coalesce_29"`
+	PropertyOfferingSourceLinkScore      int32           `json:"property_offering_source_link_score"`
+	Coalesce_30                          *string         `json:"coalesce_30"`
+	Coalesce_31                          *string         `json:"coalesce_31"`
+	Coalesce_32                          *string         `json:"coalesce_32"`
+	Coalesce_33                          *string         `json:"coalesce_33"`
+	Coalesce_34                          *string         `json:"coalesce_34"`
+	Coalesce_35                          json.RawMessage `json:"coalesce_35"`
 }
 
 func (q *Queries) LookupAddressListings(ctx context.Context, arg LookupAddressListingsParams) ([]LookupAddressListingsRow, error) {
@@ -680,62 +726,62 @@ func (q *Queries) LookupAddressListings(ctx context.Context, arg LookupAddressLi
 			&i.InsightsJson,
 			&i.ListingCount,
 			&i.PricesTransactionID,
-			&i.LinkType,
-			&i.LinkStatus,
-			&i.LinkMethod,
+			&i.Coalesce,
+			&i.Coalesce_2,
+			&i.Coalesce_3,
 			&i.Score,
-			&i.Confidence,
+			&i.Coalesce_4,
 			&i.PriceDeltaPercent,
-			&i.Reasons,
-			&i.PricesTransactionDescription,
-			&i.PricesTransactionType,
-			&i.PricesTransactionCategory,
+			&i.Coalesce_5,
+			&i.Coalesce_6,
+			&i.Coalesce_7,
+			&i.Coalesce_8,
 			&i.PricesTransactionArea,
-			&i.PtPricesTransactionPrice,
-			&i.PtPricesTransactionPricePerSquareMeter,
+			&i.PricesTransactionPrice,
+			&i.PricesTransactionPricePerSquareMeter,
 			&i.PricesTransactionBuildYear,
-			&i.PricesTransactionFloor,
+			&i.Coalesce_9,
 			&i.PricesTransactionElevator,
-			&i.PricesTransactionCondition,
-			&i.PricesTransactionPlot,
-			&i.PricesTransactionEnergyClass,
-			&i.PricesTransactionPeriodIdentifier,
-			&i.PricesCityName,
-			&i.PricesNeighborhoodName,
-			&i.PricesPostalCodeCode,
+			&i.Coalesce_10,
+			&i.Coalesce_11,
+			&i.Coalesce_12,
+			&i.Coalesce_13,
+			&i.Coalesce_14,
+			&i.Coalesce_15,
+			&i.Coalesce_16,
 			&i.PricesTransactionCreatedAt,
 			&i.PricesTransactionUpdatedAt,
 			&i.SaleListingID_2,
-			&i.SaleListingCanonicalID_2,
-			&i.SaleListingSourceProvider_2,
-			&i.SaleListingSourceKind_2,
-			&i.SaleListingNativeID_2,
-			&i.Headline_2,
-			&i.Address_2,
-			&i.City_2,
-			&i.Postal_2,
+			&i.Coalesce_17,
+			&i.Coalesce_18,
+			&i.Coalesce_19,
+			&i.Coalesce_20,
+			&i.Coalesce_21,
+			&i.Coalesce_22,
+			&i.Coalesce_23,
+			&i.Coalesce_24,
 			&i.SaleListingLatitude_2,
 			&i.SaleListingLongitude_2,
 			&i.SaleListingAskingPrice_2,
 			&i.SaleListingDebtFreePrice_2,
 			&i.SaleListingAreaValue_2,
-			&i.RoomLayout_2,
-			&i.Url_2,
-			&i.ExternalUrlAvailable_2,
+			&i.Coalesce_25,
+			&i.Coalesce_26,
+			&i.Coalesce_27,
 			&i.SaleListingFirstSeenAt_2,
 			&i.SaleListingLastSeenAt_2,
 			&i.SaleListingUpdatedAt_2,
 			&i.SaleListingPreviousAskingPrice_2,
 			&i.SaleListingPreviousDebtFreePrice_2,
-			&i.SourceLinkStatus,
-			&i.SourceLinkMethod,
+			&i.Coalesce_28,
+			&i.Coalesce_29,
 			&i.PropertyOfferingSourceLinkScore,
-			&i.AvailabilityText_2,
-			&i.RenovationsDoneText_2,
-			&i.RenovationsPlannedText_2,
-			&i.AdditionalInfoText_2,
-			&i.ChargesText_2,
-			&i.InsightsJson_2,
+			&i.Coalesce_30,
+			&i.Coalesce_31,
+			&i.Coalesce_32,
+			&i.Coalesce_33,
+			&i.Coalesce_34,
+			&i.Coalesce_35,
 		); err != nil {
 			return nil, err
 		}
@@ -950,29 +996,29 @@ type LookupAddressRawTransactionsParams struct {
 
 type LookupAddressRawTransactionsRow struct {
 	TransactionID        uuid.UUID       `json:"transaction_id"`
-	Description          string          `json:"description"`
-	Type                 string          `json:"type"`
-	Category             string          `json:"category"`
+	Description          *string         `json:"description"`
+	Type                 *string         `json:"type"`
+	Category             *string         `json:"category"`
 	Area                 float64         `json:"area"`
-	Price                int64           `json:"price"`
-	PricePerSquareMeter  int64           `json:"price_per_square_meter"`
+	Price                *int64          `json:"price"`
+	PricePerSquareMeter  *int64          `json:"price_per_square_meter"`
 	BuildYear            int32           `json:"build_year"`
-	Floor                string          `json:"floor"`
+	Floor                *string         `json:"floor"`
 	Elevator             bool            `json:"elevator"`
-	Condition            string          `json:"condition"`
-	Plot                 string          `json:"plot"`
-	EnergyClass          string          `json:"energy_class"`
-	PeriodIdentifier     string          `json:"period_identifier"`
-	City                 string          `json:"city"`
-	Neighborhood         string          `json:"neighborhood"`
-	Postal               string          `json:"postal"`
+	Condition            *string         `json:"condition"`
+	Plot                 *string         `json:"plot"`
+	EnergyClass          *string         `json:"energy_class"`
+	PeriodIdentifier     *string         `json:"period_identifier"`
+	City                 *string         `json:"city"`
+	Neighborhood         *string         `json:"neighborhood"`
+	Postal               *string         `json:"postal"`
 	CreatedAt            time.Time       `json:"created_at"`
 	UpdatedAt            time.Time       `json:"updated_at"`
 	IsMatched            *bool           `json:"is_matched"`
-	LinkedToLookup       bool            `json:"linked_to_lookup"`
-	CandidateToLookup    bool            `json:"candidate_to_lookup"`
-	MatchedListingCount  int32           `json:"matched_listing_count"`
-	MatchedOfferingCount int32           `json:"matched_offering_count"`
+	LinkedToLookup       *bool           `json:"linked_to_lookup"`
+	CandidateToLookup    *bool           `json:"candidate_to_lookup"`
+	MatchedListingCount  *int32          `json:"matched_listing_count"`
+	MatchedOfferingCount *int32          `json:"matched_offering_count"`
 	Matches              json.RawMessage `json:"matches"`
 }
 
@@ -1064,7 +1110,17 @@ candidate_links AS (
 ),
 ranked_latest AS (
     SELECT
-        candidate_links.selected_sale_listing_id, candidate_links.candidate_sale_listing_id, candidate_links.selected_property_offering_id, candidate_links.candidate_property_offering_id, candidate_links.direction, candidate_links.match_score, candidate_links.match_confidence, candidate_links.match_status, candidate_links.match_reasons, candidate_links.price_delta_percent, candidate_links.match_created_at,
+        candidate_links.selected_sale_listing_id,
+        candidate_links.candidate_sale_listing_id,
+        candidate_links.selected_property_offering_id,
+        candidate_links.candidate_property_offering_id,
+        candidate_links.direction,
+        candidate_links.match_score,
+        candidate_links.match_confidence,
+        candidate_links.match_status,
+        candidate_links.match_reasons,
+        candidate_links.price_delta_percent,
+        candidate_links.match_created_at,
         row_number() OVER (
             PARTITION BY selected_sale_listing_id
             ORDER BY match_score DESC, match_created_at DESC
@@ -1112,28 +1168,28 @@ LIMIT 250
 `
 
 type LookupAddressSourceCandidatesRow struct {
-	SelectedSaleListingID       uuid.UUID       `json:"selected_sale_listing_id"`
+	SelectedSaleListingID       *uuid.UUID      `json:"selected_sale_listing_id"`
 	SaleListingID               uuid.UUID       `json:"sale_listing_id"`
 	SaleListingCanonicalID      string          `json:"sale_listing_canonical_id"`
 	SaleListingSourceProvider   string          `json:"sale_listing_source_provider"`
 	SaleListingSourceKind       string          `json:"sale_listing_source_kind"`
 	SaleListingNativeID         string          `json:"sale_listing_native_id"`
-	Headline                    string          `json:"headline"`
-	Address                     string          `json:"address"`
-	City                        string          `json:"city"`
-	Postal                      string          `json:"postal"`
+	Headline                    *string         `json:"headline"`
+	Address                     *string         `json:"address"`
+	City                        *string         `json:"city"`
+	Postal                      *string         `json:"postal"`
 	SaleListingAskingPrice      *int64          `json:"sale_listing_asking_price"`
 	SaleListingDebtFreePrice    *int64          `json:"sale_listing_debt_free_price"`
 	SaleListingAreaValue        *float64        `json:"sale_listing_area_value"`
-	RoomLayout                  string          `json:"room_layout"`
-	Url                         string          `json:"url"`
-	ExternalUrlAvailable        bool            `json:"external_url_available"`
+	RoomLayout                  *string         `json:"room_layout"`
+	Url                         *string         `json:"url"`
+	ExternalUrlAvailable        *bool           `json:"external_url_available"`
 	SelectedPropertyOfferingID  uuid.UUID       `json:"selected_property_offering_id"`
 	CandidatePropertyOfferingID uuid.UUID       `json:"candidate_property_offering_id"`
-	Direction                   string          `json:"direction"`
+	Direction                   *string         `json:"direction"`
 	MatchStatus                 string          `json:"match_status"`
 	MatchScore                  int32           `json:"match_score"`
-	MatchConfidence             string          `json:"match_confidence"`
+	MatchConfidence             *string         `json:"match_confidence"`
 	PriceDeltaPercent           *float64        `json:"price_delta_percent"`
 	MatchReasons                json.RawMessage `json:"match_reasons"`
 	MatchCreatedAt              time.Time       `json:"match_created_at"`
@@ -1196,11 +1252,11 @@ LIMIT 1
 `
 
 type LookupPostalCityRow struct {
-	CityFi string `json:"city_fi"`
-	CitySv string `json:"city_sv"`
+	CityFi *string `json:"city_fi"`
+	CitySv *string `json:"city_sv"`
 }
 
-func (q *Queries) LookupPostalCity(ctx context.Context, postal string) (LookupPostalCityRow, error) {
+func (q *Queries) LookupPostalCity(ctx context.Context, postal *string) (LookupPostalCityRow, error) {
 	row := q.db.QueryRow(ctx, lookupPostalCity, postal)
 	var i LookupPostalCityRow
 	err := row.Scan(&i.CityFi, &i.CitySv)
@@ -1348,27 +1404,27 @@ type SearchGroupedOfferingsParams struct {
 }
 
 type SearchGroupedOfferingsRow struct {
-	RowPropertyOfferingID   string    `json:"row_property_offering_id"`
-	HousingCompanyID        string    `json:"housing_company_id"`
-	HousingCompanyName      string    `json:"housing_company_name"`
-	Headline                string    `json:"headline"`
-	Address                 string    `json:"address"`
-	City                    string    `json:"city"`
-	Postal                  string    `json:"postal"`
-	Price                   *int64    `json:"price"`
-	Area                    *float64  `json:"area"`
-	RoomLayout              string    `json:"room_layout"`
-	LastSeenAt              time.Time `json:"last_seen_at"`
-	SourceCount             int32     `json:"source_count"`
-	Sources                 string    `json:"sources"`
-	PriceMatchTransactionID string    `json:"price_match_transaction_id"`
-	PriceMatchScope         string    `json:"price_match_scope"`
-	PriceMatchStatus        string    `json:"price_match_status"`
-	PriceMatchMethod        string    `json:"price_match_method"`
-	PriceMatchScore         int32     `json:"price_match_score"`
-	PriceMatchPriceEur      int64     `json:"price_match_price_eur"`
-	InsightCount            int32     `json:"insight_count"`
-	InsightTopSeverity      string    `json:"insight_top_severity"`
+	PropertyOfferingID      *string    `json:"property_offering_id"`
+	HousingCompanyID        *string    `json:"housing_company_id"`
+	HousingCompanyName      *string    `json:"housing_company_name"`
+	Headline                *string    `json:"headline"`
+	Address                 *string    `json:"address"`
+	City                    *string    `json:"city"`
+	Postal                  *string    `json:"postal"`
+	Price                   *int64     `json:"price"`
+	Area                    *float64   `json:"area"`
+	RoomLayout              *string    `json:"room_layout"`
+	LastSeenAt              *time.Time `json:"last_seen_at"`
+	SourceCount             *int32     `json:"source_count"`
+	Sources                 *string    `json:"sources"`
+	PriceMatchTransactionID *string    `json:"price_match_transaction_id"`
+	PriceMatchScope         *string    `json:"price_match_scope"`
+	PriceMatchStatus        *string    `json:"price_match_status"`
+	PriceMatchMethod        *string    `json:"price_match_method"`
+	PriceMatchScore         *int32     `json:"price_match_score"`
+	PriceMatchPriceEur      *int64     `json:"price_match_price_eur"`
+	InsightCount            *int32     `json:"insight_count"`
+	InsightTopSeverity      *string    `json:"insight_top_severity"`
 }
 
 func (q *Queries) SearchGroupedOfferings(ctx context.Context, arg SearchGroupedOfferingsParams) ([]SearchGroupedOfferingsRow, error) {
@@ -1396,7 +1452,7 @@ func (q *Queries) SearchGroupedOfferings(ctx context.Context, arg SearchGroupedO
 	for rows.Next() {
 		var i SearchGroupedOfferingsRow
 		if err := rows.Scan(
-			&i.RowPropertyOfferingID,
+			&i.PropertyOfferingID,
 			&i.HousingCompanyID,
 			&i.HousingCompanyName,
 			&i.Headline,

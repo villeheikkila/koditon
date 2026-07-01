@@ -71,8 +71,8 @@ func (a *API) pricesTransactionsHandler(ctx context.Context, input *pricesTransa
 		return nil, huma.Error400BadRequest("invalid postal_code_id")
 	}
 	rows, err := a.pricesQueries.ListTransactionsByPostalSelection(ctx, db.ListTransactionsByPostalSelectionParams{
-		MunicipalityID: municipalityID,
-		PostalCodeID:   postalCodeID,
+		MunicipalityID: &municipalityID,
+		PostalCodeID:   &postalCodeID,
 	})
 	if err != nil {
 		return nil, huma.Error500InternalServerError("internal server error")
@@ -97,21 +97,46 @@ func (a *API) pricesTransactionsHandler(ctx context.Context, input *pricesTransa
 			CreatedAt:            RFC3339Time{row.PricesTransactionCreatedAt},
 			UpdatedAt:            RFC3339Time{row.PricesTransactionUpdatedAt},
 			Category:             row.PricesTransactionCategory,
-			IsMatched:            row.IsMatched,
-			MatchedListingCount:  row.MatchedListingCount,
-			MatchedOfferingCount: row.MatchedOfferingCount,
+			IsMatched:            boolValue(row.IsMatched),
+			MatchedListingCount:  int32Value(row.MatchedListingCount),
+			MatchedOfferingCount: int32Value(row.MatchedOfferingCount),
 			NeighborhoodID:       row.PricesNeighborhoodID.String(),
 			NeighborhoodName:     &neighborhoodName,
-			PostalCodeID:         row.PostalPostalCodeID.String(),
-			PostalCodeCode:       row.PostalPostalCodeCode,
-			PostalCodeNameFi:     row.PostalPostalCodeNameFi,
-			MunicipalityID:       row.PostalMunicipalityID.String(),
-			MunicipalityNameFi:   row.PostalMunicipalityNameFi,
+			PostalCodeID:         uuidString(row.PostalPostalCodeID),
+			PostalCodeCode:       stringValue(row.PostalPostalCodeCode),
+			PostalCodeNameFi:     stringValue(row.PostalPostalCodeNameFi),
+			MunicipalityID:       uuidString(row.PostalMunicipalityID),
+			MunicipalityNameFi:   stringValue(row.PostalMunicipalityNameFi),
 		})
 	}
 	output := &pricesTransactionsOutput{}
 	output.Body.Transactions = transactions
 	return output, nil
+}
+
+func boolValue(value *bool) bool {
+	return value != nil && *value
+}
+
+func int32Value(value *int32) int32 {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func uuidString(value *uuid.UUID) string {
+	if value == nil {
+		return ""
+	}
+	return value.String()
 }
 
 func parseUUIDParam(value string) (uuid.UUID, error) {
@@ -203,16 +228,16 @@ func (a *API) pricesTransactionsFilteredHandler(ctx context.Context, input *pric
 			CreatedAt:            RFC3339Time{row.PricesTransactionCreatedAt},
 			UpdatedAt:            RFC3339Time{row.PricesTransactionUpdatedAt},
 			Category:             row.PricesTransactionCategory,
-			IsMatched:            row.IsMatched,
-			MatchedListingCount:  row.MatchedListingCount,
-			MatchedOfferingCount: row.MatchedOfferingCount,
+			IsMatched:            boolValue(row.IsMatched),
+			MatchedListingCount:  int32Value(row.MatchedListingCount),
+			MatchedOfferingCount: int32Value(row.MatchedOfferingCount),
 			NeighborhoodID:       row.PricesNeighborhoodID.String(),
 			NeighborhoodName:     &neighborhoodName,
 			PostalCodeID:         row.PostalPostalCodeID.String(),
-			PostalCodeCode:       row.PostalPostalCodeCode,
-			PostalCodeNameFi:     row.PostalPostalCodeNameFi,
+			PostalCodeCode:       stringValue(row.PostalPostalCodeCode),
+			PostalCodeNameFi:     stringValue(row.PostalPostalCodeNameFi),
 			MunicipalityID:       row.PostalMunicipalityID.String(),
-			MunicipalityNameFi:   row.PostalMunicipalityNameFi,
+			MunicipalityNameFi:   stringValue(row.PostalMunicipalityNameFi),
 		})
 	}
 	output := &pricesTransactionsOutput{}

@@ -36,7 +36,7 @@ func mapBatchUpsertBuildingsFromSitemapParams(entries []client.SitemapEntry) []s
 
 func mapAdParams(friendlyID string, ad *frontdoorpayload.AdResponse) (db.UpdateFrontdoorAdDataParams, error) {
 	params := db.UpdateFrontdoorAdDataParams{
-		FrontdoorAdExternalID: friendlyID,
+		FrontdoorAdExternalID: &friendlyID,
 	}
 	jsonData, err := json.Marshal(ad)
 	if err != nil {
@@ -48,7 +48,7 @@ func mapAdParams(friendlyID string, ad *frontdoorpayload.AdResponse) (db.UpdateF
 	}
 	params.FrontdoorAdData = canonical
 	params.FrontdoorAdDataHash = &hash
-	params.FrontdoorAdDataHashAlgorithm = sourcejson.HashAlgorithmSHA256
+	params.FrontdoorAdDataHashAlgorithm = ptr(sourcejson.HashAlgorithmSHA256)
 	return params, nil
 }
 
@@ -151,7 +151,7 @@ func mapBuildingParams(housingCompanyID int64, data *frontdoorpayload.HousingCom
 		}
 	}
 	if jsonData, err := json.Marshal(data); err == nil {
-		p.Column44 = jsonData
+		p.FrontdoorBuildingData = jsonData
 	}
 	return p
 }
@@ -183,6 +183,10 @@ func mapAnnouncementParams(ann frontdoorpayload.Announcement, buildingID uuid.UU
 		FrontdoorBuildingAnnouncementPublished:                ann.Published,
 		FrontdoorBuildingAnnouncementRentPeriod:               ann.RentPeriod,
 		FrontdoorBuildingAnnouncementRentalUniqueNo:           util.Int32Ptr(ann.RentalUniqueNo),
-		FrontdoorBuildingID:                                   buildingID,
+		FrontdoorBuildingID:                                   &buildingID,
 	}
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }

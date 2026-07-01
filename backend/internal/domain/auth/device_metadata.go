@@ -23,7 +23,7 @@ func (s *Service) updateDeviceMetadata(
 
 	qtx := s.queries.WithTx(tx)
 	if err := qtx.UpdateDeviceMetadata(ctx, db.UpdateDeviceMetadataParams{
-		UserDeviceUuid:       deviceID,
+		UserDeviceUuid:       ptr(deviceID),
 		UserDeviceName:       nullableString(params.DeviceName),
 		UserDeviceOs:         nullableString(params.DeviceOS),
 		UserDeviceModel:      nullableString(params.DeviceModel),
@@ -45,7 +45,7 @@ func (s *Service) updateSessionMetadata(
 	qtx := s.queries.WithTx(tx)
 	location := s.resolveSessionLocation(ctx, params)
 	if err := qtx.UpdateSessionMetadata(ctx, db.UpdateSessionMetadataParams{
-		DeviceSessionUuid:                sessionID,
+		DeviceSessionUuid:                ptr(sessionID),
 		DeviceSessionDeviceName:          nullableString(params.DeviceName),
 		DeviceSessionDeviceOs:            nullableString(params.DeviceOS),
 		DeviceSessionDeviceModel:         nullableString(params.DeviceModel),
@@ -67,5 +67,9 @@ func nullableString(value string) *string {
 	if value == "" {
 		return nil
 	}
+	return &value
+}
+
+func ptr[T any](value T) *T {
 	return &value
 }

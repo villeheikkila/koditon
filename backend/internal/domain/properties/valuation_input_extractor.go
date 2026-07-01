@@ -55,7 +55,7 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return ValuationInputExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetPropertySourceOfferingValuationExtractionTexts(ctx, saleListingID)
+	row, err := s.queries.GetPropertySourceOfferingValuationExtractionTexts(ctx, &saleListingID)
 	if err != nil {
 		return ValuationInputExtractionResult{}, mapNotFound(err)
 	}
@@ -101,12 +101,15 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
-	entity := db.DeleteLLMPropertyClaimsForEntityParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID}
+	entityType := valuationClaimTargetSaleListing
+	entity := db.DeleteLLMPropertyClaimsForEntityParams{EntityType: &entityType, EntityID: &saleListingID}
 	if err := queries.DeleteLLMPropertyClaimsForEntity(ctx, entity); err != nil {
 		return fmt.Errorf("delete previous llm valuation facts: %w", err)
 	}
 	for _, fact := range facts {
-		if err := queries.InsertPropertyClaim(ctx, db.InsertPropertyClaimParams{EntityType: valuationClaimTargetSaleListing, EntityID: saleListingID, SourceField: llmValuationFactSourceField(fact.Source), Section: fact.Section, Key: fact.Key, ValueKind: fact.ValueKind, ValueText: fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: fact.Confidence * 100, EvidenceText: fact.Evidence, Model: modelName, PromptVersion: promptVersion}); err != nil {
+		sourceField := llmValuationFactSourceField(fact.Source)
+		confidence := fact.Confidence * 100
+		if err := queries.InsertPropertyClaim(ctx, db.InsertPropertyClaimParams{EntityType: &entityType, EntityID: &saleListingID, SourceField: &sourceField, Section: &fact.Section, Key: &fact.Key, ValueKind: &fact.ValueKind, ValueText: &fact.ValueText, ValueNumber: fact.ValueNumber, ValueBool: fact.ValueBool, Confidence: &confidence, EvidenceText: &fact.Evidence, Model: &modelName, PromptVersion: &promptVersion}); err != nil {
 			return fmt.Errorf("insert llm valuation fact: %w", err)
 		}
 	}
@@ -121,7 +124,7 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 
 func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExtractionTextsRow) (fantasy.Prompt, error) {
 	return propertyLLMPrompt("valuation_input_extraction", map[string]string{
-		"room_layout":                      row.RoomLayout,
+		"room_layout":                      valueOrEmpty(row.RoomLayout),
 		"rooms_count":                      int32PromptValue(row.SaleListingRoomsCount),
 		"bedrooms_count":                   int32PromptValue(row.SaleListingBedroomsCount),
 		"area_m2":                          float64PromptValue(row.SaleListingAreaValue),
@@ -130,34 +133,34 @@ func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExt
 		"other_area_m2":                    float64PromptValue(row.SaleListingOtherAreaValue),
 		"floor_level":                      int32PromptValue(row.SaleListingFloorLevel),
 		"total_floors":                     int32PromptValue(row.SaleListingTotalFloors),
-		"floor_text":                       row.FloorText,
-		"condition":                        row.Condition,
+		"floor_text":                       valueOrEmpty(row.FloorText),
+		"condition":                        valueOrEmpty(row.Condition),
 		"sauna":                            boolPromptValue(row.SaleListingSauna),
 		"balcony":                          boolPromptValue(row.SaleListingBalcony),
-		"parking_text":                     row.ParkingText,
-		"description_text":                 row.DescriptionText,
-		"additional_info_text":             row.AdditionalInfoText,
-		"kitchen_description_text":         row.KitchenDescriptionText,
-		"bathroom_description_text":        row.BathroomDescriptionText,
-		"storage_description_text":         row.StorageDescriptionText,
-		"floor_materials_description_text": row.FloorMaterialsDescriptionText,
-		"wall_materials_description_text":  row.WallMaterialsDescriptionText,
-		"balcony_description_text":         row.BalconyDescriptionText,
-		"sauna_description_text":           row.SaunaDescriptionText,
-		"views_description_text":           row.ViewsDescriptionText,
-		"building_material":                row.BuildingMaterial,
-		"heating_system":                   row.HeatingSystem,
-		"roof_type":                        row.RoofType,
-		"roof_material":                    row.RoofMaterial,
-		"car_storage_text":                 row.CarStorageText,
-		"building_description_text":        row.BuildingDescriptionText,
-		"building_other_info_text":         row.BuildingOtherInfoText,
-		"charges_text":                     row.ChargesText,
+		"parking_text":                     valueOrEmpty(row.ParkingText),
+		"description_text":                 valueOrEmpty(row.DescriptionText),
+		"additional_info_text":             valueOrEmpty(row.AdditionalInfoText),
+		"kitchen_description_text":         valueOrEmpty(row.KitchenDescriptionText),
+		"bathroom_description_text":        valueOrEmpty(row.BathroomDescriptionText),
+		"storage_description_text":         valueOrEmpty(row.StorageDescriptionText),
+		"floor_materials_description_text": valueOrEmpty(row.FloorMaterialsDescriptionText),
+		"wall_materials_description_text":  valueOrEmpty(row.WallMaterialsDescriptionText),
+		"balcony_description_text":         valueOrEmpty(row.BalconyDescriptionText),
+		"sauna_description_text":           valueOrEmpty(row.SaunaDescriptionText),
+		"views_description_text":           valueOrEmpty(row.ViewsDescriptionText),
+		"building_material":                valueOrEmpty(row.BuildingMaterial),
+		"heating_system":                   valueOrEmpty(row.HeatingSystem),
+		"roof_type":                        valueOrEmpty(row.RoofType),
+		"roof_material":                    valueOrEmpty(row.RoofMaterial),
+		"car_storage_text":                 valueOrEmpty(row.CarStorageText),
+		"building_description_text":        valueOrEmpty(row.BuildingDescriptionText),
+		"building_other_info_text":         valueOrEmpty(row.BuildingOtherInfoText),
+		"charges_text":                     valueOrEmpty(row.ChargesText),
 	})
 }
 
 func valuationInputPromptHasContent(row db.GetPropertySourceOfferingValuationExtractionTextsRow) bool {
-	return firstNonEmpty(row.RoomLayout, row.FloorText, row.Condition, row.ParkingText, row.DescriptionText, row.AdditionalInfoText, row.KitchenDescriptionText, row.BathroomDescriptionText, row.StorageDescriptionText, row.FloorMaterialsDescriptionText, row.WallMaterialsDescriptionText, row.BalconyDescriptionText, row.SaunaDescriptionText, row.ViewsDescriptionText, row.BuildingMaterial, row.HeatingSystem, row.RoofType, row.RoofMaterial, row.CarStorageText, row.BuildingDescriptionText, row.BuildingOtherInfoText, row.ChargesText) != "" || row.SaleListingRoomsCount != nil || row.SaleListingAreaValue != nil || row.SaleListingFloorLevel != nil || row.SaleListingSauna != nil || row.SaleListingBalcony != nil
+	return firstNonEmpty(valueOrEmpty(row.RoomLayout), valueOrEmpty(row.FloorText), valueOrEmpty(row.Condition), valueOrEmpty(row.ParkingText), valueOrEmpty(row.DescriptionText), valueOrEmpty(row.AdditionalInfoText), valueOrEmpty(row.KitchenDescriptionText), valueOrEmpty(row.BathroomDescriptionText), valueOrEmpty(row.StorageDescriptionText), valueOrEmpty(row.FloorMaterialsDescriptionText), valueOrEmpty(row.WallMaterialsDescriptionText), valueOrEmpty(row.BalconyDescriptionText), valueOrEmpty(row.SaunaDescriptionText), valueOrEmpty(row.ViewsDescriptionText), valueOrEmpty(row.BuildingMaterial), valueOrEmpty(row.HeatingSystem), valueOrEmpty(row.RoofType), valueOrEmpty(row.RoofMaterial), valueOrEmpty(row.CarStorageText), valueOrEmpty(row.BuildingDescriptionText), valueOrEmpty(row.BuildingOtherInfoText), valueOrEmpty(row.ChargesText)) != "" || row.SaleListingRoomsCount != nil || row.SaleListingAreaValue != nil || row.SaleListingFloorLevel != nil || row.SaleListingSauna != nil || row.SaleListingBalcony != nil
 }
 
 func normalizeValuationInputFacts(items []valuationInputExtractionFact, modelName string, promptVersion string) []valuation.ValuationFact {

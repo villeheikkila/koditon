@@ -46,17 +46,17 @@ returning
 `
 
 type CreateIdentityParams struct {
-	UserUuid                  uuid.UUID       `json:"user_uuid"`
-	UserIdentityProvider      string          `json:"user_identity_provider"`
-	UserIdentityExternalID    string          `json:"user_identity_external_id"`
+	UserUuid                  *uuid.UUID      `json:"user_uuid"`
+	UserIdentityProvider      *string         `json:"user_identity_provider"`
+	UserIdentityExternalID    *string         `json:"user_identity_external_id"`
 	UserIdentityEmail         *string         `json:"user_identity_email"`
-	UserIdentityEmailVerified bool            `json:"user_identity_email_verified"`
+	UserIdentityEmailVerified *bool           `json:"user_identity_email_verified"`
 	UserIdentityData          json.RawMessage `json:"user_identity_data"`
 }
 
 type CreateIdentityRow struct {
 	UserIdentityUuid          uuid.UUID       `json:"user_identity_uuid"`
-	UserUuid                  uuid.UUID       `json:"user_uuid"`
+	UserUuid                  *uuid.UUID      `json:"user_uuid"`
 	UserIdentityProvider      string          `json:"user_identity_provider"`
 	UserIdentityExternalID    string          `json:"user_identity_external_id"`
 	UserIdentityEmail         *string         `json:"user_identity_email"`
@@ -116,14 +116,14 @@ where
 `
 
 type GetIdentityByProviderAndExternalIDParams struct {
-	UserIdentityProvider   string `json:"user_identity_provider"`
-	UserIdentityExternalID string `json:"user_identity_external_id"`
+	UserIdentityProvider   *string `json:"user_identity_provider"`
+	UserIdentityExternalID *string `json:"user_identity_external_id"`
 }
 
 type GetIdentityByProviderAndExternalIDRow struct {
 	UserIdentityUuid          uuid.UUID       `json:"user_identity_uuid"`
 	UserIDBigint              int64           `json:"user_id_bigint"`
-	UserUuid                  uuid.UUID       `json:"user_uuid"`
+	UserUuid                  *uuid.UUID      `json:"user_uuid"`
 	UserIdentityProvider      string          `json:"user_identity_provider"`
 	UserIdentityExternalID    string          `json:"user_identity_external_id"`
 	UserIdentityEmail         *string         `json:"user_identity_email"`
@@ -181,14 +181,14 @@ returning
 
 type UpdateIdentityParams struct {
 	UserIdentityEmail         *string         `json:"user_identity_email"`
-	UserIdentityEmailVerified bool            `json:"user_identity_email_verified"`
+	UserIdentityEmailVerified *bool           `json:"user_identity_email_verified"`
 	UserIdentityData          json.RawMessage `json:"user_identity_data"`
-	UserIdentityUuid          uuid.UUID       `json:"user_identity_uuid"`
+	UserIdentityUuid          *uuid.UUID      `json:"user_identity_uuid"`
 }
 
 type UpdateIdentityRow struct {
 	UserIdentityUuid          uuid.UUID       `json:"user_identity_uuid"`
-	UserUuid                  uuid.UUID       `json:"user_uuid"`
+	UserUuid                  *uuid.UUID      `json:"user_uuid"`
 	UserIdentityProvider      string          `json:"user_identity_provider"`
 	UserIdentityExternalID    string          `json:"user_identity_external_id"`
 	UserIdentityEmail         *string         `json:"user_identity_email"`

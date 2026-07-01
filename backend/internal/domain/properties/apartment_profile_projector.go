@@ -53,7 +53,7 @@ func (s *Service) enrichSaleListingCanonicalApartmentProfile(ctx context.Context
 }
 
 func (s *Service) dimensionApartmentProfileForSaleListing(ctx context.Context, saleListingID uuid.UUID) (ApartmentProfile, error) {
-	row, err := s.queries.GetDimensionApartmentProfileForSaleListing(ctx, saleListingID)
+	row, err := s.queries.GetDimensionApartmentProfileForSaleListing(ctx, &saleListingID)
 	if err != nil {
 		return ApartmentProfile{}, err
 	}
@@ -61,7 +61,7 @@ func (s *Service) dimensionApartmentProfileForSaleListing(ctx context.Context, s
 }
 
 func (s *Service) enrichSaleListingCanonicalBuildingProfile(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	row, err := s.queries.GetCanonicalBuildingProfileForSaleListing(ctx, saleListingID)
+	row, err := s.queries.GetCanonicalBuildingProfileForSaleListing(ctx, &saleListingID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -75,7 +75,7 @@ func (s *Service) enrichSaleListingCanonicalBuildingProfile(ctx context.Context,
 }
 
 func (s *Service) enrichSaleListingQualityScores(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.queries.ListSaleListingQualityScores(ctx, saleListingID)
+	rows, err := s.queries.ListSaleListingQualityScores(ctx, &saleListingID)
 	if err != nil {
 		return err
 	}
@@ -86,23 +86,17 @@ func (s *Service) enrichSaleListingQualityScores(ctx context.Context, listing *S
 }
 
 func apartmentProfileFromDB(row db.GetDimensionApartmentProfileForSaleListingRow) ApartmentProfile {
-	return ApartmentProfile{HousingCompanyID: row.HousingCompanyID.String(), PropertyUnitID: row.PropertyUnitID.String(), AreaM2: &row.AreaM2, LivingAreaM2: &row.LivingAreaM2, RoomLayout: row.RoomLayout, RoomCount: &row.RoomCount, BedroomCount: &row.BedroomCount, FloorLevel: &row.FloorLevel, TotalFloors: &row.TotalFloors, KitchenType: row.KitchenType, LayoutQuality: row.LayoutQuality, AwkwardLayout: &row.AwkwardLayout, Condition: row.Condition, KitchenCondition: row.KitchenCondition, BathroomCondition: row.BathroomCondition, SurfaceRenovationNeed: &row.SurfaceRenovationNeed, ModernizationNeed: &row.ModernizationNeed, Sauna: &row.Sauna, Balcony: &row.Balcony, BalconyGlazing: &row.BalconyGlazing, ParkingType: row.ParkingType, StorageQuality: row.StorageQuality, ViewQuality: row.ViewQuality, NoiseRisk: &row.NoiseRisk, Accessibility: row.Accessibility, MaintenanceChargeMonthly: &row.MaintenanceChargeMonthly, CapitalChargeMonthly: &row.CapitalChargeMonthly, TotalChargeMonthly: &row.TotalChargeMonthly, DebtShareEUR: &row.DebtShareEur, ShareholderLiability: row.ShareholderLiability, Confidence: row.Confidence, UpdatedAt: row.ResolvedAt.Format(time.RFC3339)}
+	return ApartmentProfile{HousingCompanyID: row.HousingCompanyID.String(), PropertyUnitID: row.PropertyUnitID.String(), AreaM2: row.AreaM2, LivingAreaM2: row.LivingAreaM2, RoomLayout: stringValue(row.RoomLayout), RoomCount: row.RoomCount, BedroomCount: row.BedroomCount, FloorLevel: row.FloorLevel, TotalFloors: row.TotalFloors, KitchenType: stringValue(row.KitchenType), LayoutQuality: stringValue(row.LayoutQuality), AwkwardLayout: row.AwkwardLayout, Condition: stringValue(row.Condition), KitchenCondition: stringValue(row.KitchenCondition), BathroomCondition: stringValue(row.BathroomCondition), SurfaceRenovationNeed: row.SurfaceRenovationNeed, ModernizationNeed: row.ModernizationNeed, Sauna: row.Sauna, Balcony: row.Balcony, BalconyGlazing: row.BalconyGlazing, ParkingType: stringValue(row.ParkingType), StorageQuality: stringValue(row.StorageQuality), ViewQuality: stringValue(row.ViewQuality), NoiseRisk: row.NoiseRisk, Accessibility: stringValue(row.Accessibility), MaintenanceChargeMonthly: row.MaintenanceChargeMonthly, CapitalChargeMonthly: row.CapitalChargeMonthly, TotalChargeMonthly: row.TotalChargeMonthly, DebtShareEUR: row.DebtShareEur, ShareholderLiability: stringValue(row.ShareholderLiability), Confidence: stringValue(row.Confidence), UpdatedAt: row.ResolvedAt.Format(time.RFC3339)}
 }
 
 func buildingProfilesFromDB(row db.GetCanonicalBuildingProfileForSaleListingRow) (BuildingProfile, HousingCompanyProfile) {
-	profile := BuildingProfile{PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: row.BuildingHousingCompanyID.String(), BuildYear: &row.BuildYear, FloorCount: &row.FloorCount, ApartmentCount: &row.ApartmentCount, EnergyClass: row.EnergyClass, HeatingMethod: row.HeatingMethod, Material: row.Material, RoofType: row.RoofType, RoofMaterial: row.RoofMaterial, Elevator: &row.Elevator, Confidence: row.BuildingConfidence}
-	if row.BuildingResolvedAt != nil {
-		profile.UpdatedAt = row.BuildingResolvedAt.Format(time.RFC3339)
-	}
-	housingProfile := HousingCompanyProfile{HousingCompanyID: row.HousingCompanyID.String(), Name: row.HousingCompanyName, BusinessID: row.BusinessID, BuildYear: row.HousingCompanyBuildYear, ApartmentCount: &row.HousingCompanyApartmentCount, PlotOwnershipType: row.PlotOwnershipType, EnergyClass: row.HousingCompanyEnergyClass, MaintenanceRisk: row.MaintenanceRisk, FinancialRisk: row.FinancialRisk, RepairBacklogRisk: row.RepairBacklogRisk, Confidence: row.HousingCompanyConfidence}
-	if row.HousingCompanyResolvedAt != nil {
-		housingProfile.UpdatedAt = row.HousingCompanyResolvedAt.Format(time.RFC3339)
-	}
+	profile := BuildingProfile{PhysicalBuildingID: ptrUUIDString(row.PhysicalBuildingID), HousingCompanyID: row.BuildingHousingCompanyID.String(), BuildYear: row.BuildYear, FloorCount: row.FloorCount, ApartmentCount: row.ApartmentCount, EnergyClass: stringValue(row.EnergyClass), HeatingMethod: stringValue(row.HeatingMethod), Material: stringValue(row.Material), RoofType: stringValue(row.RoofType), RoofMaterial: stringValue(row.RoofMaterial), Elevator: row.Elevator, Confidence: stringValue(row.BuildingConfidence), UpdatedAt: row.BuildingResolvedAt.Format(time.RFC3339)}
+	housingProfile := HousingCompanyProfile{HousingCompanyID: row.HousingCompanyID.String(), Name: stringValue(row.HousingCompanyName), BusinessID: stringValue(row.BusinessID), BuildYear: row.HousingCompanyBuildYear, ApartmentCount: row.HousingCompanyApartmentCount, PlotOwnershipType: stringValue(row.PlotOwnershipType), EnergyClass: stringValue(row.HousingCompanyEnergyClass), MaintenanceRisk: stringValue(row.MaintenanceRisk), FinancialRisk: stringValue(row.FinancialRisk), RepairBacklogRisk: stringValue(row.RepairBacklogRisk), Confidence: stringValue(row.HousingCompanyConfidence), UpdatedAt: row.HousingCompanyResolvedAt.Format(time.RFC3339)}
 	return profile, housingProfile
 }
 
 func qualityScoreFromDB(row db.ListSaleListingQualityScoresRow) PropertyQualityScore {
-	return PropertyQualityScore{TargetType: row.TargetType, Dimension: row.Dimension, Value: row.Value, Confidence: row.Confidence, Reasons: qualityScoreReasons(row.Reasons), UpdatedAt: row.ResolvedAt.Format(time.RFC3339)}
+	return PropertyQualityScore{TargetType: stringValue(row.TargetType), Dimension: stringValue(row.Dimension), Value: int32Value(row.Value), Confidence: stringValue(row.Confidence), Reasons: qualityScoreReasons(row.Reasons), UpdatedAt: row.ResolvedAt.Format(time.RFC3339)}
 }
 
 func qualityScoreReasons(data []byte) []string {
@@ -118,4 +112,18 @@ func qualityScoreReasons(data []byte) []string {
 		}
 	}
 	return out
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func int32Value(value *int32) int32 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

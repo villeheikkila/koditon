@@ -89,7 +89,7 @@ func buildingFromFrontdoor(canonicalID string, nativeID string, row db.GetFrontd
 }
 
 func shortcutAdSource(canonicalID string, nativeID string, row db.GetShortcutAdUnifiedDetailRow) ListingSource {
-	return ListingSource{Provider: "shortcut", Kind: "ad", CanonicalID: canonicalID, NativeID: nativeID, ExternalID: nativeID, URL: row.ShortcutAdUrl, OriginalURL: row.ShortcutAdUrl, LastSeenAt: timePtr(row.ShortcutAdLastSeenAt), Metadata: sourceMetadata(map[string]any{"ad_type": row.ShortcutAdType, "building_id": ptrUUIDString(row.ShortcutBuildingID), "building_external_id": formatInt64(row.ShortcutBuildingExternalID)})}
+	return ListingSource{Provider: "shortcut", Kind: "ad", CanonicalID: canonicalID, NativeID: nativeID, ExternalID: nativeID, URL: row.ShortcutAdUrl, OriginalURL: row.ShortcutAdUrl, LastSeenAt: timePtr(row.ShortcutAdLastSeenAt), Metadata: sourceMetadata(map[string]any{"ad_type": row.ShortcutAdType, "building_id": ptrUUIDString(row.ShortcutBuildingID), "building_external_id": strconv.FormatInt(row.ShortcutBuildingExternalID, 10)})}
 }
 
 func frontdoorAdSource(canonicalID string, nativeID string, row db.GetFrontdoorAdUnifiedDetailRow, payload rawMap) ListingSource {

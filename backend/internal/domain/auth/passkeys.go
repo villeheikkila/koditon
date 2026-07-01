@@ -142,10 +142,12 @@ func (s *Service) createPasskeyAuthenticationChallenge(
 		displayName = &display
 		userUUID = &userID
 	}
+	flow := passkeyFlowAuthenticate
+	expiresAt := time.Now().Add(passkeyChallengeTTL)
 	challenge, err := s.queries.CreateWebauthnChallenge(ctx, db.CreateWebauthnChallengeParams{
-		AuthWebauthnChallengeFlow:            passkeyFlowAuthenticate,
+		AuthWebauthnChallengeFlow:            &flow,
 		AuthWebauthnChallengeSession:         sessionJSON,
-		AuthWebauthnChallengeExpiresAt:       time.Now().Add(passkeyChallengeTTL),
+		AuthWebauthnChallengeExpiresAt:       &expiresAt,
 		AuthWebauthnChallengeUserHandle:      userHandle,
 		AuthWebauthnChallengeUserDisplayName: displayName,
 		AuthWebauthnChallengeVerifiedEmail:   verifiedEmail,
@@ -170,8 +172,8 @@ func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPas
 		return nil, ErrPasskeyConfig
 	}
 	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
-		AuthWebauthnChallengeUuid: req.ChallengeID,
-		AuthWebauthnChallengeFlow: passkeyFlowAuthenticate,
+		AuthWebauthnChallengeUuid: &req.ChallengeID,
+		AuthWebauthnChallengeFlow: ptr(passkeyFlowAuthenticate),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -193,10 +195,10 @@ func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPas
 		if getErr != nil {
 			return nil, getErr
 		}
-		resolvedUserID = row.UserUuid
+		resolvedUserID = *row.UserUuid
 		resolvedPasskey = row
 		return PasskeyAccountUser{
-			userID:      row.UserUuid,
+			userID:      *row.UserUuid,
 			handle:      row.UserPasskeyUserHandle,
 			displayName: row.UserUuid.String(),
 			credentials: []wbauthn.Credential{passkeyRowToCredential(row)},
@@ -219,7 +221,7 @@ func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPas
 	qtx := s.queries.WithTx(tx)
 
 	if err := qtx.UpdatePasskeyUsage(ctx, db.UpdatePasskeyUsageParams{
-		UserPasskeySignCount:    int64(parsedCredential.Authenticator.SignCount),
+		UserPasskeySignCount:    ptr(int64(parsedCredential.Authenticator.SignCount)),
 		UserPasskeyCredentialID: resolvedPasskey.UserPasskeyCredentialID,
 		UserPasskeyBackupState:  boolPtr(parsedCredential.Flags.BackupState),
 	}); err != nil {
@@ -254,7 +256,7 @@ func (s *Service) BeginPasskeyRegistration(ctx context.Context, req BeginPasskey
 	if s.passkeyService == nil {
 		return nil, ErrPasskeyConfig
 	}
-	passkeys, err := s.queries.ListPasskeysByUserID(ctx, req.UserID)
+	passkeys, err := s.queries.ListPasskeysByUserID(ctx, &req.UserID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("list existing passkeys: %w", err)
 	}
@@ -286,10 +288,12 @@ func (s *Service) BeginPasskeyRegistration(ctx context.Context, req BeginPasskey
 	if err != nil {
 		return nil, fmt.Errorf("marshal session: %w", err)
 	}
+	flow := passkeyFlowRegister
+	expiresAt := time.Now().Add(passkeyChallengeTTL)
 	challenge, err := s.queries.CreateWebauthnChallenge(ctx, db.CreateWebauthnChallengeParams{
-		AuthWebauthnChallengeFlow:            passkeyFlowRegister,
+		AuthWebauthnChallengeFlow:            &flow,
 		AuthWebauthnChallengeSession:         sessionJSON,
-		AuthWebauthnChallengeExpiresAt:       time.Now().Add(passkeyChallengeTTL),
+		AuthWebauthnChallengeExpiresAt:       &expiresAt,
 		AuthWebauthnChallengeUserHandle:      handle,
 		AuthWebauthnChallengeUserDisplayName: &label,
 		AuthWebauthnChallengeDeviceID:        &req.DeviceID,
@@ -311,8 +315,8 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 		return nil, ErrPasskeyConfig
 	}
 	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
-		AuthWebauthnChallengeUuid: req.ChallengeID,
-		AuthWebauthnChallengeFlow: passkeyFlowRegister,
+		AuthWebauthnChallengeUuid: &req.ChallengeID,
+		AuthWebauthnChallengeFlow: ptr(passkeyFlowRegister),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -320,14 +324,14 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 		}
 		return nil, fmt.Errorf("consume challenge: %w", err)
 	}
-	if challenge.UserUuid != uuid.Nil && challenge.UserUuid != req.UserID {
+	if challenge.UserUuid != nil && *challenge.UserUuid != req.UserID {
 		return nil, ErrUnauthorized
 	}
 	sessionData, err := passkey.UnmarshalSessionData(challenge.AuthWebauthnChallengeSession)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal challenge: %w", err)
 	}
-	passkeys, err := s.queries.ListPasskeysByUserID(ctx, req.UserID)
+	passkeys, err := s.queries.ListPasskeysByUserID(ctx, &req.UserID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("load user passkeys: %w", err)
 	}
@@ -357,7 +361,7 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 	defer rollbackTx(ctx, s.logger, tx)
 	qtx := s.queries.WithTx(tx)
 
-	userEmail, err := qtx.GetUserEmailByUUID(ctx, req.UserID)
+	userEmail, err := qtx.GetUserEmailByUUID(ctx, &req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("get user email: %w", err)
 	}
@@ -374,11 +378,11 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 		},
 	})
 	identity, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
-		UserUuid:                  req.UserID,
-		UserIdentityProvider:      string(provider),
-		UserIdentityExternalID:    credentialID,
+		UserUuid:                  &req.UserID,
+		UserIdentityProvider:      ptr(string(provider)),
+		UserIdentityExternalID:    &credentialID,
 		UserIdentityEmail:         userEmail,
-		UserIdentityEmailVerified: userEmail != nil,
+		UserIdentityEmailVerified: ptr(userEmail != nil),
 		UserIdentityData:          identityData,
 	})
 	if err != nil {
@@ -386,15 +390,15 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 	}
 
 	if _, err := qtx.CreatePasskey(ctx, db.CreatePasskeyParams{
-		UserUuid:                      req.UserID,
-		UserIdentityUuid:              identity.UserIdentityUuid,
+		UserUuid:                      &req.UserID,
+		UserIdentityUuid:              &identity.UserIdentityUuid,
 		UserPasskeyCredentialID:       credential.ID,
-		UserPasskeyCredentialIDB64url: credentialID,
+		UserPasskeyCredentialIDB64url: &credentialID,
 		UserPasskeyPublicKey:          credential.PublicKey,
-		UserPasskeyAttestationType:    credential.AttestationType,
+		UserPasskeyAttestationType:    &credential.AttestationType,
 		UserPasskeyTransports:         credentialTransports(credential.Transport),
 		UserPasskeyUserHandle:         challenge.AuthWebauthnChallengeUserHandle,
-		UserPasskeySignCount:          int64(credential.Authenticator.SignCount),
+		UserPasskeySignCount:          ptr(int64(credential.Authenticator.SignCount)),
 		UserPasskeyFlags:              int32Ptr(int32(credential.Flags.ProtocolValue())),
 		UserPasskeyAaguid:             uuidPtrFromBytes(credential.Authenticator.AAGUID),
 		UserPasskeyName:               &label,
@@ -411,7 +415,7 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 }
 
 func (s *Service) ListPasskeys(ctx context.Context, userID uuid.UUID) ([]ListPasskeyItem, error) {
-	rows, err := s.queries.ListPasskeysByUserID(ctx, userID)
+	rows, err := s.queries.ListPasskeysByUserID(ctx, &userID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("list passkeys: %w", err)
 	}
@@ -441,8 +445,8 @@ func (s *Service) ListPasskeys(ctx context.Context, userID uuid.UUID) ([]ListPas
 func (s *Service) DeletePasskey(ctx context.Context, userID uuid.UUID, credentialID string) error {
 	logger := logging.With(s.logger, logging.Op("auth.passkey.delete"), slog.Any("user_id", userID), slog.String("credential_id", credentialID))
 	outcome, err := s.queries.RevokePasskeyByCredentialB64ForUser(ctx, db.RevokePasskeyByCredentialB64ForUserParams{
-		UserUuid:                 userID,
-		TargetCredentialIDB64url: credentialID,
+		UserUuid:                 &userID,
+		TargetCredentialIDB64url: &credentialID,
 	})
 	if err != nil {
 		return fmt.Errorf("revoke passkey: %w", err)
@@ -505,8 +509,8 @@ func (s *Service) createSessionWithProvider(ctx context.Context, tx pgx.Tx, para
 			deviceAppVersion = &params.DeviceAppVersion
 		}
 		if _, err := qtx.UpsertDevice(ctx, db.UpsertDeviceParams{
-			UserDeviceID:         deviceID,
-			UserUuid:             params.UserID,
+			UserDeviceID:         &deviceID,
+			UserUuid:             &params.UserID,
 			UserDeviceName:       deviceName,
 			UserDeviceOs:         deviceOS,
 			UserDeviceAppVersion: deviceAppVersion,
@@ -519,11 +523,11 @@ func (s *Service) createSessionWithProvider(ctx context.Context, tx pgx.Tx, para
 	}
 	provider := string(params.Provider)
 	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
-		UserUuid:                    params.UserID,
-		DeviceSessionUserDeviceUuid: deviceID,
+		UserUuid:                    &params.UserID,
+		DeviceSessionUserDeviceUuid: &deviceID,
 		DeviceSessionUserAgent:      userAgent,
 		DeviceSessionIp:             ip,
-		DeviceSessionProvider:       provider,
+		DeviceSessionProvider:       &provider,
 	})
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create session: %w", err)

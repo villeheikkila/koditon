@@ -6,9 +6,11 @@ import (
 	"unicode"
 )
 
-var providerEnergyCodePattern = regexp.MustCompile(`(?i)^E([0-9]{2})_([A-H])$`)
-var compactEnergyCodePattern = regexp.MustCompile(`(?i)^([A-H])((?:19|20|21)[0-9]{2})$`)
-var embeddedEnergyCodePattern = regexp.MustCompile(`(?i)(^|[^[:alnum:]])([A-H])\s*_?\s*((?:19|20|21)[0-9]{2})([^[:alnum:]]|$)`)
+var (
+	providerEnergyCodePattern = regexp.MustCompile(`(?i)^E([0-9]{2})_([A-H])$`)
+	compactEnergyCodePattern  = regexp.MustCompile(`(?i)^([A-H])((?:19|20|21)[0-9]{2})$`)
+	embeddedEnergyCodePattern = regexp.MustCompile(`(?i)(^|[^[:alnum:]])([A-H])\s*_?\s*((?:19|20|21)[0-9]{2})([^[:alnum:]]|$)`)
+)
 
 func displayEnergyClass(values ...string) string {
 	for _, value := range values {

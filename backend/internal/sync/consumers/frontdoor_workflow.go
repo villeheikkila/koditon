@@ -171,7 +171,7 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			return frontdoorEntityResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (frontdoorFanoutResult, error) {
-			ad, err := c.queries.GetFrontdoorAdByExternalID(ctx, params.SourceID)
+			ad, err := c.queries.GetFrontdoorAdByExternalID(ctx, &params.SourceID)
 			if err != nil {
 				return frontdoorFanoutResult{}, fmt.Errorf("load synced frontdoor ad for canonicalization enqueue: %w", err)
 			}
@@ -196,7 +196,7 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			if err != nil {
 				return frontdoorFanoutResult{}, nil
 			}
-			announcements, err := c.queries.ListFrontdoorBuildingAnnouncements(ctx, buildingID)
+			announcements, err := c.queries.ListFrontdoorBuildingAnnouncements(ctx, &buildingID)
 			if err != nil {
 				return frontdoorFanoutResult{}, fmt.Errorf("load synced frontdoor building announcements for canonicalization enqueue: %w", err)
 			}

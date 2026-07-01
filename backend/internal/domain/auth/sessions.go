@@ -33,7 +33,7 @@ type ListSessionItem struct {
 }
 
 func (s *Service) ListSessions(ctx context.Context, userID, currentSessionID uuid.UUID) ([]ListSessionItem, error) {
-	rows, err := s.queries.GetSessionsByUserID(ctx, userID)
+	rows, err := s.queries.GetSessionsByUserID(ctx, &userID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}

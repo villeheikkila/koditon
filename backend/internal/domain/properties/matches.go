@@ -23,9 +23,16 @@ func (s *Service) TransactionMatchPostals(ctx context.Context, limit int32) ([]T
 		if row.Postal != nil {
 			postal = *row.Postal
 		}
-		out = append(out, TransactionMatchPostalSummary{Postal: postal, NameFi: row.PostalNameFi, MunicipalityName: row.MunicipalityName, CandidateCount: row.CandidateCount, ListingCount: row.ListingCount, TransactionCount: row.TransactionCount, HighCount: row.HighCount, MediumCount: row.MediumCount, LowCount: row.LowCount, AmbiguousCount: row.AmbiguousCount, LatestAt: row.LatestAt})
+		out = append(out, TransactionMatchPostalSummary{Postal: postal, NameFi: valueOrEmpty(row.PostalNameFi), MunicipalityName: valueOrEmpty(row.MunicipalityName), CandidateCount: int64Value(row.CandidateCount), ListingCount: int64Value(row.ListingCount), TransactionCount: int64Value(row.TransactionCount), HighCount: int64Value(row.HighCount), MediumCount: int64Value(row.MediumCount), LowCount: int64Value(row.LowCount), AmbiguousCount: int64Value(row.AmbiguousCount), LatestAt: valueOrEmpty(row.LatestAt)})
 	}
 	return out, nil
+}
+
+func int64Value(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string, status string, transactionID string, limit int32) ([]TransactionMatchCandidate, error) {
@@ -50,30 +57,30 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 	out := []TransactionMatchCandidate{}
 	for _, row := range rows {
 		item := TransactionMatchCandidate{
-			ID:                row.ID,
-			Status:            row.Status,
-			LinkType:          row.LinkType,
-			LinkMethod:        row.LinkMethod,
-			Score:             row.LatestScore,
-			Confidence:        row.Confidence,
+			ID:                valueOrEmpty(row.ID),
+			Status:            valueOrEmpty(row.Status),
+			LinkType:          valueOrEmpty(row.LinkType),
+			LinkMethod:        valueOrEmpty(row.LinkMethod),
+			Score:             ptrInt32Value(row.Score),
+			Confidence:        valueOrEmpty(row.Confidence),
 			PriceDeltaPercent: row.PriceDeltaPercent,
 			Reasons:           row.Reasons,
-			CreatedAt:         row.CreatedAt,
+			CreatedAt:         valueOrEmpty(row.CreatedAt),
 			Listing: TransactionMatchListingCandidate{
-				ID:                   row.ListingID,
-				OfferingID:           row.OfferingID,
+				ID:                   valueOrEmpty(row.ListingID),
+				OfferingID:           valueOrEmpty(row.OfferingID),
 				CanonicalID:          row.SaleListingCanonicalID,
 				SourceProvider:       row.SaleListingSourceProvider,
 				NativeID:             row.SaleListingNativeID,
-				URL:                  row.ListingUrl,
-				ExternalURLAvailable: row.ExternalUrlAvailable,
-				Headline:             row.ListingHeadline,
-				StreetAddress:        row.ListingStreetAddress,
-				City:                 row.ListingCity,
-				Postal:               row.ListingPostal,
-				RoomLayout:           row.ListingRoomLayout,
-				Condition:            row.ListingCondition,
-				ConditionMatchCode:   row.ListingConditionMatchCode,
+				URL:                  valueOrEmpty(row.ListingUrl),
+				ExternalURLAvailable: boolPtrValue(row.ExternalUrlAvailable),
+				Headline:             valueOrEmpty(row.ListingHeadline),
+				StreetAddress:        valueOrEmpty(row.ListingStreetAddress),
+				City:                 valueOrEmpty(row.ListingCity),
+				Postal:               valueOrEmpty(row.ListingPostal),
+				RoomLayout:           valueOrEmpty(row.ListingRoomLayout),
+				Condition:            valueOrEmpty(row.ListingCondition),
+				ConditionMatchCode:   valueOrEmpty(row.ListingConditionMatchCode),
 				AreaM2:               row.SaleListingAreaValue,
 				AskingPrice:          row.SaleListingAskingPrice,
 				PricePerM2:           row.SaleListingPricePerM2,
@@ -81,32 +88,32 @@ func (s *Service) TransactionMatchCandidates(ctx context.Context, postal string,
 				FloorLevel:           row.SaleListingFloorLevel,
 				TotalFloors:          row.SaleListingTotalFloors,
 				Elevator:             row.SaleListingElevator,
-				EnergyMatchCode:      row.ListingEnergyMatchCode,
-				EnergyLabel:          row.ListingEnergyLabel,
-				PlotOwnershipRaw:     row.ListingPlotOwnershipRaw,
+				EnergyMatchCode:      valueOrEmpty(row.ListingEnergyMatchCode),
+				EnergyLabel:          valueOrEmpty(row.ListingEnergyLabel),
+				PlotOwnershipRaw:     valueOrEmpty(row.ListingPlotOwnershipRaw),
 				PlotOwned:            row.SaleListingPlotOwned,
-				FirstSeenAt:          row.ListingFirstSeenAt,
-				LastSeenAt:           row.ListingLastSeenAt,
+				FirstSeenAt:          valueOrEmpty(row.ListingFirstSeenAt),
+				LastSeenAt:           valueOrEmpty(row.ListingLastSeenAt),
 			},
 			Transaction: TransactionMatchTransaction{
-				ID:                  row.TransactionIDText,
-				Description:         row.TransactionDescription,
-				Type:                row.TransactionType,
-				Category:            row.TransactionCategory,
+				ID:                  valueOrEmpty(row.TransactionIDText),
+				Description:         valueOrEmpty(row.TransactionDescription),
+				Type:                valueOrEmpty(row.TransactionType),
+				Category:            valueOrEmpty(row.TransactionCategory),
 				AreaM2:              row.PricesTransactionArea,
 				Price:               int64(row.PricesTransactionPrice),
 				PricePerSquareMeter: int64(row.PricesTransactionPricePerSquareMeter),
 				BuildYear:           row.PricesTransactionBuildYear,
-				Floor:               row.TransactionFloor,
+				Floor:               valueOrEmpty(row.TransactionFloor),
 				Elevator:            row.PricesTransactionElevator,
-				Condition:           row.TransactionCondition,
-				ConditionMatchCode:  row.TransactionConditionMatchCode,
-				Plot:                row.TransactionPlot,
+				Condition:           valueOrEmpty(row.TransactionCondition),
+				ConditionMatchCode:  valueOrEmpty(row.TransactionConditionMatchCode),
+				Plot:                valueOrEmpty(row.TransactionPlot),
 				PlotOwned:           row.PricesTransactionPlotOwned,
-				EnergyClass:         row.TransactionEnergyClass,
-				EnergyMatchCode:     row.TransactionEnergyMatchCode,
-				PeriodIdentifier:    row.TransactionPeriodIdentifier,
-				CreatedAt:           row.TransactionCreatedAt,
+				EnergyClass:         valueOrEmpty(row.TransactionEnergyClass),
+				EnergyMatchCode:     valueOrEmpty(row.TransactionEnergyMatchCode),
+				PeriodIdentifier:    valueOrEmpty(row.TransactionPeriodIdentifier),
+				CreatedAt:           valueOrEmpty(row.TransactionCreatedAt),
 			},
 		}
 		item.Listing.Condition = displayCondition(item.Listing.Condition)

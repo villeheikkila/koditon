@@ -125,7 +125,7 @@ func TestRefreshOAuthTokens_ReplayedRefreshTokenRevokesSession(t *testing.T) {
 		t.Fatalf("expected ErrTokenReuse on replay, got %v", err)
 	}
 
-	session, err := queries.GetSessionByID(ctx, sessionID)
+	session, err := queries.GetSessionByID(ctx, &sessionID)
 	if err != nil {
 		t.Fatalf("load session after replay: %v", err)
 	}

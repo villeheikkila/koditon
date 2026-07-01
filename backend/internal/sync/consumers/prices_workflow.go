@@ -130,13 +130,13 @@ func (c *Consumer) runPricesMatchSaleListingsFanoutWorkflow(ctx context.Context,
 		return pricesFanoutResult{}, err
 	}
 	return absurd.Step(ctx, "scan-and-spawn-listings", func(ctx context.Context) (pricesFanoutResult, error) {
-		rows, err := c.queries.ListPricesMatchFanoutListings(ctx, payload.Limit)
+		rows, err := c.queries.ListPricesMatchFanoutListings(ctx, &payload.Limit)
 		if err != nil {
 			return pricesFanoutResult{}, fmt.Errorf("list sale listings for prices matching: %w", err)
 		}
 		enqueued := 0
 		for _, row := range rows {
-			if err := c.spawnPricesMatchSaleListing(ctx, row.SaleListingID, row.AttemptCount+1); err != nil {
+			if err := c.spawnPricesMatchSaleListing(ctx, stringValue(row.SaleListingID), int32Value(row.AttemptCount)+1); err != nil {
 				return pricesFanoutResult{}, err
 			}
 			enqueued++

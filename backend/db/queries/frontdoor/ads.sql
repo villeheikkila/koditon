@@ -1,18 +1,18 @@
 -- name: GetFrontdoorAdByExternalID :one
-SELECT * FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 WHERE frontdoor_ad_external_id = $1;
 
 -- name: GetFrontdoorAdByID :one
-SELECT * FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 WHERE frontdoor_ad_id = $1;
 
 -- name: ListFrontdoorAds :many
-SELECT * FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 ORDER BY frontdoor_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: ListUnprocessedFrontdoorAds :many
-SELECT * FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
 WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
 ORDER BY frontdoor_ad_first_seen_at ASC
 LIMIT $1;
@@ -35,7 +35,7 @@ INSERT INTO public.frontdoor_ads (
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING *;
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version;
 
 -- name: BatchUpsertFrontdoorAdsFromSitemap :many
 INSERT INTO public.frontdoor_ads (
@@ -49,7 +49,7 @@ SELECT UNNEST($1::text[]), UNNEST($2::text[]), now(), now(), now()
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE
 SET frontdoor_ad_last_seen_at = now(),
     frontdoor_ad_url = COALESCE(EXCLUDED.frontdoor_ad_url, frontdoor_ads.frontdoor_ad_url)
-RETURNING *;
+RETURNING frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version;
 
 -- name: UpdateFrontdoorAdData :exec
 UPDATE public.frontdoor_ads

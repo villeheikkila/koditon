@@ -65,8 +65,8 @@ order by
   f.flag_name
 `
 
-func (q *Queries) GetActiveFeatureFlags(ctx context.Context, userUuid uuid.UUID) ([]string, error) {
-	rows, err := q.db.Query(ctx, getActiveFeatureFlags, userUuid)
+func (q *Queries) GetActiveFeatureFlags(ctx context.Context, dollar_1 *uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, getActiveFeatureFlags, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +113,8 @@ type GetUserRolesRow struct {
 	RoleCreatedAt   time.Time `json:"role_created_at"`
 }
 
-func (q *Queries) GetUserRoles(ctx context.Context, userUuid uuid.UUID) ([]GetUserRolesRow, error) {
-	rows, err := q.db.Query(ctx, getUserRoles, userUuid)
+func (q *Queries) GetUserRoles(ctx context.Context, dollar_1 *uuid.UUID) ([]GetUserRolesRow, error) {
+	rows, err := q.db.Query(ctx, getUserRoles, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -158,12 +158,12 @@ select
 `
 
 type HasRoleParams struct {
-	UserUuid uuid.UUID `json:"user_uuid"`
-	RoleName string    `json:"role_name"`
+	Column1 *uuid.UUID `json:"column_1"`
+	Column2 *string    `json:"column_2"`
 }
 
 func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasRole, arg.UserUuid, arg.RoleName)
+	row := q.db.QueryRow(ctx, hasRole, arg.Column1, arg.Column2)
 	var has_role bool
 	err := row.Scan(&has_role)
 	return has_role, err

@@ -131,15 +131,16 @@ func (h *Handler) handleRegisterClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	issuedAt := time.Now()
 	row, err := h.queries.CreateOAuthDynamicClient(r.Context(), db.CreateOAuthDynamicClientParams{
-		OauthDynamicClientID:                      clientID,
-		OauthDynamicClientType:                    clientType,
+		OauthDynamicClientID:                      &clientID,
+		OauthDynamicClientType:                    &clientType,
 		OauthDynamicClientRedirectUris:            redirectURIs,
 		OauthDynamicClientScopes:                  clientScopes,
-		OauthDynamicClientTokenEndpointAuthMethod: method,
+		OauthDynamicClientTokenEndpointAuthMethod: &method,
 		OauthDynamicClientName:                    stringOrNil(clientName),
 		OauthDynamicClientMetadata:                metadataJSON,
-		OauthDynamicClientIssuedAt:                time.Now(),
+		OauthDynamicClientIssuedAt:                &issuedAt,
 	})
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "create oauth dynamic client failed", "error", err)
@@ -171,7 +172,7 @@ func (h *Handler) resolveClientByID(ctx context.Context, clientID string) (oauth
 	if h.queries == nil {
 		return oauthClient{}, false, nil
 	}
-	row, err := h.queries.GetOAuthDynamicClientByID(ctx, clientID)
+	row, err := h.queries.GetOAuthDynamicClientByID(ctx, &clientID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return oauthClient{}, false, nil

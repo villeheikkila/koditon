@@ -53,10 +53,10 @@ func (s *Service) CreatePersonalAccessToken(ctx context.Context, userID uuid.UUI
 		}
 		tokenHash := hashPersonalAccessTokenSecretSHA256(secret)
 		_, err = s.queries.CreatePersonalAccessToken(ctx, db.CreatePersonalAccessTokenParams{
-			UserID:                       user.UserIDBigint,
-			PersonalAccessTokenName:      name,
-			PersonalAccessTokenPrefix:    prefix,
-			PersonalAccessTokenTokenHash: tokenHash,
+			UserID:                       &user.UserIDBigint,
+			PersonalAccessTokenName:      &name,
+			PersonalAccessTokenPrefix:    &prefix,
+			PersonalAccessTokenTokenHash: &tokenHash,
 			PersonalAccessTokenScopes:    scopeList,
 			PersonalAccessTokenExpiresAt: expiresAt,
 		})
@@ -77,7 +77,7 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 	if !ok {
 		return nil, ErrInvalidToken
 	}
-	row, err := s.queries.GetPersonalAccessTokenByPrefix(ctx, prefix)
+	row, err := s.queries.GetPersonalAccessTokenByPrefix(ctx, &prefix)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidToken
@@ -111,7 +111,7 @@ func (s *Service) VerifyPersonalAccessToken(ctx context.Context, token string) (
 	if err != nil {
 		return nil, fmt.Errorf("get feature flags: %w", err)
 	}
-	if err := s.queries.UpdatePersonalAccessTokenLastUsed(ctx, row.PersonalAccessTokenID); err != nil {
+	if err := s.queries.UpdatePersonalAccessTokenLastUsed(ctx, &row.PersonalAccessTokenID); err != nil {
 		logging.With(s.logger, logging.Op("auth.personal_access_token.last_used"), slog.String("token_prefix", prefix)).WarnContext(ctx, "personal access token last used update failed", "error", err, "outcome", logging.OutcomeError)
 	}
 	claims := &AccessTokenClaims{

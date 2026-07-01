@@ -22,7 +22,7 @@ returning
   auth_signup_ticket_target_email
 `
 
-func (q *Queries) ConsumeActiveSignupTicketByHash(ctx context.Context, authSignupTicketHash string) (string, error) {
+func (q *Queries) ConsumeActiveSignupTicketByHash(ctx context.Context, authSignupTicketHash *string) (string, error) {
 	row := q.db.QueryRow(ctx, consumeActiveSignupTicketByHash, authSignupTicketHash)
 	var auth_signup_ticket_target_email string
 	err := row.Scan(&auth_signup_ticket_target_email)
@@ -46,9 +46,9 @@ returning
 `
 
 type CreateSignupTicketParams struct {
-	AuthSignupTicketTargetEmail string    `json:"auth_signup_ticket_target_email"`
-	AuthSignupTicketHash        string    `json:"auth_signup_ticket_hash"`
-	AuthSignupTicketExpiresAt   time.Time `json:"auth_signup_ticket_expires_at"`
+	AuthSignupTicketTargetEmail *string    `json:"auth_signup_ticket_target_email"`
+	AuthSignupTicketHash        *string    `json:"auth_signup_ticket_hash"`
+	AuthSignupTicketExpiresAt   *time.Time `json:"auth_signup_ticket_expires_at"`
 }
 
 type CreateSignupTicketRow struct {
@@ -79,9 +79,9 @@ order by
 limit 1
 `
 
-func (q *Queries) GetSignupTicketStatusByHash(ctx context.Context, authSignupTicketHash string) (string, error) {
+func (q *Queries) GetSignupTicketStatusByHash(ctx context.Context, authSignupTicketHash *string) (*string, error) {
 	row := q.db.QueryRow(ctx, getSignupTicketStatusByHash, authSignupTicketHash)
-	var token_status string
+	var token_status *string
 	err := row.Scan(&token_status)
 	return token_status, err
 }

@@ -71,11 +71,11 @@ LIMIT $1::int4
 `
 
 type ListCanonicalMatchFanoutListingsRow struct {
-	SaleListingID string `json:"sale_listing_id"`
-	AttemptCount  int32  `json:"attempt_count"`
+	SaleListingID *string `json:"sale_listing_id"`
+	AttemptCount  *int32  `json:"attempt_count"`
 }
 
-func (q *Queries) ListCanonicalMatchFanoutListings(ctx context.Context, limitCount int32) ([]ListCanonicalMatchFanoutListingsRow, error) {
+func (q *Queries) ListCanonicalMatchFanoutListings(ctx context.Context, limitCount *int32) ([]ListCanonicalMatchFanoutListingsRow, error) {
 	rows, err := q.db.Query(ctx, listCanonicalMatchFanoutListings, limitCount)
 	if err != nil {
 		return nil, err
@@ -127,13 +127,13 @@ UNION ALL
 `
 
 type ListCanonicalizeSourceAdsFanoutParams struct {
-	Version    int32 `json:"version"`
-	LimitCount int32 `json:"limit_count"`
+	Version    *int32 `json:"version"`
+	LimitCount *int32 `json:"limit_count"`
 }
 
 type ListCanonicalizeSourceAdsFanoutRow struct {
-	SourceTable string `json:"source_table"`
-	SourceID    string `json:"source_id"`
+	SourceTable *string `json:"source_table"`
+	SourceID    *string `json:"source_id"`
 }
 
 func (q *Queries) ListCanonicalizeSourceAdsFanout(ctx context.Context, arg ListCanonicalizeSourceAdsFanoutParams) ([]ListCanonicalizeSourceAdsFanoutRow, error) {
@@ -166,7 +166,7 @@ LIMIT $2::int4
 
 type ListDimensionLayerBackfillListingIDsParams struct {
 	Cursor     *uuid.UUID `json:"cursor"`
-	LimitCount int32      `json:"limit_count"`
+	LimitCount *int32     `json:"limit_count"`
 }
 
 func (q *Queries) ListDimensionLayerBackfillListingIDs(ctx context.Context, arg ListDimensionLayerBackfillListingIDsParams) ([]uuid.UUID, error) {
@@ -204,7 +204,7 @@ type ListDirtyDimensionTargetsRow struct {
 	DirtyAt    time.Time `json:"dirty_at"`
 }
 
-func (q *Queries) ListDirtyDimensionTargets(ctx context.Context, limitCount int32) ([]ListDirtyDimensionTargetsRow, error) {
+func (q *Queries) ListDirtyDimensionTargets(ctx context.Context, limitCount *int32) ([]ListDirtyDimensionTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listDirtyDimensionTargets, limitCount)
 	if err != nil {
 		return nil, err
@@ -239,11 +239,11 @@ LIMIT $1::int4
 `
 
 type ListPricesMatchFanoutListingsRow struct {
-	SaleListingID string `json:"sale_listing_id"`
-	AttemptCount  int32  `json:"attempt_count"`
+	SaleListingID *string `json:"sale_listing_id"`
+	AttemptCount  *int32  `json:"attempt_count"`
 }
 
-func (q *Queries) ListPricesMatchFanoutListings(ctx context.Context, limitCount int32) ([]ListPricesMatchFanoutListingsRow, error) {
+func (q *Queries) ListPricesMatchFanoutListings(ctx context.Context, limitCount *int32) ([]ListPricesMatchFanoutListingsRow, error) {
 	rows, err := q.db.Query(ctx, listPricesMatchFanoutListings, limitCount)
 	if err != nil {
 		return nil, err
@@ -279,14 +279,14 @@ WHERE sl.sale_listing_id = $1::uuid
 `
 
 type LoadCanonicalMatchSaleListingRow struct {
-	ID                                 string  `json:"id"`
-	LinkMethod                         *string `json:"link_method"`
-	LinkStatus                         *string `json:"link_status"`
+	ID                                 *string `json:"id"`
+	LinkMethod                         string  `json:"link_method"`
+	LinkStatus                         string  `json:"link_status"`
 	SaleListingSourceMatchStatus       *string `json:"sale_listing_source_match_status"`
 	SaleListingSourceMatchAttemptCount int32   `json:"sale_listing_source_match_attempt_count"`
 }
 
-func (q *Queries) LoadCanonicalMatchSaleListing(ctx context.Context, saleListingID uuid.UUID) (LoadCanonicalMatchSaleListingRow, error) {
+func (q *Queries) LoadCanonicalMatchSaleListing(ctx context.Context, saleListingID *uuid.UUID) (LoadCanonicalMatchSaleListingRow, error) {
 	row := q.db.QueryRow(ctx, loadCanonicalMatchSaleListing, saleListingID)
 	var i LoadCanonicalMatchSaleListingRow
 	err := row.Scan(
@@ -312,15 +312,15 @@ WHERE sale_listing_id = $1::uuid
 `
 
 type LoadPricesMatchSaleListingRow struct {
-	ID                                 string     `json:"id"`
+	ID                                 *string    `json:"id"`
 	SaleListingLastSeenAt              *time.Time `json:"sale_listing_last_seen_at"`
-	TransactionID                      string     `json:"transaction_id"`
+	TransactionID                      *string    `json:"transaction_id"`
 	SaleListingPricesMatchStatus       *string    `json:"sale_listing_prices_match_status"`
 	SaleListingPricesMatchAttemptCount int32      `json:"sale_listing_prices_match_attempt_count"`
 	SaleListingPricesMatchExpiresAt    *time.Time `json:"sale_listing_prices_match_expires_at"`
 }
 
-func (q *Queries) LoadPricesMatchSaleListing(ctx context.Context, saleListingID uuid.UUID) (LoadPricesMatchSaleListingRow, error) {
+func (q *Queries) LoadPricesMatchSaleListing(ctx context.Context, saleListingID *uuid.UUID) (LoadPricesMatchSaleListingRow, error) {
 	row := q.db.QueryRow(ctx, loadPricesMatchSaleListing, saleListingID)
 	var i LoadPricesMatchSaleListingRow
 	err := row.Scan(
@@ -343,9 +343,9 @@ type MarkDimensionTargetQueuedParams struct {
 	TargetID   uuid.UUID `json:"target_id"`
 }
 
-func (q *Queries) MarkDimensionTargetQueued(ctx context.Context, arg MarkDimensionTargetQueuedParams) (interface{}, error) {
+func (q *Queries) MarkDimensionTargetQueued(ctx context.Context, arg MarkDimensionTargetQueuedParams) (*int32, error) {
 	row := q.db.QueryRow(ctx, markDimensionTargetQueued, arg.TargetType, arg.TargetID)
-	var fnc__mark_dimension_target_queued interface{}
+	var fnc__mark_dimension_target_queued *int32
 	err := row.Scan(&fnc__mark_dimension_target_queued)
 	return fnc__mark_dimension_target_queued, err
 }
@@ -393,7 +393,18 @@ candidate_pairs AS (
         AND active_link.link_status <> 'rejected'
 ),
 linkable AS (
-    SELECT target_id, matched_sale_listing_id, sale_listing_id, sale_listing_source_provider, sale_listing_source_kind, sale_listing_native_id, sale_listing_first_seen_at, sale_listing_last_seen_at, active_target_source_id, active_target_id, candidate_rank
+    SELECT
+        target_id,
+        matched_sale_listing_id,
+        sale_listing_id,
+        sale_listing_source_provider,
+        sale_listing_source_kind,
+        sale_listing_native_id,
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        active_target_source_id,
+        active_target_id,
+        candidate_rank
     FROM candidate_pairs
     WHERE candidate_rank = 1
         AND (
@@ -448,10 +459,10 @@ SELECT
 `
 
 type RunCanonicalSourceMatchBackfillRow struct {
-	RunID      string `json:"run_id"`
-	Candidates int32  `json:"candidates"`
-	AutoLinked int32  `json:"auto_linked"`
-	Ambiguous  int32  `json:"ambiguous"`
+	RunID      *string `json:"run_id"`
+	Candidates *int32  `json:"candidates"`
+	AutoLinked *int32  `json:"auto_linked"`
+	Ambiguous  *int32  `json:"ambiguous"`
 }
 
 func (q *Queries) RunCanonicalSourceMatchBackfill(ctx context.Context, runID string) (RunCanonicalSourceMatchBackfillRow, error) {
@@ -506,7 +517,16 @@ candidates AS (
     WHERE candidate.sale_listing_source_provider <> base.sale_listing_source_provider
 ),
 linkable AS (
-    SELECT candidates.sale_listing_id, candidates.sale_listing_source_provider, candidates.sale_listing_source_kind, candidates.sale_listing_native_id, candidates.sale_listing_first_seen_at, candidates.sale_listing_last_seen_at, candidates.active_target_source_id, candidates.active_target_id, candidates.active_link_method
+    SELECT
+        candidates.sale_listing_id,
+        candidates.sale_listing_source_provider,
+        candidates.sale_listing_source_kind,
+        candidates.sale_listing_native_id,
+        candidates.sale_listing_first_seen_at,
+        candidates.sale_listing_last_seen_at,
+        candidates.active_target_source_id,
+        candidates.active_target_id,
+        candidates.active_link_method
     FROM candidates
     WHERE active_target_source_id IS NULL
         OR active_target_id = (SELECT target_id FROM base)
@@ -564,10 +584,10 @@ type RunCanonicalSourceMatchForSaleListingParams struct {
 }
 
 type RunCanonicalSourceMatchForSaleListingRow struct {
-	RunID      string `json:"run_id"`
-	Candidates int32  `json:"candidates"`
-	AutoLinked int32  `json:"auto_linked"`
-	Ambiguous  int32  `json:"ambiguous"`
+	RunID      *string `json:"run_id"`
+	Candidates *int32  `json:"candidates"`
+	AutoLinked *int32  `json:"auto_linked"`
+	Ambiguous  *int32  `json:"ambiguous"`
 }
 
 func (q *Queries) RunCanonicalSourceMatchForSaleListing(ctx context.Context, arg RunCanonicalSourceMatchForSaleListingParams) (RunCanonicalSourceMatchForSaleListingRow, error) {

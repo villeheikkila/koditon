@@ -88,7 +88,7 @@ type ConsumeActiveEmailChangeTokenByHashRow struct {
 	UserEmail *string `json:"user_email"`
 }
 
-func (q *Queries) ConsumeActiveEmailChangeTokenByHash(ctx context.Context, userEmailChangeTokenHash string) (ConsumeActiveEmailChangeTokenByHashRow, error) {
+func (q *Queries) ConsumeActiveEmailChangeTokenByHash(ctx context.Context, userEmailChangeTokenHash *string) (ConsumeActiveEmailChangeTokenByHashRow, error) {
 	row := q.db.QueryRow(ctx, consumeActiveEmailChangeTokenByHash, userEmailChangeTokenHash)
 	var i ConsumeActiveEmailChangeTokenByHashRow
 	err := row.Scan(&i.UserID, &i.UserEmail)
@@ -104,10 +104,10 @@ returning
 `
 
 type CreateEmailChangeTokenParams struct {
-	UserID                     int64     `json:"user_id"`
-	UserEmailChangeTargetEmail string    `json:"user_email_change_target_email"`
-	UserEmailChangeTokenHash   string    `json:"user_email_change_token_hash"`
-	UserEmailChangeExpiresAt   time.Time `json:"user_email_change_expires_at"`
+	UserID                     *int64     `json:"user_id"`
+	UserEmailChangeTargetEmail *string    `json:"user_email_change_target_email"`
+	UserEmailChangeTokenHash   *string    `json:"user_email_change_token_hash"`
+	UserEmailChangeExpiresAt   *time.Time `json:"user_email_change_expires_at"`
 }
 
 type CreateEmailChangeTokenRow struct {
@@ -146,9 +146,9 @@ order by
 limit 1
 `
 
-func (q *Queries) GetEmailChangeTokenStatusByHash(ctx context.Context, userEmailChangeTokenHash string) (string, error) {
+func (q *Queries) GetEmailChangeTokenStatusByHash(ctx context.Context, userEmailChangeTokenHash *string) (*string, error) {
 	row := q.db.QueryRow(ctx, getEmailChangeTokenStatusByHash, userEmailChangeTokenHash)
-	var token_status string
+	var token_status *string
 	err := row.Scan(&token_status)
 	return token_status, err
 }
@@ -163,7 +163,7 @@ where
   and user_email_change_consumed_at is null
 `
 
-func (q *Queries) InvalidateActiveEmailChangeTokensForUser(ctx context.Context, userID int64) error {
+func (q *Queries) InvalidateActiveEmailChangeTokensForUser(ctx context.Context, userID *int64) error {
 	_, err := q.db.Exec(ctx, invalidateActiveEmailChangeTokensForUser, userID)
 	return err
 }

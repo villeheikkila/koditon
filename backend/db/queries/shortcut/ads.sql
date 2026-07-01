@@ -1,9 +1,9 @@
 -- name: GetShortcutAdByID :one
-SELECT * FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
 WHERE shortcut_ad_id = $1;
 
 -- name: ListShortcutAds :many
-SELECT * FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -20,7 +20,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING *;
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version;
 
 -- name: BatchUpsertShortcutAdsFromSitemap :many
 INSERT INTO public.shortcut_ads (
@@ -34,7 +34,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
     shortcut_ad_type = EXCLUDED.shortcut_ad_type,
     shortcut_ad_last_seen_at = now()
-RETURNING *;
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version;
 
 -- name: UpsertShortcutAd :one
 INSERT INTO public.shortcut_ads (
@@ -49,7 +49,7 @@ INSERT INTO public.shortcut_ads (
     shortcut_building_id,
     shortcut_ad_last_seen_at
 ) VALUES (
-    $1, $2, $3, sqlc.arg(shortcut_ad_data)::jsonb, sqlc.arg(shortcut_ad_data_hash), sqlc.arg(shortcut_ad_data_hash_algorithm), now(), sqlc.arg(shortcut_ad_data_schema_version), sqlc.arg(shortcut_building_id), now()
+    @shortcut_ad_id, @shortcut_ad_url, @shortcut_ad_type, sqlc.arg(shortcut_ad_data)::jsonb, sqlc.arg(shortcut_ad_data_hash), sqlc.arg(shortcut_ad_data_hash_algorithm), now(), sqlc.arg(shortcut_ad_data_schema_version), sqlc.arg(shortcut_building_id), now()
 )
 ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_ad_url = EXCLUDED.shortcut_ad_url,
@@ -64,7 +64,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
     shortcut_building_id = EXCLUDED.shortcut_building_id,
     shortcut_ad_last_seen_at = now(),
     shortcut_ad_updated_at = CURRENT_TIMESTAMP
-RETURNING *;
+RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version;
 
 -- name: ListShortcutAdsMissingDataHash :many
 SELECT shortcut_ad_id, shortcut_ad_data

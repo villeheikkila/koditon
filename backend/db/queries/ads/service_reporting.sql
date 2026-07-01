@@ -315,7 +315,44 @@ selected_listings AS (
     CROSS JOIN lookup_input li
 ),
 limited_listings AS (
-    SELECT *
+    SELECT
+        sale_listing_id,
+        sale_listing_canonical_id,
+        sale_listing_source_provider,
+        sale_listing_source_kind,
+        sale_listing_native_id,
+        headline,
+        address,
+        city,
+        postal,
+        sale_listing_latitude,
+        sale_listing_longitude,
+        sale_listing_asking_price,
+        sale_listing_debt_free_price,
+        sale_listing_area_value,
+        room_layout,
+        url,
+        external_url_available,
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        sale_listing_published_at,
+        sale_listing_created_at,
+        sale_listing_updated_at,
+        sale_listing_previous_asking_price,
+        sale_listing_previous_debt_free_price,
+        prices_match_status,
+        source_match_status,
+        property_offering_id,
+        housing_company_id,
+        housing_company_name,
+        availability_text,
+        renovations_done_text,
+        renovations_planned_text,
+        additional_info_text,
+        charges_text,
+        insights_json,
+        listing_rank,
+        listing_count
     FROM selected_listings
     WHERE listing_rank <= $5::int
 ),
@@ -487,7 +524,16 @@ links AS (
 ),
 dedup_links AS (
     SELECT DISTINCT ON (sale_listing_id, prices_transaction_id)
-        *
+        sale_listing_id,
+        prices_transaction_id,
+        link_type,
+        link_status,
+        link_method,
+        score,
+        confidence,
+        price_delta_percent,
+        reasons,
+        link_rank
     FROM links
     ORDER BY sale_listing_id, prices_transaction_id, link_rank, score DESC NULLS LAST
 )
@@ -597,7 +643,7 @@ ORDER BY sl.listing_rank, dl.link_rank NULLS LAST, dl.score DESC NULLS LAST, pt.
 
 -- name: LookupAddressSourceCandidates :many
 WITH selected AS (
-    SELECT unnest(sqlc.arg('listing_ids')::uuid[])::uuid AS sale_listing_id
+    SELECT unnest(@listing_ids::uuid[])::uuid AS sale_listing_id
 ),
 selected_links AS (
     SELECT
@@ -631,7 +677,17 @@ candidate_links AS (
 ),
 ranked_latest AS (
     SELECT
-        candidate_links.*,
+        candidate_links.selected_sale_listing_id,
+        candidate_links.candidate_sale_listing_id,
+        candidate_links.selected_property_offering_id,
+        candidate_links.candidate_property_offering_id,
+        candidate_links.direction,
+        candidate_links.match_score,
+        candidate_links.match_confidence,
+        candidate_links.match_status,
+        candidate_links.match_reasons,
+        candidate_links.price_delta_percent,
+        candidate_links.match_created_at,
         row_number() OVER (
             PARTITION BY selected_sale_listing_id
             ORDER BY match_score DESC, match_created_at DESC

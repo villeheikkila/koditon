@@ -84,17 +84,25 @@ func (h *Handler) createAuthorizationHandoff(
 	if clientName == "" {
 		clientName = strings.TrimSpace(req.ClientID)
 	}
+	tokenHash := hashText(token)
+	clientID := strings.TrimSpace(req.ClientID)
+	redirectURI := strings.TrimSpace(req.RedirectURI)
+	resource := strings.TrimSpace(req.Resource)
+	state := strings.TrimSpace(req.State)
+	codeChallenge := strings.TrimSpace(req.CodeChallenge)
+	codeChallengeMethod := strings.TrimSpace(req.CodeChallengeMethod)
+	expiresAt := time.Now().Add(oauthAuthorizationHandoffTTL)
 	row, err := h.queries.CreateOAuthAuthorizationHandoff(ctx, db.CreateOAuthAuthorizationHandoffParams{
-		OauthAuthorizationHandoffTokenHash:           hashText(token),
-		OauthAuthorizationHandoffUserCode:            handoffUserCode,
-		OauthClientID:                                strings.TrimSpace(req.ClientID),
-		OauthAuthorizationHandoffRedirectUri:         strings.TrimSpace(req.RedirectURI),
+		OauthAuthorizationHandoffTokenHash:           &tokenHash,
+		OauthAuthorizationHandoffUserCode:            &handoffUserCode,
+		OauthClientID:                                &clientID,
+		OauthAuthorizationHandoffRedirectUri:         &redirectURI,
 		OauthAuthorizationHandoffScopes:              append([]string(nil), req.Scope...),
-		OauthAuthorizationHandoffAudience:            strings.TrimSpace(req.Resource),
-		OauthAuthorizationHandoffState:               strings.TrimSpace(req.State),
-		OauthAuthorizationHandoffCodeChallenge:       strings.TrimSpace(req.CodeChallenge),
-		OauthAuthorizationHandoffCodeChallengeMethod: strings.TrimSpace(req.CodeChallengeMethod),
-		OauthAuthorizationHandoffExpiresAt:           time.Now().Add(oauthAuthorizationHandoffTTL),
+		OauthAuthorizationHandoffAudience:            &resource,
+		OauthAuthorizationHandoffState:               &state,
+		OauthAuthorizationHandoffCodeChallenge:       &codeChallenge,
+		OauthAuthorizationHandoffCodeChallengeMethod: &codeChallengeMethod,
+		OauthAuthorizationHandoffExpiresAt:           &expiresAt,
 	})
 	if err != nil {
 		return nil, "", err
@@ -130,7 +138,7 @@ func (h *Handler) getAuthorizationHandoffByID(ctx context.Context, id string) (*
 	if err != nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByID(ctx, parsedID)
+	row, err := h.queries.GetOAuthAuthorizationHandoffByID(ctx, &parsedID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -161,7 +169,8 @@ func (h *Handler) getAuthorizationHandoffByToken(ctx context.Context, token stri
 	if h.queries == nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, hashText(strings.TrimSpace(token)))
+	tokenHash := hashText(strings.TrimSpace(token))
+	row, err := h.queries.GetOAuthAuthorizationHandoffByTokenHash(ctx, &tokenHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -192,10 +201,8 @@ func (h *Handler) getAuthorizationHandoffByUserCode(ctx context.Context, userCod
 	if h.queries == nil {
 		return nil, false
 	}
-	row, err := h.queries.GetOAuthAuthorizationHandoffByUserCode(
-		ctx,
-		strings.ToUpper(strings.TrimSpace(userCode)),
-	)
+	normalizedUserCode := strings.ToUpper(strings.TrimSpace(userCode))
+	row, err := h.queries.GetOAuthAuthorizationHandoffByUserCode(ctx, &normalizedUserCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -523,7 +530,7 @@ func (h *Handler) handleAuthorizeHandoffApprove(w http.ResponseWriter, r *http.R
 		UserUuid: &claims.UserID,
 		OauthAuthorizationHandoffAuthorizationCode: &code,
 		OauthAuthorizationHandoffRedirectUrl:       &redirectURL,
-		OauthAuthorizationHandoffID:                id,
+		OauthAuthorizationHandoffID:                &id,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -581,7 +588,7 @@ func (h *Handler) handleAuthorizeHandoffDeny(w http.ResponseWriter, r *http.Requ
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "invalid handoff id")
 		return
 	}
-	if _, err := h.queries.DenyOAuthAuthorizationHandoffByID(r.Context(), id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := h.queries.DenyOAuthAuthorizationHandoffByID(r.Context(), &id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		h.logger.ErrorContext(r.Context(), "deny oauth authorization handoff failed", "error", err)
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "failed to deny handoff")
 		return

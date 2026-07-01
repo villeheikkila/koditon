@@ -23,8 +23,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const maxMCPRequestBodyBytes = 1 << 20 // 1 MiB
-const mcpCodeUnauthorized = -32001
+const (
+	maxMCPRequestBodyBytes = 1 << 20 // 1 MiB
+	mcpCodeUnauthorized    = -32001
+)
 
 type Handler struct {
 	mcpHandler               http.Handler

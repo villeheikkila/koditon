@@ -54,33 +54,33 @@ LIMIT 1
 `
 
 type GetTransactionAdvancedByIDRow struct {
-	TransactionID       uuid.UUID  `json:"transaction_id"`
-	Description         string     `json:"description"`
-	Type                string     `json:"type"`
-	Category            string     `json:"category"`
-	Area                float64    `json:"area"`
-	Price               int32      `json:"price"`
-	PricePerSquareMeter int32      `json:"price_per_square_meter"`
-	BuildYear           int32      `json:"build_year"`
-	Floor               *string    `json:"floor"`
-	Elevator            bool       `json:"elevator"`
-	Condition           *string    `json:"condition"`
-	Plot                *string    `json:"plot"`
-	EnergyClass         *string    `json:"energy_class"`
-	PeriodIdentifier    string     `json:"period_identifier"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	NeighborhoodID      uuid.UUID  `json:"neighborhood_id"`
-	Neighborhood        string     `json:"neighborhood"`
-	PostalCodeID        *uuid.UUID `json:"postal_code_id"`
-	PostalCode          string     `json:"postal_code"`
-	PostalArea          string     `json:"postal_area"`
-	MunicipalityID      *uuid.UUID `json:"municipality_id"`
-	Municipality        string     `json:"municipality"`
-	City                string     `json:"city"`
+	TransactionID       uuid.UUID `json:"transaction_id"`
+	Description         string    `json:"description"`
+	Type                string    `json:"type"`
+	Category            string    `json:"category"`
+	Area                float64   `json:"area"`
+	Price               int32     `json:"price"`
+	PricePerSquareMeter int32     `json:"price_per_square_meter"`
+	BuildYear           int32     `json:"build_year"`
+	Floor               *string   `json:"floor"`
+	Elevator            bool      `json:"elevator"`
+	Condition           *string   `json:"condition"`
+	Plot                *string   `json:"plot"`
+	EnergyClass         *string   `json:"energy_class"`
+	PeriodIdentifier    string    `json:"period_identifier"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	NeighborhoodID      uuid.UUID `json:"neighborhood_id"`
+	Neighborhood        string    `json:"neighborhood"`
+	PostalCodeID        uuid.UUID `json:"postal_code_id"`
+	PostalCode          *string   `json:"postal_code"`
+	PostalArea          *string   `json:"postal_area"`
+	MunicipalityID      uuid.UUID `json:"municipality_id"`
+	Municipality        *string   `json:"municipality"`
+	City                string    `json:"city"`
 }
 
-func (q *Queries) GetTransactionAdvancedByID(ctx context.Context, transactionID uuid.UUID) (GetTransactionAdvancedByIDRow, error) {
+func (q *Queries) GetTransactionAdvancedByID(ctx context.Context, transactionID *uuid.UUID) (GetTransactionAdvancedByIDRow, error) {
 	row := q.db.QueryRow(ctx, getTransactionAdvancedByID, transactionID)
 	var i GetTransactionAdvancedByIDRow
 	err := row.Scan(
@@ -150,26 +150,26 @@ ORDER BY ht.prices_transaction_created_at DESC
 `
 
 type ListTransactionsByNeighborhoodsRow struct {
-	PricesTransactionID                  uuid.UUID  `json:"prices_transaction_id"`
-	PricesTransactionDescription         string     `json:"prices_transaction_description"`
-	PricesTransactionType                string     `json:"prices_transaction_type"`
-	PricesTransactionArea                float64    `json:"prices_transaction_area"`
-	PricesTransactionPrice               int32      `json:"prices_transaction_price"`
-	PricesTransactionPricePerSquareMeter int32      `json:"prices_transaction_price_per_square_meter"`
-	PricesTransactionBuildYear           int32      `json:"prices_transaction_build_year"`
-	PricesTransactionFloor               *string    `json:"prices_transaction_floor"`
-	PricesTransactionElevator            bool       `json:"prices_transaction_elevator"`
-	PricesTransactionCondition           *string    `json:"prices_transaction_condition"`
-	PricesTransactionPlot                *string    `json:"prices_transaction_plot"`
-	PricesTransactionEnergyClass         *string    `json:"prices_transaction_energy_class"`
-	PricesTransactionPeriodIdentifier    string     `json:"prices_transaction_period_identifier"`
-	PricesTransactionCreatedAt           time.Time  `json:"prices_transaction_created_at"`
-	PricesTransactionUpdatedAt           time.Time  `json:"prices_transaction_updated_at"`
-	PricesTransactionCategory            string     `json:"prices_transaction_category"`
-	PricesNeighborhoodID                 *uuid.UUID `json:"prices_neighborhood_id"`
-	PricesNeighborhoodName               *string    `json:"prices_neighborhood_name"`
-	PricesPostalCodeCode                 *string    `json:"prices_postal_code_code"`
-	PricesCityName                       *string    `json:"prices_city_name"`
+	PricesTransactionID                  uuid.UUID `json:"prices_transaction_id"`
+	PricesTransactionDescription         string    `json:"prices_transaction_description"`
+	PricesTransactionType                string    `json:"prices_transaction_type"`
+	PricesTransactionArea                float64   `json:"prices_transaction_area"`
+	PricesTransactionPrice               int32     `json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32     `json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32     `json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string   `json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool      `json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string   `json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string   `json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string   `json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string    `json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time `json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string    `json:"prices_transaction_category"`
+	PricesNeighborhoodID                 uuid.UUID `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
+	PricesPostalCodeCode                 string    `json:"prices_postal_code_code"`
+	PricesCityName                       string    `json:"prices_city_name"`
 }
 
 func (q *Queries) ListTransactionsByNeighborhoods(ctx context.Context, neighborhoodIds []uuid.UUID) ([]ListTransactionsByNeighborhoodsRow, error) {
@@ -277,37 +277,37 @@ ORDER BY ht.prices_transaction_created_at DESC
 `
 
 type ListTransactionsByPostalSelectionParams struct {
-	MunicipalityID uuid.UUID `json:"municipality_id"`
-	PostalCodeID   uuid.UUID `json:"postal_code_id"`
+	MunicipalityID *uuid.UUID `json:"municipality_id"`
+	PostalCodeID   *uuid.UUID `json:"postal_code_id"`
 }
 
 type ListTransactionsByPostalSelectionRow struct {
-	PricesTransactionID                  uuid.UUID `json:"prices_transaction_id"`
-	PricesTransactionDescription         string    `json:"prices_transaction_description"`
-	PricesTransactionType                string    `json:"prices_transaction_type"`
-	PricesTransactionArea                float64   `json:"prices_transaction_area"`
-	PricesTransactionPrice               int32     `json:"prices_transaction_price"`
-	PricesTransactionPricePerSquareMeter int32     `json:"prices_transaction_price_per_square_meter"`
-	PricesTransactionBuildYear           int32     `json:"prices_transaction_build_year"`
-	PricesTransactionFloor               *string   `json:"prices_transaction_floor"`
-	PricesTransactionElevator            bool      `json:"prices_transaction_elevator"`
-	PricesTransactionCondition           *string   `json:"prices_transaction_condition"`
-	PricesTransactionPlot                *string   `json:"prices_transaction_plot"`
-	PricesTransactionEnergyClass         *string   `json:"prices_transaction_energy_class"`
-	PricesTransactionPeriodIdentifier    string    `json:"prices_transaction_period_identifier"`
-	PricesTransactionCreatedAt           time.Time `json:"prices_transaction_created_at"`
-	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
-	PricesTransactionCategory            string    `json:"prices_transaction_category"`
-	IsMatched                            bool      `json:"is_matched"`
-	MatchedListingCount                  int32     `json:"matched_listing_count"`
-	MatchedOfferingCount                 int32     `json:"matched_offering_count"`
-	PricesNeighborhoodID                 uuid.UUID `json:"prices_neighborhood_id"`
-	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
-	PostalPostalCodeID                   uuid.UUID `json:"postal_postal_code_id"`
-	PostalPostalCodeCode                 string    `json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi               string    `json:"postal_postal_code_name_fi"`
-	PostalMunicipalityID                 uuid.UUID `json:"postal_municipality_id"`
-	PostalMunicipalityNameFi             string    `json:"postal_municipality_name_fi"`
+	PricesTransactionID                  uuid.UUID  `json:"prices_transaction_id"`
+	PricesTransactionDescription         string     `json:"prices_transaction_description"`
+	PricesTransactionType                string     `json:"prices_transaction_type"`
+	PricesTransactionArea                float64    `json:"prices_transaction_area"`
+	PricesTransactionPrice               int32      `json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32      `json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32      `json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string    `json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool       `json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string    `json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string    `json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string    `json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string     `json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time  `json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time  `json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string     `json:"prices_transaction_category"`
+	IsMatched                            *bool      `json:"is_matched"`
+	MatchedListingCount                  *int32     `json:"matched_listing_count"`
+	MatchedOfferingCount                 *int32     `json:"matched_offering_count"`
+	PricesNeighborhoodID                 uuid.UUID  `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string     `json:"prices_neighborhood_name"`
+	PostalPostalCodeID                   *uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode                 *string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi               *string    `json:"postal_postal_code_name_fi"`
+	PostalMunicipalityID                 *uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityNameFi             *string    `json:"postal_municipality_name_fi"`
 }
 
 func (q *Queries) ListTransactionsByPostalSelection(ctx context.Context, arg ListTransactionsByPostalSelectionParams) ([]ListTransactionsByPostalSelectionRow, error) {
@@ -436,32 +436,32 @@ type ListTransactionsFilteredParams struct {
 }
 
 type ListTransactionsFilteredRow struct {
-	PricesTransactionID                  uuid.UUID `json:"prices_transaction_id"`
-	PricesTransactionDescription         string    `json:"prices_transaction_description"`
-	PricesTransactionType                string    `json:"prices_transaction_type"`
-	PricesTransactionArea                float64   `json:"prices_transaction_area"`
-	PricesTransactionPrice               int32     `json:"prices_transaction_price"`
-	PricesTransactionPricePerSquareMeter int32     `json:"prices_transaction_price_per_square_meter"`
-	PricesTransactionBuildYear           int32     `json:"prices_transaction_build_year"`
-	PricesTransactionFloor               *string   `json:"prices_transaction_floor"`
-	PricesTransactionElevator            bool      `json:"prices_transaction_elevator"`
-	PricesTransactionCondition           *string   `json:"prices_transaction_condition"`
-	PricesTransactionPlot                *string   `json:"prices_transaction_plot"`
-	PricesTransactionEnergyClass         *string   `json:"prices_transaction_energy_class"`
-	PricesTransactionPeriodIdentifier    string    `json:"prices_transaction_period_identifier"`
-	PricesTransactionCreatedAt           time.Time `json:"prices_transaction_created_at"`
-	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
-	PricesTransactionCategory            string    `json:"prices_transaction_category"`
-	IsMatched                            bool      `json:"is_matched"`
-	MatchedListingCount                  int32     `json:"matched_listing_count"`
-	MatchedOfferingCount                 int32     `json:"matched_offering_count"`
-	PricesNeighborhoodID                 uuid.UUID `json:"prices_neighborhood_id"`
-	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
-	PostalPostalCodeID                   uuid.UUID `json:"postal_postal_code_id"`
-	PostalPostalCodeCode                 string    `json:"postal_postal_code_code"`
-	PostalPostalCodeNameFi               string    `json:"postal_postal_code_name_fi"`
-	PostalMunicipalityID                 uuid.UUID `json:"postal_municipality_id"`
-	PostalMunicipalityNameFi             string    `json:"postal_municipality_name_fi"`
+	PricesTransactionID                  uuid.UUID  `json:"prices_transaction_id"`
+	PricesTransactionDescription         string     `json:"prices_transaction_description"`
+	PricesTransactionType                string     `json:"prices_transaction_type"`
+	PricesTransactionArea                float64    `json:"prices_transaction_area"`
+	PricesTransactionPrice               int32      `json:"prices_transaction_price"`
+	PricesTransactionPricePerSquareMeter int32      `json:"prices_transaction_price_per_square_meter"`
+	PricesTransactionBuildYear           int32      `json:"prices_transaction_build_year"`
+	PricesTransactionFloor               *string    `json:"prices_transaction_floor"`
+	PricesTransactionElevator            bool       `json:"prices_transaction_elevator"`
+	PricesTransactionCondition           *string    `json:"prices_transaction_condition"`
+	PricesTransactionPlot                *string    `json:"prices_transaction_plot"`
+	PricesTransactionEnergyClass         *string    `json:"prices_transaction_energy_class"`
+	PricesTransactionPeriodIdentifier    string     `json:"prices_transaction_period_identifier"`
+	PricesTransactionCreatedAt           time.Time  `json:"prices_transaction_created_at"`
+	PricesTransactionUpdatedAt           time.Time  `json:"prices_transaction_updated_at"`
+	PricesTransactionCategory            string     `json:"prices_transaction_category"`
+	IsMatched                            *bool      `json:"is_matched"`
+	MatchedListingCount                  *int32     `json:"matched_listing_count"`
+	MatchedOfferingCount                 *int32     `json:"matched_offering_count"`
+	PricesNeighborhoodID                 uuid.UUID  `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName               string     `json:"prices_neighborhood_name"`
+	PostalPostalCodeID                   *uuid.UUID `json:"postal_postal_code_id"`
+	PostalPostalCodeCode                 *string    `json:"postal_postal_code_code"`
+	PostalPostalCodeNameFi               *string    `json:"postal_postal_code_name_fi"`
+	PostalMunicipalityID                 *uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityNameFi             *string    `json:"postal_municipality_name_fi"`
 }
 
 func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]ListTransactionsFilteredRow, error) {
@@ -595,7 +595,7 @@ LIMIT $14::int
 `
 
 type SearchTransactionsAdvancedParams struct {
-	City            string      `json:"city"`
+	City            *string     `json:"city"`
 	MunicipalityIds []uuid.UUID `json:"municipality_ids"`
 	PostalCodeIds   []uuid.UUID `json:"postal_code_ids"`
 	PostalCodes     []string    `json:"postal_codes"`
@@ -605,37 +605,37 @@ type SearchTransactionsAdvancedParams struct {
 	MaxPrice        *int32      `json:"max_price"`
 	MinArea         *float64    `json:"min_area"`
 	MaxArea         *float64    `json:"max_area"`
-	Query           string      `json:"query"`
-	NormalizedQuery string      `json:"normalized_query"`
-	SortMode        string      `json:"sort_mode"`
-	LimitCount      int32       `json:"limit_count"`
+	Query           *string     `json:"query"`
+	NormalizedQuery *string     `json:"normalized_query"`
+	SortMode        *string     `json:"sort_mode"`
+	LimitCount      *int32      `json:"limit_count"`
 }
 
 type SearchTransactionsAdvancedRow struct {
-	TransactionID       uuid.UUID `json:"transaction_id"`
-	Description         string    `json:"description"`
-	Type                string    `json:"type"`
-	Category            string    `json:"category"`
-	Area                float64   `json:"area"`
-	Price               int32     `json:"price"`
-	PricePerSquareMeter int32     `json:"price_per_square_meter"`
-	BuildYear           int32     `json:"build_year"`
-	Floor               *string   `json:"floor"`
-	Elevator            bool      `json:"elevator"`
-	Condition           *string   `json:"condition"`
-	Plot                *string   `json:"plot"`
-	EnergyClass         *string   `json:"energy_class"`
-	PeriodIdentifier    string    `json:"period_identifier"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	NeighborhoodID      uuid.UUID `json:"neighborhood_id"`
-	Neighborhood        string    `json:"neighborhood"`
-	PostalCodeID        uuid.UUID `json:"postal_code_id"`
-	PostalCode          string    `json:"postal_code"`
-	PostalArea          string    `json:"postal_area"`
-	MunicipalityID      uuid.UUID `json:"municipality_id"`
-	Municipality        string    `json:"municipality"`
-	City                string    `json:"city"`
+	TransactionID       uuid.UUID  `json:"transaction_id"`
+	Description         string     `json:"description"`
+	Type                string     `json:"type"`
+	Category            string     `json:"category"`
+	Area                float64    `json:"area"`
+	Price               int32      `json:"price"`
+	PricePerSquareMeter int32      `json:"price_per_square_meter"`
+	BuildYear           int32      `json:"build_year"`
+	Floor               *string    `json:"floor"`
+	Elevator            bool       `json:"elevator"`
+	Condition           *string    `json:"condition"`
+	Plot                *string    `json:"plot"`
+	EnergyClass         *string    `json:"energy_class"`
+	PeriodIdentifier    string     `json:"period_identifier"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	NeighborhoodID      uuid.UUID  `json:"neighborhood_id"`
+	Neighborhood        string     `json:"neighborhood"`
+	PostalCodeID        *uuid.UUID `json:"postal_code_id"`
+	PostalCode          *string    `json:"postal_code"`
+	PostalArea          *string    `json:"postal_area"`
+	MunicipalityID      *uuid.UUID `json:"municipality_id"`
+	Municipality        *string    `json:"municipality"`
+	City                string     `json:"city"`
 }
 
 func (q *Queries) SearchTransactionsAdvanced(ctx context.Context, arg SearchTransactionsAdvancedParams) ([]SearchTransactionsAdvancedRow, error) {
@@ -748,9 +748,9 @@ LIMIT COALESCE($3::int, 200)
 `
 
 type SearchTransactionsByCityAndAddressParams struct {
-	CityName   string `json:"city_name"`
-	SearchTerm string `json:"search_term"`
-	LimitCount *int32 `json:"limit_count"`
+	CityName   *string `json:"city_name"`
+	SearchTerm *string `json:"search_term"`
+	LimitCount *int32  `json:"limit_count"`
 }
 
 type SearchTransactionsByCityAndAddressRow struct {
@@ -771,9 +771,9 @@ type SearchTransactionsByCityAndAddressRow struct {
 	PricesTransactionUpdatedAt           time.Time `json:"prices_transaction_updated_at"`
 	PricesTransactionCategory            string    `json:"prices_transaction_category"`
 	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
-	PostalCode                           string    `json:"postal_code"`
-	PostalAreaNameFi                     string    `json:"postal_area_name_fi"`
-	MunicipalityNameFi                   string    `json:"municipality_name_fi"`
+	PostalCode                           *string   `json:"postal_code"`
+	PostalAreaNameFi                     *string   `json:"postal_area_name_fi"`
+	MunicipalityNameFi                   *string   `json:"municipality_name_fi"`
 	PricesCityName                       string    `json:"prices_city_name"`
 }
 

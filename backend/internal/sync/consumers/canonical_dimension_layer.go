@@ -142,7 +142,7 @@ func (c *Consumer) handleCanonicalBackfillDetachedHouses(ctx context.Context, lo
 	if err != nil {
 		return fmt.Errorf("backfill detached property houses: %w", err)
 	}
-	if count == payload.BatchSize {
+	if count != nil && *count == payload.BatchSize {
 		if err := c.enqueueDetachedHouseBackfill(ctx, payload.BatchSize); err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func (c *Consumer) handleCanonicalResolveDimensionTarget(ctx context.Context, lo
 }
 
 func (c *Consumer) listDimensionLayerBackfillListingIDs(ctx context.Context, cursor *uuid.UUID, limit int32) ([]uuid.UUID, error) {
-	ids, err := c.queries.ListDimensionLayerBackfillListingIDs(ctx, db.ListDimensionLayerBackfillListingIDsParams{Cursor: cursor, LimitCount: limit})
+	ids, err := c.queries.ListDimensionLayerBackfillListingIDs(ctx, db.ListDimensionLayerBackfillListingIDsParams{Cursor: cursor, LimitCount: &limit})
 	if err != nil {
 		return nil, fmt.Errorf("list dimension layer backfill listings: %w", err)
 	}
@@ -363,7 +363,7 @@ func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, docu
 }
 
 func (c *Consumer) listDirtyDimensionTargets(ctx context.Context, limit int32) ([]dirtyDimensionTargetRow, error) {
-	rows, err := c.queries.ListDirtyDimensionTargets(ctx, limit)
+	rows, err := c.queries.ListDirtyDimensionTargets(ctx, &limit)
 	if err != nil {
 		return nil, fmt.Errorf("list dirty dimension targets: %w", err)
 	}

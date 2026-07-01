@@ -20,10 +20,10 @@ returning
 `
 
 type CreatePersonalAccessTokenParams struct {
-	UserID                       int64      `json:"user_id"`
-	PersonalAccessTokenName      string     `json:"personal_access_token_name"`
-	PersonalAccessTokenPrefix    string     `json:"personal_access_token_prefix"`
-	PersonalAccessTokenTokenHash string     `json:"personal_access_token_token_hash"`
+	UserID                       *int64     `json:"user_id"`
+	PersonalAccessTokenName      *string    `json:"personal_access_token_name"`
+	PersonalAccessTokenPrefix    *string    `json:"personal_access_token_prefix"`
+	PersonalAccessTokenTokenHash *string    `json:"personal_access_token_token_hash"`
 	PersonalAccessTokenScopes    []string   `json:"personal_access_token_scopes"`
 	PersonalAccessTokenExpiresAt *time.Time `json:"personal_access_token_expires_at"`
 }
@@ -100,7 +100,7 @@ type GetPersonalAccessTokenByPrefixRow struct {
 	PersonalAccessTokenRevokedAt  *time.Time `json:"personal_access_token_revoked_at"`
 }
 
-func (q *Queries) GetPersonalAccessTokenByPrefix(ctx context.Context, personalAccessTokenPrefix string) (GetPersonalAccessTokenByPrefixRow, error) {
+func (q *Queries) GetPersonalAccessTokenByPrefix(ctx context.Context, personalAccessTokenPrefix *string) (GetPersonalAccessTokenByPrefixRow, error) {
 	row := q.db.QueryRow(ctx, getPersonalAccessTokenByPrefix, personalAccessTokenPrefix)
 	var i GetPersonalAccessTokenByPrefixRow
 	err := row.Scan(
@@ -129,7 +129,7 @@ where
   and personal_access_token_revoked_at is null
 `
 
-func (q *Queries) RevokePersonalAccessToken(ctx context.Context, personalAccessTokenID uuid.UUID) error {
+func (q *Queries) RevokePersonalAccessToken(ctx context.Context, personalAccessTokenID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokePersonalAccessToken, personalAccessTokenID)
 	return err
 }
@@ -143,7 +143,7 @@ where
   personal_access_token_id = $1
 `
 
-func (q *Queries) UpdatePersonalAccessTokenLastUsed(ctx context.Context, personalAccessTokenID uuid.UUID) error {
+func (q *Queries) UpdatePersonalAccessTokenLastUsed(ctx context.Context, personalAccessTokenID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, updatePersonalAccessTokenLastUsed, personalAccessTokenID)
 	return err
 }

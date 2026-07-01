@@ -25,8 +25,10 @@ const (
 	managerCertificateClaimConfidence         = 90
 )
 
-var ErrPropertyDocumentInvalid = errors.New("property document invalid")
-var ErrPropertyDocumentTooLarge = errors.New("property document too large")
+var (
+	ErrPropertyDocumentInvalid  = errors.New("property document invalid")
+	ErrPropertyDocumentTooLarge = errors.New("property document too large")
+)
 
 type normalizedPropertyDocumentUpload struct {
 	Filename string
@@ -182,7 +184,9 @@ func (s *Service) UploadManagerCertificate(ctx context.Context, input string, up
 	if err != nil {
 		return PropertyDocumentSummary{}, err
 	}
-	row, err := s.queries.CreatePropertyDocumentForOffering(ctx, db.CreatePropertyDocumentForOfferingParams{DocumentType: managerCertificateDocumentType, Filename: normalized.Filename, MimeType: normalized.MimeType, SizeBytes: int64(len(normalized.Bytes)), Sha256: normalized.SHA256, DocumentBytes: normalized.Bytes, PropertyOfferingID: offeringID})
+	documentType := managerCertificateDocumentType
+	sizeBytes := int64(len(normalized.Bytes))
+	row, err := s.queries.CreatePropertyDocumentForOffering(ctx, db.CreatePropertyDocumentForOfferingParams{DocumentType: &documentType, Filename: &normalized.Filename, MimeType: &normalized.MimeType, SizeBytes: &sizeBytes, Sha256: &normalized.SHA256, DocumentBytes: normalized.Bytes, PropertyOfferingID: &offeringID})
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}
@@ -194,7 +198,9 @@ func (s *Service) UploadDetachedManagerCertificate(ctx context.Context, upload P
 	if err != nil {
 		return PropertyDocumentSummary{}, err
 	}
-	row, err := s.queries.CreateDetachedPropertyDocument(ctx, db.CreateDetachedPropertyDocumentParams{DocumentType: managerCertificateDocumentType, Filename: normalized.Filename, MimeType: normalized.MimeType, SizeBytes: int64(len(normalized.Bytes)), Sha256: normalized.SHA256, DocumentBytes: normalized.Bytes})
+	documentType := managerCertificateDocumentType
+	sizeBytes := int64(len(normalized.Bytes))
+	row, err := s.queries.CreateDetachedPropertyDocument(ctx, db.CreateDetachedPropertyDocumentParams{DocumentType: &documentType, Filename: &normalized.Filename, MimeType: &normalized.MimeType, SizeBytes: &sizeBytes, Sha256: &normalized.SHA256, DocumentBytes: normalized.Bytes})
 	if err != nil {
 		return PropertyDocumentSummary{}, err
 	}
@@ -206,7 +212,7 @@ func (s *Service) DownloadPropertyDocument(ctx context.Context, input string) (P
 	if err != nil {
 		return PropertyDocumentDownload{}, ErrNotFound
 	}
-	row, err := s.queries.GetPropertyDocumentDownload(ctx, documentID)
+	row, err := s.queries.GetPropertyDocumentDownload(ctx, &documentID)
 	if err != nil {
 		return PropertyDocumentDownload{}, mapNotFound(err)
 	}
@@ -237,16 +243,19 @@ func (s *Service) ExtractManagerCertificateSource(ctx context.Context, input str
 	if err != nil {
 		return ManagerCertificateSourceExtractionResult{}, ErrNotFound
 	}
-	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, documentID)
+	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, &documentID)
 	if err != nil {
 		return ManagerCertificateSourceExtractionResult{}, mapNotFound(err)
 	}
 	modelName = firstNonEmpty(modelName, s.managerCertificateModelName, defaultOpenAIManagerCertificateModel)
 	operation := propertyLLMOperationConfig("manager_certificate_extraction")
-	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracting", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
+	status := "extracting"
+	errorText := ""
+	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: &status, ErrorText: &errorText, PropertyDocumentID: &documentID}); err != nil {
 		return ManagerCertificateSourceExtractionResult{}, err
 	}
-	runID, err := s.queries.CreatePropertyDocumentExtractionRun(ctx, db.CreatePropertyDocumentExtractionRunParams{PropertyDocumentID: documentID, Model: modelName, PromptVersion: operation.Version})
+	promptVersion := operation.Version
+	runID, err := s.queries.CreatePropertyDocumentExtractionRun(ctx, db.CreatePropertyDocumentExtractionRunParams{PropertyDocumentID: &documentID, Model: &modelName, PromptVersion: &promptVersion})
 	if err != nil {
 		return ManagerCertificateSourceExtractionResult{}, err
 	}
@@ -256,11 +265,14 @@ func (s *Service) ExtractManagerCertificateSource(ctx context.Context, input str
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateSourceExtractionResult{}, err
 	}
-	if _, err := s.queries.UpsertPropertyDocumentExtraction(ctx, db.UpsertPropertyDocumentExtractionParams{PropertyDocumentID: documentID, Kind: managerCertificateExtractionKind, SchemaVersion: managerCertificateExtractionSchemaVersion, Model: modelName, PromptVersion: operation.Version, SourceJson: rawJSON}); err != nil {
+	kind := managerCertificateExtractionKind
+	schemaVersion := managerCertificateExtractionSchemaVersion
+	if _, err := s.queries.UpsertPropertyDocumentExtraction(ctx, db.UpsertPropertyDocumentExtractionParams{PropertyDocumentID: &documentID, Kind: &kind, SchemaVersion: &schemaVersion, Model: &modelName, PromptVersion: &promptVersion, SourceJson: rawJSON}); err != nil {
 		s.finishFailedDocumentExtraction(ctx, documentID, runID, err)
 		return ManagerCertificateSourceExtractionResult{}, fmt.Errorf("store manager certificate source extraction: %w", err)
 	}
-	if err := s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: "succeeded", RawJson: rawJSON, ErrorText: "", PropertyDocumentExtractionRunID: runID}); err != nil {
+	status = "succeeded"
+	if err := s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: &status, RawJson: rawJSON, ErrorText: &errorText, PropertyDocumentExtractionRunID: &runID}); err != nil {
 		return ManagerCertificateSourceExtractionResult{}, err
 	}
 	summary, err := s.propertyDocumentSummary(ctx, documentID)
@@ -279,7 +291,8 @@ func (s *Service) AttachPropertyDocumentToOffering(ctx context.Context, document
 	if err != nil {
 		return PropertyDocumentSummary{}, ErrNotFound
 	}
-	row, err := s.queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: documentID, PropertyOfferingID: offeringID, Reason: "property_document_relinked"})
+	reason := "property_document_relinked"
+	row, err := s.queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: &documentID, PropertyOfferingID: &offeringID, Reason: &reason})
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}
@@ -291,11 +304,12 @@ func (s *Service) ProjectManagerCertificateExtraction(ctx context.Context, input
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, ErrNotFound
 	}
-	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, documentID)
+	document, err := s.queries.GetPropertyDocumentForExtraction(ctx, &documentID)
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, mapNotFound(err)
 	}
-	extraction, err := s.queries.GetLatestPropertyDocumentExtraction(ctx, db.GetLatestPropertyDocumentExtractionParams{PropertyDocumentID: documentID, Kind: managerCertificateExtractionKind})
+	kind := managerCertificateExtractionKind
+	extraction, err := s.queries.GetLatestPropertyDocumentExtraction(ctx, db.GetLatestPropertyDocumentExtractionParams{PropertyDocumentID: &documentID, Kind: &kind})
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, mapNotFound(err)
 	}
@@ -307,7 +321,9 @@ func (s *Service) ProjectManagerCertificateExtraction(ctx context.Context, input
 	if err != nil {
 		return ManagerCertificateExtractionResult{}, err
 	}
-	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "extracted", ErrorText: "", PropertyDocumentID: documentID}); err != nil {
+	status := "extracted"
+	errorText := ""
+	if err := s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: &status, ErrorText: &errorText, PropertyDocumentID: &documentID}); err != nil {
 		return ManagerCertificateExtractionResult{}, err
 	}
 	summary, err := s.propertyDocumentSummary(ctx, documentID)
@@ -347,8 +363,9 @@ func (s *Service) ExtractManagerCertificatePDF(ctx context.Context, upload Prope
 
 func (s *Service) finishFailedDocumentExtraction(ctx context.Context, documentID uuid.UUID, runID uuid.UUID, cause error) {
 	message := cause.Error()
-	_ = s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: "failed", RawJson: json.RawMessage(`null`), ErrorText: message, PropertyDocumentExtractionRunID: runID})
-	_ = s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: "failed", ErrorText: message, PropertyDocumentID: documentID})
+	status := "failed"
+	_ = s.queries.FinishPropertyDocumentExtractionRun(ctx, db.FinishPropertyDocumentExtractionRunParams{Status: &status, RawJson: json.RawMessage(`null`), ErrorText: &message, PropertyDocumentExtractionRunID: &runID})
+	_ = s.queries.UpdatePropertyDocumentExtractionStatus(ctx, db.UpdatePropertyDocumentExtractionStatusParams{Status: &status, ErrorText: &message, PropertyDocumentID: &documentID})
 }
 
 func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, queries *db.Queries, document db.GetPropertyDocumentForExtractionRow, extracted managerCertificateObject) (db.GetPropertyDocumentForExtractionRow, error) {
@@ -361,20 +378,21 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 		companyIdentityKey = "business_id:" + businessID
 	}
 	companyID, err := queries.EnsureManagerCertificateHousingCompany(ctx, db.EnsureManagerCertificateHousingCompanyParams{
-		IdentityKey:        companyIdentityKey,
+		IdentityKey:        &companyIdentityKey,
 		Name:               optionalText(extracted.HousingCompany.Name),
 		BusinessID:         optionalText(extracted.HousingCompany.BusinessID),
 		BuildYear:          firstInt32(extracted.HousingCompany.BuildYear, extracted.Building.BuildYear),
 		ApartmentCount:     firstInt32(extracted.HousingCompany.ApartmentCount, extracted.Building.ApartmentCount),
 		EnergyClass:        optionalText(firstNonEmpty(extracted.HousingCompany.EnergyClass, extracted.Building.EnergyClass)),
-		PropertyDocumentID: documentKey,
+		PropertyDocumentID: &documentKey,
 	})
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate housing company: %w", err)
 	}
+	buildingIdentityKey := "manager_certificate_document:" + documentKey + ":building"
 	buildingID, err := queries.EnsureManagerCertificatePhysicalBuilding(ctx, db.EnsureManagerCertificatePhysicalBuildingParams{
 		HousingCompanyID: &companyID,
-		IdentityKey:      "manager_certificate_document:" + documentKey + ":building",
+		IdentityKey:      &buildingIdentityKey,
 		BuildYear:        firstInt32(extracted.Building.BuildYear, extracted.HousingCompany.BuildYear),
 		FloorCount:       extracted.Building.FloorCount,
 		ApartmentCount:   firstInt32(extracted.Building.ApartmentCount, extracted.HousingCompany.ApartmentCount),
@@ -383,39 +401,43 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate physical building: %w", err)
 	}
+	unitIdentityKey := "manager_certificate_document:" + documentKey + ":unit"
 	unitID, err := queries.EnsureManagerCertificatePropertyUnit(ctx, db.EnsureManagerCertificatePropertyUnitParams{
-		HousingCompanyID:   companyID,
+		HousingCompanyID:   &companyID,
 		PhysicalBuildingID: &buildingID,
-		IdentityKey:        "manager_certificate_document:" + documentKey + ":unit",
+		IdentityKey:        &unitIdentityKey,
 		FloorLevel:         extracted.Unit.FloorLevel,
 		AreaM2:             extracted.Unit.AreaM2,
 		RoomsCount:         nil,
 		RoomLayout:         optionalText(extracted.Unit.RoomLayout),
 		LayoutMatchKey:     optionalText(normalizeIdentityPart(extracted.Unit.RoomLayout)),
-		PropertyDocumentID: documentKey,
+		PropertyDocumentID: &documentKey,
 	})
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate property unit: %w", err)
 	}
-	if err := queries.SyncUnitFromPropertyUnit(ctx, unitID); err != nil {
+	if err := queries.SyncUnitFromPropertyUnit(ctx, &unitID); err != nil {
 		return document, fmt.Errorf("sync manager certificate unit: %w", err)
 	}
+	offeringIdentityKey := "manager_certificate_document:" + documentKey + ":offering"
+	headline := managerCertificateOfferingHeadline(extracted)
 	offeringID, err := queries.EnsureManagerCertificatePropertyOffering(ctx, db.EnsureManagerCertificatePropertyOfferingParams{
 		PropertyUnitID:     &unitID,
-		IdentityKey:        "manager_certificate_document:" + documentKey + ":offering",
-		Headline:           managerCertificateOfferingHeadline(extracted),
-		PropertyDocumentID: documentKey,
+		IdentityKey:        &offeringIdentityKey,
+		Headline:           &headline,
+		PropertyDocumentID: &documentKey,
 	})
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate property offering: %w", err)
 	}
-	if err := queries.SyncListingFromPropertyOffering(ctx, offeringID); err != nil {
+	if err := queries.SyncListingFromPropertyOffering(ctx, &offeringID); err != nil {
 		return document, fmt.Errorf("sync manager certificate listing: %w", err)
 	}
-	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: document.PropertyDocumentID, PropertyOfferingID: offeringID, Reason: "manager_certificate_target_created"}); err != nil {
+	reason := "manager_certificate_target_created"
+	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: &document.PropertyDocumentID, PropertyOfferingID: &offeringID, Reason: &reason}); err != nil {
 		return document, fmt.Errorf("attach manager certificate document to offering: %w", err)
 	}
-	updated, err := queries.GetPropertyDocumentForExtraction(ctx, document.PropertyDocumentID)
+	updated, err := queries.GetPropertyDocumentForExtraction(ctx, &document.PropertyDocumentID)
 	if err != nil {
 		return document, fmt.Errorf("reload manager certificate document target: %w", err)
 	}
@@ -439,7 +461,7 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 	if err != nil {
 		return 0, err
 	}
-	if err := queries.DeleteLLMPropertyClaimsForDocument(ctx, document.PropertyDocumentID); err != nil {
+	if err := queries.DeleteLLMPropertyClaimsForDocument(ctx, &document.PropertyDocumentID); err != nil {
 		return 0, fmt.Errorf("delete previous document claims: %w", err)
 	}
 	observedAt := managerCertificateObservedAt(extracted)
@@ -598,7 +620,9 @@ func (w *managerCertificateClaimWriter) insert(entityType string, entityID uuid.
 	if confidence > 100 {
 		confidence = 100
 	}
-	w.err = w.queries.InsertDocumentPropertyClaim(w.ctx, db.InsertDocumentPropertyClaimParams{EntityType: entityType, EntityID: entityID, Section: section, Key: key, ValueKind: valueKind, ValueText: valueText, ValueNumber: valueNumber, ValueBool: valueBool, ValueJson: valueJSON, PropertyDocumentID: w.documentID, SourceField: sourceField, SourceObservedAt: w.observedAt, EvidenceText: cleanDisplayString(evidence), Confidence: float64(confidence), Model: w.model, PromptVersion: w.promptVersion})
+	confidenceValue := float64(confidence)
+	evidenceText := cleanDisplayString(evidence)
+	w.err = w.queries.InsertDocumentPropertyClaim(w.ctx, db.InsertDocumentPropertyClaimParams{EntityType: &entityType, EntityID: &entityID, Section: &section, Key: &key, ValueKind: &valueKind, ValueText: &valueText, ValueNumber: valueNumber, ValueBool: valueBool, ValueJson: valueJSON, PropertyDocumentID: &w.documentID, SourceField: &sourceField, SourceObservedAt: w.observedAt, EvidenceText: &evidenceText, Confidence: &confidenceValue, Model: &w.model, PromptVersion: &w.promptVersion})
 	if w.err == nil {
 		w.count++
 	}
@@ -606,11 +630,11 @@ func (w *managerCertificateClaimWriter) insert(entityType string, entityID uuid.
 
 func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, documentID uuid.UUID, housingCompanyID uuid.UUID, offeringID uuid.UUID, observedAt *time.Time, items []managerCertificateRenovationObject) error {
 	queries := db.New(tx)
-	runID, err := queries.CreateManagerCertificateRenovationProjectionRun(ctx, documentID)
+	runID, err := queries.CreateManagerCertificateRenovationProjectionRun(ctx, &documentID)
 	if err != nil {
 		return fmt.Errorf("create manager certificate renovation projection run: %w", err)
 	}
-	if err := queries.DeleteManagerCertificateRenovationEvents(ctx, db.DeleteManagerCertificateRenovationEventsParams{HousingCompanyID: housingCompanyID, PropertyDocumentID: documentID}); err != nil {
+	if err := queries.DeleteManagerCertificateRenovationEvents(ctx, db.DeleteManagerCertificateRenovationEventsParams{HousingCompanyID: &housingCompanyID, PropertyDocumentID: &documentID}); err != nil {
 		return fmt.Errorf("delete previous manager certificate renovations: %w", err)
 	}
 	for _, item := range items {
@@ -623,7 +647,10 @@ func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, docume
 		scope := normalizeManagerCertificateRenovationScope(item.Scope)
 		responsibility := normalizeRenovationResponsibility(item.Responsibility)
 		summary := cleanDisplayString(firstNonEmpty(item.Summary, item.SourceLabel))
-		if err := queries.InsertManagerCertificateRenovationEvent(ctx, db.InsertManagerCertificateRenovationEventParams{PropertyDimensionProjectionRunID: runID, HousingCompanyID: housingCompanyID, PropertyDocumentID: documentID, Category: category, Status: status, Stage: emptyToNil(stage), Scope: emptyToNil(scope), Responsibility: emptyToNil(responsibility), Year: item.Year, StartYear: item.StartYear, EndYear: item.EndYear, CostEstimateEur: item.CostEstimateEUR, Summary: emptyToNil(summary), SourceLabel: cleanDisplayString(item.SourceLabel), Action: normalizeManagerCertificateRenovationAction(item.Action), EvidenceText: evidenceText(item.Evidence), SourceObservedAt: observedAt}); err != nil {
+		sourceLabel := cleanDisplayString(item.SourceLabel)
+		action := normalizeManagerCertificateRenovationAction(item.Action)
+		evidenceText := evidenceText(item.Evidence)
+		if err := queries.InsertManagerCertificateRenovationEvent(ctx, db.InsertManagerCertificateRenovationEventParams{PropertyDimensionProjectionRunID: &runID, HousingCompanyID: &housingCompanyID, PropertyDocumentID: &documentID, Category: &category, Status: &status, Stage: emptyToNil(stage), Scope: emptyToNil(scope), Responsibility: emptyToNil(responsibility), Year: item.Year, StartYear: item.StartYear, EndYear: item.EndYear, CostEstimateEur: item.CostEstimateEUR, Summary: emptyToNil(summary), SourceLabel: &sourceLabel, Action: &action, EvidenceText: &evidenceText, SourceObservedAt: observedAt}); err != nil {
 			return fmt.Errorf("insert manager certificate renovation: %w", err)
 		}
 	}
@@ -634,7 +661,7 @@ func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, docume
 }
 
 func (s *Service) propertyDocumentSummary(ctx context.Context, documentID uuid.UUID) (PropertyDocumentSummary, error) {
-	row, err := s.queries.GetPropertyDocumentSummary(ctx, documentID)
+	row, err := s.queries.GetPropertyDocumentSummary(ctx, &documentID)
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}

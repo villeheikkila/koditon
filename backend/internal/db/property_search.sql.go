@@ -45,19 +45,19 @@ WHERE ($1 = 'all' OR u.source = $1)
 `
 
 type CountRentalListingsParams struct {
-	Source          interface{} `json:"source"`
-	QueryText       *string     `json:"query_text"`
-	City            *string     `json:"city"`
-	Postal          *string     `json:"postal"`
-	MinPrice        *int64      `json:"min_price"`
-	MaxPrice        *int64      `json:"max_price"`
-	MinArea         *float64    `json:"min_area"`
-	MaxArea         *float64    `json:"max_area"`
-	PublishedAfter  *time.Time  `json:"published_after"`
-	PublishedBefore *time.Time  `json:"published_before"`
+	Source          *string    `json:"source"`
+	QueryText       *string    `json:"query_text"`
+	City            *string    `json:"city"`
+	Postal          *string    `json:"postal"`
+	MinPrice        *int64     `json:"min_price"`
+	MaxPrice        *int64     `json:"max_price"`
+	MinArea         *float64   `json:"min_area"`
+	MaxArea         *float64   `json:"max_area"`
+	PublishedAfter  *time.Time `json:"published_after"`
+	PublishedBefore *time.Time `json:"published_before"`
 }
 
-func (q *Queries) CountRentalListings(ctx context.Context, arg CountRentalListingsParams) (int64, error) {
+func (q *Queries) CountRentalListings(ctx context.Context, arg CountRentalListingsParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, countRentalListings,
 		arg.Source,
 		arg.QueryText,
@@ -70,9 +70,9 @@ func (q *Queries) CountRentalListings(ctx context.Context, arg CountRentalListin
 		arg.PublishedAfter,
 		arg.PublishedBefore,
 	)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var count *int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const countSaleListings = `-- name: CountSaleListings :one
@@ -130,28 +130,28 @@ WHERE EXISTS (
 `
 
 type CountSaleListingsParams struct {
-	Source          interface{} `json:"source"`
-	QueryText       *string     `json:"query_text"`
-	City            *string     `json:"city"`
-	Postal          *string     `json:"postal"`
-	MinPrice        *int64      `json:"min_price"`
-	MaxPrice        *int64      `json:"max_price"`
-	MinArea         *float64    `json:"min_area"`
-	MaxArea         *float64    `json:"max_area"`
-	PublishedAfter  *time.Time  `json:"published_after"`
-	PublishedBefore *time.Time  `json:"published_before"`
-	MinPricePerM2   *float64    `json:"min_price_per_m2"`
-	MaxPricePerM2   *float64    `json:"max_price_per_m2"`
-	Rooms           *int32      `json:"rooms"`
-	Floor           *int32      `json:"floor"`
-	MinBuildYear    *int32      `json:"min_build_year"`
-	MaxBuildYear    *int32      `json:"max_build_year"`
-	Condition       *string     `json:"condition"`
-	EnergyClass     *string     `json:"energy_class"`
-	Kind            interface{} `json:"kind"`
+	Source          *string    `json:"source"`
+	QueryText       *string    `json:"query_text"`
+	City            *string    `json:"city"`
+	Postal          *string    `json:"postal"`
+	MinPrice        *int64     `json:"min_price"`
+	MaxPrice        *int64     `json:"max_price"`
+	MinArea         *float64   `json:"min_area"`
+	MaxArea         *float64   `json:"max_area"`
+	PublishedAfter  *time.Time `json:"published_after"`
+	PublishedBefore *time.Time `json:"published_before"`
+	MinPricePerM2   *float64   `json:"min_price_per_m2"`
+	MaxPricePerM2   *float64   `json:"max_price_per_m2"`
+	Rooms           *int32     `json:"rooms"`
+	Floor           *int32     `json:"floor"`
+	MinBuildYear    *int32     `json:"min_build_year"`
+	MaxBuildYear    *int32     `json:"max_build_year"`
+	Condition       *string    `json:"condition"`
+	EnergyClass     *string    `json:"energy_class"`
+	Kind            *string    `json:"kind"`
 }
 
-func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsParams) (int64, error) {
+func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, countSaleListings,
 		arg.Source,
 		arg.QueryText,
@@ -173,9 +173,9 @@ func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsPa
 		arg.EnergyClass,
 		arg.Kind,
 	)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var count *int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const listBuildingCanonicalIDs = `-- name: ListBuildingCanonicalIDs :many
@@ -186,15 +186,15 @@ SELECT ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id
 FROM public.frontdoor_buildings fb
 `
 
-func (q *Queries) ListBuildingCanonicalIDs(ctx context.Context) ([]interface{}, error) {
+func (q *Queries) ListBuildingCanonicalIDs(ctx context.Context) ([]*string, error) {
 	rows, err := q.db.Query(ctx, listBuildingCanonicalIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []interface{}{}
+	items := []*string{}
 	for rows.Next() {
-		var canonical_id interface{}
+		var canonical_id *string
 		if err := rows.Scan(&canonical_id); err != nil {
 			return nil, err
 		}
@@ -216,15 +216,15 @@ FROM public.frontdoor_building_announcements fba
 WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
 `
 
-func (q *Queries) ListRentalCanonicalIDs(ctx context.Context) ([]interface{}, error) {
+func (q *Queries) ListRentalCanonicalIDs(ctx context.Context) ([]*string, error) {
 	rows, err := q.db.Query(ctx, listRentalCanonicalIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []interface{}{}
+	items := []*string{}
 	for rows.Next() {
-		var canonical_id interface{}
+		var canonical_id *string
 		if err := rows.Scan(&canonical_id); err != nil {
 			return nil, err
 		}
@@ -279,49 +279,49 @@ LIMIT $13::int OFFSET $12::int
 `
 
 type SearchRentalListingsParams struct {
-	Source          interface{} `json:"source"`
-	QueryText       *string     `json:"query_text"`
-	City            *string     `json:"city"`
-	Postal          *string     `json:"postal"`
-	MinPrice        *int64      `json:"min_price"`
-	MaxPrice        *int64      `json:"max_price"`
-	MinArea         *float64    `json:"min_area"`
-	MaxArea         *float64    `json:"max_area"`
-	PublishedAfter  *time.Time  `json:"published_after"`
-	PublishedBefore *time.Time  `json:"published_before"`
-	SortMode        interface{} `json:"sort_mode"`
-	OffsetCount     int32       `json:"offset_count"`
-	LimitCount      int32       `json:"limit_count"`
+	Source          *string    `json:"source"`
+	QueryText       *string    `json:"query_text"`
+	City            *string    `json:"city"`
+	Postal          *string    `json:"postal"`
+	MinPrice        *int64     `json:"min_price"`
+	MaxPrice        *int64     `json:"max_price"`
+	MinArea         *float64   `json:"min_area"`
+	MaxArea         *float64   `json:"max_area"`
+	PublishedAfter  *time.Time `json:"published_after"`
+	PublishedBefore *time.Time `json:"published_before"`
+	SortMode        *string    `json:"sort_mode"`
+	OffsetCount     int32      `json:"offset_count"`
+	LimitCount      int32      `json:"limit_count"`
 }
 
 type SearchRentalListingsRow struct {
-	Source      string      `json:"source"`
-	Kind        string      `json:"kind"`
-	NativeID    string      `json:"native_id"`
-	CanonicalID interface{} `json:"canonical_id"`
-	PublicID    interface{} `json:"public_id"`
-	Url         string      `json:"url"`
-	Headline    interface{} `json:"headline"`
-	Address     interface{} `json:"address"`
-	City        bool        `json:"city"`
-	Postal      bool        `json:"postal"`
-	Price       interface{} `json:"price"`
-	Area        interface{} `json:"area"`
-	RoomLayout  interface{} `json:"room_layout"`
-	Column14    *float64    `json:"column_14"`
-	Column15    *int64      `json:"column_15"`
-	Column16    *int64      `json:"column_16"`
-	Column17    *int32      `json:"column_17"`
-	Column18    *int32      `json:"column_18"`
-	Column19    *int32      `json:"column_19"`
-	Column20    *int32      `json:"column_20"`
-	Column21    *string     `json:"column_21"`
-	Column22    *string     `json:"column_22"`
-	Column23    *string     `json:"column_23"`
-	LastSeenAt  string      `json:"last_seen_at"`
-	PublishedAt string      `json:"published_at"`
-	Address_2   interface{} `json:"address_2"`
-	Column27    []string    `json:"column_27"`
+	Source      *string  `json:"source"`
+	Kind        *string  `json:"kind"`
+	NativeID    *string  `json:"native_id"`
+	CanonicalID *string  `json:"canonical_id"`
+	PublicID    *string  `json:"public_id"`
+	Url         *string  `json:"url"`
+	Headline    *string  `json:"headline"`
+	Address     *string  `json:"address"`
+	City        *string  `json:"city"`
+	Postal      *string  `json:"postal"`
+	Price       *int64   `json:"price"`
+	Area        *float64 `json:"area"`
+	RoomLayout  *string  `json:"room_layout"`
+	Float8      *float64 `json:"float8"`
+	Int8        *int64   `json:"int8"`
+	Int8_2      *int64   `json:"int8_2"`
+	Int4        *int32   `json:"int4"`
+	Int4_2      *int32   `json:"int4_2"`
+	Int4_3      *int32   `json:"int4_3"`
+	Int4_4      *int32   `json:"int4_4"`
+	Text        *string  `json:"text"`
+	Text_2      *string  `json:"text_2"`
+	Text_3      *string  `json:"text_3"`
+	LastSeenAt  *string  `json:"last_seen_at"`
+	PublishedAt *string  `json:"published_at"`
+	Address_2   *string  `json:"address_2"`
+	Array       []string `json:"array"`
 }
 
 func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalListingsParams) ([]SearchRentalListingsRow, error) {
@@ -361,20 +361,20 @@ func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalList
 			&i.Price,
 			&i.Area,
 			&i.RoomLayout,
-			&i.Column14,
-			&i.Column15,
-			&i.Column16,
-			&i.Column17,
-			&i.Column18,
-			&i.Column19,
-			&i.Column20,
-			&i.Column21,
-			&i.Column22,
-			&i.Column23,
+			&i.Float8,
+			&i.Int8,
+			&i.Int8_2,
+			&i.Int4,
+			&i.Int4_2,
+			&i.Int4_3,
+			&i.Int4_4,
+			&i.Text,
+			&i.Text_2,
+			&i.Text_3,
 			&i.LastSeenAt,
 			&i.PublishedAt,
 			&i.Address_2,
-			&i.Column27,
+			&i.Array,
 		); err != nil {
 			return nil, err
 		}
@@ -491,28 +491,28 @@ LIMIT $22::int OFFSET $21::int
 `
 
 type SearchSaleListingsParams struct {
-	Source          interface{} `json:"source"`
-	QueryText       *string     `json:"query_text"`
-	City            *string     `json:"city"`
-	Postal          *string     `json:"postal"`
-	MinPrice        *int64      `json:"min_price"`
-	MaxPrice        *int64      `json:"max_price"`
-	MinArea         *float64    `json:"min_area"`
-	MaxArea         *float64    `json:"max_area"`
-	PublishedAfter  *time.Time  `json:"published_after"`
-	PublishedBefore *time.Time  `json:"published_before"`
-	MinPricePerM2   *float64    `json:"min_price_per_m2"`
-	MaxPricePerM2   *float64    `json:"max_price_per_m2"`
-	Rooms           *int32      `json:"rooms"`
-	Floor           *int32      `json:"floor"`
-	MinBuildYear    *int32      `json:"min_build_year"`
-	MaxBuildYear    *int32      `json:"max_build_year"`
-	Condition       *string     `json:"condition"`
-	EnergyClass     *string     `json:"energy_class"`
-	Kind            interface{} `json:"kind"`
-	SortMode        interface{} `json:"sort_mode"`
-	OffsetCount     int32       `json:"offset_count"`
-	LimitCount      int32       `json:"limit_count"`
+	Source          *string    `json:"source"`
+	QueryText       *string    `json:"query_text"`
+	City            *string    `json:"city"`
+	Postal          *string    `json:"postal"`
+	MinPrice        *int64     `json:"min_price"`
+	MaxPrice        *int64     `json:"max_price"`
+	MinArea         *float64   `json:"min_area"`
+	MaxArea         *float64   `json:"max_area"`
+	PublishedAfter  *time.Time `json:"published_after"`
+	PublishedBefore *time.Time `json:"published_before"`
+	MinPricePerM2   *float64   `json:"min_price_per_m2"`
+	MaxPricePerM2   *float64   `json:"max_price_per_m2"`
+	Rooms           *int32     `json:"rooms"`
+	Floor           *int32     `json:"floor"`
+	MinBuildYear    *int32     `json:"min_build_year"`
+	MaxBuildYear    *int32     `json:"max_build_year"`
+	Condition       *string    `json:"condition"`
+	EnergyClass     *string    `json:"energy_class"`
+	Kind            *string    `json:"kind"`
+	SortMode        *string    `json:"sort_mode"`
+	OffsetCount     *int32     `json:"offset_count"`
+	LimitCount      *int32     `json:"limit_count"`
 }
 
 type SearchSaleListingsRow struct {
@@ -520,28 +520,28 @@ type SearchSaleListingsRow struct {
 	SaleListingSourceKind            string   `json:"sale_listing_source_kind"`
 	SaleListingNativeID              string   `json:"sale_listing_native_id"`
 	SaleListingCanonicalID           string   `json:"sale_listing_canonical_id"`
-	LListingID                       string   `json:"l_listing_id"`
-	SaleListingUrl                   string   `json:"sale_listing_url"`
-	SaleListingHeadline              string   `json:"sale_listing_headline"`
-	SaleListingStreetAddress         string   `json:"sale_listing_street_address"`
-	SaleListingCity                  string   `json:"sale_listing_city"`
-	SaleListingPostal                string   `json:"sale_listing_postal"`
+	ListingID                        *string  `json:"listing_id"`
+	Coalesce                         *string  `json:"coalesce"`
+	Coalesce_2                       *string  `json:"coalesce_2"`
+	Coalesce_3                       *string  `json:"coalesce_3"`
+	Coalesce_4                       *string  `json:"coalesce_4"`
+	Coalesce_5                       *string  `json:"coalesce_5"`
 	SaleListingAskingPrice           *int64   `json:"sale_listing_asking_price"`
-	SaleListingAreaValue             *float64 `json:"sale_listing_area_value"`
-	SaleListingRoomLayout            string   `json:"sale_listing_room_layout"`
+	Coalesce_6                       *float64 `json:"coalesce_6"`
+	Coalesce_7                       *string  `json:"coalesce_7"`
 	SaleListingPricePerM2            *float64 `json:"sale_listing_price_per_m2"`
 	SaleListingDebtFreePrice         *int64   `json:"sale_listing_debt_free_price"`
 	SaleListingDebtShareAmount       *int64   `json:"sale_listing_debt_share_amount"`
-	SaleListingRoomsCount            *int32   `json:"sale_listing_rooms_count"`
-	SaleListingFloorLevel            *int32   `json:"sale_listing_floor_level"`
-	SaleListingTotalFloors           *int32   `json:"sale_listing_total_floors"`
-	HousingCompanyBuildYear          *int32   `json:"housing_company_build_year"`
-	SaleListingCondition             *string  `json:"sale_listing_condition"`
-	SaleListingEnergyClass           *string  `json:"sale_listing_energy_class"`
+	Coalesce_8                       *int32   `json:"coalesce_8"`
+	Coalesce_9                       *int32   `json:"coalesce_9"`
+	Coalesce_10                      *int32   `json:"coalesce_10"`
+	Coalesce_11                      *int32   `json:"coalesce_11"`
+	Coalesce_12                      *string  `json:"coalesce_12"`
+	Coalesce_13                      *string  `json:"coalesce_13"`
 	SaleListingEnergyEfficiencyLabel *string  `json:"sale_listing_energy_efficiency_label"`
-	PsoSaleListingLastSeenAt         string   `json:"pso_sale_listing_last_seen_at"`
-	PsoSaleListingPublishedAt        string   `json:"pso_sale_listing_published_at"`
-	SaleListingStreetAddress_2       string   `json:"sale_listing_street_address_2"`
+	SaleListingLastSeenAt            *string  `json:"sale_listing_last_seen_at"`
+	SaleListingPublishedAt           *string  `json:"sale_listing_published_at"`
+	Coalesce_14                      *string  `json:"coalesce_14"`
 	SourceProviders                  []string `json:"source_providers"`
 }
 
@@ -582,28 +582,28 @@ func (q *Queries) SearchSaleListings(ctx context.Context, arg SearchSaleListings
 			&i.SaleListingSourceKind,
 			&i.SaleListingNativeID,
 			&i.SaleListingCanonicalID,
-			&i.LListingID,
-			&i.SaleListingUrl,
-			&i.SaleListingHeadline,
-			&i.SaleListingStreetAddress,
-			&i.SaleListingCity,
-			&i.SaleListingPostal,
+			&i.ListingID,
+			&i.Coalesce,
+			&i.Coalesce_2,
+			&i.Coalesce_3,
+			&i.Coalesce_4,
+			&i.Coalesce_5,
 			&i.SaleListingAskingPrice,
-			&i.SaleListingAreaValue,
-			&i.SaleListingRoomLayout,
+			&i.Coalesce_6,
+			&i.Coalesce_7,
 			&i.SaleListingPricePerM2,
 			&i.SaleListingDebtFreePrice,
 			&i.SaleListingDebtShareAmount,
-			&i.SaleListingRoomsCount,
-			&i.SaleListingFloorLevel,
-			&i.SaleListingTotalFloors,
-			&i.HousingCompanyBuildYear,
-			&i.SaleListingCondition,
-			&i.SaleListingEnergyClass,
+			&i.Coalesce_8,
+			&i.Coalesce_9,
+			&i.Coalesce_10,
+			&i.Coalesce_11,
+			&i.Coalesce_12,
+			&i.Coalesce_13,
 			&i.SaleListingEnergyEfficiencyLabel,
-			&i.PsoSaleListingLastSeenAt,
-			&i.PsoSaleListingPublishedAt,
-			&i.SaleListingStreetAddress_2,
+			&i.SaleListingLastSeenAt,
+			&i.SaleListingPublishedAt,
+			&i.Coalesce_14,
 			&i.SourceProviders,
 		); err != nil {
 			return nil, err

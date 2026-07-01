@@ -668,15 +668,30 @@ RETURNING sale_listing_id;
 
 -- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
 WITH listing AS (
-    SELECT sl.sale_listing_id, fb.*
+    SELECT
+        sl.sale_listing_id,
+        fb.frontdoor_building_elevator_renovated,
+        fb.frontdoor_building_elevator_renovated_year,
+        fb.frontdoor_building_facade_renovated,
+        fb.frontdoor_building_facade_renovated_year,
+        fb.frontdoor_building_window_renovated,
+        fb.frontdoor_building_window_renovated_year,
+        fb.frontdoor_building_roof_renovated,
+        fb.frontdoor_building_roof_renovated_year,
+        fb.frontdoor_building_pipe_renovated,
+        fb.frontdoor_building_pipe_renovated_year,
+        fb.frontdoor_building_balcony_renovated,
+        fb.frontdoor_building_balcony_renovated_year,
+        fb.frontdoor_building_electricity_renovated,
+        fb.frontdoor_building_electricity_renovated_year
     FROM public.property_source_offerings sl
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+    WHERE sl.sale_listing_id = @sale_listing_id
 ),
 deleted AS (
     DELETE FROM public.property_source_offering_renovations
-    WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+    WHERE sale_listing_id = @sale_listing_id
 )
 INSERT INTO public.property_source_offering_renovations (
     sale_listing_id,
@@ -997,10 +1012,10 @@ ON CONFLICT (
 SELECT public.fnc__mark_property_offering_dimension_targets_dirty(sqlc.arg(property_offering_id)::uuid, sqlc.arg(reason)::text)::integer AS count;
 
 -- name: RebuildListingDimensionLayer :one
-SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid)::jsonb AS payload;
+SELECT public.fnc__rebuild_listing_dimension_layer(@sale_listing_id::uuid, NULL::timestamptz)::jsonb AS payload;
 
 -- name: RebuildListingDimensionLayerAt :one
-SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb AS payload;
+SELECT public.fnc__rebuild_listing_dimension_layer(@sale_listing_id::uuid, sqlc.narg('expected_dirty_at')::timestamptz)::jsonb AS payload;
 
 -- name: ProjectListingProviderDimensionClaims :one
 SELECT public.fnc__project_listing_provider_dimension_claims(sqlc.arg(sale_listing_id)::uuid)::integer;
@@ -1030,20 +1045,28 @@ WITH linked AS (
     JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
     WHERE source_link.target_type = 'listing'
         AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+        AND source_link.source_id = @sale_listing_id::uuid
         AND source_link.link_status <> 'rejected'
     ORDER BY source_link.link_score DESC, source_link.updated_at DESC
     LIMIT 1
 ),
 listing AS (
     SELECT
-        sl.*,
+        sl.sale_listing_address_norm,
+        sl.sale_listing_postal_norm,
+        sl.sale_listing_city_norm,
+        sl.sale_listing_build_year,
+        sl.sale_listing_total_floors,
+        sl.sale_listing_apartment_count,
+        sl.sale_listing_elevator,
+        sl.sale_listing_latitude,
+        sl.sale_listing_longitude,
         linked.housing_company_id,
         linked.property_unit_id,
         linked.housing_company_identity_key
     FROM public.property_source_offerings sl
     JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
-    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)::uuid
+    WHERE sl.sale_listing_id = @sale_listing_id::uuid
 ),
 inserted AS (
     INSERT INTO public.physical_buildings (
@@ -2335,10 +2358,34 @@ WITH unified AS (
         NULL::timestamptz AS published_at
     FROM public.frontdoor_buildings fb
 ), filtered AS (
-    SELECT *
+    SELECT
+        u.source,
+        u.kind,
+        u.native_id,
+        u.canonical_id,
+        u.listing_id,
+        u.offering_id,
+        u.latitude,
+        u.longitude,
+        u.link_status,
+        u.link_method,
+        u.link_score,
+        u.external_url_available,
+        u.headline,
+        u.address,
+        u.city,
+        u.postal,
+        u.price,
+        u.area,
+        u.room_layout,
+        u.url,
+        u.last_seen_at,
+        u.searchable,
+        u.listing_type,
+        u.published_at
     FROM unified u
-    WHERE (sqlc.arg(source_filter) = 'all' OR u.source = sqlc.arg(source_filter))
-      AND (sqlc.arg(kind_filter) = 'all' OR u.kind = sqlc.arg(kind_filter))
+    WHERE (@source_filter = 'all' OR u.source = @source_filter)
+      AND (@kind_filter = 'all' OR u.kind = @kind_filter)
       AND (sqlc.narg('query_text')::text IS NULL OR trim(sqlc.narg('query_text')::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim(sqlc.narg('query_text')::text)) || '%'))
       AND (sqlc.narg('city_filter')::text IS NULL OR trim(sqlc.narg('city_filter')::text) = '' OR lower(COALESCE(u.city, '')) LIKE ('%' || lower(trim(sqlc.narg('city_filter')::text)) || '%'))
       AND (sqlc.narg('postal_filter')::text IS NULL OR trim(sqlc.narg('postal_filter')::text) = '' OR lower(COALESCE(u.postal, '')) LIKE ('%' || lower(trim(sqlc.narg('postal_filter')::text)) || '%'))
@@ -2347,7 +2394,7 @@ WITH unified AS (
       AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
       AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
       AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text)
-      AND (sqlc.arg(grouping_filter) = 'all' OR (sqlc.arg(grouping_filter) = 'grouped' AND u.offering_id <> '') OR (sqlc.arg(grouping_filter) = 'ungrouped' AND u.offering_id = ''))
+      AND (@grouping_filter = 'all' OR (@grouping_filter = 'grouped' AND u.offering_id <> '') OR (@grouping_filter = 'ungrouped' AND u.offering_id = ''))
       AND (sqlc.narg('published_after')::timestamptz IS NULL OR u.published_at >= sqlc.narg('published_after')::timestamptz)
       AND (sqlc.narg('published_before')::timestamptz IS NULL OR u.published_at <= sqlc.narg('published_before')::timestamptz)
 )
@@ -2415,17 +2462,17 @@ LEFT JOIN LATERAL (
         AND observation.superseded_at IS NULL
 ) insight_stats ON true
 ORDER BY
-    CASE WHEN sqlc.arg(sort_mode) = 'price_asc' THEN u.price END ASC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'price_desc' THEN u.price END DESC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'area_asc' THEN u.area END ASC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'area_desc' THEN u.area END DESC NULLS LAST,
-    CASE WHEN sqlc.arg(sort_mode) = 'seen_desc' THEN u.last_seen_at END DESC NULLS LAST,
+    CASE WHEN @sort_mode = 'price_asc' THEN u.price END ASC NULLS LAST,
+    CASE WHEN @sort_mode = 'price_desc' THEN u.price END DESC NULLS LAST,
+    CASE WHEN @sort_mode = 'area_asc' THEN u.area END ASC NULLS LAST,
+    CASE WHEN @sort_mode = 'area_desc' THEN u.area END DESC NULLS LAST,
+    CASE WHEN @sort_mode = 'seen_desc' THEN u.last_seen_at END DESC NULLS LAST,
     u.last_seen_at DESC,
     u.source,
     u.kind,
     u.native_id
-LIMIT sqlc.arg(limit_count)::int
-OFFSET sqlc.arg(offset_count)::int;
+LIMIT @limit_count::int
+OFFSET @offset_count::int;
 
 -- name: CountUnifiedEntities :one
 WITH unified AS (
@@ -2538,8 +2585,8 @@ WITH unified AS (
 )
 SELECT COUNT(*)::bigint AS count
 FROM unified u
-WHERE (sqlc.arg(source_filter) = 'all' OR u.source = sqlc.arg(source_filter))
-  AND (sqlc.arg(kind_filter) = 'all' OR u.kind = sqlc.arg(kind_filter))
+WHERE (@source_filter = 'all' OR u.source = @source_filter)
+  AND (@kind_filter = 'all' OR u.kind = @kind_filter)
   AND (sqlc.narg('query_text')::text IS NULL OR trim(sqlc.narg('query_text')::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim(sqlc.narg('query_text')::text)) || '%'))
   AND (sqlc.narg('city_filter')::text IS NULL OR trim(sqlc.narg('city_filter')::text) = '' OR lower(COALESCE(u.city, '')) LIKE ('%' || lower(trim(sqlc.narg('city_filter')::text)) || '%'))
   AND (sqlc.narg('postal_filter')::text IS NULL OR trim(sqlc.narg('postal_filter')::text) = '' OR lower(COALESCE(u.postal, '')) LIKE ('%' || lower(trim(sqlc.narg('postal_filter')::text)) || '%'))
@@ -2548,7 +2595,7 @@ WHERE (sqlc.arg(source_filter) = 'all' OR u.source = sqlc.arg(source_filter))
   AND (sqlc.narg('min_area')::float8 IS NULL OR u.area >= sqlc.narg('min_area')::float8)
   AND (sqlc.narg('max_area')::float8 IS NULL OR u.area <= sqlc.narg('max_area')::float8)
   AND (sqlc.narg('listing_type_filter')::text IS NULL OR u.listing_type IS NULL OR u.listing_type = sqlc.narg('listing_type_filter')::text)
-  AND (sqlc.arg(grouping_filter) = 'all' OR (sqlc.arg(grouping_filter) = 'grouped' AND u.offering_id <> '') OR (sqlc.arg(grouping_filter) = 'ungrouped' AND u.offering_id = ''))
+  AND (@grouping_filter = 'all' OR (@grouping_filter = 'grouped' AND u.offering_id <> '') OR (@grouping_filter = 'ungrouped' AND u.offering_id = ''))
   AND (sqlc.narg('published_after')::timestamptz IS NULL OR u.published_at >= sqlc.narg('published_after')::timestamptz)
   AND (sqlc.narg('published_before')::timestamptz IS NULL OR u.published_at <= sqlc.narg('published_before')::timestamptz);
 
@@ -2599,7 +2646,7 @@ ORDER BY
     abs(COALESCE(ssl.sale_listing_area_value, 0) - COALESCE(fsl.sale_listing_area_value, 0)) ASC,
     ssl.sale_listing_last_seen_at DESC,
     fsl.sale_listing_last_seen_at DESC
-LIMIT sqlc.arg(limit_count)::int;
+LIMIT @limit_count::int;
 
 -- name: GetShortcutAdUnifiedDetail :one
 SELECT

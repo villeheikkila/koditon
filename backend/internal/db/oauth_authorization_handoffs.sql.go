@@ -49,17 +49,38 @@ type ApproveOAuthAuthorizationHandoffByIDParams struct {
 	UserUuid                                   *uuid.UUID `json:"user_uuid"`
 	OauthAuthorizationHandoffAuthorizationCode *string    `json:"oauth_authorization_handoff_authorization_code"`
 	OauthAuthorizationHandoffRedirectUrl       *string    `json:"oauth_authorization_handoff_redirect_url"`
-	OauthAuthorizationHandoffID                uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffID                *uuid.UUID `json:"oauth_authorization_handoff_id"`
 }
 
-func (q *Queries) ApproveOAuthAuthorizationHandoffByID(ctx context.Context, arg ApproveOAuthAuthorizationHandoffByIDParams) (OauthAuthorizationHandoff, error) {
+type ApproveOAuthAuthorizationHandoffByIDRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) ApproveOAuthAuthorizationHandoffByID(ctx context.Context, arg ApproveOAuthAuthorizationHandoffByIDParams) (ApproveOAuthAuthorizationHandoffByIDRow, error) {
 	row := q.db.QueryRow(ctx, approveOAuthAuthorizationHandoffByID,
 		arg.UserUuid,
 		arg.OauthAuthorizationHandoffAuthorizationCode,
 		arg.OauthAuthorizationHandoffRedirectUrl,
 		arg.OauthAuthorizationHandoffID,
 	)
-	var i OauthAuthorizationHandoff
+	var i ApproveOAuthAuthorizationHandoffByIDRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -129,19 +150,40 @@ returning
 `
 
 type CreateOAuthAuthorizationHandoffParams struct {
-	OauthAuthorizationHandoffTokenHash           string    `json:"oauth_authorization_handoff_token_hash"`
-	OauthAuthorizationHandoffUserCode            string    `json:"oauth_authorization_handoff_user_code"`
-	OauthClientID                                string    `json:"oauth_client_id"`
-	OauthAuthorizationHandoffRedirectUri         string    `json:"oauth_authorization_handoff_redirect_uri"`
-	OauthAuthorizationHandoffScopes              []string  `json:"oauth_authorization_handoff_scopes"`
-	OauthAuthorizationHandoffAudience            string    `json:"oauth_authorization_handoff_audience"`
-	OauthAuthorizationHandoffState               string    `json:"oauth_authorization_handoff_state"`
-	OauthAuthorizationHandoffCodeChallenge       string    `json:"oauth_authorization_handoff_code_challenge"`
-	OauthAuthorizationHandoffCodeChallengeMethod string    `json:"oauth_authorization_handoff_code_challenge_method"`
-	OauthAuthorizationHandoffExpiresAt           time.Time `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffTokenHash           *string    `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            *string    `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                *string    `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         *string    `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            *string    `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               *string    `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       *string    `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod *string    `json:"oauth_authorization_handoff_code_challenge_method"`
+	OauthAuthorizationHandoffExpiresAt           *time.Time `json:"oauth_authorization_handoff_expires_at"`
 }
 
-func (q *Queries) CreateOAuthAuthorizationHandoff(ctx context.Context, arg CreateOAuthAuthorizationHandoffParams) (OauthAuthorizationHandoff, error) {
+type CreateOAuthAuthorizationHandoffRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) CreateOAuthAuthorizationHandoff(ctx context.Context, arg CreateOAuthAuthorizationHandoffParams) (CreateOAuthAuthorizationHandoffRow, error) {
 	row := q.db.QueryRow(ctx, createOAuthAuthorizationHandoff,
 		arg.OauthAuthorizationHandoffTokenHash,
 		arg.OauthAuthorizationHandoffUserCode,
@@ -154,7 +196,7 @@ func (q *Queries) CreateOAuthAuthorizationHandoff(ctx context.Context, arg Creat
 		arg.OauthAuthorizationHandoffCodeChallengeMethod,
 		arg.OauthAuthorizationHandoffExpiresAt,
 	)
-	var i OauthAuthorizationHandoff
+	var i CreateOAuthAuthorizationHandoffRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -209,9 +251,30 @@ returning
   oauth_authorization_handoff_updated_at
 `
 
-func (q *Queries) DenyOAuthAuthorizationHandoffByID(ctx context.Context, oauthAuthorizationHandoffID uuid.UUID) (OauthAuthorizationHandoff, error) {
+type DenyOAuthAuthorizationHandoffByIDRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) DenyOAuthAuthorizationHandoffByID(ctx context.Context, oauthAuthorizationHandoffID *uuid.UUID) (DenyOAuthAuthorizationHandoffByIDRow, error) {
 	row := q.db.QueryRow(ctx, denyOAuthAuthorizationHandoffByID, oauthAuthorizationHandoffID)
-	var i OauthAuthorizationHandoff
+	var i DenyOAuthAuthorizationHandoffByIDRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -259,9 +322,30 @@ from oauth_authorization_handoffs
 where oauth_authorization_handoff_id = $1
 `
 
-func (q *Queries) GetOAuthAuthorizationHandoffByID(ctx context.Context, oauthAuthorizationHandoffID uuid.UUID) (OauthAuthorizationHandoff, error) {
+type GetOAuthAuthorizationHandoffByIDRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) GetOAuthAuthorizationHandoffByID(ctx context.Context, oauthAuthorizationHandoffID *uuid.UUID) (GetOAuthAuthorizationHandoffByIDRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthAuthorizationHandoffByID, oauthAuthorizationHandoffID)
-	var i OauthAuthorizationHandoff
+	var i GetOAuthAuthorizationHandoffByIDRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -309,9 +393,30 @@ from oauth_authorization_handoffs
 where oauth_authorization_handoff_token_hash = $1
 `
 
-func (q *Queries) GetOAuthAuthorizationHandoffByTokenHash(ctx context.Context, oauthAuthorizationHandoffTokenHash string) (OauthAuthorizationHandoff, error) {
+type GetOAuthAuthorizationHandoffByTokenHashRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) GetOAuthAuthorizationHandoffByTokenHash(ctx context.Context, oauthAuthorizationHandoffTokenHash *string) (GetOAuthAuthorizationHandoffByTokenHashRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthAuthorizationHandoffByTokenHash, oauthAuthorizationHandoffTokenHash)
-	var i OauthAuthorizationHandoff
+	var i GetOAuthAuthorizationHandoffByTokenHashRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -359,9 +464,30 @@ from oauth_authorization_handoffs
 where oauth_authorization_handoff_user_code = $1
 `
 
-func (q *Queries) GetOAuthAuthorizationHandoffByUserCode(ctx context.Context, oauthAuthorizationHandoffUserCode string) (OauthAuthorizationHandoff, error) {
+type GetOAuthAuthorizationHandoffByUserCodeRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) GetOAuthAuthorizationHandoffByUserCode(ctx context.Context, oauthAuthorizationHandoffUserCode *string) (GetOAuthAuthorizationHandoffByUserCodeRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthAuthorizationHandoffByUserCode, oauthAuthorizationHandoffUserCode)
-	var i OauthAuthorizationHandoff
+	var i GetOAuthAuthorizationHandoffByUserCodeRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,
@@ -414,9 +540,30 @@ returning
   oauth_authorization_handoff_updated_at
 `
 
-func (q *Queries) MarkOAuthAuthorizationHandoffCompletedByID(ctx context.Context, oauthAuthorizationHandoffID uuid.UUID) (OauthAuthorizationHandoff, error) {
+type MarkOAuthAuthorizationHandoffCompletedByIDRow struct {
+	OauthAuthorizationHandoffID                  uuid.UUID  `json:"oauth_authorization_handoff_id"`
+	OauthAuthorizationHandoffTokenHash           string     `json:"oauth_authorization_handoff_token_hash"`
+	OauthAuthorizationHandoffUserCode            string     `json:"oauth_authorization_handoff_user_code"`
+	OauthClientID                                string     `json:"oauth_client_id"`
+	OauthAuthorizationHandoffRedirectUri         string     `json:"oauth_authorization_handoff_redirect_uri"`
+	OauthAuthorizationHandoffScopes              []string   `json:"oauth_authorization_handoff_scopes"`
+	OauthAuthorizationHandoffAudience            string     `json:"oauth_authorization_handoff_audience"`
+	OauthAuthorizationHandoffState               string     `json:"oauth_authorization_handoff_state"`
+	OauthAuthorizationHandoffCodeChallenge       string     `json:"oauth_authorization_handoff_code_challenge"`
+	OauthAuthorizationHandoffCodeChallengeMethod string     `json:"oauth_authorization_handoff_code_challenge_method"`
+	UserUuid                                     *uuid.UUID `json:"user_uuid"`
+	OauthAuthorizationHandoffAuthorizationCode   *string    `json:"oauth_authorization_handoff_authorization_code"`
+	OauthAuthorizationHandoffRedirectUrl         *string    `json:"oauth_authorization_handoff_redirect_url"`
+	OauthAuthorizationHandoffDeniedAt            *time.Time `json:"oauth_authorization_handoff_denied_at"`
+	OauthAuthorizationHandoffCompletedAt         *time.Time `json:"oauth_authorization_handoff_completed_at"`
+	OauthAuthorizationHandoffExpiresAt           time.Time  `json:"oauth_authorization_handoff_expires_at"`
+	OauthAuthorizationHandoffCreatedAt           time.Time  `json:"oauth_authorization_handoff_created_at"`
+	OauthAuthorizationHandoffUpdatedAt           time.Time  `json:"oauth_authorization_handoff_updated_at"`
+}
+
+func (q *Queries) MarkOAuthAuthorizationHandoffCompletedByID(ctx context.Context, oauthAuthorizationHandoffID *uuid.UUID) (MarkOAuthAuthorizationHandoffCompletedByIDRow, error) {
 	row := q.db.QueryRow(ctx, markOAuthAuthorizationHandoffCompletedByID, oauthAuthorizationHandoffID)
-	var i OauthAuthorizationHandoff
+	var i MarkOAuthAuthorizationHandoffCompletedByIDRow
 	err := row.Scan(
 		&i.OauthAuthorizationHandoffID,
 		&i.OauthAuthorizationHandoffTokenHash,

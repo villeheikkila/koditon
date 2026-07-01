@@ -41,7 +41,7 @@ select
       lower(btrim(user_email)) = lower(btrim($1))) as email_exists
 `
 
-func (q *Queries) EmailExists(ctx context.Context, userEmail string) (bool, error) {
+func (q *Queries) EmailExists(ctx context.Context, userEmail *string) (bool, error) {
 	row := q.db.QueryRow(ctx, emailExists, userEmail)
 	var email_exists bool
 	err := row.Scan(&email_exists)
@@ -61,8 +61,8 @@ select
 `
 
 type EmailExistsForAnotherUserParams struct {
-	UserID    int64  `json:"user_id"`
-	UserEmail string `json:"user_email"`
+	UserID    *int64  `json:"user_id"`
+	UserEmail *string `json:"user_email"`
 }
 
 func (q *Queries) EmailExistsForAnotherUser(ctx context.Context, arg EmailExistsForAnotherUserParams) (bool, error) {
@@ -87,7 +87,7 @@ type GetUserByEmailRow struct {
 	UserIDBigint int64     `json:"user_id_bigint"`
 }
 
-func (q *Queries) GetUserByEmail(ctx context.Context, userEmail string) (GetUserByEmailRow, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, userEmail *string) (GetUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, userEmail)
 	var i GetUserByEmailRow
 	err := row.Scan(&i.UserUuid, &i.UserIDBigint)
@@ -109,7 +109,7 @@ type GetUserByIDRow struct {
 	UserIDBigint int64     `json:"user_id_bigint"`
 }
 
-func (q *Queries) GetUserByID(ctx context.Context, userUuid uuid.UUID) (GetUserByIDRow, error) {
+func (q *Queries) GetUserByID(ctx context.Context, userUuid *uuid.UUID) (GetUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByID, userUuid)
 	var i GetUserByIDRow
 	err := row.Scan(&i.UserUuid, &i.UserIDBigint)
@@ -125,7 +125,7 @@ where
   user_id = $1
 `
 
-func (q *Queries) GetUserEmailByIDBigint(ctx context.Context, userID int64) (*string, error) {
+func (q *Queries) GetUserEmailByIDBigint(ctx context.Context, userID *int64) (*string, error) {
 	row := q.db.QueryRow(ctx, getUserEmailByIDBigint, userID)
 	var user_email *string
 	err := row.Scan(&user_email)
@@ -141,7 +141,7 @@ where
   user_uuid = $1
 `
 
-func (q *Queries) GetUserEmailByUUID(ctx context.Context, userUuid uuid.UUID) (*string, error) {
+func (q *Queries) GetUserEmailByUUID(ctx context.Context, userUuid *uuid.UUID) (*string, error) {
 	row := q.db.QueryRow(ctx, getUserEmailByUUID, userUuid)
 	var user_email *string
 	err := row.Scan(&user_email)
@@ -161,7 +161,7 @@ returning
 
 type UpdateUserEmailByIDBigintParams struct {
 	UserEmail *string `json:"user_email"`
-	UserID    int64   `json:"user_id"`
+	UserID    *int64  `json:"user_id"`
 }
 
 func (q *Queries) UpdateUserEmailByIDBigint(ctx context.Context, arg UpdateUserEmailByIDBigintParams) (*string, error) {
@@ -185,7 +185,7 @@ returning
 
 type UpdateUserEmailIfEmptyByIDBigintParams struct {
 	UserEmail *string `json:"user_email"`
-	UserID    int64   `json:"user_id"`
+	UserID    *int64  `json:"user_id"`
 }
 
 func (q *Queries) UpdateUserEmailIfEmptyByIDBigint(ctx context.Context, arg UpdateUserEmailIfEmptyByIDBigintParams) (*string, error) {

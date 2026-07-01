@@ -99,9 +99,9 @@ RETURNING sale_listing_prices_transaction_match_run_id
 `
 
 type CreateTransactionMatchRunParams struct {
-	Mode             string `json:"mode"`
-	ScoreThreshold   int32  `json:"score_threshold"`
-	CompetitorMargin int32  `json:"competitor_margin"`
+	Mode             *string `json:"mode"`
+	ScoreThreshold   *int32  `json:"score_threshold"`
+	CompetitorMargin *int32  `json:"competitor_margin"`
 }
 
 func (q *Queries) CreateTransactionMatchRun(ctx context.Context, arg CreateTransactionMatchRunParams) (uuid.UUID, error) {
@@ -121,10 +121,10 @@ WHERE sale_listing_prices_transaction_match_run_id = $4::uuid
 `
 
 type FinishTransactionMatchRunParams struct {
-	Candidates int32     `json:"candidates"`
-	AutoLinked int32     `json:"auto_linked"`
-	Ambiguous  int32     `json:"ambiguous"`
-	RunID      uuid.UUID `json:"run_id"`
+	Candidates *int32     `json:"candidates"`
+	AutoLinked *int32     `json:"auto_linked"`
+	Ambiguous  *int32     `json:"ambiguous"`
+	RunID      *uuid.UUID `json:"run_id"`
 }
 
 func (q *Queries) FinishTransactionMatchRun(ctx context.Context, arg FinishTransactionMatchRunParams) error {
@@ -159,11 +159,11 @@ VALUES (
 `
 
 type InsertTransactionMatchCandidateParams struct {
-	RunID             uuid.UUID       `json:"run_id"`
-	ListingID         uuid.UUID       `json:"listing_id"`
-	TransactionID     uuid.UUID       `json:"transaction_id"`
-	Score             int32           `json:"score"`
-	Confidence        string          `json:"confidence"`
+	RunID             *uuid.UUID      `json:"run_id"`
+	ListingID         *uuid.UUID      `json:"listing_id"`
+	TransactionID     *uuid.UUID      `json:"transaction_id"`
+	Score             *int32          `json:"score"`
+	Confidence        *string         `json:"confidence"`
 	Reasons           json.RawMessage `json:"reasons"`
 	PriceDeltaPercent *float64        `json:"price_delta_percent"`
 }
@@ -239,25 +239,25 @@ WHERE sl.sale_listing_source_kind = 'ad'
 type LoadTransactionMatchCandidateRowsRow struct {
 	SaleListingID              uuid.UUID  `json:"sale_listing_id"`
 	PricesTransactionID        uuid.UUID  `json:"prices_transaction_id"`
-	ListingLayout              string     `json:"listing_layout"`
-	TransactionLayout          string     `json:"transaction_layout"`
+	ListingLayout              *string    `json:"listing_layout"`
+	TransactionLayout          *string    `json:"transaction_layout"`
 	SaleListingAreaValue       *float64   `json:"sale_listing_area_value"`
 	PricesTransactionArea      float64    `json:"prices_transaction_area"`
-	ListingType                string     `json:"listing_type"`
-	TransactionType            string     `json:"transaction_type"`
+	ListingType                *string    `json:"listing_type"`
+	TransactionType            *string    `json:"transaction_type"`
 	SaleListingBuildYear       *int32     `json:"sale_listing_build_year"`
 	PricesTransactionBuildYear int32      `json:"prices_transaction_build_year"`
 	SaleListingFloorLevel      *int32     `json:"sale_listing_floor_level"`
 	SaleListingTotalFloors     *int32     `json:"sale_listing_total_floors"`
-	TransactionFloor           string     `json:"transaction_floor"`
+	TransactionFloor           *string    `json:"transaction_floor"`
 	SaleListingElevator        *bool      `json:"sale_listing_elevator"`
 	PricesTransactionElevator  bool       `json:"prices_transaction_elevator"`
-	ListingCondition           string     `json:"listing_condition"`
-	TransactionCondition       string     `json:"transaction_condition"`
+	ListingCondition           *string    `json:"listing_condition"`
+	TransactionCondition       *string    `json:"transaction_condition"`
 	SaleListingPlotOwned       *bool      `json:"sale_listing_plot_owned"`
 	PricesTransactionPlotOwned *bool      `json:"prices_transaction_plot_owned"`
-	ListingEnergy              string     `json:"listing_energy"`
-	TransactionEnergy          string     `json:"transaction_energy"`
+	ListingEnergy              *string    `json:"listing_energy"`
+	TransactionEnergy          *string    `json:"transaction_energy"`
 	SaleListingAskingPrice     *int64     `json:"sale_listing_asking_price"`
 	PricesTransactionPrice     int32      `json:"prices_transaction_price"`
 	SaleListingFirstSeenAt     *time.Time `json:"sale_listing_first_seen_at"`
@@ -325,8 +325,8 @@ WHERE sale_listing_prices_transaction_match_run_id = $1::uuid
 `
 
 type MarkAmbiguousTransactionMatchesParams struct {
-	RunID     uuid.UUID `json:"run_id"`
-	Threshold int32     `json:"threshold"`
+	RunID     *uuid.UUID `json:"run_id"`
+	Threshold *int32     `json:"threshold"`
 }
 
 func (q *Queries) MarkAmbiguousTransactionMatches(ctx context.Context, arg MarkAmbiguousTransactionMatchesParams) (int64, error) {
@@ -346,9 +346,9 @@ WHERE sale_listing_prices_transaction_match_run_id = $1::uuid
 `
 
 type MarkTransactionMatchLinkedParams struct {
-	RunID         uuid.UUID `json:"run_id"`
-	ListingID     uuid.UUID `json:"listing_id"`
-	TransactionID uuid.UUID `json:"transaction_id"`
+	RunID         *uuid.UUID `json:"run_id"`
+	ListingID     *uuid.UUID `json:"listing_id"`
+	TransactionID *uuid.UUID `json:"transaction_id"`
 }
 
 func (q *Queries) MarkTransactionMatchLinked(ctx context.Context, arg MarkTransactionMatchLinkedParams) error {
@@ -365,7 +365,7 @@ WHERE sl.sale_listing_id = $1::uuid
     AND src.source_listing_id = sl.sale_listing_id
 `
 
-func (q *Queries) SyncSourceListingTransactionMatchState(ctx context.Context, listingID uuid.UUID) error {
+func (q *Queries) SyncSourceListingTransactionMatchState(ctx context.Context, listingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncSourceListingTransactionMatchState, listingID)
 	return err
 }

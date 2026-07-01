@@ -17,9 +17,44 @@ SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_exter
 WHERE frontdoor_building_announcement_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, frontdoorBuildingAnnouncementID uuid.UUID) (FrontdoorBuildingAnnouncement, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingAnnouncementByID, frontdoorBuildingAnnouncementID)
-	var i FrontdoorBuildingAnnouncement
+type GetFrontdoorBuildingAnnouncementByIDRow struct {
+	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
+	FrontdoorBuildingAnnouncementAddressLine1             *string    `json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2             *string    `json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation                 *string    `json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice              *float64   `json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementNotifyPriceChanged       *bool      `json:"frontdoor_building_announcement_notify_price_changed"`
+	FrontdoorBuildingAnnouncementPropertyType             *string    `json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype          *string    `json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementConstructionFinishedYear *int32     `json:"frontdoor_building_announcement_construction_finished_year"`
+	FrontdoorBuildingAnnouncementMainImageUri             *string    `json:"frontdoor_building_announcement_main_image_uri"`
+	FrontdoorBuildingAnnouncementHasOpenBidding           *bool      `json:"frontdoor_building_announcement_has_open_bidding"`
+	FrontdoorBuildingAnnouncementRoomStructure            *string    `json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementArea                     *float64   `json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementTotalArea                *float64   `json:"frontdoor_building_announcement_total_area"`
+	FrontdoorBuildingAnnouncementPricePerSquare           *float64   `json:"frontdoor_building_announcement_price_per_square"`
+	FrontdoorBuildingAnnouncementDaysOnMarket             *int32     `json:"frontdoor_building_announcement_days_on_market"`
+	FrontdoorBuildingAnnouncementNewBuilding              *bool      `json:"frontdoor_building_announcement_new_building"`
+	FrontdoorBuildingAnnouncementMainImageHidden          *bool      `json:"frontdoor_building_announcement_main_image_hidden"`
+	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    *bool      `json:"frontdoor_building_announcement_is_company_announcement"`
+	FrontdoorBuildingAnnouncementShowBiddingIndicators    *bool      `json:"frontdoor_building_announcement_show_bidding_indicators"`
+	FrontdoorBuildingAnnouncementPublished                *bool      `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod               *string    `json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32     `json:"frontdoor_building_announcement_rental_unique_no"`
+	FrontdoorBuildingID                                   uuid.UUID  `json:"frontdoor_building_id"`
+	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time  `json:"frontdoor_building_announcement_first_seen_at"`
+	FrontdoorBuildingAnnouncementLastSeenAt               time.Time  `json:"frontdoor_building_announcement_last_seen_at"`
+	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementDataNormalizedAt         *time.Time `json:"frontdoor_building_announcement_data_normalized_at"`
+	FrontdoorBuildingAnnouncementDataNormalizedVersion    int32      `json:"frontdoor_building_announcement_data_normalized_version"`
+}
+
+func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, dollar_1 *uuid.UUID) (GetFrontdoorBuildingAnnouncementByIDRow, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingAnnouncementByID, dollar_1)
+	var i GetFrontdoorBuildingAnnouncementByIDRow
 	err := row.Scan(
 		&i.FrontdoorBuildingAnnouncementID,
 		&i.FrontdoorBuildingAnnouncementExternalID,
@@ -63,15 +98,50 @@ WHERE frontdoor_building_id = $1
 ORDER BY frontdoor_building_announcement_last_seen_at DESC
 `
 
-func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, frontdoorBuildingID uuid.UUID) ([]FrontdoorBuildingAnnouncement, error) {
-	rows, err := q.db.Query(ctx, listFrontdoorBuildingAnnouncements, frontdoorBuildingID)
+type ListFrontdoorBuildingAnnouncementsRow struct {
+	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
+	FrontdoorBuildingAnnouncementAddressLine1             *string    `json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2             *string    `json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation                 *string    `json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice              *float64   `json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementNotifyPriceChanged       *bool      `json:"frontdoor_building_announcement_notify_price_changed"`
+	FrontdoorBuildingAnnouncementPropertyType             *string    `json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype          *string    `json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementConstructionFinishedYear *int32     `json:"frontdoor_building_announcement_construction_finished_year"`
+	FrontdoorBuildingAnnouncementMainImageUri             *string    `json:"frontdoor_building_announcement_main_image_uri"`
+	FrontdoorBuildingAnnouncementHasOpenBidding           *bool      `json:"frontdoor_building_announcement_has_open_bidding"`
+	FrontdoorBuildingAnnouncementRoomStructure            *string    `json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementArea                     *float64   `json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementTotalArea                *float64   `json:"frontdoor_building_announcement_total_area"`
+	FrontdoorBuildingAnnouncementPricePerSquare           *float64   `json:"frontdoor_building_announcement_price_per_square"`
+	FrontdoorBuildingAnnouncementDaysOnMarket             *int32     `json:"frontdoor_building_announcement_days_on_market"`
+	FrontdoorBuildingAnnouncementNewBuilding              *bool      `json:"frontdoor_building_announcement_new_building"`
+	FrontdoorBuildingAnnouncementMainImageHidden          *bool      `json:"frontdoor_building_announcement_main_image_hidden"`
+	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    *bool      `json:"frontdoor_building_announcement_is_company_announcement"`
+	FrontdoorBuildingAnnouncementShowBiddingIndicators    *bool      `json:"frontdoor_building_announcement_show_bidding_indicators"`
+	FrontdoorBuildingAnnouncementPublished                *bool      `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod               *string    `json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32     `json:"frontdoor_building_announcement_rental_unique_no"`
+	FrontdoorBuildingID                                   uuid.UUID  `json:"frontdoor_building_id"`
+	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time  `json:"frontdoor_building_announcement_first_seen_at"`
+	FrontdoorBuildingAnnouncementLastSeenAt               time.Time  `json:"frontdoor_building_announcement_last_seen_at"`
+	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementDataNormalizedAt         *time.Time `json:"frontdoor_building_announcement_data_normalized_at"`
+	FrontdoorBuildingAnnouncementDataNormalizedVersion    int32      `json:"frontdoor_building_announcement_data_normalized_version"`
+}
+
+func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, dollar_1 *uuid.UUID) ([]ListFrontdoorBuildingAnnouncementsRow, error) {
+	rows, err := q.db.Query(ctx, listFrontdoorBuildingAnnouncements, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FrontdoorBuildingAnnouncement{}
+	items := []ListFrontdoorBuildingAnnouncementsRow{}
 	for rows.Next() {
-		var i FrontdoorBuildingAnnouncement
+		var i ListFrontdoorBuildingAnnouncementsRow
 		if err := rows.Scan(
 			&i.FrontdoorBuildingAnnouncementID,
 			&i.FrontdoorBuildingAnnouncementExternalID,
@@ -124,8 +194,8 @@ WHERE frontdoor_building_announcement_id = $2
 `
 
 type MarkFrontdoorBuildingAnnouncementDataNormalizedParams struct {
-	FrontdoorBuildingAnnouncementDataNormalizedVersion int32     `json:"frontdoor_building_announcement_data_normalized_version"`
-	FrontdoorBuildingAnnouncementID                    uuid.UUID `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementDataNormalizedVersion *int32     `json:"frontdoor_building_announcement_data_normalized_version"`
+	FrontdoorBuildingAnnouncementID                    *uuid.UUID `json:"frontdoor_building_announcement_id"`
 }
 
 func (q *Queries) MarkFrontdoorBuildingAnnouncementDataNormalized(ctx context.Context, arg MarkFrontdoorBuildingAnnouncementDataNormalizedParams) error {
@@ -165,9 +235,35 @@ INSERT INTO public.frontdoor_building_announcements (
     frontdoor_building_announcement_last_seen_at,
     frontdoor_building_announcement_unpublishing_time_date
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-    $21, $22, $23, $24, $25, $26, now(), now(), $27
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21,
+    $22,
+    $23,
+    $24,
+    $25,
+    $26,
+    now(),
+    now(),
+    $27
 )
 ON CONFLICT (frontdoor_building_announcement_external_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_search_price) DO UPDATE
 SET frontdoor_building_announcement_last_seen_at = now(),
@@ -225,11 +321,46 @@ type UpsertFrontdoorBuildingAnnouncementParams struct {
 	FrontdoorBuildingAnnouncementPublished                *bool      `json:"frontdoor_building_announcement_published"`
 	FrontdoorBuildingAnnouncementRentPeriod               *string    `json:"frontdoor_building_announcement_rent_period"`
 	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32     `json:"frontdoor_building_announcement_rental_unique_no"`
-	FrontdoorBuildingID                                   uuid.UUID  `json:"frontdoor_building_id"`
+	FrontdoorBuildingID                                   *uuid.UUID `json:"frontdoor_building_id"`
 	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
 }
 
-func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg UpsertFrontdoorBuildingAnnouncementParams) (FrontdoorBuildingAnnouncement, error) {
+type UpsertFrontdoorBuildingAnnouncementRow struct {
+	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
+	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
+	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
+	FrontdoorBuildingAnnouncementAddressLine1             *string    `json:"frontdoor_building_announcement_address_line1"`
+	FrontdoorBuildingAnnouncementAddressLine2             *string    `json:"frontdoor_building_announcement_address_line2"`
+	FrontdoorBuildingAnnouncementLocation                 *string    `json:"frontdoor_building_announcement_location"`
+	FrontdoorBuildingAnnouncementSearchPrice              *float64   `json:"frontdoor_building_announcement_search_price"`
+	FrontdoorBuildingAnnouncementNotifyPriceChanged       *bool      `json:"frontdoor_building_announcement_notify_price_changed"`
+	FrontdoorBuildingAnnouncementPropertyType             *string    `json:"frontdoor_building_announcement_property_type"`
+	FrontdoorBuildingAnnouncementPropertySubtype          *string    `json:"frontdoor_building_announcement_property_subtype"`
+	FrontdoorBuildingAnnouncementConstructionFinishedYear *int32     `json:"frontdoor_building_announcement_construction_finished_year"`
+	FrontdoorBuildingAnnouncementMainImageUri             *string    `json:"frontdoor_building_announcement_main_image_uri"`
+	FrontdoorBuildingAnnouncementHasOpenBidding           *bool      `json:"frontdoor_building_announcement_has_open_bidding"`
+	FrontdoorBuildingAnnouncementRoomStructure            *string    `json:"frontdoor_building_announcement_room_structure"`
+	FrontdoorBuildingAnnouncementArea                     *float64   `json:"frontdoor_building_announcement_area"`
+	FrontdoorBuildingAnnouncementTotalArea                *float64   `json:"frontdoor_building_announcement_total_area"`
+	FrontdoorBuildingAnnouncementPricePerSquare           *float64   `json:"frontdoor_building_announcement_price_per_square"`
+	FrontdoorBuildingAnnouncementDaysOnMarket             *int32     `json:"frontdoor_building_announcement_days_on_market"`
+	FrontdoorBuildingAnnouncementNewBuilding              *bool      `json:"frontdoor_building_announcement_new_building"`
+	FrontdoorBuildingAnnouncementMainImageHidden          *bool      `json:"frontdoor_building_announcement_main_image_hidden"`
+	FrontdoorBuildingAnnouncementIsCompanyAnnouncement    *bool      `json:"frontdoor_building_announcement_is_company_announcement"`
+	FrontdoorBuildingAnnouncementShowBiddingIndicators    *bool      `json:"frontdoor_building_announcement_show_bidding_indicators"`
+	FrontdoorBuildingAnnouncementPublished                *bool      `json:"frontdoor_building_announcement_published"`
+	FrontdoorBuildingAnnouncementRentPeriod               *string    `json:"frontdoor_building_announcement_rent_period"`
+	FrontdoorBuildingAnnouncementRentalUniqueNo           *int32     `json:"frontdoor_building_announcement_rental_unique_no"`
+	FrontdoorBuildingID                                   uuid.UUID  `json:"frontdoor_building_id"`
+	FrontdoorBuildingAnnouncementFirstSeenAt              time.Time  `json:"frontdoor_building_announcement_first_seen_at"`
+	FrontdoorBuildingAnnouncementLastSeenAt               time.Time  `json:"frontdoor_building_announcement_last_seen_at"`
+	FrontdoorBuildingAnnouncementUnpublishingTimeDate     *time.Time `json:"frontdoor_building_announcement_unpublishing_time_date"`
+	FrontdoorBuildingAnnouncementDataNormalizedAt         *time.Time `json:"frontdoor_building_announcement_data_normalized_at"`
+	FrontdoorBuildingAnnouncementDataNormalizedVersion    int32      `json:"frontdoor_building_announcement_data_normalized_version"`
+}
+
+func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg UpsertFrontdoorBuildingAnnouncementParams) (UpsertFrontdoorBuildingAnnouncementRow, error) {
 	row := q.db.QueryRow(ctx, upsertFrontdoorBuildingAnnouncement,
 		arg.FrontdoorBuildingAnnouncementExternalID,
 		arg.FrontdoorBuildingAnnouncementFriendlyID,
@@ -259,7 +390,7 @@ func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg U
 		arg.FrontdoorBuildingID,
 		arg.FrontdoorBuildingAnnouncementUnpublishingTimeDate,
 	)
-	var i FrontdoorBuildingAnnouncement
+	var i UpsertFrontdoorBuildingAnnouncementRow
 	err := row.Scan(
 		&i.FrontdoorBuildingAnnouncementID,
 		&i.FrontdoorBuildingAnnouncementExternalID,

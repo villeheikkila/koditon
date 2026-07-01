@@ -42,9 +42,9 @@ WHERE property_document_id = $1
 `
 
 type AttachPropertyDocumentToOfferingParams struct {
-	PropertyDocumentID uuid.UUID `json:"property_document_id"`
-	PropertyOfferingID uuid.UUID `json:"property_offering_id"`
-	Reason             string    `json:"reason"`
+	PropertyDocumentID *uuid.UUID `json:"property_document_id"`
+	PropertyOfferingID *uuid.UUID `json:"property_offering_id"`
+	Reason             *string    `json:"reason"`
 }
 
 type AttachPropertyDocumentToOfferingRow struct {
@@ -186,11 +186,11 @@ FROM synced
 WHERE property_house_id IS NOT NULL
 `
 
-func (q *Queries) BackfillDetachedPropertyHouses(ctx context.Context, batchSize int32) (int32, error) {
+func (q *Queries) BackfillDetachedPropertyHouses(ctx context.Context, batchSize int32) (*int32, error) {
 	row := q.db.QueryRow(ctx, backfillDetachedPropertyHouses, batchSize)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
+	var count *int32
+	err := row.Scan(&count)
+	return count, err
 }
 
 const canonicalizeFrontdoorAdSaleListing = `-- name: CanonicalizeFrontdoorAdSaleListing :one
@@ -426,7 +426,7 @@ ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
 RETURNING sale_listing_id
 `
 
-func (q *Queries) CanonicalizeFrontdoorAdSaleListing(ctx context.Context, frontdoorAdID uuid.UUID) (uuid.UUID, error) {
+func (q *Queries) CanonicalizeFrontdoorAdSaleListing(ctx context.Context, frontdoorAdID *uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, canonicalizeFrontdoorAdSaleListing, frontdoorAdID)
 	var sale_listing_id uuid.UUID
 	err := row.Scan(&sale_listing_id)
@@ -560,7 +560,7 @@ ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
 RETURNING sale_listing_id
 `
 
-func (q *Queries) CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx context.Context, frontdoorBuildingAnnouncementID uuid.UUID) (uuid.UUID, error) {
+func (q *Queries) CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, canonicalizeFrontdoorBuildingAnnouncementSourceOffering, frontdoorBuildingAnnouncementID)
 	var sale_listing_id uuid.UUID
 	err := row.Scan(&sale_listing_id)
@@ -799,7 +799,7 @@ ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
 RETURNING sale_listing_id
 `
 
-func (q *Queries) CanonicalizeShortcutAdSaleListing(ctx context.Context, shortcutAdID int64) (uuid.UUID, error) {
+func (q *Queries) CanonicalizeShortcutAdSaleListing(ctx context.Context, shortcutAdID *int64) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, canonicalizeShortcutAdSaleListing, shortcutAdID)
 	var sale_listing_id uuid.UUID
 	err := row.Scan(&sale_listing_id)
@@ -933,22 +933,22 @@ WHERE ($1 = 'all' OR u.source = $1)
 `
 
 type CountUnifiedEntitiesParams struct {
-	SourceFilter      interface{} `json:"source_filter"`
-	KindFilter        interface{} `json:"kind_filter"`
-	QueryText         *string     `json:"query_text"`
-	CityFilter        *string     `json:"city_filter"`
-	PostalFilter      *string     `json:"postal_filter"`
-	MinPrice          *int64      `json:"min_price"`
-	MaxPrice          *int64      `json:"max_price"`
-	MinArea           *float64    `json:"min_area"`
-	MaxArea           *float64    `json:"max_area"`
-	ListingTypeFilter *string     `json:"listing_type_filter"`
-	GroupingFilter    interface{} `json:"grouping_filter"`
-	PublishedAfter    *time.Time  `json:"published_after"`
-	PublishedBefore   *time.Time  `json:"published_before"`
+	SourceFilter      *string    `json:"source_filter"`
+	KindFilter        *string    `json:"kind_filter"`
+	QueryText         *string    `json:"query_text"`
+	CityFilter        *string    `json:"city_filter"`
+	PostalFilter      *string    `json:"postal_filter"`
+	MinPrice          *int64     `json:"min_price"`
+	MaxPrice          *int64     `json:"max_price"`
+	MinArea           *float64   `json:"min_area"`
+	MaxArea           *float64   `json:"max_area"`
+	ListingTypeFilter *string    `json:"listing_type_filter"`
+	GroupingFilter    *string    `json:"grouping_filter"`
+	PublishedAfter    *time.Time `json:"published_after"`
+	PublishedBefore   *time.Time `json:"published_before"`
 }
 
-func (q *Queries) CountUnifiedEntities(ctx context.Context, arg CountUnifiedEntitiesParams) (int64, error) {
+func (q *Queries) CountUnifiedEntities(ctx context.Context, arg CountUnifiedEntitiesParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, countUnifiedEntities,
 		arg.SourceFilter,
 		arg.KindFilter,
@@ -964,7 +964,7 @@ func (q *Queries) CountUnifiedEntities(ctx context.Context, arg CountUnifiedEnti
 		arg.PublishedAfter,
 		arg.PublishedBefore,
 	)
-	var count int64
+	var count *int64
 	err := row.Scan(&count)
 	return count, err
 }
@@ -1011,12 +1011,12 @@ RETURNING
 `
 
 type CreateDetachedPropertyDocumentParams struct {
-	DocumentType  string `json:"document_type"`
-	Filename      string `json:"filename"`
-	MimeType      string `json:"mime_type"`
-	SizeBytes     int64  `json:"size_bytes"`
-	Sha256        string `json:"sha256"`
-	DocumentBytes []byte `json:"document_bytes"`
+	DocumentType  *string `json:"document_type"`
+	Filename      *string `json:"filename"`
+	MimeType      *string `json:"mime_type"`
+	SizeBytes     *int64  `json:"size_bytes"`
+	Sha256        *string `json:"sha256"`
+	DocumentBytes []byte  `json:"document_bytes"`
 }
 
 type CreateDetachedPropertyDocumentRow struct {
@@ -1084,7 +1084,7 @@ INSERT INTO public.property_dimension_projection_runs (
 RETURNING property_dimension_projection_run_id
 `
 
-func (q *Queries) CreateManagerCertificateRenovationProjectionRun(ctx context.Context, propertyDocumentID uuid.UUID) (uuid.UUID, error) {
+func (q *Queries) CreateManagerCertificateRenovationProjectionRun(ctx context.Context, propertyDocumentID *uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, createManagerCertificateRenovationProjectionRun, propertyDocumentID)
 	var property_dimension_projection_run_id uuid.UUID
 	err := row.Scan(&property_dimension_projection_run_id)
@@ -1107,9 +1107,9 @@ RETURNING property_document_extraction_run_id
 `
 
 type CreatePropertyDocumentExtractionRunParams struct {
-	PropertyDocumentID uuid.UUID `json:"property_document_id"`
-	Model              string    `json:"model"`
-	PromptVersion      string    `json:"prompt_version"`
+	PropertyDocumentID *uuid.UUID `json:"property_document_id"`
+	Model              *string    `json:"model"`
+	PromptVersion      *string    `json:"prompt_version"`
 }
 
 func (q *Queries) CreatePropertyDocumentExtractionRun(ctx context.Context, arg CreatePropertyDocumentExtractionRunParams) (uuid.UUID, error) {
@@ -1180,13 +1180,13 @@ RETURNING
 `
 
 type CreatePropertyDocumentForOfferingParams struct {
-	DocumentType       string    `json:"document_type"`
-	Filename           string    `json:"filename"`
-	MimeType           string    `json:"mime_type"`
-	SizeBytes          int64     `json:"size_bytes"`
-	Sha256             string    `json:"sha256"`
-	DocumentBytes      []byte    `json:"document_bytes"`
-	PropertyOfferingID uuid.UUID `json:"property_offering_id"`
+	DocumentType       *string    `json:"document_type"`
+	Filename           *string    `json:"filename"`
+	MimeType           *string    `json:"mime_type"`
+	SizeBytes          *int64     `json:"size_bytes"`
+	Sha256             *string    `json:"sha256"`
+	DocumentBytes      []byte     `json:"document_bytes"`
+	PropertyOfferingID *uuid.UUID `json:"property_offering_id"`
 }
 
 type CreatePropertyDocumentForOfferingRow struct {
@@ -1253,7 +1253,7 @@ WHERE claims.source_table = 'property_documents'
     AND claims.extraction_model IS NOT NULL
 `
 
-func (q *Queries) DeleteLLMPropertyClaimsForDocument(ctx context.Context, propertyDocumentID uuid.UUID) error {
+func (q *Queries) DeleteLLMPropertyClaimsForDocument(ctx context.Context, propertyDocumentID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteLLMPropertyClaimsForDocument, propertyDocumentID)
 	return err
 }
@@ -1266,8 +1266,8 @@ WHERE claims.target_type = public.fnc__legacy_property_dimension_target_type($1:
 `
 
 type DeleteLLMPropertyClaimsForEntityParams struct {
-	EntityType string    `json:"entity_type"`
-	EntityID   uuid.UUID `json:"entity_id"`
+	EntityType *string    `json:"entity_type"`
+	EntityID   *uuid.UUID `json:"entity_id"`
 }
 
 func (q *Queries) DeleteLLMPropertyClaimsForEntity(ctx context.Context, arg DeleteLLMPropertyClaimsForEntityParams) error {
@@ -1284,7 +1284,7 @@ WHERE source_type = 'source_listing'
     AND evidence ->> 'source_field' LIKE 'llm_%'
 `
 
-func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, saleListingID uuid.UUID) error {
+func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, saleListingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingInsights, saleListingID)
 	return err
 }
@@ -1295,7 +1295,7 @@ WHERE sale_listing_id = $1
     AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text')
 `
 
-func (q *Queries) DeleteLLMPropertySourceOfferingRenovations(ctx context.Context, saleListingID uuid.UUID) error {
+func (q *Queries) DeleteLLMPropertySourceOfferingRenovations(ctx context.Context, saleListingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingRenovations, saleListingID)
 	return err
 }
@@ -1311,8 +1311,8 @@ WHERE event_scope = 'source'
 `
 
 type DeleteManagerCertificateRenovationEventsParams struct {
-	HousingCompanyID   uuid.UUID `json:"housing_company_id"`
-	PropertyDocumentID uuid.UUID `json:"property_document_id"`
+	HousingCompanyID   *uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentID *uuid.UUID `json:"property_document_id"`
 }
 
 func (q *Queries) DeleteManagerCertificateRenovationEvents(ctx context.Context, arg DeleteManagerCertificateRenovationEventsParams) error {
@@ -1381,13 +1381,13 @@ RETURNING housing_company_id
 `
 
 type EnsureManagerCertificateHousingCompanyParams struct {
-	IdentityKey        string  `json:"identity_key"`
+	IdentityKey        *string `json:"identity_key"`
 	Name               *string `json:"name"`
 	BusinessID         *string `json:"business_id"`
 	BuildYear          *int32  `json:"build_year"`
 	ApartmentCount     *int32  `json:"apartment_count"`
 	EnergyClass        *string `json:"energy_class"`
-	PropertyDocumentID string  `json:"property_document_id"`
+	PropertyDocumentID *string `json:"property_document_id"`
 }
 
 func (q *Queries) EnsureManagerCertificateHousingCompany(ctx context.Context, arg EnsureManagerCertificateHousingCompanyParams) (uuid.UUID, error) {
@@ -1433,7 +1433,7 @@ RETURNING physical_building_id
 
 type EnsureManagerCertificatePhysicalBuildingParams struct {
 	HousingCompanyID *uuid.UUID `json:"housing_company_id"`
-	IdentityKey      string     `json:"identity_key"`
+	IdentityKey      *string    `json:"identity_key"`
 	BuildYear        *int32     `json:"build_year"`
 	FloorCount       *int32     `json:"floor_count"`
 	ApartmentCount   *int32     `json:"apartment_count"`
@@ -1477,9 +1477,9 @@ RETURNING property_offering_id
 
 type EnsureManagerCertificatePropertyOfferingParams struct {
 	PropertyUnitID     *uuid.UUID `json:"property_unit_id"`
-	IdentityKey        string     `json:"identity_key"`
-	Headline           string     `json:"headline"`
-	PropertyDocumentID string     `json:"property_document_id"`
+	IdentityKey        *string    `json:"identity_key"`
+	Headline           *string    `json:"headline"`
+	PropertyDocumentID *string    `json:"property_document_id"`
 }
 
 func (q *Queries) EnsureManagerCertificatePropertyOffering(ctx context.Context, arg EnsureManagerCertificatePropertyOfferingParams) (uuid.UUID, error) {
@@ -1529,15 +1529,15 @@ RETURNING property_unit_id
 `
 
 type EnsureManagerCertificatePropertyUnitParams struct {
-	HousingCompanyID   uuid.UUID  `json:"housing_company_id"`
+	HousingCompanyID   *uuid.UUID `json:"housing_company_id"`
 	PhysicalBuildingID *uuid.UUID `json:"physical_building_id"`
-	IdentityKey        string     `json:"identity_key"`
+	IdentityKey        *string    `json:"identity_key"`
 	FloorLevel         *int32     `json:"floor_level"`
 	AreaM2             *float64   `json:"area_m2"`
 	RoomsCount         *int32     `json:"rooms_count"`
 	RoomLayout         *string    `json:"room_layout"`
 	LayoutMatchKey     *string    `json:"layout_match_key"`
-	PropertyDocumentID string     `json:"property_document_id"`
+	PropertyDocumentID *string    `json:"property_document_id"`
 }
 
 func (q *Queries) EnsureManagerCertificatePropertyUnit(ctx context.Context, arg EnsureManagerCertificatePropertyUnitParams) (uuid.UUID, error) {
@@ -1577,7 +1577,15 @@ WITH linked AS (
 ),
 listing AS (
     SELECT
-        sl.sale_listing_id, sl.shortcut_ad_id, sl.frontdoor_ad_id, sl.frontdoor_building_announcement_id, sl.prices_transaction_id, sl.sale_listing_source_provider, sl.sale_listing_source_kind, sl.sale_listing_native_id, sl.sale_listing_canonical_id, sl.sale_listing_url, sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_city, sl.sale_listing_postal, sl.sale_listing_asking_price, sl.sale_listing_area_value, sl.sale_listing_room_layout, sl.sale_listing_last_seen_at, sl.sale_listing_published_at, sl.sale_listing_search_text, sl.sale_listing_created_at, sl.sale_listing_updated_at, sl.sale_listing_street_name, sl.sale_listing_street_number, sl.sale_listing_building_letter, sl.sale_listing_apartment, sl.sale_listing_street_name_norm, sl.sale_listing_street_number_norm, sl.sale_listing_building_letter_norm, sl.sale_listing_city_norm, sl.sale_listing_postal_norm, sl.sale_listing_address_norm, sl.sale_listing_address_components, sl.sale_listing_building_match_key, sl.sale_listing_street_match_key, sl.sale_listing_unit_match_key, sl.sale_listing_price_per_m2, sl.sale_listing_debt_free_price, sl.sale_listing_debt_share_amount, sl.sale_listing_rooms_count, sl.sale_listing_floor_level, sl.sale_listing_total_floors, sl.sale_listing_build_year, sl.sale_listing_condition, sl.sale_listing_energy_class, sl.sale_listing_description_text, sl.sale_listing_property_type_raw, sl.sale_listing_property_type_code, sl.sale_listing_room_category_code, sl.sale_listing_floor_text, sl.sale_listing_elevator, sl.sale_listing_plot_type_raw, sl.sale_listing_plot_type_code, sl.sale_listing_energy_efficiency_label, sl.sale_listing_energy_efficiency_class_code, sl.sale_listing_energy_efficiency_standard_year, sl.sale_listing_energy_efficiency_status, sl.sale_listing_energy_efficiency_match_code, sl.sale_listing_first_seen_at, sl.sale_listing_prices_match_status, sl.sale_listing_prices_match_next_attempt_at, sl.sale_listing_prices_match_last_attempted_at, sl.sale_listing_prices_match_attempt_count, sl.sale_listing_prices_match_expires_at, sl.sale_listing_prices_match_run_id, sl.sale_listing_plot_owned, sl.sale_listing_source_match_status, sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_source_match_last_attempted_at, sl.sale_listing_source_match_attempt_count, sl.sale_listing_availability_text, sl.sale_listing_renovations_done_text, sl.sale_listing_renovations_planned_text, sl.sale_listing_additional_info_text, sl.sale_listing_charges_text, sl.sale_listing_maintenance_charge_monthly, sl.sale_listing_total_charge_monthly, sl.sale_listing_water_charge, sl.sale_listing_housing_company_name, sl.sale_listing_housing_company_business_id, sl.sale_listing_building_material, sl.sale_listing_heating_system, sl.sale_listing_roof_type, sl.sale_listing_roof_material, sl.sale_listing_apartment_count, sl.sale_listing_car_storage_text, sl.sale_listing_building_description_text, sl.sale_listing_building_other_info_text, sl.sale_listing_latitude, sl.sale_listing_longitude, sl.sale_listing_living_area_value, sl.sale_listing_total_area_value, sl.sale_listing_other_area_value, sl.sale_listing_bedrooms_count, sl.sale_listing_sauna, sl.sale_listing_balcony, sl.sale_listing_parking_text, sl.sale_listing_kitchen_description_text, sl.sale_listing_bathroom_description_text, sl.sale_listing_storage_description_text, sl.sale_listing_floor_materials_description_text, sl.sale_listing_wall_materials_description_text, sl.sale_listing_balcony_description_text, sl.sale_listing_sauna_description_text, sl.sale_listing_views_description_text, sl.sale_listing_appliances, sl.sale_listing_features, sl.sale_listing_plot_area_value, sl.sale_listing_services_text, sl.sale_listing_transport_text, sl.sale_listing_previous_asking_price, sl.sale_listing_previous_debt_free_price, sl.sale_listing_new_development,
+        sl.sale_listing_address_norm,
+        sl.sale_listing_postal_norm,
+        sl.sale_listing_city_norm,
+        sl.sale_listing_build_year,
+        sl.sale_listing_total_floors,
+        sl.sale_listing_apartment_count,
+        sl.sale_listing_elevator,
+        sl.sale_listing_latitude,
+        sl.sale_listing_longitude,
         linked.housing_company_id,
         linked.property_unit_id,
         linked.housing_company_identity_key
@@ -1734,7 +1742,7 @@ type FindCrossSourceAdMatchesParams struct {
 	CityFilter    *string  `json:"city_filter"`
 	MaxPriceDelta *int64   `json:"max_price_delta"`
 	MaxAreaDelta  *float64 `json:"max_area_delta"`
-	LimitCount    int32    `json:"limit_count"`
+	LimitCount    *int32   `json:"limit_count"`
 }
 
 type FindCrossSourceAdMatchesRow struct {
@@ -1802,10 +1810,10 @@ WHERE property_document_extraction_run_id = $4
 `
 
 type FinishPropertyDocumentExtractionRunParams struct {
-	Status                          string          `json:"status"`
+	Status                          *string         `json:"status"`
 	RawJson                         json.RawMessage `json:"raw_json"`
-	ErrorText                       interface{}     `json:"error_text"`
-	PropertyDocumentExtractionRunID uuid.UUID       `json:"property_document_extraction_run_id"`
+	ErrorText                       *string         `json:"error_text"`
+	PropertyDocumentExtractionRunID *uuid.UUID      `json:"property_document_extraction_run_id"`
 }
 
 func (q *Queries) FinishPropertyDocumentExtractionRun(ctx context.Context, arg FinishPropertyDocumentExtractionRunParams) error {
@@ -1879,9 +1887,9 @@ type GetFrontdoorAdUnifiedDetailRow struct {
 	AdLongitude                         *float64        `json:"ad_longitude"`
 	AdPrice                             *int64          `json:"ad_price"`
 	AdArea                              *float64        `json:"ad_area"`
-	AdRoomLayout                        string          `json:"ad_room_layout"`
-	AdPropertyType                      string          `json:"ad_property_type"`
-	AdCondition                         string          `json:"ad_condition"`
+	AdRoomLayout                        *string         `json:"ad_room_layout"`
+	AdPropertyType                      *string         `json:"ad_property_type"`
+	AdCondition                         *string         `json:"ad_condition"`
 	FrontdoorAdDescriptionText          *string         `json:"frontdoor_ad_description_text"`
 	FrontdoorAdAvailabilityText         *string         `json:"frontdoor_ad_availability_text"`
 	FrontdoorAdRenovationsDoneText      *string         `json:"frontdoor_ad_renovations_done_text"`
@@ -1900,12 +1908,12 @@ type GetFrontdoorAdUnifiedDetailRow struct {
 	FrontdoorAdEnergyClass              *string         `json:"frontdoor_ad_energy_class"`
 	FrontdoorAdPlotType                 *string         `json:"frontdoor_ad_plot_type"`
 	FrontdoorAdElevator                 *bool           `json:"frontdoor_ad_elevator"`
-	FrontdoorAdSauna                    bool            `json:"frontdoor_ad_sauna"`
+	FrontdoorAdSauna                    *bool           `json:"frontdoor_ad_sauna"`
 	FrontdoorAdRoomsCount               *int32          `json:"frontdoor_ad_rooms_count"`
 	FrontdoorAdData                     json.RawMessage `json:"frontdoor_ad_data"`
 }
 
-func (q *Queries) GetFrontdoorAdUnifiedDetail(ctx context.Context, externalID string) (GetFrontdoorAdUnifiedDetailRow, error) {
+func (q *Queries) GetFrontdoorAdUnifiedDetail(ctx context.Context, externalID *string) (GetFrontdoorAdUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getFrontdoorAdUnifiedDetail, externalID)
 	var i GetFrontdoorAdUnifiedDetailRow
 	err := row.Scan(
@@ -2045,7 +2053,7 @@ type GetFrontdoorAnnouncementUnifiedDetailRow struct {
 	RawJson                                      json.RawMessage `json:"raw_json"`
 }
 
-func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, announcementID uuid.UUID) (GetFrontdoorAnnouncementUnifiedDetailRow, error) {
+func (q *Queries) GetFrontdoorAnnouncementUnifiedDetail(ctx context.Context, announcementID *uuid.UUID) (GetFrontdoorAnnouncementUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getFrontdoorAnnouncementUnifiedDetail, announcementID)
 	var i GetFrontdoorAnnouncementUnifiedDetailRow
 	err := row.Scan(
@@ -2135,11 +2143,11 @@ type GetFrontdoorBuildingUnifiedDetailRow struct {
 	FrontdoorBuildingLongitude                *float64        `json:"frontdoor_building_longitude"`
 	FrontdoorBuildingHousingCompanyID         *int64          `json:"frontdoor_building_housing_company_id"`
 	FrontdoorBuildingHousingCompanyFriendlyID *string         `json:"frontdoor_building_housing_company_friendly_id"`
-	AnnouncementCount                         int64           `json:"announcement_count"`
+	AnnouncementCount                         *int64          `json:"announcement_count"`
 	FrontdoorBuildingData                     json.RawMessage `json:"frontdoor_building_data"`
 }
 
-func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildingID uuid.UUID) (GetFrontdoorBuildingUnifiedDetailRow, error) {
+func (q *Queries) GetFrontdoorBuildingUnifiedDetail(ctx context.Context, buildingID *uuid.UUID) (GetFrontdoorBuildingUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getFrontdoorBuildingUnifiedDetail, buildingID)
 	var i GetFrontdoorBuildingUnifiedDetailRow
 	err := row.Scan(
@@ -2192,13 +2200,28 @@ LIMIT 1
 `
 
 type GetLatestPropertyDocumentExtractionParams struct {
-	PropertyDocumentID uuid.UUID `json:"property_document_id"`
-	Kind               string    `json:"kind"`
+	PropertyDocumentID *uuid.UUID `json:"property_document_id"`
+	Kind               *string    `json:"kind"`
 }
 
-func (q *Queries) GetLatestPropertyDocumentExtraction(ctx context.Context, arg GetLatestPropertyDocumentExtractionParams) (PropertyDocumentExtraction, error) {
+type GetLatestPropertyDocumentExtractionRow struct {
+	PropertyDocumentExtractionID            uuid.UUID       `json:"property_document_extraction_id"`
+	PropertyDocumentID                      uuid.UUID       `json:"property_document_id"`
+	PropertyDocumentExtractionKind          string          `json:"property_document_extraction_kind"`
+	PropertyDocumentExtractionSchemaVersion string          `json:"property_document_extraction_schema_version"`
+	PropertyDocumentExtractionModel         string          `json:"property_document_extraction_model"`
+	PropertyDocumentExtractionPromptVersion string          `json:"property_document_extraction_prompt_version"`
+	PropertyDocumentExtractionSourceJson    json.RawMessage `json:"property_document_extraction_source_json"`
+	PropertyDocumentExtractionStatus        string          `json:"property_document_extraction_status"`
+	PropertyDocumentExtractionError         *string         `json:"property_document_extraction_error"`
+	PropertyDocumentExtractionCreatedAt     time.Time       `json:"property_document_extraction_created_at"`
+	PropertyDocumentExtractionExtractedAt   time.Time       `json:"property_document_extraction_extracted_at"`
+	PropertyDocumentExtractionSupersededAt  *time.Time      `json:"property_document_extraction_superseded_at"`
+}
+
+func (q *Queries) GetLatestPropertyDocumentExtraction(ctx context.Context, arg GetLatestPropertyDocumentExtractionParams) (GetLatestPropertyDocumentExtractionRow, error) {
 	row := q.db.QueryRow(ctx, getLatestPropertyDocumentExtraction, arg.PropertyDocumentID, arg.Kind)
-	var i PropertyDocumentExtraction
+	var i GetLatestPropertyDocumentExtractionRow
 	err := row.Scan(
 		&i.PropertyDocumentExtractionID,
 		&i.PropertyDocumentID,
@@ -2240,7 +2263,7 @@ type GetPropertyDocumentDownloadRow struct {
 	PropertyDocumentBytes     []byte    `json:"property_document_bytes"`
 }
 
-func (q *Queries) GetPropertyDocumentDownload(ctx context.Context, propertyDocumentID uuid.UUID) (GetPropertyDocumentDownloadRow, error) {
+func (q *Queries) GetPropertyDocumentDownload(ctx context.Context, propertyDocumentID *uuid.UUID) (GetPropertyDocumentDownloadRow, error) {
 	row := q.db.QueryRow(ctx, getPropertyDocumentDownload, propertyDocumentID)
 	var i GetPropertyDocumentDownloadRow
 	err := row.Scan(
@@ -2287,7 +2310,7 @@ type GetPropertyDocumentForExtractionRow struct {
 	PropertyDocumentBytes     []byte     `json:"property_document_bytes"`
 }
 
-func (q *Queries) GetPropertyDocumentForExtraction(ctx context.Context, propertyDocumentID uuid.UUID) (GetPropertyDocumentForExtractionRow, error) {
+func (q *Queries) GetPropertyDocumentForExtraction(ctx context.Context, propertyDocumentID *uuid.UUID) (GetPropertyDocumentForExtractionRow, error) {
 	row := q.db.QueryRow(ctx, getPropertyDocumentForExtraction, propertyDocumentID)
 	var i GetPropertyDocumentForExtractionRow
 	err := row.Scan(
@@ -2344,7 +2367,7 @@ type GetPropertyDocumentSummaryRow struct {
 	PropertyDocumentExtractedAt      *time.Time `json:"property_document_extracted_at"`
 }
 
-func (q *Queries) GetPropertyDocumentSummary(ctx context.Context, propertyDocumentID uuid.UUID) (GetPropertyDocumentSummaryRow, error) {
+func (q *Queries) GetPropertyDocumentSummary(ctx context.Context, propertyDocumentID *uuid.UUID) (GetPropertyDocumentSummaryRow, error) {
 	row := q.db.QueryRow(ctx, getPropertyDocumentSummary, propertyDocumentID)
 	var i GetPropertyDocumentSummaryRow
 	err := row.Scan(
@@ -2377,12 +2400,12 @@ LIMIT 1
 `
 
 type GetPropertySourceOfferingDescriptionTextsRow struct {
-	DescriptionText    string `json:"description_text"`
-	BuildingText       string `json:"building_text"`
-	AdditionalInfoText string `json:"additional_info_text"`
+	DescriptionText    *string `json:"description_text"`
+	BuildingText       *string `json:"building_text"`
+	AdditionalInfoText *string `json:"additional_info_text"`
 }
 
-func (q *Queries) GetPropertySourceOfferingDescriptionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingDescriptionTextsRow, error) {
+func (q *Queries) GetPropertySourceOfferingDescriptionTexts(ctx context.Context, saleListingID *uuid.UUID) (GetPropertySourceOfferingDescriptionTextsRow, error) {
 	row := q.db.QueryRow(ctx, getPropertySourceOfferingDescriptionTexts, saleListingID)
 	var i GetPropertySourceOfferingDescriptionTextsRow
 	err := row.Scan(&i.DescriptionText, &i.BuildingText, &i.AdditionalInfoText)
@@ -2476,24 +2499,24 @@ type GetPropertySourceOfferingDetailRow struct {
 	SaleListingID                       uuid.UUID  `json:"sale_listing_id"`
 	SaleListingSourceProvider           string     `json:"sale_listing_source_provider"`
 	SaleListingSourceKind               string     `json:"sale_listing_source_kind"`
-	Url                                 string     `json:"url"`
-	Headline                            string     `json:"headline"`
-	StreetAddress                       string     `json:"street_address"`
-	City                                string     `json:"city"`
-	Postal                              string     `json:"postal"`
+	Url                                 *string    `json:"url"`
+	Headline                            *string    `json:"headline"`
+	StreetAddress                       *string    `json:"street_address"`
+	City                                *string    `json:"city"`
+	Postal                              *string    `json:"postal"`
 	SaleListingLatitude                 *float64   `json:"sale_listing_latitude"`
 	SaleListingLongitude                *float64   `json:"sale_listing_longitude"`
-	RoomLayout                          string     `json:"room_layout"`
+	RoomLayout                          *string    `json:"room_layout"`
 	SaleListingRoomsCount               *int32     `json:"sale_listing_rooms_count"`
 	SaleListingAreaValue                *float64   `json:"sale_listing_area_value"`
 	SaleListingFloorLevel               *int32     `json:"sale_listing_floor_level"`
-	PropertyTypeRaw                     string     `json:"property_type_raw"`
-	Condition                           string     `json:"condition"`
+	PropertyTypeRaw                     *string    `json:"property_type_raw"`
+	Condition                           *string    `json:"condition"`
 	SaleListingElevator                 *bool      `json:"sale_listing_elevator"`
-	EnergyClass                         string     `json:"energy_class"`
-	EnergyEfficiencyLabel               string     `json:"energy_efficiency_label"`
-	PlotTypeRaw                         string     `json:"plot_type_raw"`
-	PlotTypeCode                        string     `json:"plot_type_code"`
+	EnergyClass                         *string    `json:"energy_class"`
+	EnergyEfficiencyLabel               *string    `json:"energy_efficiency_label"`
+	PlotTypeRaw                         *string    `json:"plot_type_raw"`
+	PlotTypeCode                        *string    `json:"plot_type_code"`
 	SaleListingPlotOwned                *bool      `json:"sale_listing_plot_owned"`
 	SaleListingAskingPrice              *int64     `json:"sale_listing_asking_price"`
 	SaleListingDebtFreePrice            *int64     `json:"sale_listing_debt_free_price"`
@@ -2511,44 +2534,44 @@ type GetPropertySourceOfferingDetailRow struct {
 	SaleListingBedroomsCount            *int32     `json:"sale_listing_bedrooms_count"`
 	SaleListingSauna                    *bool      `json:"sale_listing_sauna"`
 	SaleListingBalcony                  *bool      `json:"sale_listing_balcony"`
-	ParkingText                         string     `json:"parking_text"`
-	KitchenDescriptionText              string     `json:"kitchen_description_text"`
-	BathroomDescriptionText             string     `json:"bathroom_description_text"`
-	StorageDescriptionText              string     `json:"storage_description_text"`
-	FloorMaterialsDescriptionText       string     `json:"floor_materials_description_text"`
-	WallMaterialsDescriptionText        string     `json:"wall_materials_description_text"`
-	BalconyDescriptionText              string     `json:"balcony_description_text"`
-	SaunaDescriptionText                string     `json:"sauna_description_text"`
-	ViewsDescriptionText                string     `json:"views_description_text"`
+	ParkingText                         *string    `json:"parking_text"`
+	KitchenDescriptionText              *string    `json:"kitchen_description_text"`
+	BathroomDescriptionText             *string    `json:"bathroom_description_text"`
+	StorageDescriptionText              *string    `json:"storage_description_text"`
+	FloorMaterialsDescriptionText       *string    `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText        *string    `json:"wall_materials_description_text"`
+	BalconyDescriptionText              *string    `json:"balcony_description_text"`
+	SaunaDescriptionText                *string    `json:"sauna_description_text"`
+	ViewsDescriptionText                *string    `json:"views_description_text"`
 	Appliances                          []string   `json:"appliances"`
 	Features                            []string   `json:"features"`
 	SaleListingPlotAreaValue            *float64   `json:"sale_listing_plot_area_value"`
-	ServicesText                        string     `json:"services_text"`
-	TransportText                       string     `json:"transport_text"`
+	ServicesText                        *string    `json:"services_text"`
+	TransportText                       *string    `json:"transport_text"`
 	SaleListingPreviousAskingPrice      *int64     `json:"sale_listing_previous_asking_price"`
 	SaleListingPreviousDebtFreePrice    *int64     `json:"sale_listing_previous_debt_free_price"`
 	SaleListingNewDevelopment           *bool      `json:"sale_listing_new_development"`
-	DescriptionText                     string     `json:"description_text"`
-	AvailabilityText                    string     `json:"availability_text"`
-	RenovationsDoneText                 string     `json:"renovations_done_text"`
-	RenovationsPlannedText              string     `json:"renovations_planned_text"`
-	AdditionalInfoText                  string     `json:"additional_info_text"`
-	ChargesText                         string     `json:"charges_text"`
+	DescriptionText                     *string    `json:"description_text"`
+	AvailabilityText                    *string    `json:"availability_text"`
+	RenovationsDoneText                 *string    `json:"renovations_done_text"`
+	RenovationsPlannedText              *string    `json:"renovations_planned_text"`
+	AdditionalInfoText                  *string    `json:"additional_info_text"`
+	ChargesText                         *string    `json:"charges_text"`
 	SaleListingMaintenanceChargeMonthly *float64   `json:"sale_listing_maintenance_charge_monthly"`
 	SaleListingTotalChargeMonthly       *float64   `json:"sale_listing_total_charge_monthly"`
 	SaleListingWaterCharge              *float64   `json:"sale_listing_water_charge"`
-	HousingCompanyName                  string     `json:"housing_company_name"`
-	HousingCompanyBusinessID            string     `json:"housing_company_business_id"`
-	BuildingMaterial                    string     `json:"building_material"`
-	HeatingSystem                       string     `json:"heating_system"`
-	RoofType                            string     `json:"roof_type"`
-	RoofMaterial                        string     `json:"roof_material"`
-	CarStorageText                      string     `json:"car_storage_text"`
-	BuildingDescriptionText             string     `json:"building_description_text"`
-	BuildingOtherInfoText               string     `json:"building_other_info_text"`
+	HousingCompanyName                  *string    `json:"housing_company_name"`
+	HousingCompanyBusinessID            *string    `json:"housing_company_business_id"`
+	BuildingMaterial                    *string    `json:"building_material"`
+	HeatingSystem                       *string    `json:"heating_system"`
+	RoofType                            *string    `json:"roof_type"`
+	RoofMaterial                        *string    `json:"roof_material"`
+	CarStorageText                      *string    `json:"car_storage_text"`
+	BuildingDescriptionText             *string    `json:"building_description_text"`
+	BuildingOtherInfoText               *string    `json:"building_other_info_text"`
 }
 
-func (q *Queries) GetPropertySourceOfferingDetail(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingDetailRow, error) {
+func (q *Queries) GetPropertySourceOfferingDetail(ctx context.Context, saleListingID *uuid.UUID) (GetPropertySourceOfferingDetailRow, error) {
 	row := q.db.QueryRow(ctx, getPropertySourceOfferingDetail, saleListingID)
 	var i GetPropertySourceOfferingDetailRow
 	err := row.Scan(
@@ -2669,7 +2692,7 @@ LIMIT 1
 `
 
 type GetPropertySourceOfferingValuationExtractionTextsRow struct {
-	RoomLayout                    string   `json:"room_layout"`
+	RoomLayout                    *string  `json:"room_layout"`
 	SaleListingRoomsCount         *int32   `json:"sale_listing_rooms_count"`
 	SaleListingBedroomsCount      *int32   `json:"sale_listing_bedrooms_count"`
 	SaleListingAreaValue          *float64 `json:"sale_listing_area_value"`
@@ -2678,32 +2701,32 @@ type GetPropertySourceOfferingValuationExtractionTextsRow struct {
 	SaleListingOtherAreaValue     *float64 `json:"sale_listing_other_area_value"`
 	SaleListingFloorLevel         *int32   `json:"sale_listing_floor_level"`
 	SaleListingTotalFloors        *int32   `json:"sale_listing_total_floors"`
-	FloorText                     string   `json:"floor_text"`
-	Condition                     string   `json:"condition"`
+	FloorText                     *string  `json:"floor_text"`
+	Condition                     *string  `json:"condition"`
 	SaleListingSauna              *bool    `json:"sale_listing_sauna"`
 	SaleListingBalcony            *bool    `json:"sale_listing_balcony"`
-	ParkingText                   string   `json:"parking_text"`
-	DescriptionText               string   `json:"description_text"`
-	AdditionalInfoText            string   `json:"additional_info_text"`
-	KitchenDescriptionText        string   `json:"kitchen_description_text"`
-	BathroomDescriptionText       string   `json:"bathroom_description_text"`
-	StorageDescriptionText        string   `json:"storage_description_text"`
-	FloorMaterialsDescriptionText string   `json:"floor_materials_description_text"`
-	WallMaterialsDescriptionText  string   `json:"wall_materials_description_text"`
-	BalconyDescriptionText        string   `json:"balcony_description_text"`
-	SaunaDescriptionText          string   `json:"sauna_description_text"`
-	ViewsDescriptionText          string   `json:"views_description_text"`
-	BuildingMaterial              string   `json:"building_material"`
-	HeatingSystem                 string   `json:"heating_system"`
-	RoofType                      string   `json:"roof_type"`
-	RoofMaterial                  string   `json:"roof_material"`
-	CarStorageText                string   `json:"car_storage_text"`
-	BuildingDescriptionText       string   `json:"building_description_text"`
-	BuildingOtherInfoText         string   `json:"building_other_info_text"`
-	ChargesText                   string   `json:"charges_text"`
+	ParkingText                   *string  `json:"parking_text"`
+	DescriptionText               *string  `json:"description_text"`
+	AdditionalInfoText            *string  `json:"additional_info_text"`
+	KitchenDescriptionText        *string  `json:"kitchen_description_text"`
+	BathroomDescriptionText       *string  `json:"bathroom_description_text"`
+	StorageDescriptionText        *string  `json:"storage_description_text"`
+	FloorMaterialsDescriptionText *string  `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText  *string  `json:"wall_materials_description_text"`
+	BalconyDescriptionText        *string  `json:"balcony_description_text"`
+	SaunaDescriptionText          *string  `json:"sauna_description_text"`
+	ViewsDescriptionText          *string  `json:"views_description_text"`
+	BuildingMaterial              *string  `json:"building_material"`
+	HeatingSystem                 *string  `json:"heating_system"`
+	RoofType                      *string  `json:"roof_type"`
+	RoofMaterial                  *string  `json:"roof_material"`
+	CarStorageText                *string  `json:"car_storage_text"`
+	BuildingDescriptionText       *string  `json:"building_description_text"`
+	BuildingOtherInfoText         *string  `json:"building_other_info_text"`
+	ChargesText                   *string  `json:"charges_text"`
 }
 
-func (q *Queries) GetPropertySourceOfferingValuationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingValuationExtractionTextsRow, error) {
+func (q *Queries) GetPropertySourceOfferingValuationExtractionTexts(ctx context.Context, saleListingID *uuid.UUID) (GetPropertySourceOfferingValuationExtractionTextsRow, error) {
 	row := q.db.QueryRow(ctx, getPropertySourceOfferingValuationExtractionTexts, saleListingID)
 	var i GetPropertySourceOfferingValuationExtractionTextsRow
 	err := row.Scan(
@@ -2750,7 +2773,7 @@ WHERE kv_key = $1
   AND expires_at > now()
 `
 
-func (q *Queries) GetRuntimeKV(ctx context.Context, kvKey string) ([]byte, error) {
+func (q *Queries) GetRuntimeKV(ctx context.Context, kvKey *string) ([]byte, error) {
 	row := q.db.QueryRow(ctx, getRuntimeKV, kvKey)
 	var kv_value []byte
 	err := row.Scan(&kv_value)
@@ -2769,11 +2792,11 @@ LIMIT 1
 `
 
 type GetSaleListingRenovationExtractionTextsRow struct {
-	DoneText    string `json:"done_text"`
-	PlannedText string `json:"planned_text"`
+	DoneText    *string `json:"done_text"`
+	PlannedText *string `json:"planned_text"`
 }
 
-func (q *Queries) GetSaleListingRenovationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetSaleListingRenovationExtractionTextsRow, error) {
+func (q *Queries) GetSaleListingRenovationExtractionTexts(ctx context.Context, saleListingID *uuid.UUID) (GetSaleListingRenovationExtractionTextsRow, error) {
 	row := q.db.QueryRow(ctx, getSaleListingRenovationExtractionTexts, saleListingID)
 	var i GetSaleListingRenovationExtractionTextsRow
 	err := row.Scan(&i.DoneText, &i.PlannedText)
@@ -2855,7 +2878,7 @@ type GetShortcutAdUnifiedDetailRow struct {
 	AdPostal                           *string         `json:"ad_postal"`
 	AdLatitude                         *float64        `json:"ad_latitude"`
 	AdLongitude                        *float64        `json:"ad_longitude"`
-	AdRoomLayout                       string          `json:"ad_room_layout"`
+	AdRoomLayout                       *string         `json:"ad_room_layout"`
 	AdPrice                            *int64          `json:"ad_price"`
 	AdArea                             *float64        `json:"ad_area"`
 	ShortcutAdDescriptionText          *string         `json:"shortcut_ad_description_text"`
@@ -2877,18 +2900,18 @@ type GetShortcutAdUnifiedDetailRow struct {
 	ShortcutAdEnergyClass              *string         `json:"shortcut_ad_energy_class"`
 	ShortcutAdPlotType                 *string         `json:"shortcut_ad_plot_type"`
 	ShortcutAdElevator                 *bool           `json:"shortcut_ad_elevator"`
-	ShortcutAdSauna                    bool            `json:"shortcut_ad_sauna"`
+	ShortcutAdSauna                    *bool           `json:"shortcut_ad_sauna"`
 	ShortcutAdRoomsCount               *int32          `json:"shortcut_ad_rooms_count"`
 	ShortcutAdData                     json.RawMessage `json:"shortcut_ad_data"`
-	ShortcutBuildingExternalID         *int64          `json:"shortcut_building_external_id"`
-	ShortcutBuildingUrl                *string         `json:"shortcut_building_url"`
+	ShortcutBuildingExternalID         int64           `json:"shortcut_building_external_id"`
+	ShortcutBuildingUrl                string          `json:"shortcut_building_url"`
 	ShortcutBuildingAddress            *string         `json:"shortcut_building_address"`
 	ShortcutBuildingHousingCompany     *string         `json:"shortcut_building_housing_company"`
-	BuildingListingCount               int64           `json:"building_listing_count"`
-	BuildingRentalCount                int64           `json:"building_rental_count"`
+	BuildingListingCount               *int64          `json:"building_listing_count"`
+	BuildingRentalCount                *int64          `json:"building_rental_count"`
 }
 
-func (q *Queries) GetShortcutAdUnifiedDetail(ctx context.Context, adID int64) (GetShortcutAdUnifiedDetailRow, error) {
+func (q *Queries) GetShortcutAdUnifiedDetail(ctx context.Context, adID *int64) (GetShortcutAdUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getShortcutAdUnifiedDetail, adID)
 	var i GetShortcutAdUnifiedDetailRow
 	err := row.Scan(
@@ -3015,13 +3038,13 @@ type GetShortcutBuildingUnifiedDetailRow struct {
 	ShortcutBuildingUpdatedAt        time.Time       `json:"shortcut_building_updated_at"`
 	ShortcutBuildingProcessedAt      *time.Time      `json:"shortcut_building_processed_at"`
 	ShortcutBuildingPageNotFound     *bool           `json:"shortcut_building_page_not_found"`
-	AdCount                          int64           `json:"ad_count"`
-	ListingCount                     int64           `json:"listing_count"`
-	RentalCount                      int64           `json:"rental_count"`
+	AdCount                          *int64          `json:"ad_count"`
+	ListingCount                     *int64          `json:"listing_count"`
+	RentalCount                      *int64          `json:"rental_count"`
 	RawJson                          json.RawMessage `json:"raw_json"`
 }
 
-func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, buildingID uuid.UUID) (GetShortcutBuildingUnifiedDetailRow, error) {
+func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, buildingID *uuid.UUID) (GetShortcutBuildingUnifiedDetailRow, error) {
 	row := q.db.QueryRow(ctx, getShortcutBuildingUnifiedDetail, buildingID)
 	var i GetShortcutBuildingUnifiedDetailRow
 	err := row.Scan(
@@ -3149,20 +3172,20 @@ ON CONFLICT (
 `
 
 type InsertDocumentPropertyClaimParams struct {
-	PromptVersion      interface{}     `json:"prompt_version"`
-	EntityID           uuid.UUID       `json:"entity_id"`
-	PropertyDocumentID uuid.UUID       `json:"property_document_id"`
-	SourceField        interface{}     `json:"source_field"`
+	PromptVersion      *string         `json:"prompt_version"`
+	EntityID           *uuid.UUID      `json:"entity_id"`
+	PropertyDocumentID *uuid.UUID      `json:"property_document_id"`
+	SourceField        *string         `json:"source_field"`
 	SourceObservedAt   *time.Time      `json:"source_observed_at"`
-	Confidence         float64         `json:"confidence"`
-	EvidenceText       interface{}     `json:"evidence_text"`
-	Model              interface{}     `json:"model"`
-	EntityType         string          `json:"entity_type"`
-	Section            string          `json:"section"`
-	Key                string          `json:"key"`
-	ValueKind          string          `json:"value_kind"`
+	Confidence         *float64        `json:"confidence"`
+	EvidenceText       *string         `json:"evidence_text"`
+	Model              *string         `json:"model"`
+	EntityType         *string         `json:"entity_type"`
+	Section            *string         `json:"section"`
+	Key                *string         `json:"key"`
+	ValueKind          *string         `json:"value_kind"`
 	ValueJson          json.RawMessage `json:"value_json"`
-	ValueText          interface{}     `json:"value_text"`
+	ValueText          *string         `json:"value_text"`
 	ValueNumber        *float64        `json:"value_number"`
 	ValueBool          *bool           `json:"value_bool"`
 }
@@ -3220,18 +3243,18 @@ INSERT INTO public.property_source_offering_renovations (
 `
 
 type InsertLLMPropertySourceOfferingRenovationParams struct {
-	SaleListingID   uuid.UUID `json:"sale_listing_id"`
-	SourceField     string    `json:"source_field"`
-	Category        string    `json:"category"`
-	Status          string    `json:"status"`
-	Year            *int32    `json:"year"`
-	Component       string    `json:"component"`
-	Scope           string    `json:"scope"`
-	Stage           string    `json:"stage"`
-	Responsibility  string    `json:"responsibility"`
-	CostEstimateEur *int64    `json:"cost_estimate_eur"`
-	Summary         string    `json:"summary"`
-	Confidence      int32     `json:"confidence"`
+	SaleListingID   *uuid.UUID `json:"sale_listing_id"`
+	SourceField     *string    `json:"source_field"`
+	Category        *string    `json:"category"`
+	Status          *string    `json:"status"`
+	Year            *int32     `json:"year"`
+	Component       *string    `json:"component"`
+	Scope           *string    `json:"scope"`
+	Stage           *string    `json:"stage"`
+	Responsibility  *string    `json:"responsibility"`
+	CostEstimateEur *int64     `json:"cost_estimate_eur"`
+	Summary         *string    `json:"summary"`
+	Confidence      *int32     `json:"confidence"`
 }
 
 func (q *Queries) InsertLLMPropertySourceOfferingRenovation(ctx context.Context, arg InsertLLMPropertySourceOfferingRenovationParams) error {
@@ -3329,11 +3352,11 @@ ON CONFLICT (
 `
 
 type InsertManagerCertificateRenovationEventParams struct {
-	PropertyDimensionProjectionRunID uuid.UUID  `json:"property_dimension_projection_run_id"`
-	HousingCompanyID                 uuid.UUID  `json:"housing_company_id"`
-	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
-	Category                         string     `json:"category"`
-	Status                           string     `json:"status"`
+	PropertyDimensionProjectionRunID *uuid.UUID `json:"property_dimension_projection_run_id"`
+	HousingCompanyID                 *uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentID               *uuid.UUID `json:"property_document_id"`
+	Category                         *string    `json:"category"`
+	Status                           *string    `json:"status"`
 	Stage                            *string    `json:"stage"`
 	Scope                            *string    `json:"scope"`
 	Responsibility                   *string    `json:"responsibility"`
@@ -3342,9 +3365,9 @@ type InsertManagerCertificateRenovationEventParams struct {
 	EndYear                          *int32     `json:"end_year"`
 	CostEstimateEur                  *int64     `json:"cost_estimate_eur"`
 	Summary                          *string    `json:"summary"`
-	SourceLabel                      string     `json:"source_label"`
-	Action                           string     `json:"action"`
-	EvidenceText                     string     `json:"evidence_text"`
+	SourceLabel                      *string    `json:"source_label"`
+	Action                           *string    `json:"action"`
+	EvidenceText                     *string    `json:"evidence_text"`
 	SourceObservedAt                 *time.Time `json:"source_observed_at"`
 }
 
@@ -3465,19 +3488,19 @@ ON CONFLICT (
 `
 
 type InsertPropertyClaimParams struct {
-	PromptVersion interface{} `json:"prompt_version"`
-	EntityID      uuid.UUID   `json:"entity_id"`
-	SourceField   interface{} `json:"source_field"`
-	Confidence    float64     `json:"confidence"`
-	EvidenceText  interface{} `json:"evidence_text"`
-	Model         interface{} `json:"model"`
-	EntityType    string      `json:"entity_type"`
-	Section       string      `json:"section"`
-	Key           string      `json:"key"`
-	ValueKind     string      `json:"value_kind"`
-	ValueText     interface{} `json:"value_text"`
-	ValueNumber   *float64    `json:"value_number"`
-	ValueBool     *bool       `json:"value_bool"`
+	PromptVersion *string    `json:"prompt_version"`
+	EntityID      *uuid.UUID `json:"entity_id"`
+	SourceField   *string    `json:"source_field"`
+	Confidence    *float64   `json:"confidence"`
+	EvidenceText  *string    `json:"evidence_text"`
+	Model         *string    `json:"model"`
+	EntityType    *string    `json:"entity_type"`
+	Section       *string    `json:"section"`
+	Key           *string    `json:"key"`
+	ValueKind     *string    `json:"value_kind"`
+	ValueText     *string    `json:"value_text"`
+	ValueNumber   *float64   `json:"value_number"`
+	ValueBool     *bool      `json:"value_bool"`
 }
 
 func (q *Queries) InsertPropertyClaim(ctx context.Context, arg InsertPropertyClaimParams) error {
@@ -3547,14 +3570,14 @@ ON CONFLICT (target_type, target_id, observation_key, source_type, source_id) WH
 `
 
 type InsertPropertySourceOfferingInsightParams struct {
-	Key           string      `json:"key"`
-	Direction     string      `json:"direction"`
-	Severity      string      `json:"severity"`
-	Value         string      `json:"value"`
-	Text          interface{} `json:"text"`
-	Confidence    int32       `json:"confidence"`
-	SourceField   string      `json:"source_field"`
-	SaleListingID uuid.UUID   `json:"sale_listing_id"`
+	Key           *string    `json:"key"`
+	Direction     *string    `json:"direction"`
+	Severity      *string    `json:"severity"`
+	Value         *string    `json:"value"`
+	Text          *string    `json:"text"`
+	Confidence    *int32     `json:"confidence"`
+	SourceField   *string    `json:"source_field"`
+	SaleListingID *uuid.UUID `json:"sale_listing_id"`
 }
 
 func (q *Queries) InsertPropertySourceOfferingInsight(ctx context.Context, arg InsertPropertySourceOfferingInsightParams) error {
@@ -3764,22 +3787,22 @@ ORDER BY property_claim_namespace, property_claim_key
 `
 
 type ListPropertyClaimsForEntityParams struct {
-	EntityType string    `json:"entity_type"`
-	EntityID   uuid.UUID `json:"entity_id"`
+	EntityType *string    `json:"entity_type"`
+	EntityID   *uuid.UUID `json:"entity_id"`
 }
 
 type ListPropertyClaimsForEntityRow struct {
-	PropertyClaimSourceField   string  `json:"property_claim_source_field"`
-	PropertyClaimNamespace     string  `json:"property_claim_namespace"`
-	PropertyClaimKey           string  `json:"property_claim_key"`
-	PropertyClaimValueKind     string  `json:"property_claim_value_kind"`
-	PropertyClaimValueText     string  `json:"property_claim_value_text"`
-	PropertyClaimValueNumber   float64 `json:"property_claim_value_number"`
-	PropertyClaimValueBool     bool    `json:"property_claim_value_bool"`
-	PropertyClaimConfidence    int32   `json:"property_claim_confidence"`
-	PropertyClaimEvidenceText  string  `json:"property_claim_evidence_text"`
-	PropertyClaimModel         string  `json:"property_claim_model"`
-	PropertyClaimPromptVersion string  `json:"property_claim_prompt_version"`
+	PropertyClaimSourceField   *string  `json:"property_claim_source_field"`
+	PropertyClaimNamespace     *string  `json:"property_claim_namespace"`
+	PropertyClaimKey           *string  `json:"property_claim_key"`
+	PropertyClaimValueKind     *string  `json:"property_claim_value_kind"`
+	PropertyClaimValueText     *string  `json:"property_claim_value_text"`
+	PropertyClaimValueNumber   *float64 `json:"property_claim_value_number"`
+	PropertyClaimValueBool     *bool    `json:"property_claim_value_bool"`
+	PropertyClaimConfidence    *int32   `json:"property_claim_confidence"`
+	PropertyClaimEvidenceText  *string  `json:"property_claim_evidence_text"`
+	PropertyClaimModel         *string  `json:"property_claim_model"`
+	PropertyClaimPromptVersion *string  `json:"property_claim_prompt_version"`
 }
 
 func (q *Queries) ListPropertyClaimsForEntity(ctx context.Context, arg ListPropertyClaimsForEntityParams) ([]ListPropertyClaimsForEntityRow, error) {
@@ -3904,16 +3927,16 @@ ORDER BY observation.severity DESC, observation.observation_key
 `
 
 type ListPropertySourceOfferingInsightsRow struct {
-	PropertySourceOfferingInsightKey         string `json:"property_source_offering_insight_key"`
-	PropertySourceOfferingInsightValue       string `json:"property_source_offering_insight_value"`
-	PropertySourceOfferingInsightDirection   string `json:"property_source_offering_insight_direction"`
-	PropertySourceOfferingInsightSeverity    string `json:"property_source_offering_insight_severity"`
-	PropertySourceOfferingInsightConfidence  int32  `json:"property_source_offering_insight_confidence"`
-	PropertySourceOfferingInsightSourceField string `json:"property_source_offering_insight_source_field"`
-	PropertySourceOfferingInsightText        string `json:"property_source_offering_insight_text"`
+	PropertySourceOfferingInsightKey         string  `json:"property_source_offering_insight_key"`
+	PropertySourceOfferingInsightValue       *string `json:"property_source_offering_insight_value"`
+	PropertySourceOfferingInsightDirection   string  `json:"property_source_offering_insight_direction"`
+	PropertySourceOfferingInsightSeverity    string  `json:"property_source_offering_insight_severity"`
+	PropertySourceOfferingInsightConfidence  *int32  `json:"property_source_offering_insight_confidence"`
+	PropertySourceOfferingInsightSourceField *string `json:"property_source_offering_insight_source_field"`
+	PropertySourceOfferingInsightText        *string `json:"property_source_offering_insight_text"`
 }
 
-func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleListingID uuid.UUID) ([]ListPropertySourceOfferingInsightsRow, error) {
+func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleListingID *uuid.UUID) ([]ListPropertySourceOfferingInsightsRow, error) {
 	rows, err := q.db.Query(ctx, listPropertySourceOfferingInsights, saleListingID)
 	if err != nil {
 		return nil, err
@@ -4131,19 +4154,19 @@ FROM inserted
 `
 
 type ProjectListingRenovationEventsParams struct {
-	ProjectionVersion string    `json:"projection_version"`
-	SaleListingID     uuid.UUID `json:"sale_listing_id"`
+	ProjectionVersion *string    `json:"projection_version"`
+	SaleListingID     *uuid.UUID `json:"sale_listing_id"`
 }
 
-func (q *Queries) ProjectListingRenovationEvents(ctx context.Context, arg ProjectListingRenovationEventsParams) (int64, error) {
+func (q *Queries) ProjectListingRenovationEvents(ctx context.Context, arg ProjectListingRenovationEventsParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, projectListingRenovationEvents, arg.ProjectionVersion, arg.SaleListingID)
-	var projected int64
+	var projected *int64
 	err := row.Scan(&projected)
 	return projected, err
 }
 
 const rebuildListingDimensionLayer = `-- name: RebuildListingDimensionLayer :one
-SELECT public.fnc__rebuild_listing_dimension_layer($1::uuid)::jsonb AS payload
+SELECT public.fnc__rebuild_listing_dimension_layer($1::uuid, NULL::timestamptz)::jsonb AS payload
 `
 
 func (q *Queries) RebuildListingDimensionLayer(ctx context.Context, saleListingID uuid.UUID) (json.RawMessage, error) {
@@ -4171,7 +4194,22 @@ func (q *Queries) RebuildListingDimensionLayerAt(ctx context.Context, arg Rebuil
 
 const refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding = `-- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
 WITH listing AS (
-    SELECT sl.sale_listing_id, fb.frontdoor_building_id, fb.frontdoor_building_url, fb.frontdoor_building_first_seen_at, fb.frontdoor_building_last_seen_at, fb.frontdoor_building_updated_at, fb.frontdoor_building_company_name, fb.frontdoor_building_business_id, fb.frontdoor_building_apartment_count, fb.frontdoor_building_floor_count, fb.frontdoor_building_construction_end_year, fb.frontdoor_building_build_year, fb.frontdoor_building_has_elevator, fb.frontdoor_building_has_sauna, fb.frontdoor_building_energy_certificate_code, fb.frontdoor_building_plot_holding_type, fb.frontdoor_building_outer_roof_material, fb.frontdoor_building_outer_roof_type, fb.frontdoor_building_heating, fb.frontdoor_building_heating_fuel, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality, fb.frontdoor_building_district, fb.frontdoor_building_latitude, fb.frontdoor_building_longitude, fb.frontdoor_building_elevator_renovated, fb.frontdoor_building_elevator_renovated_year, fb.frontdoor_building_facade_renovated, fb.frontdoor_building_facade_renovated_year, fb.frontdoor_building_window_renovated, fb.frontdoor_building_window_renovated_year, fb.frontdoor_building_roof_renovated, fb.frontdoor_building_roof_renovated_year, fb.frontdoor_building_pipe_renovated, fb.frontdoor_building_pipe_renovated_year, fb.frontdoor_building_balcony_renovated, fb.frontdoor_building_balcony_renovated_year, fb.frontdoor_building_electricity_renovated, fb.frontdoor_building_electricity_renovated_year, fb.frontdoor_building_contact_phone, fb.frontdoor_building_contact_office_name, fb.frontdoor_building_contact_office_id, fb.frontdoor_building_description, fb.frontdoor_building_car_storage_description, fb.frontdoor_building_other_info, fb.frontdoor_building_additional_addresses, fb.frontdoor_building_links, fb.frontdoor_building_data, fb.frontdoor_building_processed_at, fb.frontdoor_building_housing_company_id, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_geom
+    SELECT
+        sl.sale_listing_id,
+        fb.frontdoor_building_elevator_renovated,
+        fb.frontdoor_building_elevator_renovated_year,
+        fb.frontdoor_building_facade_renovated,
+        fb.frontdoor_building_facade_renovated_year,
+        fb.frontdoor_building_window_renovated,
+        fb.frontdoor_building_window_renovated_year,
+        fb.frontdoor_building_roof_renovated,
+        fb.frontdoor_building_roof_renovated_year,
+        fb.frontdoor_building_pipe_renovated,
+        fb.frontdoor_building_pipe_renovated_year,
+        fb.frontdoor_building_balcony_renovated,
+        fb.frontdoor_building_balcony_renovated_year,
+        fb.frontdoor_building_electricity_renovated,
+        fb.frontdoor_building_electricity_renovated_year
     FROM public.property_source_offerings sl
     JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
@@ -4222,7 +4260,7 @@ CROSS JOIN LATERAL (
 WHERE renovation.done IS TRUE
 `
 
-func (q *Queries) RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx context.Context, saleListingID uuid.UUID) error {
+func (q *Queries) RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx context.Context, saleListingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding, saleListingID)
 	return err
 }
@@ -4497,7 +4535,31 @@ WITH unified AS (
         NULL::timestamptz AS published_at
     FROM public.frontdoor_buildings fb
 ), filtered AS (
-    SELECT source, kind, native_id, canonical_id, listing_id, offering_id, latitude, longitude, link_status, link_method, link_score, external_url_available, headline, address, city, postal, price, area, room_layout, url, last_seen_at, searchable, listing_type, published_at
+    SELECT
+        u.source,
+        u.kind,
+        u.native_id,
+        u.canonical_id,
+        u.listing_id,
+        u.offering_id,
+        u.latitude,
+        u.longitude,
+        u.link_status,
+        u.link_method,
+        u.link_score,
+        u.external_url_available,
+        u.headline,
+        u.address,
+        u.city,
+        u.postal,
+        u.price,
+        u.area,
+        u.room_layout,
+        u.url,
+        u.last_seen_at,
+        u.searchable,
+        u.listing_type,
+        u.published_at
     FROM unified u
     WHERE ($4 = 'all' OR u.source = $4)
       AND ($5 = 'all' OR u.kind = $5)
@@ -4591,56 +4653,56 @@ OFFSET $2::int
 `
 
 type SearchUnifiedEntitiesParams struct {
-	SortMode          interface{} `json:"sort_mode"`
-	OffsetCount       int32       `json:"offset_count"`
-	LimitCount        int32       `json:"limit_count"`
-	SourceFilter      interface{} `json:"source_filter"`
-	KindFilter        interface{} `json:"kind_filter"`
-	QueryText         *string     `json:"query_text"`
-	CityFilter        *string     `json:"city_filter"`
-	PostalFilter      *string     `json:"postal_filter"`
-	MinPrice          *int64      `json:"min_price"`
-	MaxPrice          *int64      `json:"max_price"`
-	MinArea           *float64    `json:"min_area"`
-	MaxArea           *float64    `json:"max_area"`
-	ListingTypeFilter *string     `json:"listing_type_filter"`
-	GroupingFilter    interface{} `json:"grouping_filter"`
-	PublishedAfter    *time.Time  `json:"published_after"`
-	PublishedBefore   *time.Time  `json:"published_before"`
+	SortMode          *string    `json:"sort_mode"`
+	OffsetCount       int32      `json:"offset_count"`
+	LimitCount        int32      `json:"limit_count"`
+	SourceFilter      *string    `json:"source_filter"`
+	KindFilter        *string    `json:"kind_filter"`
+	QueryText         *string    `json:"query_text"`
+	CityFilter        *string    `json:"city_filter"`
+	PostalFilter      *string    `json:"postal_filter"`
+	MinPrice          *int64     `json:"min_price"`
+	MaxPrice          *int64     `json:"max_price"`
+	MinArea           *float64   `json:"min_area"`
+	MaxArea           *float64   `json:"max_area"`
+	ListingTypeFilter *string    `json:"listing_type_filter"`
+	GroupingFilter    *string    `json:"grouping_filter"`
+	PublishedAfter    *time.Time `json:"published_after"`
+	PublishedBefore   *time.Time `json:"published_before"`
 }
 
 type SearchUnifiedEntitiesRow struct {
-	Source                  string    `json:"source"`
-	Kind                    string    `json:"kind"`
-	NativeID                string    `json:"native_id"`
-	CanonicalID             string    `json:"canonical_id"`
-	ListingID               string    `json:"listing_id"`
-	OfferingID              string    `json:"offering_id"`
-	Latitude                *float64  `json:"latitude"`
-	Longitude               *float64  `json:"longitude"`
-	HousingCompanyID        string    `json:"housing_company_id"`
-	HousingCompanyName      string    `json:"housing_company_name"`
-	LinkStatus              string    `json:"link_status"`
-	LinkMethod              string    `json:"link_method"`
-	LinkScore               int32     `json:"link_score"`
-	ExternalUrlAvailable    bool      `json:"external_url_available"`
-	PriceMatchTransactionID string    `json:"price_match_transaction_id"`
-	PriceMatchScope         string    `json:"price_match_scope"`
-	PriceMatchStatus        string    `json:"price_match_status"`
-	PriceMatchMethod        string    `json:"price_match_method"`
-	PriceMatchScore         int32     `json:"price_match_score"`
-	PriceMatchPriceEur      int64     `json:"price_match_price_eur"`
-	InsightCount            int32     `json:"insight_count"`
-	InsightTopSeverity      string    `json:"insight_top_severity"`
-	Headline                string    `json:"headline"`
-	Address                 string    `json:"address"`
-	City                    string    `json:"city"`
-	Postal                  string    `json:"postal"`
-	Price                   int64     `json:"price"`
-	Area                    float64   `json:"area"`
-	RoomLayout              string    `json:"room_layout"`
-	Url                     string    `json:"url"`
-	LastSeenAt              time.Time `json:"last_seen_at"`
+	Source                  *string    `json:"source"`
+	Kind                    *string    `json:"kind"`
+	NativeID                *string    `json:"native_id"`
+	CanonicalID             *string    `json:"canonical_id"`
+	ListingID               *string    `json:"listing_id"`
+	OfferingID              *string    `json:"offering_id"`
+	Latitude                *float64   `json:"latitude"`
+	Longitude               *float64   `json:"longitude"`
+	HousingCompanyID        *string    `json:"housing_company_id"`
+	HousingCompanyName      *string    `json:"housing_company_name"`
+	LinkStatus              *string    `json:"link_status"`
+	LinkMethod              *string    `json:"link_method"`
+	LinkScore               *int32     `json:"link_score"`
+	ExternalUrlAvailable    *bool      `json:"external_url_available"`
+	PriceMatchTransactionID *string    `json:"price_match_transaction_id"`
+	PriceMatchScope         *string    `json:"price_match_scope"`
+	PriceMatchStatus        *string    `json:"price_match_status"`
+	PriceMatchMethod        *string    `json:"price_match_method"`
+	PriceMatchScore         *int32     `json:"price_match_score"`
+	PriceMatchPriceEur      *int64     `json:"price_match_price_eur"`
+	InsightCount            *int32     `json:"insight_count"`
+	InsightTopSeverity      *string    `json:"insight_top_severity"`
+	Headline                *string    `json:"headline"`
+	Address                 *string    `json:"address"`
+	City                    *string    `json:"city"`
+	Postal                  *string    `json:"postal"`
+	Price                   *int64     `json:"price"`
+	Area                    *float64   `json:"area"`
+	RoomLayout              *string    `json:"room_layout"`
+	Url                     *string    `json:"url"`
+	LastSeenAt              *time.Time `json:"last_seen_at"`
 }
 
 func (q *Queries) SearchUnifiedEntities(ctx context.Context, arg SearchUnifiedEntitiesParams) ([]SearchUnifiedEntitiesRow, error) {
@@ -4746,7 +4808,7 @@ ON CONFLICT (house_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 `
 
-func (q *Queries) SyncHouseFromPropertyHouse(ctx context.Context, propertyHouseID uuid.UUID) error {
+func (q *Queries) SyncHouseFromPropertyHouse(ctx context.Context, propertyHouseID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncHouseFromPropertyHouse, propertyHouseID)
 	return err
 }
@@ -4788,7 +4850,7 @@ ON CONFLICT (listing_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 `
 
-func (q *Queries) SyncListingFromPropertyOffering(ctx context.Context, propertyOfferingID uuid.UUID) error {
+func (q *Queries) SyncListingFromPropertyOffering(ctx context.Context, propertyOfferingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncListingFromPropertyOffering, propertyOfferingID)
 	return err
 }
@@ -4834,7 +4896,7 @@ ON CONFLICT (listing_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 `
 
-func (q *Queries) SyncListingFromSourceListing(ctx context.Context, sourceListingID uuid.UUID) error {
+func (q *Queries) SyncListingFromSourceListing(ctx context.Context, sourceListingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncListingFromSourceListing, sourceListingID)
 	return err
 }
@@ -4886,9 +4948,9 @@ type SyncPropertyHouseForSaleListingParams struct {
 	LinkMethod    string    `json:"link_method"`
 }
 
-func (q *Queries) SyncPropertyHouseForSaleListing(ctx context.Context, arg SyncPropertyHouseForSaleListingParams) (uuid.UUID, error) {
+func (q *Queries) SyncPropertyHouseForSaleListing(ctx context.Context, arg SyncPropertyHouseForSaleListingParams) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, syncPropertyHouseForSaleListing, arg.SaleListingID, arg.LinkMethod)
-	var property_house_id uuid.UUID
+	var property_house_id *uuid.UUID
 	err := row.Scan(&property_house_id)
 	return property_house_id, err
 }
@@ -4953,7 +5015,7 @@ ON CONFLICT (source_listing_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 `
 
-func (q *Queries) SyncSourceListingFromPropertySourceOffering(ctx context.Context, saleListingID uuid.UUID) error {
+func (q *Queries) SyncSourceListingFromPropertySourceOffering(ctx context.Context, saleListingID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncSourceListingFromPropertySourceOffering, saleListingID)
 	return err
 }
@@ -4998,7 +5060,7 @@ ON CONFLICT (unit_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 `
 
-func (q *Queries) SyncUnitFromPropertyUnit(ctx context.Context, propertyUnitID uuid.UUID) error {
+func (q *Queries) SyncUnitFromPropertyUnit(ctx context.Context, propertyUnitID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, syncUnitFromPropertyUnit, propertyUnitID)
 	return err
 }
@@ -5013,9 +5075,9 @@ WHERE property_document_id = $3
 `
 
 type UpdatePropertyDocumentExtractionStatusParams struct {
-	Status             string      `json:"status"`
-	ErrorText          interface{} `json:"error_text"`
-	PropertyDocumentID uuid.UUID   `json:"property_document_id"`
+	Status             *string    `json:"status"`
+	ErrorText          *string    `json:"error_text"`
+	PropertyDocumentID *uuid.UUID `json:"property_document_id"`
 }
 
 func (q *Queries) UpdatePropertyDocumentExtractionStatus(ctx context.Context, arg UpdatePropertyDocumentExtractionStatusParams) error {
@@ -5055,16 +5117,25 @@ type UpsertPostalAdAreasBulkParams struct {
 	NamesSv []string `json:"names_sv"`
 }
 
+type UpsertPostalAdAreasBulkRow struct {
+	PostalAdAreaID        uuid.UUID `json:"postal_ad_area_id"`
+	PostalAdAreaCode      string    `json:"postal_ad_area_code"`
+	PostalAdAreaNameFi    string    `json:"postal_ad_area_name_fi"`
+	PostalAdAreaNameSv    *string   `json:"postal_ad_area_name_sv"`
+	PostalAdAreaCreatedAt time.Time `json:"postal_ad_area_created_at"`
+	PostalAdAreaUpdatedAt time.Time `json:"postal_ad_area_updated_at"`
+}
+
 // Ad Areas
-func (q *Queries) UpsertPostalAdAreasBulk(ctx context.Context, arg UpsertPostalAdAreasBulkParams) ([]PostalAdArea, error) {
+func (q *Queries) UpsertPostalAdAreasBulk(ctx context.Context, arg UpsertPostalAdAreasBulkParams) ([]UpsertPostalAdAreasBulkRow, error) {
 	rows, err := q.db.Query(ctx, upsertPostalAdAreasBulk, arg.Codes, arg.NamesFi, arg.NamesSv)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PostalAdArea{}
+	items := []UpsertPostalAdAreasBulkRow{}
 	for rows.Next() {
-		var i PostalAdArea
+		var i UpsertPostalAdAreasBulkRow
 		if err := rows.Scan(
 			&i.PostalAdAreaID,
 			&i.PostalAdAreaCode,
@@ -5120,8 +5191,18 @@ type UpsertPostalMunicipalitiesBulkParams struct {
 	LanguageRatioCodes []string `json:"language_ratio_codes"`
 }
 
+type UpsertPostalMunicipalitiesBulkRow struct {
+	PostalMunicipalityID                uuid.UUID `json:"postal_municipality_id"`
+	PostalMunicipalityCode              string    `json:"postal_municipality_code"`
+	PostalMunicipalityNameFi            string    `json:"postal_municipality_name_fi"`
+	PostalMunicipalityNameSv            *string   `json:"postal_municipality_name_sv"`
+	PostalMunicipalityLanguageRatioCode *string   `json:"postal_municipality_language_ratio_code"`
+	PostalMunicipalityCreatedAt         time.Time `json:"postal_municipality_created_at"`
+	PostalMunicipalityUpdatedAt         time.Time `json:"postal_municipality_updated_at"`
+}
+
 // Municipalities
-func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg UpsertPostalMunicipalitiesBulkParams) ([]PostalMunicipality, error) {
+func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg UpsertPostalMunicipalitiesBulkParams) ([]UpsertPostalMunicipalitiesBulkRow, error) {
 	rows, err := q.db.Query(ctx, upsertPostalMunicipalitiesBulk,
 		arg.Codes,
 		arg.NamesFi,
@@ -5132,9 +5213,9 @@ func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg Upsert
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PostalMunicipality{}
+	items := []UpsertPostalMunicipalitiesBulkRow{}
 	for rows.Next() {
-		var i PostalMunicipality
+		var i UpsertPostalMunicipalitiesBulkRow
 		if err := rows.Scan(
 			&i.PostalMunicipalityID,
 			&i.PostalMunicipalityCode,
@@ -5291,11 +5372,11 @@ RETURNING property_document_extraction_id
 `
 
 type UpsertPropertyDocumentExtractionParams struct {
-	PropertyDocumentID uuid.UUID       `json:"property_document_id"`
-	Kind               string          `json:"kind"`
-	SchemaVersion      string          `json:"schema_version"`
-	Model              string          `json:"model"`
-	PromptVersion      string          `json:"prompt_version"`
+	PropertyDocumentID *uuid.UUID      `json:"property_document_id"`
+	Kind               *string         `json:"kind"`
+	SchemaVersion      *string         `json:"schema_version"`
+	Model              *string         `json:"model"`
+	PromptVersion      *string         `json:"prompt_version"`
 	SourceJson         json.RawMessage `json:"source_json"`
 }
 
@@ -5330,9 +5411,9 @@ ON CONFLICT (kv_key) DO UPDATE SET
 `
 
 type UpsertRuntimeKVParams struct {
-	KvKey     string    `json:"kv_key"`
-	KvValue   []byte    `json:"kv_value"`
-	ExpiresAt time.Time `json:"expires_at"`
+	KvKey     *string    `json:"kv_key"`
+	KvValue   []byte     `json:"kv_value"`
+	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 func (q *Queries) UpsertRuntimeKV(ctx context.Context, arg UpsertRuntimeKVParams) error {

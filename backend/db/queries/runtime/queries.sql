@@ -1,7 +1,7 @@
 -- name: GetRuntimeKV :one
 SELECT kv_value
 FROM runtime.kv_store
-WHERE kv_key = $1
+WHERE kv_key = @kv_key
   AND expires_at > now();
 
 -- name: UpsertRuntimeKV :exec
@@ -10,9 +10,9 @@ INSERT INTO runtime.kv_store (
   kv_value,
   expires_at
 ) VALUES (
-  $1,
-  $2,
-  $3
+  @kv_key,
+  @kv_value,
+  @expires_at
 )
 ON CONFLICT (kv_key) DO UPDATE SET
   kv_value = EXCLUDED.kv_value,

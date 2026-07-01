@@ -61,8 +61,8 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 		limit = 200
 	}
 	rows, err := s.queries.SearchTransactionsByCityAndAddress(ctx, db.SearchTransactionsByCityAndAddressParams{
-		CityName:   cityName,
-		SearchTerm: searchTerm,
+		CityName:   &cityName,
+		SearchTerm: &searchTerm,
 		LimitCount: &limit,
 	})
 	if err != nil {
@@ -72,9 +72,9 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 	for _, row := range rows {
 		result = append(result, SearchTransactionsRow{
 			City:             row.PricesCityName,
-			Municipality:     row.MunicipalityNameFi,
-			PostalCode:       row.PostalCode,
-			PostalArea:       row.PostalAreaNameFi,
+			Municipality:     ptrString(row.MunicipalityNameFi),
+			PostalCode:       ptrString(row.PostalCode),
+			PostalArea:       ptrString(row.PostalAreaNameFi),
 			Neighborhood:     row.PricesNeighborhoodName,
 			Description:      row.PricesTransactionDescription,
 			Type:             row.PricesTransactionType,

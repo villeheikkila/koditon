@@ -137,16 +137,16 @@ ORDER BY hc.prices_city_name, hn.prices_neighborhood_name
 `
 
 type ListCitiesWithNeighborhoodsRow struct {
-	PricesCityID                uuid.UUID  `json:"prices_city_id"`
-	PricesCityName              string     `json:"prices_city_name"`
-	PricesCityCreatedAt         time.Time  `json:"prices_city_created_at"`
-	PricesCityUpdatedAt         time.Time  `json:"prices_city_updated_at"`
-	PricesNeighborhoodID        *uuid.UUID `json:"prices_neighborhood_id"`
-	PricesNeighborhoodName      *string    `json:"prices_neighborhood_name"`
-	PricesNeighborhoodCreatedAt *time.Time `json:"prices_neighborhood_created_at"`
-	PricesNeighborhoodUpdatedAt *time.Time `json:"prices_neighborhood_updated_at"`
-	PricesPostalCodeID          *uuid.UUID `json:"prices_postal_code_id"`
-	PricesPostalCodeCode        *string    `json:"prices_postal_code_code"`
+	PricesCityID                uuid.UUID `json:"prices_city_id"`
+	PricesCityName              string    `json:"prices_city_name"`
+	PricesCityCreatedAt         time.Time `json:"prices_city_created_at"`
+	PricesCityUpdatedAt         time.Time `json:"prices_city_updated_at"`
+	PricesNeighborhoodID        uuid.UUID `json:"prices_neighborhood_id"`
+	PricesNeighborhoodName      string    `json:"prices_neighborhood_name"`
+	PricesNeighborhoodCreatedAt time.Time `json:"prices_neighborhood_created_at"`
+	PricesNeighborhoodUpdatedAt time.Time `json:"prices_neighborhood_updated_at"`
+	PricesPostalCodeID          uuid.UUID `json:"prices_postal_code_id"`
+	PricesPostalCodeCode        string    `json:"prices_postal_code_code"`
 }
 
 func (q *Queries) ListCitiesWithNeighborhoods(ctx context.Context) ([]ListCitiesWithNeighborhoodsRow, error) {
@@ -269,15 +269,22 @@ FROM public.prices_cities
 ORDER BY prices_city_name
 `
 
-func (q *Queries) ListPricesCities(ctx context.Context) ([]PricesCity, error) {
+type ListPricesCitiesRow struct {
+	PricesCityID        uuid.UUID `json:"prices_city_id"`
+	PricesCityName      string    `json:"prices_city_name"`
+	PricesCityCreatedAt time.Time `json:"prices_city_created_at"`
+	PricesCityUpdatedAt time.Time `json:"prices_city_updated_at"`
+}
+
+func (q *Queries) ListPricesCities(ctx context.Context) ([]ListPricesCitiesRow, error) {
 	rows, err := q.db.Query(ctx, listPricesCities)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PricesCity{}
+	items := []ListPricesCitiesRow{}
 	for rows.Next() {
-		var i PricesCity
+		var i ListPricesCitiesRow
 		if err := rows.Scan(
 			&i.PricesCityID,
 			&i.PricesCityName,
@@ -306,15 +313,23 @@ WHERE prices_city_id = $1
 ORDER BY prices_postal_code_code
 `
 
-func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID uuid.UUID) ([]PricesPostalCode, error) {
+type ListPricesPostalCodesByCityRow struct {
+	PricesPostalCodeID        uuid.UUID `json:"prices_postal_code_id"`
+	PricesPostalCodeCode      string    `json:"prices_postal_code_code"`
+	PricesCityID              uuid.UUID `json:"prices_city_id"`
+	PricesPostalCodeCreatedAt time.Time `json:"prices_postal_code_created_at"`
+	PricesPostalCodeUpdatedAt time.Time `json:"prices_postal_code_updated_at"`
+}
+
+func (q *Queries) ListPricesPostalCodesByCity(ctx context.Context, cityID *uuid.UUID) ([]ListPricesPostalCodesByCityRow, error) {
 	rows, err := q.db.Query(ctx, listPricesPostalCodesByCity, cityID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PricesPostalCode{}
+	items := []ListPricesPostalCodesByCityRow{}
 	for rows.Next() {
-		var i PricesPostalCode
+		var i ListPricesPostalCodesByCityRow
 		if err := rows.Scan(
 			&i.PricesPostalCodeID,
 			&i.PricesPostalCodeCode,

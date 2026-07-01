@@ -69,12 +69,12 @@ func (s *Service) extractSourceListingRenovations(ctx context.Context, saleListi
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return RenovationExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetSaleListingRenovationExtractionTexts(ctx, saleListingID)
+	row, err := s.queries.GetSaleListingRenovationExtractionTexts(ctx, &saleListingID)
 	if err != nil {
 		return RenovationExtractionResult{}, mapNotFound(err)
 	}
-	doneText := cleanDisplayString(row.DoneText)
-	plannedText := cleanDisplayString(row.PlannedText)
+	doneText := cleanDisplayString(valueOrEmpty(row.DoneText))
+	plannedText := cleanDisplayString(valueOrEmpty(row.PlannedText))
 	modelName = firstNonEmpty(modelName, s.renovationExtractorModelName, "~google/gemini-flash-latest")
 	result := RenovationExtractionResult{SaleListingID: saleListingID.String(), Model: modelName}
 	if doneText == "" && plannedText == "" {
@@ -129,11 +129,12 @@ func (s *Service) replaceLLMRenovationRows(ctx context.Context, saleListingID uu
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
-	if err := queries.DeleteLLMPropertySourceOfferingRenovations(ctx, saleListingID); err != nil {
+	if err := queries.DeleteLLMPropertySourceOfferingRenovations(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("delete previous llm renovation rows: %w", err)
 	}
 	for _, item := range items {
-		if err := queries.InsertLLMPropertySourceOfferingRenovation(ctx, db.InsertLLMPropertySourceOfferingRenovationParams{SaleListingID: saleListingID, SourceField: llmRenovationSourceField(item.SourceField), Category: item.Category, Status: item.Status, Year: item.Year, Component: item.Component, Scope: item.Scope, Stage: item.Stage, Responsibility: item.Responsibility, CostEstimateEur: item.CostEstimateEUR, Summary: item.Text, Confidence: item.Confidence}); err != nil {
+		sourceField := llmRenovationSourceField(item.SourceField)
+		if err := queries.InsertLLMPropertySourceOfferingRenovation(ctx, db.InsertLLMPropertySourceOfferingRenovationParams{SaleListingID: &saleListingID, SourceField: &sourceField, Category: &item.Category, Status: &item.Status, Year: item.Year, Component: &item.Component, Scope: &item.Scope, Stage: &item.Stage, Responsibility: &item.Responsibility, CostEstimateEur: item.CostEstimateEUR, Summary: &item.Text, Confidence: &item.Confidence}); err != nil {
 			return fmt.Errorf("insert llm renovation row: %w", err)
 		}
 	}

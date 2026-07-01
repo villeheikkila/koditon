@@ -17,9 +17,11 @@ import (
 	"koditon/internal/platform/logging"
 )
 
-const secureWebRefreshCookieName = "__Host-koditon_refresh"
-const devWebRefreshCookieName = "koditon_refresh"
-const webOAuthClientID = "koditon-web"
+const (
+	secureWebRefreshCookieName = "__Host-koditon_refresh"
+	devWebRefreshCookieName    = "koditon_refresh"
+	webOAuthClientID           = "koditon-web"
+)
 
 type webAuthHeaders struct {
 	Origin  string `header:"Origin"`

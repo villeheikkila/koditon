@@ -86,7 +86,7 @@ func (s *Service) SyncAd(ctx context.Context, friendlyID string) error {
 	ad, err := s.client.GetAdByFriendlyID(ctx, friendlyID)
 	if err != nil {
 		if httpErr, ok := client.IsHTTPStatusError(err); ok && httpErr.IsNotFound() {
-			if markErr := s.queries.MarkFrontdoorAdNotFoundByExternalID(ctx, friendlyID); markErr != nil {
+			if markErr := s.queries.MarkFrontdoorAdNotFoundByExternalID(ctx, &friendlyID); markErr != nil {
 				return fmt.Errorf("mark ad not found (friendly_id=%s): %w", friendlyID, markErr)
 			}
 			return nil
@@ -107,7 +107,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 	if limit <= 0 {
 		limit = 1000
 	}
-	rows, err := s.queries.ListFrontdoorAdsMissingDataHash(ctx, limit)
+	rows, err := s.queries.ListFrontdoorAdsMissingDataHash(ctx, ptr(int64(limit)))
 	if err != nil {
 		return sourcejson.BackfillResult{}, fmt.Errorf("list frontdoor ads missing data hash: %w", err)
 	}
@@ -120,7 +120,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 		if err != nil {
 			return result, fmt.Errorf("hash frontdoor ad payload (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
 		}
-		params := db.BackfillFrontdoorAdDataHashParams{FrontdoorAdData: canonical, FrontdoorAdDataHash: &hash, FrontdoorAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, FrontdoorAdExternalID: row.FrontdoorAdExternalID}
+		params := db.BackfillFrontdoorAdDataHashParams{FrontdoorAdData: canonical, FrontdoorAdDataHash: &hash, FrontdoorAdDataHashAlgorithm: ptr(sourcejson.HashAlgorithmSHA256), FrontdoorAdExternalID: &row.FrontdoorAdExternalID}
 		if err := s.queries.BackfillFrontdoorAdDataHash(ctx, params); err != nil {
 			return result, fmt.Errorf("backfill frontdoor ad data hash (friendly_id=%s): %w", row.FrontdoorAdExternalID, err)
 		}
@@ -172,7 +172,7 @@ func (s *Service) resolveBuildingURL(ctx context.Context, externalID string) (ur
 	if parseErr != nil {
 		return "", 0, fmt.Errorf("invalid building identifier %q: not a housing company ID or UUID", externalID)
 	}
-	building, lookupErr := s.queries.GetFrontdoorBuildingByID(ctx, buildingUUID)
+	building, lookupErr := s.queries.GetFrontdoorBuildingByID(ctx, &buildingUUID)
 	if lookupErr != nil {
 		return "", 0, fmt.Errorf("lookup building by UUID %s: %w", externalID, lookupErr)
 	}

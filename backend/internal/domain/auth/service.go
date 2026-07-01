@@ -219,8 +219,8 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	logger.DebugContext(ctx, "looking up existing identity", "provider", "apple", "external_id", identity.Subject)
 	provider := AuthProviderApple
 	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   string(provider),
-		UserIdentityExternalID: identity.Subject,
+		UserIdentityProvider:   ptr(string(provider)),
+		UserIdentityExternalID: &identity.Subject,
 	})
 	var userID uuid.UUID
 	var isNewUser bool
@@ -240,11 +240,11 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		logger.DebugContext(ctx, "creating identity for new user", "user_id", userID)
 		appleProvider := AuthProviderApple
 		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
-			UserUuid:                  userID,
-			UserIdentityProvider:      string(appleProvider),
-			UserIdentityExternalID:    identity.Subject,
+			UserUuid:                  &userID,
+			UserIdentityProvider:      ptr(string(appleProvider)),
+			UserIdentityExternalID:    &identity.Subject,
 			UserIdentityEmail:         email,
-			UserIdentityEmailVerified: emailVerified,
+			UserIdentityEmailVerified: &emailVerified,
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
@@ -253,12 +253,12 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		}
 		logger.InfoContext(ctx, "new user created via apple sign in", "user_id", userID, "outcome", logging.OutcomeSuccess)
 	} else {
-		userID = existingIdentity.UserUuid
+		userID = *existingIdentity.UserUuid
 		logger.DebugContext(ctx, "existing user found", "user_id", userID, "identity_id", existingIdentity.UserIdentityUuid)
 		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
-			UserIdentityUuid:          existingIdentity.UserIdentityUuid,
+			UserIdentityUuid:          &existingIdentity.UserIdentityUuid,
 			UserIdentityEmail:         email,
-			UserIdentityEmailVerified: emailVerified,
+			UserIdentityEmailVerified: &emailVerified,
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
@@ -268,7 +268,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		if email != nil {
 			_, err = qtx.UpdateUserEmailIfEmptyByIDBigint(ctx, db.UpdateUserEmailIfEmptyByIDBigintParams{
 				UserEmail: email,
-				UserID:    existingIdentity.UserIDBigint,
+				UserID:    &existingIdentity.UserIDBigint,
 			})
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				logger.ErrorContext(ctx, "failed to update user email if empty", "error", err, "user_id", userID, "outcome", logging.OutcomeError)
@@ -360,8 +360,8 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 	})
 	provider := AuthProviderApple
 	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   string(provider),
-		UserIdentityExternalID: identity.Subject,
+		UserIdentityProvider:   ptr(string(provider)),
+		UserIdentityExternalID: &identity.Subject,
 	})
 	var userID uuid.UUID
 	var isNewUser bool
@@ -377,22 +377,25 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 		isNewUser = true
 		appleProvider := AuthProviderApple
 		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
-			UserUuid:                  userID,
-			UserIdentityProvider:      string(appleProvider),
-			UserIdentityExternalID:    identity.Subject,
+			UserUuid:                  &userID,
+			UserIdentityProvider:      ptr(string(appleProvider)),
+			UserIdentityExternalID:    &identity.Subject,
 			UserIdentityEmail:         email,
-			UserIdentityEmailVerified: emailVerified,
+			UserIdentityEmailVerified: &emailVerified,
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create identity: %w", err)
 		}
 	} else {
-		userID = existingIdentity.UserUuid
+		if existingIdentity.UserUuid == nil {
+			return nil, fmt.Errorf("identity has no user")
+		}
+		userID = *existingIdentity.UserUuid
 		_, err = qtx.UpdateIdentity(ctx, db.UpdateIdentityParams{
-			UserIdentityUuid:          existingIdentity.UserIdentityUuid,
+			UserIdentityUuid:          &existingIdentity.UserIdentityUuid,
 			UserIdentityEmail:         email,
-			UserIdentityEmailVerified: emailVerified,
+			UserIdentityEmailVerified: &emailVerified,
 			UserIdentityData:          identityData,
 		})
 		if err != nil {
@@ -421,7 +424,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 }
 
 func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
-	if err := s.queries.RevokeSession(ctx, sessionID); err != nil {
+	if err := s.queries.RevokeSession(ctx, &sessionID); err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -434,24 +437,24 @@ func (s *Service) SignOut(ctx context.Context, sessionID uuid.UUID) error {
 }
 
 func (s *Service) SignOutWithOwnershipCheck(ctx context.Context, userID, sessionID uuid.UUID) error {
-	session, err := s.queries.GetSessionByID(ctx, sessionID)
+	session, err := s.queries.GetSessionByID(ctx, &sessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrSessionNotFound
 		}
 		return fmt.Errorf("get session: %w", err)
 	}
-	if session.UserUuid != userID {
+	if session.UserUuid == nil || *session.UserUuid != userID {
 		return ErrSessionNotOwned
 	}
 	return s.SignOut(ctx, sessionID)
 }
 
 func (s *Service) SignOutAllSessions(ctx context.Context, userID uuid.UUID) error {
-	if err := s.queries.RevokeAllUserSessions(ctx, userID); err != nil {
+	if err := s.queries.RevokeAllUserSessions(ctx, &userID); err != nil {
 		return err
 	}
-	if err := s.queries.RevokeAllOAuthRefreshTokensByUserID(ctx, userID); err != nil {
+	if err := s.queries.RevokeAllOAuthRefreshTokensByUserID(ctx, &userID); err != nil {
 		return fmt.Errorf("revoke all oauth refresh tokens: %w", err)
 	}
 	s.emitTokenEvent(ctx, tokenEvent{
@@ -467,7 +470,7 @@ func (s *Service) SignOutAllSessions(ctx context.Context, userID uuid.UUID) erro
 // Returns nil even if the token is already revoked or doesn't exist (per RFC 7009).
 func (s *Service) RevokeOAuthRefreshToken(ctx context.Context, token string) error {
 	tokenHash := hashSHA256Hex(token)
-	row, err := s.queries.RevokeOAuthRefreshTokenByHash(ctx, tokenHash)
+	row, err := s.queries.RevokeOAuthRefreshTokenByHash(ctx, &tokenHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// RFC 7009: the server responds with HTTP 200 even if the token
@@ -495,9 +498,10 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 	if clientID == "" || token == "" {
 		return nil
 	}
+	tokenHash := hashSHA256Hex(token)
 	row, err := s.queries.RevokeOAuthRefreshTokenByHashAndClientID(ctx, db.RevokeOAuthRefreshTokenByHashAndClientIDParams{
-		OauthRefreshTokenTokenHash: hashSHA256Hex(token),
-		OauthClientID:              clientID,
+		OauthRefreshTokenTokenHash: &tokenHash,
+		OauthClientID:              &clientID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -506,7 +510,7 @@ func (s *Service) RevokeOAuthRefreshTokenForClient(ctx context.Context, clientID
 		return fmt.Errorf("revoke oauth refresh token for client: %w", err)
 	}
 	if row.DeviceSessionUuid != nil {
-		if err := s.queries.RevokeSession(ctx, *row.DeviceSessionUuid); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if err := s.queries.RevokeSession(ctx, row.DeviceSessionUuid); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("revoke session for oauth refresh token: %w", err)
 		}
 	}
@@ -530,7 +534,7 @@ func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*A
 		// OAuth-issued access tokens are not bound to a device session row.
 		return claims, nil
 	}
-	_, err = s.queries.GetActiveSessionByID(ctx, claims.SessionID)
+	_, err = s.queries.GetActiveSessionByID(ctx, &claims.SessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSessionRevoked
@@ -541,7 +545,7 @@ func (s *Service) VerifyAccessToken(ctx context.Context, tokenString string) (*A
 }
 
 func (s *Service) GetUserByID(ctx context.Context, userID uuid.UUID) (db.GetUserByIDRow, error) {
-	user, err := s.queries.GetUserByID(ctx, userID)
+	user, err := s.queries.GetUserByID(ctx, &userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.GetUserByIDRow{}, ErrUserNotFound
@@ -552,11 +556,11 @@ func (s *Service) GetUserByID(ctx context.Context, userID uuid.UUID) (db.GetUser
 }
 
 func (s *Service) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]db.GetSessionsByUserIDRow, error) {
-	return s.queries.GetSessionsByUserID(ctx, userID)
+	return s.queries.GetSessionsByUserID(ctx, &userID)
 }
 
 func (s *Service) GetRoleNamesByUserID(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	roles, err := s.queries.GetUserRoles(ctx, userID)
+	roles, err := s.queries.GetUserRoles(ctx, &userID)
 	if err != nil {
 		return nil, err
 	}
@@ -568,7 +572,7 @@ func (s *Service) GetRoleNamesByUserID(ctx context.Context, userID uuid.UUID) ([
 }
 
 func (s *Service) GetActiveFeatureFlagsByUserID(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	return s.queries.GetActiveFeatureFlags(ctx, userID)
+	return s.queries.GetActiveFeatureFlags(ctx, &userID)
 }
 
 func (s *Service) JWTService() *JWTService {

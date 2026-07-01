@@ -7,20 +7,20 @@ SELECT
     sale_listing_prices_match_attempt_count,
     sale_listing_prices_match_expires_at
 FROM public.property_source_offerings
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)::uuid;
+WHERE sale_listing_id = @sale_listing_id::uuid;
 
 -- name: UpdatePricesMatchState :exec
 WITH updated_source AS (
     UPDATE public.property_source_offerings
     SET
-        sale_listing_prices_match_status = sqlc.arg(status)::text,
-        sale_listing_prices_match_next_attempt_at = sqlc.narg(next_attempt_at)::timestamptz,
+        sale_listing_prices_match_status = @status::text,
+        sale_listing_prices_match_next_attempt_at = sqlc.narg('next_attempt_at')::timestamptz,
         sale_listing_prices_match_last_attempted_at = now(),
         sale_listing_prices_match_attempt_count = sale_listing_prices_match_attempt_count + 1,
-        sale_listing_prices_match_run_id = COALESCE(sqlc.narg(run_id)::uuid, sale_listing_prices_match_run_id),
-        sale_listing_prices_match_expires_at = COALESCE(sqlc.narg(expires_at)::timestamptz, sale_listing_prices_match_expires_at),
+        sale_listing_prices_match_run_id = COALESCE(sqlc.narg('run_id')::uuid, sale_listing_prices_match_run_id),
+        sale_listing_prices_match_expires_at = COALESCE(sqlc.narg('expires_at')::timestamptz, sale_listing_prices_match_expires_at),
         sale_listing_updated_at = now()
-    WHERE sale_listing_id = sqlc.arg(sale_listing_id)::uuid
+    WHERE sale_listing_id = @sale_listing_id::uuid
     RETURNING sale_listing_id, sale_listing_updated_at
 )
 UPDATE public.source_listings src
@@ -66,9 +66,9 @@ WHERE pb.physical_building_id = coordinates.physical_building_id
 -- name: ListDimensionLayerBackfillListingIDs :many
 SELECT source_listing_id
 FROM public.source_listings
-WHERE (sqlc.narg(cursor)::uuid IS NULL OR source_listing_id > sqlc.narg(cursor)::uuid)
+WHERE (sqlc.narg('cursor')::uuid IS NULL OR source_listing_id > sqlc.narg('cursor')::uuid)
 ORDER BY source_listing_id
-LIMIT sqlc.arg(limit_count)::int4;
+LIMIT @limit_count::int4;
 
 -- name: ListDirtyDimensionTargets :many
 SELECT target_type, target_id, dirty_at
@@ -76,10 +76,10 @@ FROM public.property_dimension_dirty_targets
 WHERE (resolved_at IS NULL OR resolved_at < dirty_at)
     AND (queued_at IS NULL OR queued_at < dirty_at OR queued_at < now() - interval '30 minutes')
 ORDER BY dirty_at
-LIMIT sqlc.arg(limit_count)::int4;
+LIMIT @limit_count::int4;
 
 -- name: MarkDimensionTargetQueued :one
-SELECT public.fnc__mark_dimension_target_queued(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid);
+SELECT public.fnc__mark_dimension_target_queued(@target_type::text, @target_id::uuid);
 
 -- name: ListPricesMatchFanoutListings :many
 SELECT sale_listing_id::text AS sale_listing_id, COALESCE(sale_listing_prices_match_attempt_count, 0)::int4 AS attempt_count
@@ -92,7 +92,7 @@ WHERE sale_listing_source_kind = 'ad'
     AND COALESCE(sale_listing_prices_match_status, 'pending') IN ('pending', 'deferred', 'noop')
     AND COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days') <= now()
 ORDER BY COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days'), sale_listing_last_seen_at
-LIMIT sqlc.arg(limit_count)::int4;
+LIMIT @limit_count::int4;
 
 -- name: ListCanonicalizeSourceAdsFanout :many
 (SELECT 'frontdoor_ad'::text AS source_table, frontdoor_ad_id::text AS source_id
@@ -101,9 +101,9 @@ LIMIT sqlc.arg(limit_count)::int4;
      AND (frontdoor_ad_data_hash IS NULL
          OR frontdoor_ad_data_normalized_at IS NULL
          OR frontdoor_ad_data_changed_at > frontdoor_ad_data_normalized_at
-         OR frontdoor_ad_data_normalized_version < sqlc.arg(version)::int4)
+         OR frontdoor_ad_data_normalized_version < @version::int4)
  ORDER BY frontdoor_ad_updated_at ASC
- LIMIT sqlc.arg(limit_count)::int4)
+ LIMIT @limit_count::int4)
 UNION ALL
 (SELECT 'shortcut_ad'::text AS source_table, shortcut_ad_id::text AS source_id
  FROM public.shortcut_ads
@@ -111,18 +111,18 @@ UNION ALL
      AND (shortcut_ad_data_hash IS NULL
          OR shortcut_ad_data_normalized_at IS NULL
          OR shortcut_ad_data_changed_at > shortcut_ad_data_normalized_at
-         OR shortcut_ad_data_normalized_version < sqlc.arg(version)::int4)
+         OR shortcut_ad_data_normalized_version < @version::int4)
  ORDER BY shortcut_ad_updated_at ASC NULLS FIRST
- LIMIT sqlc.arg(limit_count)::int4)
+ LIMIT @limit_count::int4)
 UNION ALL
 (SELECT 'frontdoor_building_announcement'::text AS source_table, frontdoor_building_announcement_id::text AS source_id
  FROM public.frontdoor_building_announcements
  WHERE frontdoor_building_announcement_rent_period IS NULL
      AND frontdoor_building_announcement_rental_unique_no IS NULL
      AND (frontdoor_building_announcement_data_normalized_at IS NULL
-         OR frontdoor_building_announcement_data_normalized_version < sqlc.arg(version)::int4)
+         OR frontdoor_building_announcement_data_normalized_version < @version::int4)
  ORDER BY frontdoor_building_announcement_last_seen_at ASC
- LIMIT sqlc.arg(limit_count)::int4);
+ LIMIT @limit_count::int4);
 
 -- name: ListCanonicalMatchFanoutListings :many
 SELECT sl.sale_listing_id::text AS sale_listing_id, COALESCE(sl.sale_listing_source_match_attempt_count, 0)::int4 AS attempt_count
@@ -136,7 +136,7 @@ WHERE sl.sale_listing_source_kind = 'ad'
     AND COALESCE(sl.sale_listing_source_match_status, 'pending') IN ('pending', 'deferred', 'noop')
     AND COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at) <= now()
 ORDER BY COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at), sl.sale_listing_updated_at
-LIMIT sqlc.arg(limit_count)::int4;
+LIMIT @limit_count::int4;
 
 -- name: LoadCanonicalMatchSaleListing :one
 SELECT
@@ -150,7 +150,7 @@ LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_l
     AND source_link.target_type = 'listing'
     AND source_link.source_type = 'source_listing'
     AND source_link.link_status <> 'rejected'
-WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)::uuid;
+WHERE sl.sale_listing_id = @sale_listing_id::uuid;
 
 -- name: RunCanonicalSourceMatchForSaleListing :one
 WITH base AS (
@@ -164,7 +164,7 @@ WITH base AS (
         AND link.source_type = 'source_listing'
         AND link.source_id = sl.sale_listing_id
         AND link.link_status <> 'rejected'
-    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)::uuid
+    WHERE sl.sale_listing_id = @sale_listing_id::uuid
         AND sl.sale_listing_source_kind = 'ad'
         AND COALESCE(sl.sale_listing_unit_match_key, '') <> ''
     ORDER BY CASE WHEN link.link_status = 'confirmed' THEN 0 ELSE 1 END, link.link_score DESC
@@ -192,7 +192,16 @@ candidates AS (
     WHERE candidate.sale_listing_source_provider <> base.sale_listing_source_provider
 ),
 linkable AS (
-    SELECT candidates.*
+    SELECT
+        candidates.sale_listing_id,
+        candidates.sale_listing_source_provider,
+        candidates.sale_listing_source_kind,
+        candidates.sale_listing_native_id,
+        candidates.sale_listing_first_seen_at,
+        candidates.sale_listing_last_seen_at,
+        candidates.active_target_source_id,
+        candidates.active_target_id,
+        candidates.active_link_method
     FROM candidates
     WHERE active_target_source_id IS NULL
         OR active_target_id = (SELECT target_id FROM base)
@@ -238,7 +247,7 @@ inserted AS (
     RETURNING target_source_id
 )
 SELECT
-    sqlc.arg(run_id)::text AS run_id,
+    @run_id::text AS run_id,
     (SELECT count(*)::int4 FROM candidates) AS candidates,
     (SELECT count(*)::int4 FROM inserted) AS auto_linked,
     (SELECT count(*)::int4 FROM candidates WHERE active_target_source_id IS NOT NULL AND active_target_id <> (SELECT target_id FROM base)) AS ambiguous;
@@ -286,7 +295,18 @@ candidate_pairs AS (
         AND active_link.link_status <> 'rejected'
 ),
 linkable AS (
-    SELECT *
+    SELECT
+        target_id,
+        matched_sale_listing_id,
+        sale_listing_id,
+        sale_listing_source_provider,
+        sale_listing_source_kind,
+        sale_listing_native_id,
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        active_target_source_id,
+        active_target_id,
+        candidate_rank
     FROM candidate_pairs
     WHERE candidate_rank = 1
         AND (
@@ -334,7 +354,7 @@ inserted AS (
     RETURNING target_source_id
 )
 SELECT
-    sqlc.arg(run_id)::text AS run_id,
+    @run_id::text AS run_id,
     (SELECT count(*)::int4 FROM candidate_pairs) AS candidates,
     (SELECT count(*)::int4 FROM inserted) AS auto_linked,
     (SELECT count(*)::int4 FROM candidate_pairs WHERE active_target_source_id IS NOT NULL AND active_target_id <> target_id) AS ambiguous;
@@ -343,12 +363,12 @@ SELECT
 WITH updated_source AS (
     UPDATE public.property_source_offerings
     SET
-        sale_listing_source_match_status = sqlc.arg(status)::text,
-        sale_listing_source_match_next_attempt_at = sqlc.narg(next_attempt_at)::timestamptz,
+        sale_listing_source_match_status = @status::text,
+        sale_listing_source_match_next_attempt_at = sqlc.narg('next_attempt_at')::timestamptz,
         sale_listing_source_match_last_attempted_at = now(),
         sale_listing_source_match_attempt_count = sale_listing_source_match_attempt_count + 1,
         sale_listing_updated_at = now()
-    WHERE sale_listing_id = sqlc.arg(sale_listing_id)::uuid
+    WHERE sale_listing_id = @sale_listing_id::uuid
     RETURNING sale_listing_id, sale_listing_updated_at
 )
 UPDATE public.source_listings src

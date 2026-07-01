@@ -293,9 +293,10 @@ func (t *toolImpl) searchTransactions(ctx context.Context, _ *mcp.CallToolReques
 		}
 		limit = *in.Limit
 	}
+	searchTerm := strings.TrimSpace(in.Address)
 	rows, err := t.queries.SearchTransactionsByCityAndAddress(ctx, db.SearchTransactionsByCityAndAddressParams{
-		CityName:   city,
-		SearchTerm: strings.TrimSpace(in.Address),
+		CityName:   &city,
+		SearchTerm: &searchTerm,
 		LimitCount: &limit,
 	})
 	if err != nil {
@@ -648,8 +649,11 @@ type adsRankedMatch struct {
 
 func (t *toolImpl) runSearchTransactionsAdvanced(ctx context.Context, params transactionsAdvancedParams) ([]transactionsAdvancedRow, error) {
 	query := strings.TrimSpace(params.Query)
+	city := strings.TrimSpace(params.City)
+	normalizedQuery := compactText(query)
+	sortMode := normalizeTransactionSort(params.Sort)
 	rows, err := t.queries.SearchTransactionsAdvanced(ctx, db.SearchTransactionsAdvancedParams{
-		City:            strings.TrimSpace(params.City),
+		City:            &city,
 		MunicipalityIds: params.MunicipalityIDs,
 		PostalCodeIds:   params.PostalCodeIDs,
 		PostalCodes:     params.PostalCodes,
@@ -659,10 +663,10 @@ func (t *toolImpl) runSearchTransactionsAdvanced(ctx context.Context, params tra
 		MaxPrice:        params.MaxPrice,
 		MinArea:         params.MinArea,
 		MaxArea:         params.MaxArea,
-		Query:           query,
-		NormalizedQuery: compactText(query),
-		SortMode:        normalizeTransactionSort(params.Sort),
-		LimitCount:      params.Limit,
+		Query:           &query,
+		NormalizedQuery: &normalizedQuery,
+		SortMode:        &sortMode,
+		LimitCount:      &params.Limit,
 	})
 	if err != nil {
 		return nil, err
@@ -675,7 +679,7 @@ func (t *toolImpl) runSearchTransactionsAdvanced(ctx context.Context, params tra
 }
 
 func (t *toolImpl) getTransactionByID(ctx context.Context, transactionID uuid.UUID) (transactionsAdvancedRow, error) {
-	row, err := t.queries.GetTransactionAdvancedByID(ctx, transactionID)
+	row, err := t.queries.GetTransactionAdvancedByID(ctx, &transactionID)
 	if err != nil {
 		return transactionsAdvancedRow{}, err
 	}
@@ -683,6 +687,37 @@ func (t *toolImpl) getTransactionByID(ctx context.Context, transactionID uuid.UU
 }
 
 func mapSearchTransactionsAdvancedRow(row db.SearchTransactionsAdvancedRow) transactionsAdvancedRow {
+	out := transactionsAdvancedRow{
+		TransactionID:       row.TransactionID,
+		Description:         row.Description,
+		Type:                row.Type,
+		Category:            row.Category,
+		Area:                row.Area,
+		Price:               row.Price,
+		PricePerSquareMeter: row.PricePerSquareMeter,
+		BuildYear:           row.BuildYear,
+		Floor:               row.Floor,
+		Elevator:            row.Elevator,
+		Condition:           row.Condition,
+		Plot:                row.Plot,
+		EnergyClass:         row.EnergyClass,
+		PeriodIdentifier:    row.PeriodIdentifier,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
+		NeighborhoodID:      row.NeighborhoodID,
+		Neighborhood:        row.Neighborhood,
+		PostalCodeID:        row.PostalCodeID,
+		PostalCode:          stringFromPtr(row.PostalCode),
+		PostalArea:          stringFromPtr(row.PostalArea),
+		MunicipalityID:      row.MunicipalityID,
+		Municipality:        stringFromPtr(row.Municipality),
+		City:                row.City,
+	}
+	out.Display = formatTransactionDisplay(out)
+	return out
+}
+
+func mapGetTransactionAdvancedByIDRow(row db.GetTransactionAdvancedByIDRow) transactionsAdvancedRow {
 	postalCodeID := row.PostalCodeID
 	municipalityID := row.MunicipalityID
 	out := transactionsAdvancedRow{
@@ -705,45 +740,21 @@ func mapSearchTransactionsAdvancedRow(row db.SearchTransactionsAdvancedRow) tran
 		NeighborhoodID:      row.NeighborhoodID,
 		Neighborhood:        row.Neighborhood,
 		PostalCodeID:        &postalCodeID,
-		PostalCode:          row.PostalCode,
-		PostalArea:          row.PostalArea,
+		PostalCode:          stringFromPtr(row.PostalCode),
+		PostalArea:          stringFromPtr(row.PostalArea),
 		MunicipalityID:      &municipalityID,
-		Municipality:        row.Municipality,
+		Municipality:        stringFromPtr(row.Municipality),
 		City:                row.City,
 	}
 	out.Display = formatTransactionDisplay(out)
 	return out
 }
 
-func mapGetTransactionAdvancedByIDRow(row db.GetTransactionAdvancedByIDRow) transactionsAdvancedRow {
-	out := transactionsAdvancedRow{
-		TransactionID:       row.TransactionID,
-		Description:         row.Description,
-		Type:                row.Type,
-		Category:            row.Category,
-		Area:                row.Area,
-		Price:               row.Price,
-		PricePerSquareMeter: row.PricePerSquareMeter,
-		BuildYear:           row.BuildYear,
-		Floor:               row.Floor,
-		Elevator:            row.Elevator,
-		Condition:           row.Condition,
-		Plot:                row.Plot,
-		EnergyClass:         row.EnergyClass,
-		PeriodIdentifier:    row.PeriodIdentifier,
-		CreatedAt:           row.CreatedAt,
-		UpdatedAt:           row.UpdatedAt,
-		NeighborhoodID:      row.NeighborhoodID,
-		Neighborhood:        row.Neighborhood,
-		PostalCodeID:        row.PostalCodeID,
-		PostalCode:          row.PostalCode,
-		PostalArea:          row.PostalArea,
-		MunicipalityID:      row.MunicipalityID,
-		Municipality:        row.Municipality,
-		City:                row.City,
+func stringFromPtr(value *string) string {
+	if value == nil {
+		return ""
 	}
-	out.Display = formatTransactionDisplay(out)
-	return out
+	return *value
 }
 
 // ---- result helpers ------------------------------------------------------------

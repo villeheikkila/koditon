@@ -47,14 +47,14 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 		"pl.price_link_id::text || ':' || sl.sale_listing_id::text",
 		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
 		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
-		"pl.prices_transaction_id = sqlc.narg(transaction_id)::uuid",
+		"pl.prices_transaction_id = sqlc.narg('transaction_id')::uuid",
 		"pl.target_type = 'source_listing'",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("expected transaction review SQL to include %q", want)
 		}
 	}
-	if !strings.Contains(query, "WHERE (sqlc.narg(transaction_id)::uuid IS NOT NULL OR latest.status = ANY") {
+	if !strings.Contains(query, "WHERE (sqlc.narg('transaction_id')::uuid IS NOT NULL OR latest.status = ANY") {
 		t.Fatal("expected postal review to remain limited to candidate statuses")
 	}
 	if strings.Contains(query, "po.primary_sale_listing_id = sl.sale_listing_id") {

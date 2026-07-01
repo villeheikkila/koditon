@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -25,15 +26,72 @@ SET frontdoor_building_last_seen_at = now()
 RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_seen_at, frontdoor_building_last_seen_at, frontdoor_building_updated_at, frontdoor_building_company_name, frontdoor_building_business_id, frontdoor_building_apartment_count, frontdoor_building_floor_count, frontdoor_building_construction_end_year, frontdoor_building_build_year, frontdoor_building_has_elevator, frontdoor_building_has_sauna, frontdoor_building_energy_certificate_code, frontdoor_building_plot_holding_type, frontdoor_building_outer_roof_material, frontdoor_building_outer_roof_type, frontdoor_building_heating, frontdoor_building_heating_fuel, frontdoor_building_street_address, frontdoor_building_house_number, frontdoor_building_postcode, frontdoor_building_post_area, frontdoor_building_municipality, frontdoor_building_district, frontdoor_building_latitude, frontdoor_building_longitude, frontdoor_building_elevator_renovated, frontdoor_building_elevator_renovated_year, frontdoor_building_facade_renovated, frontdoor_building_facade_renovated_year, frontdoor_building_window_renovated, frontdoor_building_window_renovated_year, frontdoor_building_roof_renovated, frontdoor_building_roof_renovated_year, frontdoor_building_pipe_renovated, frontdoor_building_pipe_renovated_year, frontdoor_building_balcony_renovated, frontdoor_building_balcony_renovated_year, frontdoor_building_electricity_renovated, frontdoor_building_electricity_renovated_year, frontdoor_building_contact_phone, frontdoor_building_contact_office_name, frontdoor_building_contact_office_id, frontdoor_building_description, frontdoor_building_car_storage_description, frontdoor_building_other_info, frontdoor_building_additional_addresses, frontdoor_building_links, frontdoor_building_data, frontdoor_building_processed_at, frontdoor_building_housing_company_id, frontdoor_building_housing_company_friendly_id, frontdoor_building_geom
 `
 
-func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, dollar_1 []string) ([]FrontdoorBuilding, error) {
+type BatchUpsertFrontdoorBuildingsFromSitemapRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) BatchUpsertFrontdoorBuildingsFromSitemap(ctx context.Context, dollar_1 []string) ([]BatchUpsertFrontdoorBuildingsFromSitemapRow, error) {
 	rows, err := q.db.Query(ctx, batchUpsertFrontdoorBuildingsFromSitemap, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FrontdoorBuilding{}
+	items := []BatchUpsertFrontdoorBuildingsFromSitemapRow{}
 	for rows.Next() {
-		var i FrontdoorBuilding
+		var i BatchUpsertFrontdoorBuildingsFromSitemapRow
 		if err := rows.Scan(
 			&i.FrontdoorBuildingID,
 			&i.FrontdoorBuildingUrl,
@@ -117,15 +175,45 @@ type BatchUpsertShortcutBuildingsFromSitemapParams struct {
 	Column2 []string `json:"column_2"`
 }
 
-func (q *Queries) BatchUpsertShortcutBuildingsFromSitemap(ctx context.Context, arg BatchUpsertShortcutBuildingsFromSitemapParams) ([]ShortcutBuilding, error) {
+type BatchUpsertShortcutBuildingsFromSitemapRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) BatchUpsertShortcutBuildingsFromSitemap(ctx context.Context, arg BatchUpsertShortcutBuildingsFromSitemapParams) ([]BatchUpsertShortcutBuildingsFromSitemapRow, error) {
 	rows, err := q.db.Query(ctx, batchUpsertShortcutBuildingsFromSitemap, arg.Column1, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutBuilding{}
+	items := []BatchUpsertShortcutBuildingsFromSitemapRow{}
 	for rows.Next() {
-		var i ShortcutBuilding
+		var i BatchUpsertShortcutBuildingsFromSitemapRow
 		if err := rows.Scan(
 			&i.ShortcutBuildingID,
 			&i.ShortcutBuildingExternalID,
@@ -170,9 +258,66 @@ SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_s
 WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID *int64) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingByHousingCompanyID, frontdoorBuildingHousingCompanyID)
-	var i FrontdoorBuilding
+type GetFrontdoorBuildingByHousingCompanyIDRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) GetFrontdoorBuildingByHousingCompanyID(ctx context.Context, dollar_1 *int64) (GetFrontdoorBuildingByHousingCompanyIDRow, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingByHousingCompanyID, dollar_1)
+	var i GetFrontdoorBuildingByHousingCompanyIDRow
 	err := row.Scan(
 		&i.FrontdoorBuildingID,
 		&i.FrontdoorBuildingUrl,
@@ -237,9 +382,66 @@ SELECT frontdoor_building_id, frontdoor_building_url, frontdoor_building_first_s
 WHERE frontdoor_building_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingByID(ctx context.Context, frontdoorBuildingID uuid.UUID) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingByID, frontdoorBuildingID)
-	var i FrontdoorBuilding
+type GetFrontdoorBuildingByIDRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) GetFrontdoorBuildingByID(ctx context.Context, dollar_1 *uuid.UUID) (GetFrontdoorBuildingByIDRow, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingByID, dollar_1)
+	var i GetFrontdoorBuildingByIDRow
 	err := row.Scan(
 		&i.FrontdoorBuildingID,
 		&i.FrontdoorBuildingUrl,
@@ -304,8 +506,8 @@ SELECT frontdoor_building_id FROM public.frontdoor_buildings
 WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingIDByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID *int64) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingIDByHousingCompanyID, frontdoorBuildingHousingCompanyID)
+func (q *Queries) GetFrontdoorBuildingIDByHousingCompanyID(ctx context.Context, dollar_1 *int64) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingIDByHousingCompanyID, dollar_1)
 	var frontdoor_building_id uuid.UUID
 	err := row.Scan(&frontdoor_building_id)
 	return frontdoor_building_id, err
@@ -316,8 +518,8 @@ SELECT frontdoor_building_url FROM public.frontdoor_buildings
 WHERE frontdoor_building_housing_company_id = $1
 `
 
-func (q *Queries) GetFrontdoorBuildingURLByHousingCompanyID(ctx context.Context, frontdoorBuildingHousingCompanyID *int64) (*string, error) {
-	row := q.db.QueryRow(ctx, getFrontdoorBuildingURLByHousingCompanyID, frontdoorBuildingHousingCompanyID)
+func (q *Queries) GetFrontdoorBuildingURLByHousingCompanyID(ctx context.Context, dollar_1 *int64) (*string, error) {
+	row := q.db.QueryRow(ctx, getFrontdoorBuildingURLByHousingCompanyID, dollar_1)
 	var frontdoor_building_url *string
 	err := row.Scan(&frontdoor_building_url)
 	return frontdoor_building_url, err
@@ -328,9 +530,39 @@ SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_bu
 WHERE shortcut_building_external_id = $1
 `
 
-func (q *Queries) GetShortcutBuildingByExternalID(ctx context.Context, shortcutBuildingExternalID int64) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, getShortcutBuildingByExternalID, shortcutBuildingExternalID)
-	var i ShortcutBuilding
+type GetShortcutBuildingByExternalIDRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) GetShortcutBuildingByExternalID(ctx context.Context, dollar_1 *int64) (GetShortcutBuildingByExternalIDRow, error) {
+	row := q.db.QueryRow(ctx, getShortcutBuildingByExternalID, dollar_1)
+	var i GetShortcutBuildingByExternalIDRow
 	err := row.Scan(
 		&i.ShortcutBuildingID,
 		&i.ShortcutBuildingExternalID,
@@ -368,9 +600,39 @@ SELECT shortcut_building_id, shortcut_building_external_id, shortcut_building_bu
 WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) GetShortcutBuildingByID(ctx context.Context, shortcutBuildingID uuid.UUID) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, getShortcutBuildingByID, shortcutBuildingID)
-	var i ShortcutBuilding
+type GetShortcutBuildingByIDRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) GetShortcutBuildingByID(ctx context.Context, dollar_1 *uuid.UUID) (GetShortcutBuildingByIDRow, error) {
+	row := q.db.QueryRow(ctx, getShortcutBuildingByID, dollar_1)
+	var i GetShortcutBuildingByIDRow
 	err := row.Scan(
 		&i.ShortcutBuildingID,
 		&i.ShortcutBuildingExternalID,
@@ -410,19 +672,76 @@ LIMIT $1 OFFSET $2
 `
 
 type ListFrontdoorBuildingsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Column1 *int64 `json:"column_1"`
+	Column2 *int64 `json:"column_2"`
 }
 
-func (q *Queries) ListFrontdoorBuildings(ctx context.Context, arg ListFrontdoorBuildingsParams) ([]FrontdoorBuilding, error) {
-	rows, err := q.db.Query(ctx, listFrontdoorBuildings, arg.Limit, arg.Offset)
+type ListFrontdoorBuildingsRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) ListFrontdoorBuildings(ctx context.Context, arg ListFrontdoorBuildingsParams) ([]ListFrontdoorBuildingsRow, error) {
+	rows, err := q.db.Query(ctx, listFrontdoorBuildings, arg.Column1, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FrontdoorBuilding{}
+	items := []ListFrontdoorBuildingsRow{}
 	for rows.Next() {
-		var i FrontdoorBuilding
+		var i ListFrontdoorBuildingsRow
 		if err := rows.Scan(
 			&i.FrontdoorBuildingID,
 			&i.FrontdoorBuildingUrl,
@@ -496,19 +815,49 @@ LIMIT $1 OFFSET $2
 `
 
 type ListShortcutBuildingsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Column1 *int64 `json:"column_1"`
+	Column2 *int64 `json:"column_2"`
 }
 
-func (q *Queries) ListShortcutBuildings(ctx context.Context, arg ListShortcutBuildingsParams) ([]ShortcutBuilding, error) {
-	rows, err := q.db.Query(ctx, listShortcutBuildings, arg.Limit, arg.Offset)
+type ListShortcutBuildingsRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) ListShortcutBuildings(ctx context.Context, arg ListShortcutBuildingsParams) ([]ListShortcutBuildingsRow, error) {
+	rows, err := q.db.Query(ctx, listShortcutBuildings, arg.Column1, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutBuilding{}
+	items := []ListShortcutBuildingsRow{}
 	for rows.Next() {
-		var i ShortcutBuilding
+		var i ListShortcutBuildingsRow
 		if err := rows.Scan(
 			&i.ShortcutBuildingID,
 			&i.ShortcutBuildingExternalID,
@@ -555,15 +904,72 @@ ORDER BY frontdoor_building_first_seen_at ASC
 LIMIT $1
 `
 
-func (q *Queries) ListUnprocessedFrontdoorBuildings(ctx context.Context, limit int32) ([]FrontdoorBuilding, error) {
-	rows, err := q.db.Query(ctx, listUnprocessedFrontdoorBuildings, limit)
+type ListUnprocessedFrontdoorBuildingsRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) ListUnprocessedFrontdoorBuildings(ctx context.Context, dollar_1 *int64) ([]ListUnprocessedFrontdoorBuildingsRow, error) {
+	rows, err := q.db.Query(ctx, listUnprocessedFrontdoorBuildings, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FrontdoorBuilding{}
+	items := []ListUnprocessedFrontdoorBuildingsRow{}
 	for rows.Next() {
-		var i FrontdoorBuilding
+		var i ListUnprocessedFrontdoorBuildingsRow
 		if err := rows.Scan(
 			&i.FrontdoorBuildingID,
 			&i.FrontdoorBuildingUrl,
@@ -637,15 +1043,45 @@ ORDER BY shortcut_building_created_at DESC
 LIMIT $1
 `
 
-func (q *Queries) ListUnprocessedShortcutBuildings(ctx context.Context, limit int32) ([]ShortcutBuilding, error) {
-	rows, err := q.db.Query(ctx, listUnprocessedShortcutBuildings, limit)
+type ListUnprocessedShortcutBuildingsRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) ListUnprocessedShortcutBuildings(ctx context.Context, dollar_1 *int64) ([]ListUnprocessedShortcutBuildingsRow, error) {
+	rows, err := q.db.Query(ctx, listUnprocessedShortcutBuildings, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutBuilding{}
+	items := []ListUnprocessedShortcutBuildingsRow{}
 	for rows.Next() {
-		var i ShortcutBuilding
+		var i ListUnprocessedShortcutBuildingsRow
 		if err := rows.Scan(
 			&i.ShortcutBuildingID,
 			&i.ShortcutBuildingExternalID,
@@ -691,8 +1127,8 @@ SET frontdoor_building_processed_at = now(), frontdoor_building_updated_at = now
 WHERE frontdoor_building_id = $1
 `
 
-func (q *Queries) MarkFrontdoorBuildingProcessed(ctx context.Context, frontdoorBuildingID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, markFrontdoorBuildingProcessed, frontdoorBuildingID)
+func (q *Queries) MarkFrontdoorBuildingProcessed(ctx context.Context, dollar_1 *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markFrontdoorBuildingProcessed, dollar_1)
 	return err
 }
 
@@ -702,8 +1138,8 @@ SET shortcut_building_page_not_found = true, shortcut_building_updated_at = CURR
 WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) MarkShortcutBuildingPageNotFound(ctx context.Context, shortcutBuildingID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, markShortcutBuildingPageNotFound, shortcutBuildingID)
+func (q *Queries) MarkShortcutBuildingPageNotFound(ctx context.Context, dollar_1 *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markShortcutBuildingPageNotFound, dollar_1)
 	return err
 }
 
@@ -713,8 +1149,8 @@ SET shortcut_building_processed_at = CURRENT_TIMESTAMP, shortcut_building_update
 WHERE shortcut_building_id = $1
 `
 
-func (q *Queries) MarkShortcutBuildingProcessed(ctx context.Context, shortcutBuildingID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, markShortcutBuildingProcessed, shortcutBuildingID)
+func (q *Queries) MarkShortcutBuildingProcessed(ctx context.Context, dollar_1 *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markShortcutBuildingProcessed, dollar_1)
 	return err
 }
 
@@ -754,66 +1190,123 @@ RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_firs
 `
 
 type UpdateFrontdoorBuildingDetailsParams struct {
-	FrontdoorBuildingID                    uuid.UUID       `json:"frontdoor_building_id"`
-	FrontdoorBuildingCompanyName           *string         `json:"frontdoor_building_company_name"`
-	FrontdoorBuildingBusinessID            *string         `json:"frontdoor_building_business_id"`
-	FrontdoorBuildingApartmentCount        *int32          `json:"frontdoor_building_apartment_count"`
-	FrontdoorBuildingFloorCount            *int32          `json:"frontdoor_building_floor_count"`
-	FrontdoorBuildingConstructionEndYear   *int32          `json:"frontdoor_building_construction_end_year"`
-	FrontdoorBuildingBuildYear             *int32          `json:"frontdoor_building_build_year"`
-	FrontdoorBuildingHasElevator           *bool           `json:"frontdoor_building_has_elevator"`
-	FrontdoorBuildingHasSauna              *bool           `json:"frontdoor_building_has_sauna"`
-	FrontdoorBuildingEnergyCertificateCode *string         `json:"frontdoor_building_energy_certificate_code"`
-	FrontdoorBuildingPlotHoldingType       *string         `json:"frontdoor_building_plot_holding_type"`
-	FrontdoorBuildingOuterRoofMaterial     *string         `json:"frontdoor_building_outer_roof_material"`
-	FrontdoorBuildingOuterRoofType         *string         `json:"frontdoor_building_outer_roof_type"`
-	FrontdoorBuildingHeating               *string         `json:"frontdoor_building_heating"`
-	FrontdoorBuildingHeatingFuel           []string        `json:"frontdoor_building_heating_fuel"`
-	FrontdoorBuildingStreetAddress         *string         `json:"frontdoor_building_street_address"`
-	FrontdoorBuildingHouseNumber           *string         `json:"frontdoor_building_house_number"`
-	FrontdoorBuildingPostcode              *string         `json:"frontdoor_building_postcode"`
-	FrontdoorBuildingPostArea              *string         `json:"frontdoor_building_post_area"`
-	FrontdoorBuildingMunicipality          *string         `json:"frontdoor_building_municipality"`
-	FrontdoorBuildingDistrict              *string         `json:"frontdoor_building_district"`
-	FrontdoorBuildingLatitude              *float64        `json:"frontdoor_building_latitude"`
-	FrontdoorBuildingLongitude             *float64        `json:"frontdoor_building_longitude"`
-	FrontdoorBuildingDescription           *string         `json:"frontdoor_building_description"`
-	FrontdoorBuildingCarStorageDescription *string         `json:"frontdoor_building_car_storage_description"`
-	FrontdoorBuildingOtherInfo             *string         `json:"frontdoor_building_other_info"`
-	FrontdoorBuildingData                  json.RawMessage `json:"frontdoor_building_data"`
+	Column1  *uuid.UUID      `json:"column_1"`
+	Column2  *string         `json:"column_2"`
+	Column3  *string         `json:"column_3"`
+	Column4  *int32          `json:"column_4"`
+	Column5  *int32          `json:"column_5"`
+	Column6  *int32          `json:"column_6"`
+	Column7  *int32          `json:"column_7"`
+	Column8  *bool           `json:"column_8"`
+	Column9  *bool           `json:"column_9"`
+	Column10 *string         `json:"column_10"`
+	Column11 *string         `json:"column_11"`
+	Column12 *string         `json:"column_12"`
+	Column13 *string         `json:"column_13"`
+	Column14 *string         `json:"column_14"`
+	Column15 []string        `json:"column_15"`
+	Column16 *string         `json:"column_16"`
+	Column17 *string         `json:"column_17"`
+	Column18 *string         `json:"column_18"`
+	Column19 *string         `json:"column_19"`
+	Column20 *string         `json:"column_20"`
+	Column21 *string         `json:"column_21"`
+	Column22 *float64        `json:"column_22"`
+	Column23 *float64        `json:"column_23"`
+	Column24 *string         `json:"column_24"`
+	Column25 *string         `json:"column_25"`
+	Column26 *string         `json:"column_26"`
+	Column27 json.RawMessage `json:"column_27"`
 }
 
-func (q *Queries) UpdateFrontdoorBuildingDetails(ctx context.Context, arg UpdateFrontdoorBuildingDetailsParams) (FrontdoorBuilding, error) {
+type UpdateFrontdoorBuildingDetailsRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) UpdateFrontdoorBuildingDetails(ctx context.Context, arg UpdateFrontdoorBuildingDetailsParams) (UpdateFrontdoorBuildingDetailsRow, error) {
 	row := q.db.QueryRow(ctx, updateFrontdoorBuildingDetails,
-		arg.FrontdoorBuildingID,
-		arg.FrontdoorBuildingCompanyName,
-		arg.FrontdoorBuildingBusinessID,
-		arg.FrontdoorBuildingApartmentCount,
-		arg.FrontdoorBuildingFloorCount,
-		arg.FrontdoorBuildingConstructionEndYear,
-		arg.FrontdoorBuildingBuildYear,
-		arg.FrontdoorBuildingHasElevator,
-		arg.FrontdoorBuildingHasSauna,
-		arg.FrontdoorBuildingEnergyCertificateCode,
-		arg.FrontdoorBuildingPlotHoldingType,
-		arg.FrontdoorBuildingOuterRoofMaterial,
-		arg.FrontdoorBuildingOuterRoofType,
-		arg.FrontdoorBuildingHeating,
-		arg.FrontdoorBuildingHeatingFuel,
-		arg.FrontdoorBuildingStreetAddress,
-		arg.FrontdoorBuildingHouseNumber,
-		arg.FrontdoorBuildingPostcode,
-		arg.FrontdoorBuildingPostArea,
-		arg.FrontdoorBuildingMunicipality,
-		arg.FrontdoorBuildingDistrict,
-		arg.FrontdoorBuildingLatitude,
-		arg.FrontdoorBuildingLongitude,
-		arg.FrontdoorBuildingDescription,
-		arg.FrontdoorBuildingCarStorageDescription,
-		arg.FrontdoorBuildingOtherInfo,
-		arg.FrontdoorBuildingData,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+		arg.Column9,
+		arg.Column10,
+		arg.Column11,
+		arg.Column12,
+		arg.Column13,
+		arg.Column14,
+		arg.Column15,
+		arg.Column16,
+		arg.Column17,
+		arg.Column18,
+		arg.Column19,
+		arg.Column20,
+		arg.Column21,
+		arg.Column22,
+		arg.Column23,
+		arg.Column24,
+		arg.Column25,
+		arg.Column26,
+		arg.Column27,
 	)
-	var i FrontdoorBuilding
+	var i UpdateFrontdoorBuildingDetailsRow
 	err := row.Scan(
 		&i.FrontdoorBuildingID,
 		&i.FrontdoorBuildingUrl,
@@ -875,56 +1368,55 @@ func (q *Queries) UpdateFrontdoorBuildingDetails(ctx context.Context, arg Update
 
 const updateFrontdoorBuildingDetailsByHousingCompanyID = `-- name: UpdateFrontdoorBuildingDetailsByHousingCompanyID :exec
 UPDATE public.frontdoor_buildings
-SET frontdoor_building_company_name = $2,
-    frontdoor_building_business_id = $3,
-    frontdoor_building_apartment_count = $4,
-    frontdoor_building_floor_count = $5,
-    frontdoor_building_construction_end_year = $6,
-    frontdoor_building_build_year = $7,
-    frontdoor_building_has_elevator = $8,
-    frontdoor_building_has_sauna = $9,
-    frontdoor_building_energy_certificate_code = $10,
-    frontdoor_building_plot_holding_type = $11,
-    frontdoor_building_outer_roof_material = $12,
-    frontdoor_building_outer_roof_type = $13,
-    frontdoor_building_heating = $14,
-    frontdoor_building_heating_fuel = $15,
-    frontdoor_building_street_address = $16,
-    frontdoor_building_house_number = $17,
-    frontdoor_building_postcode = $18,
-    frontdoor_building_post_area = $19,
-    frontdoor_building_municipality = $20,
-    frontdoor_building_district = $21,
-    frontdoor_building_latitude = $22,
-    frontdoor_building_longitude = $23,
-    frontdoor_building_elevator_renovated = $24,
-    frontdoor_building_elevator_renovated_year = $25,
-    frontdoor_building_facade_renovated = $26,
-    frontdoor_building_facade_renovated_year = $27,
-    frontdoor_building_window_renovated = $28,
-    frontdoor_building_window_renovated_year = $29,
-    frontdoor_building_roof_renovated = $30,
-    frontdoor_building_roof_renovated_year = $31,
-    frontdoor_building_pipe_renovated = $32,
-    frontdoor_building_pipe_renovated_year = $33,
-    frontdoor_building_balcony_renovated = $34,
-    frontdoor_building_balcony_renovated_year = $35,
-    frontdoor_building_electricity_renovated = $36,
-    frontdoor_building_electricity_renovated_year = $37,
-    frontdoor_building_contact_phone = $38,
-    frontdoor_building_contact_office_name = $39,
-    frontdoor_building_contact_office_id = $40,
-    frontdoor_building_description = $41,
-    frontdoor_building_car_storage_description = $42,
-    frontdoor_building_other_info = $43,
-    frontdoor_building_data = $44::jsonb,
+SET frontdoor_building_company_name = $1,
+    frontdoor_building_business_id = $2,
+    frontdoor_building_apartment_count = $3,
+    frontdoor_building_floor_count = $4,
+    frontdoor_building_construction_end_year = $5,
+    frontdoor_building_build_year = $6,
+    frontdoor_building_has_elevator = $7,
+    frontdoor_building_has_sauna = $8,
+    frontdoor_building_energy_certificate_code = $9,
+    frontdoor_building_plot_holding_type = $10,
+    frontdoor_building_outer_roof_material = $11,
+    frontdoor_building_outer_roof_type = $12,
+    frontdoor_building_heating = $13,
+    frontdoor_building_heating_fuel = $14,
+    frontdoor_building_street_address = $15,
+    frontdoor_building_house_number = $16,
+    frontdoor_building_postcode = $17,
+    frontdoor_building_post_area = $18,
+    frontdoor_building_municipality = $19,
+    frontdoor_building_district = $20,
+    frontdoor_building_latitude = $21,
+    frontdoor_building_longitude = $22,
+    frontdoor_building_elevator_renovated = $23,
+    frontdoor_building_elevator_renovated_year = $24,
+    frontdoor_building_facade_renovated = $25,
+    frontdoor_building_facade_renovated_year = $26,
+    frontdoor_building_window_renovated = $27,
+    frontdoor_building_window_renovated_year = $28,
+    frontdoor_building_roof_renovated = $29,
+    frontdoor_building_roof_renovated_year = $30,
+    frontdoor_building_pipe_renovated = $31,
+    frontdoor_building_pipe_renovated_year = $32,
+    frontdoor_building_balcony_renovated = $33,
+    frontdoor_building_balcony_renovated_year = $34,
+    frontdoor_building_electricity_renovated = $35,
+    frontdoor_building_electricity_renovated_year = $36,
+    frontdoor_building_contact_phone = $37,
+    frontdoor_building_contact_office_name = $38,
+    frontdoor_building_contact_office_id = $39,
+    frontdoor_building_description = $40,
+    frontdoor_building_car_storage_description = $41,
+    frontdoor_building_other_info = $42,
+    frontdoor_building_data = $43::jsonb,
     frontdoor_building_processed_at = NOW(),
     frontdoor_building_updated_at = NOW()
-WHERE frontdoor_building_housing_company_id = $1
+WHERE frontdoor_building_housing_company_id = $44
 `
 
 type UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams struct {
-	FrontdoorBuildingHousingCompanyID         *int64          `json:"frontdoor_building_housing_company_id"`
 	FrontdoorBuildingCompanyName              *string         `json:"frontdoor_building_company_name"`
 	FrontdoorBuildingBusinessID               *string         `json:"frontdoor_building_business_id"`
 	FrontdoorBuildingApartmentCount           *int32          `json:"frontdoor_building_apartment_count"`
@@ -967,12 +1459,12 @@ type UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams struct {
 	FrontdoorBuildingDescription              *string         `json:"frontdoor_building_description"`
 	FrontdoorBuildingCarStorageDescription    *string         `json:"frontdoor_building_car_storage_description"`
 	FrontdoorBuildingOtherInfo                *string         `json:"frontdoor_building_other_info"`
-	Column44                                  json.RawMessage `json:"column_44"`
+	FrontdoorBuildingData                     json.RawMessage `json:"frontdoor_building_data"`
+	FrontdoorBuildingHousingCompanyID         *int64          `json:"frontdoor_building_housing_company_id"`
 }
 
 func (q *Queries) UpdateFrontdoorBuildingDetailsByHousingCompanyID(ctx context.Context, arg UpdateFrontdoorBuildingDetailsByHousingCompanyIDParams) error {
 	_, err := q.db.Exec(ctx, updateFrontdoorBuildingDetailsByHousingCompanyID,
-		arg.FrontdoorBuildingHousingCompanyID,
 		arg.FrontdoorBuildingCompanyName,
 		arg.FrontdoorBuildingBusinessID,
 		arg.FrontdoorBuildingApartmentCount,
@@ -1015,7 +1507,8 @@ func (q *Queries) UpdateFrontdoorBuildingDetailsByHousingCompanyID(ctx context.C
 		arg.FrontdoorBuildingDescription,
 		arg.FrontdoorBuildingCarStorageDescription,
 		arg.FrontdoorBuildingOtherInfo,
-		arg.Column44,
+		arg.FrontdoorBuildingData,
+		arg.FrontdoorBuildingHousingCompanyID,
 	)
 	return err
 }
@@ -1037,14 +1530,71 @@ RETURNING frontdoor_building_id, frontdoor_building_url, frontdoor_building_firs
 `
 
 type UpsertFrontdoorBuildingParams struct {
-	FrontdoorBuildingUrl                      *string `json:"frontdoor_building_url"`
-	FrontdoorBuildingHousingCompanyID         *int64  `json:"frontdoor_building_housing_company_id"`
-	FrontdoorBuildingHousingCompanyFriendlyID *string `json:"frontdoor_building_housing_company_friendly_id"`
+	Column1 *string `json:"column_1"`
+	Column2 *int64  `json:"column_2"`
+	Column3 *string `json:"column_3"`
 }
 
-func (q *Queries) UpsertFrontdoorBuilding(ctx context.Context, arg UpsertFrontdoorBuildingParams) (FrontdoorBuilding, error) {
-	row := q.db.QueryRow(ctx, upsertFrontdoorBuilding, arg.FrontdoorBuildingUrl, arg.FrontdoorBuildingHousingCompanyID, arg.FrontdoorBuildingHousingCompanyFriendlyID)
-	var i FrontdoorBuilding
+type UpsertFrontdoorBuildingRow struct {
+	FrontdoorBuildingID                       uuid.UUID         `json:"frontdoor_building_id"`
+	FrontdoorBuildingUrl                      *string           `json:"frontdoor_building_url"`
+	FrontdoorBuildingFirstSeenAt              time.Time         `json:"frontdoor_building_first_seen_at"`
+	FrontdoorBuildingLastSeenAt               time.Time         `json:"frontdoor_building_last_seen_at"`
+	FrontdoorBuildingUpdatedAt                time.Time         `json:"frontdoor_building_updated_at"`
+	FrontdoorBuildingCompanyName              *string           `json:"frontdoor_building_company_name"`
+	FrontdoorBuildingBusinessID               *string           `json:"frontdoor_building_business_id"`
+	FrontdoorBuildingApartmentCount           *int32            `json:"frontdoor_building_apartment_count"`
+	FrontdoorBuildingFloorCount               *int32            `json:"frontdoor_building_floor_count"`
+	FrontdoorBuildingConstructionEndYear      *int32            `json:"frontdoor_building_construction_end_year"`
+	FrontdoorBuildingBuildYear                *int32            `json:"frontdoor_building_build_year"`
+	FrontdoorBuildingHasElevator              *bool             `json:"frontdoor_building_has_elevator"`
+	FrontdoorBuildingHasSauna                 *bool             `json:"frontdoor_building_has_sauna"`
+	FrontdoorBuildingEnergyCertificateCode    *string           `json:"frontdoor_building_energy_certificate_code"`
+	FrontdoorBuildingPlotHoldingType          *string           `json:"frontdoor_building_plot_holding_type"`
+	FrontdoorBuildingOuterRoofMaterial        *string           `json:"frontdoor_building_outer_roof_material"`
+	FrontdoorBuildingOuterRoofType            *string           `json:"frontdoor_building_outer_roof_type"`
+	FrontdoorBuildingHeating                  *string           `json:"frontdoor_building_heating"`
+	FrontdoorBuildingHeatingFuel              []string          `json:"frontdoor_building_heating_fuel"`
+	FrontdoorBuildingStreetAddress            *string           `json:"frontdoor_building_street_address"`
+	FrontdoorBuildingHouseNumber              *string           `json:"frontdoor_building_house_number"`
+	FrontdoorBuildingPostcode                 *string           `json:"frontdoor_building_postcode"`
+	FrontdoorBuildingPostArea                 *string           `json:"frontdoor_building_post_area"`
+	FrontdoorBuildingMunicipality             *string           `json:"frontdoor_building_municipality"`
+	FrontdoorBuildingDistrict                 *string           `json:"frontdoor_building_district"`
+	FrontdoorBuildingLatitude                 *float64          `json:"frontdoor_building_latitude"`
+	FrontdoorBuildingLongitude                *float64          `json:"frontdoor_building_longitude"`
+	FrontdoorBuildingElevatorRenovated        *bool             `json:"frontdoor_building_elevator_renovated"`
+	FrontdoorBuildingElevatorRenovatedYear    *int32            `json:"frontdoor_building_elevator_renovated_year"`
+	FrontdoorBuildingFacadeRenovated          *bool             `json:"frontdoor_building_facade_renovated"`
+	FrontdoorBuildingFacadeRenovatedYear      *int32            `json:"frontdoor_building_facade_renovated_year"`
+	FrontdoorBuildingWindowRenovated          *bool             `json:"frontdoor_building_window_renovated"`
+	FrontdoorBuildingWindowRenovatedYear      *int32            `json:"frontdoor_building_window_renovated_year"`
+	FrontdoorBuildingRoofRenovated            *bool             `json:"frontdoor_building_roof_renovated"`
+	FrontdoorBuildingRoofRenovatedYear        *int32            `json:"frontdoor_building_roof_renovated_year"`
+	FrontdoorBuildingPipeRenovated            *bool             `json:"frontdoor_building_pipe_renovated"`
+	FrontdoorBuildingPipeRenovatedYear        *int32            `json:"frontdoor_building_pipe_renovated_year"`
+	FrontdoorBuildingBalconyRenovated         *bool             `json:"frontdoor_building_balcony_renovated"`
+	FrontdoorBuildingBalconyRenovatedYear     *int32            `json:"frontdoor_building_balcony_renovated_year"`
+	FrontdoorBuildingElectricityRenovated     *bool             `json:"frontdoor_building_electricity_renovated"`
+	FrontdoorBuildingElectricityRenovatedYear *int32            `json:"frontdoor_building_electricity_renovated_year"`
+	FrontdoorBuildingContactPhone             *string           `json:"frontdoor_building_contact_phone"`
+	FrontdoorBuildingContactOfficeName        *string           `json:"frontdoor_building_contact_office_name"`
+	FrontdoorBuildingContactOfficeID          *int32            `json:"frontdoor_building_contact_office_id"`
+	FrontdoorBuildingDescription              *string           `json:"frontdoor_building_description"`
+	FrontdoorBuildingCarStorageDescription    *string           `json:"frontdoor_building_car_storage_description"`
+	FrontdoorBuildingOtherInfo                *string           `json:"frontdoor_building_other_info"`
+	FrontdoorBuildingAdditionalAddresses      []json.RawMessage `json:"frontdoor_building_additional_addresses"`
+	FrontdoorBuildingLinks                    []json.RawMessage `json:"frontdoor_building_links"`
+	FrontdoorBuildingData                     json.RawMessage   `json:"frontdoor_building_data"`
+	FrontdoorBuildingProcessedAt              *time.Time        `json:"frontdoor_building_processed_at"`
+	FrontdoorBuildingHousingCompanyID         *int64            `json:"frontdoor_building_housing_company_id"`
+	FrontdoorBuildingHousingCompanyFriendlyID *string           `json:"frontdoor_building_housing_company_friendly_id"`
+	FrontdoorBuildingGeom                     interface{}       `json:"frontdoor_building_geom"`
+}
+
+func (q *Queries) UpsertFrontdoorBuilding(ctx context.Context, arg UpsertFrontdoorBuildingParams) (UpsertFrontdoorBuildingRow, error) {
+	row := q.db.QueryRow(ctx, upsertFrontdoorBuilding, arg.Column1, arg.Column2, arg.Column3)
+	var i UpsertFrontdoorBuildingRow
 	err := row.Scan(
 		&i.FrontdoorBuildingID,
 		&i.FrontdoorBuildingUrl,
@@ -1141,7 +1691,27 @@ INSERT INTO public.shortcut_buildings (
     shortcut_building_frame_construction_method,
     shortcut_building_housing_company
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21
 )
 ON CONFLICT (shortcut_building_external_id) DO UPDATE SET
     shortcut_building_building_id = EXCLUDED.shortcut_building_building_id,
@@ -1169,7 +1739,7 @@ RETURNING shortcut_building_id, shortcut_building_external_id, shortcut_building
 `
 
 type UpsertShortcutBuildingParams struct {
-	ShortcutBuildingExternalID              int64    `json:"shortcut_building_external_id"`
+	ShortcutBuildingExternalID              *int64   `json:"shortcut_building_external_id"`
 	ShortcutBuildingBuildingID              *string  `json:"shortcut_building_building_id"`
 	ShortcutBuildingBuildingType            *string  `json:"shortcut_building_building_type"`
 	ShortcutBuildingBuildingSubtype         *string  `json:"shortcut_building_building_subtype"`
@@ -1186,13 +1756,43 @@ type UpsertShortcutBuildingParams struct {
 	ShortcutBuildingLatitude                *float64 `json:"shortcut_building_latitude"`
 	ShortcutBuildingLongitude               *float64 `json:"shortcut_building_longitude"`
 	ShortcutBuildingAdditionalAddresses     *string  `json:"shortcut_building_additional_addresses"`
-	ShortcutBuildingUrl                     string   `json:"shortcut_building_url"`
+	ShortcutBuildingUrl                     *string  `json:"shortcut_building_url"`
 	ShortcutBuildingAddress                 *string  `json:"shortcut_building_address"`
 	ShortcutBuildingFrameConstructionMethod *string  `json:"shortcut_building_frame_construction_method"`
 	ShortcutBuildingHousingCompany          *string  `json:"shortcut_building_housing_company"`
 }
 
-func (q *Queries) UpsertShortcutBuilding(ctx context.Context, arg UpsertShortcutBuildingParams) (ShortcutBuilding, error) {
+type UpsertShortcutBuildingRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) UpsertShortcutBuilding(ctx context.Context, arg UpsertShortcutBuildingParams) (UpsertShortcutBuildingRow, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuilding,
 		arg.ShortcutBuildingExternalID,
 		arg.ShortcutBuildingBuildingID,
@@ -1216,7 +1816,7 @@ func (q *Queries) UpsertShortcutBuilding(ctx context.Context, arg UpsertShortcut
 		arg.ShortcutBuildingFrameConstructionMethod,
 		arg.ShortcutBuildingHousingCompany,
 	)
-	var i ShortcutBuilding
+	var i UpsertShortcutBuildingRow
 	err := row.Scan(
 		&i.ShortcutBuildingID,
 		&i.ShortcutBuildingExternalID,
@@ -1263,13 +1863,43 @@ RETURNING shortcut_building_id, shortcut_building_external_id, shortcut_building
 `
 
 type UpsertShortcutBuildingFromSitemapParams struct {
-	ShortcutBuildingExternalID int64  `json:"shortcut_building_external_id"`
-	ShortcutBuildingUrl        string `json:"shortcut_building_url"`
+	Column1 *int64  `json:"column_1"`
+	Column2 *string `json:"column_2"`
 }
 
-func (q *Queries) UpsertShortcutBuildingFromSitemap(ctx context.Context, arg UpsertShortcutBuildingFromSitemapParams) (ShortcutBuilding, error) {
-	row := q.db.QueryRow(ctx, upsertShortcutBuildingFromSitemap, arg.ShortcutBuildingExternalID, arg.ShortcutBuildingUrl)
-	var i ShortcutBuilding
+type UpsertShortcutBuildingFromSitemapRow struct {
+	ShortcutBuildingID                      uuid.UUID   `json:"shortcut_building_id"`
+	ShortcutBuildingExternalID              int64       `json:"shortcut_building_external_id"`
+	ShortcutBuildingBuildingID              *string     `json:"shortcut_building_building_id"`
+	ShortcutBuildingBuildingType            *string     `json:"shortcut_building_building_type"`
+	ShortcutBuildingBuildingSubtype         *string     `json:"shortcut_building_building_subtype"`
+	ShortcutBuildingConstructionYear        *int32      `json:"shortcut_building_construction_year"`
+	ShortcutBuildingFloorCount              *int32      `json:"shortcut_building_floor_count"`
+	ShortcutBuildingApartmentCount          *int32      `json:"shortcut_building_apartment_count"`
+	ShortcutBuildingHeatingSystem           *string     `json:"shortcut_building_heating_system"`
+	ShortcutBuildingBuildingMaterial        *string     `json:"shortcut_building_building_material"`
+	ShortcutBuildingPlotType                *string     `json:"shortcut_building_plot_type"`
+	ShortcutBuildingWallStructure           *string     `json:"shortcut_building_wall_structure"`
+	ShortcutBuildingHeatSource              *string     `json:"shortcut_building_heat_source"`
+	ShortcutBuildingHasElevator             *string     `json:"shortcut_building_has_elevator"`
+	ShortcutBuildingHasSauna                *string     `json:"shortcut_building_has_sauna"`
+	ShortcutBuildingLatitude                *float64    `json:"shortcut_building_latitude"`
+	ShortcutBuildingLongitude               *float64    `json:"shortcut_building_longitude"`
+	ShortcutBuildingAdditionalAddresses     *string     `json:"shortcut_building_additional_addresses"`
+	ShortcutBuildingUrl                     string      `json:"shortcut_building_url"`
+	ShortcutBuildingCreatedAt               time.Time   `json:"shortcut_building_created_at"`
+	ShortcutBuildingUpdatedAt               time.Time   `json:"shortcut_building_updated_at"`
+	ShortcutBuildingAddress                 *string     `json:"shortcut_building_address"`
+	ShortcutBuildingProcessedAt             *time.Time  `json:"shortcut_building_processed_at"`
+	ShortcutBuildingPageNotFound            *bool       `json:"shortcut_building_page_not_found"`
+	ShortcutBuildingFrameConstructionMethod *string     `json:"shortcut_building_frame_construction_method"`
+	ShortcutBuildingHousingCompany          *string     `json:"shortcut_building_housing_company"`
+	ShortcutBuildingGeom                    interface{} `json:"shortcut_building_geom"`
+}
+
+func (q *Queries) UpsertShortcutBuildingFromSitemap(ctx context.Context, arg UpsertShortcutBuildingFromSitemapParams) (UpsertShortcutBuildingFromSitemapRow, error) {
+	row := q.db.QueryRow(ctx, upsertShortcutBuildingFromSitemap, arg.Column1, arg.Column2)
+	var i UpsertShortcutBuildingFromSitemapRow
 	err := row.Scan(
 		&i.ShortcutBuildingID,
 		&i.ShortcutBuildingExternalID,

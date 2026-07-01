@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -17,15 +18,29 @@ WHERE shortcut_building_id = $1
 ORDER BY shortcut_building_listing_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, shortcutBuildingID uuid.UUID) ([]ShortcutBuildingListing, error) {
-	rows, err := q.db.Query(ctx, getShortcutBuildingListingsByBuildingID, shortcutBuildingID)
+type GetShortcutBuildingListingsByBuildingIDRow struct {
+	ShortcutBuildingListingID            uuid.UUID  `json:"shortcut_building_listing_id"`
+	ShortcutBuildingID                   uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string    `json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64   `json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64   `json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64   `json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingDeletedAt     *time.Time `json:"shortcut_building_listing_deleted_at"`
+	ShortcutBuildingListingCreatedAt     time.Time  `json:"shortcut_building_listing_created_at"`
+	ShortcutBuildingListingUpdatedAt     time.Time  `json:"shortcut_building_listing_updated_at"`
+	ShortcutBuildingListingMarketingTime *string    `json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32     `json:"shortcut_building_listing_idx"`
+}
+
+func (q *Queries) GetShortcutBuildingListingsByBuildingID(ctx context.Context, dollar_1 *uuid.UUID) ([]GetShortcutBuildingListingsByBuildingIDRow, error) {
+	rows, err := q.db.Query(ctx, getShortcutBuildingListingsByBuildingID, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutBuildingListing{}
+	items := []GetShortcutBuildingListingsByBuildingIDRow{}
 	for rows.Next() {
-		var i ShortcutBuildingListing
+		var i GetShortcutBuildingListingsByBuildingIDRow
 		if err := rows.Scan(
 			&i.ShortcutBuildingListingID,
 			&i.ShortcutBuildingID,
@@ -55,15 +70,28 @@ WHERE shortcut_building_id = $1
 ORDER BY shortcut_building_rental_created_at DESC
 `
 
-func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, shortcutBuildingID uuid.UUID) ([]ShortcutBuildingRental, error) {
-	rows, err := q.db.Query(ctx, getShortcutBuildingRentalsByBuildingID, shortcutBuildingID)
+type GetShortcutBuildingRentalsByBuildingIDRow struct {
+	ShortcutBuildingRentalID            uuid.UUID  `json:"shortcut_building_rental_id"`
+	ShortcutBuildingID                  uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string    `json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64   `json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64   `json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalDeletedAt     *time.Time `json:"shortcut_building_rental_deleted_at"`
+	ShortcutBuildingRentalCreatedAt     time.Time  `json:"shortcut_building_rental_created_at"`
+	ShortcutBuildingRentalUpdatedAt     time.Time  `json:"shortcut_building_rental_updated_at"`
+	ShortcutBuildingRentalMarketingTime *string    `json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32     `json:"shortcut_building_rental_idx"`
+}
+
+func (q *Queries) GetShortcutBuildingRentalsByBuildingID(ctx context.Context, dollar_1 *uuid.UUID) ([]GetShortcutBuildingRentalsByBuildingIDRow, error) {
+	rows, err := q.db.Query(ctx, getShortcutBuildingRentalsByBuildingID, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutBuildingRental{}
+	items := []GetShortcutBuildingRentalsByBuildingIDRow{}
 	for rows.Next() {
-		var i ShortcutBuildingRental
+		var i GetShortcutBuildingRentalsByBuildingIDRow
 		if err := rows.Scan(
 			&i.ShortcutBuildingRentalID,
 			&i.ShortcutBuildingID,
@@ -96,7 +124,13 @@ INSERT INTO public.shortcut_building_listings (
     shortcut_building_listing_marketing_time,
     shortcut_building_listing_idx
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7
 )
 ON CONFLICT (shortcut_building_id, shortcut_building_listing_layout, shortcut_building_listing_size, shortcut_building_listing_price, shortcut_building_listing_price_per_sqm, shortcut_building_listing_deleted_at, shortcut_building_listing_marketing_time, shortcut_building_listing_idx) DO UPDATE SET
     shortcut_building_listing_updated_at = CURRENT_TIMESTAMP
@@ -104,16 +138,30 @@ RETURNING shortcut_building_listing_id, shortcut_building_id, shortcut_building_
 `
 
 type UpsertShortcutBuildingListingParams struct {
-	ShortcutBuildingID                   uuid.UUID `json:"shortcut_building_id"`
-	ShortcutBuildingListingLayout        *string   `json:"shortcut_building_listing_layout"`
-	ShortcutBuildingListingSize          *float64  `json:"shortcut_building_listing_size"`
-	ShortcutBuildingListingPrice         *float64  `json:"shortcut_building_listing_price"`
-	ShortcutBuildingListingPricePerSqm   *float64  `json:"shortcut_building_listing_price_per_sqm"`
-	ShortcutBuildingListingMarketingTime *string   `json:"shortcut_building_listing_marketing_time"`
-	ShortcutBuildingListingIdx           *int32    `json:"shortcut_building_listing_idx"`
+	ShortcutBuildingID                   *uuid.UUID `json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string    `json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64   `json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64   `json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64   `json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingMarketingTime *string    `json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32     `json:"shortcut_building_listing_idx"`
 }
 
-func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg UpsertShortcutBuildingListingParams) (ShortcutBuildingListing, error) {
+type UpsertShortcutBuildingListingRow struct {
+	ShortcutBuildingListingID            uuid.UUID  `json:"shortcut_building_listing_id"`
+	ShortcutBuildingID                   uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingListingLayout        *string    `json:"shortcut_building_listing_layout"`
+	ShortcutBuildingListingSize          *float64   `json:"shortcut_building_listing_size"`
+	ShortcutBuildingListingPrice         *float64   `json:"shortcut_building_listing_price"`
+	ShortcutBuildingListingPricePerSqm   *float64   `json:"shortcut_building_listing_price_per_sqm"`
+	ShortcutBuildingListingDeletedAt     *time.Time `json:"shortcut_building_listing_deleted_at"`
+	ShortcutBuildingListingCreatedAt     time.Time  `json:"shortcut_building_listing_created_at"`
+	ShortcutBuildingListingUpdatedAt     time.Time  `json:"shortcut_building_listing_updated_at"`
+	ShortcutBuildingListingMarketingTime *string    `json:"shortcut_building_listing_marketing_time"`
+	ShortcutBuildingListingIdx           *int32     `json:"shortcut_building_listing_idx"`
+}
+
+func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg UpsertShortcutBuildingListingParams) (UpsertShortcutBuildingListingRow, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingListing,
 		arg.ShortcutBuildingID,
 		arg.ShortcutBuildingListingLayout,
@@ -123,7 +171,7 @@ func (q *Queries) UpsertShortcutBuildingListing(ctx context.Context, arg UpsertS
 		arg.ShortcutBuildingListingMarketingTime,
 		arg.ShortcutBuildingListingIdx,
 	)
-	var i ShortcutBuildingListing
+	var i UpsertShortcutBuildingListingRow
 	err := row.Scan(
 		&i.ShortcutBuildingListingID,
 		&i.ShortcutBuildingID,
@@ -149,7 +197,12 @@ INSERT INTO public.shortcut_building_rentals (
     shortcut_building_rental_marketing_time,
     shortcut_building_rental_idx
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
 )
 ON CONFLICT (shortcut_building_id, shortcut_building_rental_layout, shortcut_building_rental_size, shortcut_building_rental_price, shortcut_building_rental_deleted_at, shortcut_building_rental_marketing_time, shortcut_building_rental_idx) DO UPDATE SET
     shortcut_building_rental_updated_at = CURRENT_TIMESTAMP
@@ -157,15 +210,28 @@ RETURNING shortcut_building_rental_id, shortcut_building_id, shortcut_building_r
 `
 
 type UpsertShortcutBuildingRentalParams struct {
-	ShortcutBuildingID                  uuid.UUID `json:"shortcut_building_id"`
-	ShortcutBuildingRentalLayout        *string   `json:"shortcut_building_rental_layout"`
-	ShortcutBuildingRentalSize          *float64  `json:"shortcut_building_rental_size"`
-	ShortcutBuildingRentalPrice         *float64  `json:"shortcut_building_rental_price"`
-	ShortcutBuildingRentalMarketingTime *string   `json:"shortcut_building_rental_marketing_time"`
-	ShortcutBuildingRentalIdx           *int32    `json:"shortcut_building_rental_idx"`
+	ShortcutBuildingID                  *uuid.UUID `json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string    `json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64   `json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64   `json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalMarketingTime *string    `json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32     `json:"shortcut_building_rental_idx"`
 }
 
-func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg UpsertShortcutBuildingRentalParams) (ShortcutBuildingRental, error) {
+type UpsertShortcutBuildingRentalRow struct {
+	ShortcutBuildingRentalID            uuid.UUID  `json:"shortcut_building_rental_id"`
+	ShortcutBuildingID                  uuid.UUID  `json:"shortcut_building_id"`
+	ShortcutBuildingRentalLayout        *string    `json:"shortcut_building_rental_layout"`
+	ShortcutBuildingRentalSize          *float64   `json:"shortcut_building_rental_size"`
+	ShortcutBuildingRentalPrice         *float64   `json:"shortcut_building_rental_price"`
+	ShortcutBuildingRentalDeletedAt     *time.Time `json:"shortcut_building_rental_deleted_at"`
+	ShortcutBuildingRentalCreatedAt     time.Time  `json:"shortcut_building_rental_created_at"`
+	ShortcutBuildingRentalUpdatedAt     time.Time  `json:"shortcut_building_rental_updated_at"`
+	ShortcutBuildingRentalMarketingTime *string    `json:"shortcut_building_rental_marketing_time"`
+	ShortcutBuildingRentalIdx           *int32     `json:"shortcut_building_rental_idx"`
+}
+
+func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg UpsertShortcutBuildingRentalParams) (UpsertShortcutBuildingRentalRow, error) {
 	row := q.db.QueryRow(ctx, upsertShortcutBuildingRental,
 		arg.ShortcutBuildingID,
 		arg.ShortcutBuildingRentalLayout,
@@ -174,7 +240,7 @@ func (q *Queries) UpsertShortcutBuildingRental(ctx context.Context, arg UpsertSh
 		arg.ShortcutBuildingRentalMarketingTime,
 		arg.ShortcutBuildingRentalIdx,
 	)
-	var i ShortcutBuildingRental
+	var i UpsertShortcutBuildingRentalRow
 	err := row.Scan(
 		&i.ShortcutBuildingRentalID,
 		&i.ShortcutBuildingID,

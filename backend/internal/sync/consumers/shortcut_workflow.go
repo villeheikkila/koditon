@@ -220,7 +220,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 			return shortcutEntityResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (shortcutFanoutResult, error) {
-			ad, err := c.queries.GetShortcutAdByID(ctx, adID)
+			ad, err := c.queries.GetShortcutAdByID(ctx, &adID)
 			if err != nil {
 				return shortcutFanoutResult{}, fmt.Errorf("load synced shortcut ad for canonicalization enqueue: %w", err)
 			}

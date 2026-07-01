@@ -192,13 +192,13 @@ func TestSignInWithEmail_RepairsMissingEmailIdentityFromLegacyUserEmail(t *testi
 
 	emailProvider := string(AuthProviderEmail)
 	identity, err := queries.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   emailProvider,
-		UserIdentityExternalID: normalizedEmail,
+		UserIdentityProvider:   &emailProvider,
+		UserIdentityExternalID: &normalizedEmail,
 	})
 	if err != nil {
 		t.Fatalf("get repaired email identity: %v", err)
 	}
-	if identity.UserUuid != user.UserUuid {
+	if identity.UserUuid == nil || *identity.UserUuid != user.UserUuid {
 		t.Fatalf("expected repaired identity to belong to user %s, got %s", user.UserUuid, identity.UserUuid)
 	}
 }
@@ -214,10 +214,11 @@ func createAuthenticatedEmailForTest(t *testing.T, ctx context.Context, queries 
 	rawToken := "signup-email-token-" + time.Now().UTC().Format(time.RFC3339Nano)
 	tokenHash := sha256.Sum256([]byte(rawToken))
 	tokenHashHex := hex.EncodeToString(tokenHash[:])
+	expiresAt := time.Now().Add(time.Hour)
 	if _, err := queries.CreateSignupEmailToken(ctx, db.CreateSignupEmailTokenParams{
-		AuthSignupEmailTargetEmail: normalizedEmail,
-		AuthSignupEmailTokenHash:   tokenHashHex,
-		AuthSignupEmailExpiresAt:   time.Now().Add(time.Hour),
+		AuthSignupEmailTargetEmail: &normalizedEmail,
+		AuthSignupEmailTokenHash:   &tokenHashHex,
+		AuthSignupEmailExpiresAt:   &expiresAt,
 	}); err != nil {
 		t.Fatalf("create signup email token: %v", err)
 	}

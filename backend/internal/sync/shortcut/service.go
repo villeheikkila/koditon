@@ -51,10 +51,10 @@ func NewService(
 	}
 	tokenStore := func(ctx context.Context, tokens *client.Tokens, expiresAt time.Time) error {
 		_, err := queries.InsertShortcutToken(ctx, db.InsertShortcutTokenParams{
-			ShortcutTokenCuid:      tokens.CUID,
-			ShortcutTokenToken:     tokens.Token,
-			ShortcutTokenLoaded:    tokens.Loaded,
-			ShortcutTokenExpiresAt: expiresAt,
+			ShortcutTokenCuid:      &tokens.CUID,
+			ShortcutTokenToken:     &tokens.Token,
+			ShortcutTokenLoaded:    &tokens.Loaded,
+			ShortcutTokenExpiresAt: &expiresAt,
 		})
 		return err
 	}
@@ -163,7 +163,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	}
 	var shortcutBuildingID *uuid.UUID
 	if payload.BuildingExternalID != nil {
-		building, err := s.queries.GetShortcutBuildingByExternalID(ctx, *payload.BuildingExternalID)
+		building, err := s.queries.GetShortcutBuildingByExternalID(ctx, payload.BuildingExternalID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("get linked building (ad_id=%d, building_external_id=%d): %w", adID, *payload.BuildingExternalID, err)
 		}
@@ -171,7 +171,7 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 			shortcutBuildingID = &building.ShortcutBuildingID
 		}
 	}
-	existingAd, err := s.queries.GetShortcutAdByID(ctx, adID)
+	existingAd, err := s.queries.GetShortcutAdByID(ctx, &adID)
 	if err != nil {
 		return fmt.Errorf("get existing ad (ad_id=%d): %w", adID, err)
 	}
@@ -189,7 +189,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 	if limit <= 0 {
 		limit = 1000
 	}
-	rows, err := s.queries.ListShortcutAdsMissingDataHash(ctx, limit)
+	rows, err := s.queries.ListShortcutAdsMissingDataHash(ctx, ptr(int64(limit)))
 	if err != nil {
 		return sourcejson.BackfillResult{}, fmt.Errorf("list shortcut ads missing data hash: %w", err)
 	}
@@ -202,7 +202,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 		if err != nil {
 			return result, fmt.Errorf("hash shortcut ad payload (ad_id=%d): %w", row.ShortcutAdID, err)
 		}
-		params := db.BackfillShortcutAdDataHashParams{ShortcutAdData: canonical, ShortcutAdDataHash: &hash, ShortcutAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256, ShortcutAdID: row.ShortcutAdID}
+		params := db.BackfillShortcutAdDataHashParams{ShortcutAdData: canonical, ShortcutAdDataHash: &hash, ShortcutAdDataHashAlgorithm: ptr(sourcejson.HashAlgorithmSHA256), ShortcutAdID: &row.ShortcutAdID}
 		if err := s.queries.BackfillShortcutAdDataHash(ctx, params); err != nil {
 			return result, fmt.Errorf("backfill shortcut ad data hash (ad_id=%d): %w", row.ShortcutAdID, err)
 		}
@@ -212,7 +212,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 }
 
 func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error {
-	building, err := s.queries.GetShortcutBuildingByID(ctx, buildingID)
+	building, err := s.queries.GetShortcutBuildingByID(ctx, &buildingID)
 	if err != nil {
 		return fmt.Errorf("get building (building_id=%s): %w", buildingID, err)
 	}
@@ -222,7 +222,7 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 	scrapedBuilding, listings, rentals, err := s.client.ScrapeBuildingPage(ctx, int(building.ShortcutBuildingExternalID), building.ShortcutBuildingUrl)
 	if err != nil {
 		if errors.Is(err, client.ErrScraperErrorPage) {
-			if markErr := s.queries.MarkShortcutBuildingPageNotFound(ctx, buildingID); markErr != nil {
+			if markErr := s.queries.MarkShortcutBuildingPageNotFound(ctx, &buildingID); markErr != nil {
 				return fmt.Errorf("mark building page not found (building_id=%s): %w", buildingID, markErr)
 			}
 			return nil
@@ -249,7 +249,7 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 			upsertErrors = append(upsertErrors, fmt.Errorf("upsert rental %d: %w", rental.Index, err))
 		}
 	}
-	if err := s.queries.MarkShortcutBuildingProcessed(ctx, buildingID); err != nil {
+	if err := s.queries.MarkShortcutBuildingProcessed(ctx, &buildingID); err != nil {
 		return fmt.Errorf("mark building processed (building_id=%s): %w", buildingID, err)
 	}
 	if len(upsertErrors) > 0 && len(listings)+len(rentals) == len(upsertErrors) {
@@ -259,7 +259,7 @@ func (s *Service) SyncBuilding(ctx context.Context, buildingID uuid.UUID) error 
 }
 
 func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
-	ad, err := s.queries.GetShortcutAdByID(ctx, adID)
+	ad, err := s.queries.GetShortcutAdByID(ctx, &adID)
 	if err != nil {
 		return "", err
 	}
@@ -268,7 +268,7 @@ func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
 		lines = append(lines, "title: "+title)
 	}
 	if ad.ShortcutBuildingID != nil {
-		building, err := s.queries.GetShortcutBuildingByID(ctx, *ad.ShortcutBuildingID)
+		building, err := s.queries.GetShortcutBuildingByID(ctx, ad.ShortcutBuildingID)
 		if err == nil {
 			if addr := firstNonEmptyString(building.ShortcutBuildingAddress, building.ShortcutBuildingHousingCompany); addr != "" {
 				lines = append(lines, "address: "+addr)
@@ -282,7 +282,7 @@ func (s *Service) DescribeAd(ctx context.Context, adID int64) (string, error) {
 }
 
 func (s *Service) DescribeBuilding(ctx context.Context, buildingID uuid.UUID) (string, error) {
-	building, err := s.queries.GetShortcutBuildingByID(ctx, buildingID)
+	building, err := s.queries.GetShortcutBuildingByID(ctx, &buildingID)
 	if err != nil {
 		return "", err
 	}

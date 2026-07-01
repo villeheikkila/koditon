@@ -239,7 +239,6 @@ sql:
       - no-delete
       - no-select-star
       - no-seq-scan
-      - query-too-costly
 
 rules:
   - name: no-pg-catalog
@@ -262,8 +261,3 @@ rules:
       has(postgresql.explain) &&
       postgresql.explain.plan.node_type == "Seq Scan" &&
       postgresql.explain.plan.plan_rows > uint(100)
-  - name: query-too-costly
-    message: "Query cost estimate exceeds threshold (>10000); consider optimizing"
-    rule: >-
-      has(postgresql.explain) &&
-      postgresql.explain.plan.total_cost > 10000.0

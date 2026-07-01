@@ -28,13 +28,13 @@ where
 `
 
 type UpdateDeviceMetadataParams struct {
-	UserDeviceName       interface{} `json:"user_device_name"`
-	UserDeviceOs         interface{} `json:"user_device_os"`
-	UserDeviceModel      interface{} `json:"user_device_model"`
-	UserDeviceLocale     interface{} `json:"user_device_locale"`
-	UserDeviceTimeZone   interface{} `json:"user_device_time_zone"`
-	UserDeviceAppVersion interface{} `json:"user_device_app_version"`
-	UserDeviceUuid       uuid.UUID   `json:"user_device_uuid"`
+	UserDeviceName       *string    `json:"user_device_name"`
+	UserDeviceOs         *string    `json:"user_device_os"`
+	UserDeviceModel      *string    `json:"user_device_model"`
+	UserDeviceLocale     *string    `json:"user_device_locale"`
+	UserDeviceTimeZone   *string    `json:"user_device_time_zone"`
+	UserDeviceAppVersion *string    `json:"user_device_app_version"`
+	UserDeviceUuid       *uuid.UUID `json:"user_device_uuid"`
 }
 
 func (q *Queries) UpdateDeviceMetadata(ctx context.Context, arg UpdateDeviceMetadataParams) error {
@@ -89,16 +89,16 @@ on conflict (user_device_uuid)
 `
 
 type UpsertDeviceParams struct {
-	UserDeviceID         uuid.UUID `json:"user_device_id"`
-	UserUuid             uuid.UUID `json:"user_uuid"`
-	UserDeviceName       *string   `json:"user_device_name"`
-	UserDeviceOs         *string   `json:"user_device_os"`
-	UserDeviceAppVersion *string   `json:"user_device_app_version"`
+	UserDeviceID         *uuid.UUID `json:"user_device_id"`
+	UserUuid             *uuid.UUID `json:"user_uuid"`
+	UserDeviceName       *string    `json:"user_device_name"`
+	UserDeviceOs         *string    `json:"user_device_os"`
+	UserDeviceAppVersion *string    `json:"user_device_app_version"`
 }
 
 type UpsertDeviceRow struct {
 	UserDeviceUuid               uuid.UUID  `json:"user_device_uuid"`
-	UserUuid                     uuid.UUID  `json:"user_uuid"`
+	UserUuid                     *uuid.UUID `json:"user_uuid"`
 	UserDeviceName               *string    `json:"user_device_name"`
 	UserDeviceOs                 *string    `json:"user_device_os"`
 	UserDeviceAppVersion         *string    `json:"user_device_app_version"`

@@ -47,20 +47,20 @@ func mapUpsertAdParams(adID int64, url string, adType string, data []byte, schem
 		return db.UpsertShortcutAdParams{}, fmt.Errorf("hash shortcut ad payload: %w", err)
 	}
 	return db.UpsertShortcutAdParams{
-		ShortcutAdID:                adID,
-		ShortcutAdUrl:               url,
-		ShortcutAdType:              adType,
+		ShortcutAdID:                ptr(adID),
+		ShortcutAdUrl:               ptr(url),
+		ShortcutAdType:              ptr(adType),
 		ShortcutAdData:              canonical,
 		ShortcutAdDataHash:          &hash,
-		ShortcutAdDataHashAlgorithm: sourcejson.HashAlgorithmSHA256,
-		ShortcutAdDataSchemaVersion: schemaVersion,
+		ShortcutAdDataHashAlgorithm: ptr(sourcejson.HashAlgorithmSHA256),
+		ShortcutAdDataSchemaVersion: ptr(schemaVersion),
 		ShortcutBuildingID:          shortcutBuildingID,
 	}, nil
 }
 
 func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *client.ScrapedBuilding) db.UpsertShortcutBuildingParams {
 	return db.UpsertShortcutBuildingParams{
-		ShortcutBuildingExternalID:              shortcutBuildingID,
+		ShortcutBuildingExternalID:              ptr(shortcutBuildingID),
 		ShortcutBuildingBuildingID:              scraped.BuildingID,
 		ShortcutBuildingBuildingType:            scraped.BuildingType,
 		ShortcutBuildingBuildingSubtype:         scraped.BuildingSubtype,
@@ -77,7 +77,7 @@ func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *cli
 		ShortcutBuildingLatitude:                scraped.Latitude,
 		ShortcutBuildingLongitude:               scraped.Longitude,
 		ShortcutBuildingAdditionalAddresses:     scraped.AdditionalAddresses,
-		ShortcutBuildingUrl:                     url,
+		ShortcutBuildingUrl:                     ptr(url),
 		ShortcutBuildingAddress:                 &scraped.Address,
 		ShortcutBuildingFrameConstructionMethod: scraped.FrameConstructionMethod,
 		ShortcutBuildingHousingCompany:          scraped.HousingCompany,
@@ -86,7 +86,7 @@ func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *cli
 
 func mapListingParams(buildingID uuid.UUID, listing *client.BuildingListing) db.UpsertShortcutBuildingListingParams {
 	return db.UpsertShortcutBuildingListingParams{
-		ShortcutBuildingID:                   buildingID,
+		ShortcutBuildingID:                   &buildingID,
 		ShortcutBuildingListingLayout:        listing.Layout,
 		ShortcutBuildingListingSize:          listing.Size,
 		ShortcutBuildingListingPrice:         listing.Price,
@@ -98,11 +98,15 @@ func mapListingParams(buildingID uuid.UUID, listing *client.BuildingListing) db.
 
 func mapRentalParams(buildingID uuid.UUID, rental *client.RentalListing) db.UpsertShortcutBuildingRentalParams {
 	return db.UpsertShortcutBuildingRentalParams{
-		ShortcutBuildingID:                  buildingID,
+		ShortcutBuildingID:                  &buildingID,
 		ShortcutBuildingRentalLayout:        rental.Layout,
 		ShortcutBuildingRentalSize:          rental.Size,
 		ShortcutBuildingRentalPrice:         rental.Price,
 		ShortcutBuildingRentalMarketingTime: rental.MarketingTime,
 		ShortcutBuildingRentalIdx:           util.Int32Ptr(&rental.Index),
 	}
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }

@@ -57,13 +57,13 @@ func (c *Consumer) loadPricesMatchSaleListing(ctx context.Context, saleListingID
 	if err != nil {
 		return pricesMatchSaleListingRow{}, fmt.Errorf("parse sale listing id: %w", err)
 	}
-	result, err := c.queries.LoadPricesMatchSaleListing(ctx, id)
+	result, err := c.queries.LoadPricesMatchSaleListing(ctx, &id)
 	if err != nil {
 		return pricesMatchSaleListingRow{}, err
 	}
-	row := pricesMatchSaleListingRow{ID: result.ID, LastSeenAt: result.SaleListingLastSeenAt, Status: result.SaleListingPricesMatchStatus, AttemptCount: result.SaleListingPricesMatchAttemptCount, ExpiresAt: result.SaleListingPricesMatchExpiresAt}
-	if result.TransactionID != "" {
-		row.TransactionID = &result.TransactionID
+	row := pricesMatchSaleListingRow{ID: stringValue(result.ID), LastSeenAt: result.SaleListingLastSeenAt, Status: result.SaleListingPricesMatchStatus, AttemptCount: result.SaleListingPricesMatchAttemptCount, ExpiresAt: result.SaleListingPricesMatchExpiresAt}
+	if stringValue(result.TransactionID) != "" {
+		row.TransactionID = result.TransactionID
 	}
 	return row, nil
 }

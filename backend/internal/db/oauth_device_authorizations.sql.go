@@ -42,12 +42,28 @@ returning
 
 type ApproveOAuthDeviceAuthorizationByUserCodeParams struct {
 	UserUuid                         *uuid.UUID `json:"user_uuid"`
-	OauthDeviceAuthorizationUserCode string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationUserCode *string    `json:"oauth_device_authorization_user_code"`
 }
 
-func (q *Queries) ApproveOAuthDeviceAuthorizationByUserCode(ctx context.Context, arg ApproveOAuthDeviceAuthorizationByUserCodeParams) (OauthDeviceAuthorization, error) {
+type ApproveOAuthDeviceAuthorizationByUserCodeRow struct {
+	OauthDeviceAuthorizationID             uuid.UUID  `json:"oauth_device_authorization_id"`
+	OauthDeviceAuthorizationDeviceCodeHash string     `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          string     `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       string     `json:"oauth_device_authorization_audience"`
+	UserUuid                               *uuid.UUID `json:"user_uuid"`
+	OauthDeviceAuthorizationExpiresAt      time.Time  `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationApprovedAt     *time.Time `json:"oauth_device_authorization_approved_at"`
+	OauthDeviceAuthorizationDeniedAt       *time.Time `json:"oauth_device_authorization_denied_at"`
+	OauthDeviceAuthorizationConsumedAt     *time.Time `json:"oauth_device_authorization_consumed_at"`
+	OauthDeviceAuthorizationCreatedAt      time.Time  `json:"oauth_device_authorization_created_at"`
+	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
+}
+
+func (q *Queries) ApproveOAuthDeviceAuthorizationByUserCode(ctx context.Context, arg ApproveOAuthDeviceAuthorizationByUserCodeParams) (ApproveOAuthDeviceAuthorizationByUserCodeRow, error) {
 	row := q.db.QueryRow(ctx, approveOAuthDeviceAuthorizationByUserCode, arg.UserUuid, arg.OauthDeviceAuthorizationUserCode)
-	var i OauthDeviceAuthorization
+	var i ApproveOAuthDeviceAuthorizationByUserCodeRow
 	err := row.Scan(
 		&i.OauthDeviceAuthorizationID,
 		&i.OauthDeviceAuthorizationDeviceCodeHash,
@@ -104,7 +120,7 @@ type ConsumeOAuthDeviceAuthorizationByIDRow struct {
 	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
 }
 
-func (q *Queries) ConsumeOAuthDeviceAuthorizationByID(ctx context.Context, oauthDeviceAuthorizationID uuid.UUID) (ConsumeOAuthDeviceAuthorizationByIDRow, error) {
+func (q *Queries) ConsumeOAuthDeviceAuthorizationByID(ctx context.Context, oauthDeviceAuthorizationID *uuid.UUID) (ConsumeOAuthDeviceAuthorizationByIDRow, error) {
 	row := q.db.QueryRow(ctx, consumeOAuthDeviceAuthorizationByID, oauthDeviceAuthorizationID)
 	var i ConsumeOAuthDeviceAuthorizationByIDRow
 	err := row.Scan(
@@ -157,15 +173,31 @@ returning
 `
 
 type CreateOAuthDeviceAuthorizationParams struct {
-	OauthDeviceAuthorizationDeviceCodeHash string    `json:"oauth_device_authorization_device_code_hash"`
-	OauthClientID                          string    `json:"oauth_client_id"`
-	OauthDeviceAuthorizationUserCode       string    `json:"oauth_device_authorization_user_code"`
-	OauthDeviceAuthorizationScopes         []string  `json:"oauth_device_authorization_scopes"`
-	OauthDeviceAuthorizationAudience       string    `json:"oauth_device_authorization_audience"`
-	OauthDeviceAuthorizationExpiresAt      time.Time `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationDeviceCodeHash *string    `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          *string    `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       *string    `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       *string    `json:"oauth_device_authorization_audience"`
+	OauthDeviceAuthorizationExpiresAt      *time.Time `json:"oauth_device_authorization_expires_at"`
 }
 
-func (q *Queries) CreateOAuthDeviceAuthorization(ctx context.Context, arg CreateOAuthDeviceAuthorizationParams) (OauthDeviceAuthorization, error) {
+type CreateOAuthDeviceAuthorizationRow struct {
+	OauthDeviceAuthorizationID             uuid.UUID  `json:"oauth_device_authorization_id"`
+	OauthDeviceAuthorizationDeviceCodeHash string     `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          string     `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       string     `json:"oauth_device_authorization_audience"`
+	UserUuid                               *uuid.UUID `json:"user_uuid"`
+	OauthDeviceAuthorizationExpiresAt      time.Time  `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationApprovedAt     *time.Time `json:"oauth_device_authorization_approved_at"`
+	OauthDeviceAuthorizationDeniedAt       *time.Time `json:"oauth_device_authorization_denied_at"`
+	OauthDeviceAuthorizationConsumedAt     *time.Time `json:"oauth_device_authorization_consumed_at"`
+	OauthDeviceAuthorizationCreatedAt      time.Time  `json:"oauth_device_authorization_created_at"`
+	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
+}
+
+func (q *Queries) CreateOAuthDeviceAuthorization(ctx context.Context, arg CreateOAuthDeviceAuthorizationParams) (CreateOAuthDeviceAuthorizationRow, error) {
 	row := q.db.QueryRow(ctx, createOAuthDeviceAuthorization,
 		arg.OauthDeviceAuthorizationDeviceCodeHash,
 		arg.OauthClientID,
@@ -174,7 +206,7 @@ func (q *Queries) CreateOAuthDeviceAuthorization(ctx context.Context, arg Create
 		arg.OauthDeviceAuthorizationAudience,
 		arg.OauthDeviceAuthorizationExpiresAt,
 	)
-	var i OauthDeviceAuthorization
+	var i CreateOAuthDeviceAuthorizationRow
 	err := row.Scan(
 		&i.OauthDeviceAuthorizationID,
 		&i.OauthDeviceAuthorizationDeviceCodeHash,
@@ -219,9 +251,25 @@ returning
   oauth_device_authorization_updated_at
 `
 
-func (q *Queries) DenyOAuthDeviceAuthorizationByUserCode(ctx context.Context, oauthDeviceAuthorizationUserCode string) (OauthDeviceAuthorization, error) {
+type DenyOAuthDeviceAuthorizationByUserCodeRow struct {
+	OauthDeviceAuthorizationID             uuid.UUID  `json:"oauth_device_authorization_id"`
+	OauthDeviceAuthorizationDeviceCodeHash string     `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          string     `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       string     `json:"oauth_device_authorization_audience"`
+	UserUuid                               *uuid.UUID `json:"user_uuid"`
+	OauthDeviceAuthorizationExpiresAt      time.Time  `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationApprovedAt     *time.Time `json:"oauth_device_authorization_approved_at"`
+	OauthDeviceAuthorizationDeniedAt       *time.Time `json:"oauth_device_authorization_denied_at"`
+	OauthDeviceAuthorizationConsumedAt     *time.Time `json:"oauth_device_authorization_consumed_at"`
+	OauthDeviceAuthorizationCreatedAt      time.Time  `json:"oauth_device_authorization_created_at"`
+	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
+}
+
+func (q *Queries) DenyOAuthDeviceAuthorizationByUserCode(ctx context.Context, oauthDeviceAuthorizationUserCode *string) (DenyOAuthDeviceAuthorizationByUserCodeRow, error) {
 	row := q.db.QueryRow(ctx, denyOAuthDeviceAuthorizationByUserCode, oauthDeviceAuthorizationUserCode)
-	var i OauthDeviceAuthorization
+	var i DenyOAuthDeviceAuthorizationByUserCodeRow
 	err := row.Scan(
 		&i.OauthDeviceAuthorizationID,
 		&i.OauthDeviceAuthorizationDeviceCodeHash,
@@ -259,9 +307,25 @@ from oauth_device_authorizations
 where oauth_device_authorization_device_code_hash = $1
 `
 
-func (q *Queries) GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx context.Context, oauthDeviceAuthorizationDeviceCodeHash string) (OauthDeviceAuthorization, error) {
+type GetOAuthDeviceAuthorizationByDeviceCodeHashRow struct {
+	OauthDeviceAuthorizationID             uuid.UUID  `json:"oauth_device_authorization_id"`
+	OauthDeviceAuthorizationDeviceCodeHash string     `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          string     `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       string     `json:"oauth_device_authorization_audience"`
+	UserUuid                               *uuid.UUID `json:"user_uuid"`
+	OauthDeviceAuthorizationExpiresAt      time.Time  `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationApprovedAt     *time.Time `json:"oauth_device_authorization_approved_at"`
+	OauthDeviceAuthorizationDeniedAt       *time.Time `json:"oauth_device_authorization_denied_at"`
+	OauthDeviceAuthorizationConsumedAt     *time.Time `json:"oauth_device_authorization_consumed_at"`
+	OauthDeviceAuthorizationCreatedAt      time.Time  `json:"oauth_device_authorization_created_at"`
+	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
+}
+
+func (q *Queries) GetOAuthDeviceAuthorizationByDeviceCodeHash(ctx context.Context, oauthDeviceAuthorizationDeviceCodeHash *string) (GetOAuthDeviceAuthorizationByDeviceCodeHashRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthDeviceAuthorizationByDeviceCodeHash, oauthDeviceAuthorizationDeviceCodeHash)
-	var i OauthDeviceAuthorization
+	var i GetOAuthDeviceAuthorizationByDeviceCodeHashRow
 	err := row.Scan(
 		&i.OauthDeviceAuthorizationID,
 		&i.OauthDeviceAuthorizationDeviceCodeHash,
@@ -299,9 +363,25 @@ from oauth_device_authorizations
 where oauth_device_authorization_user_code = $1
 `
 
-func (q *Queries) GetOAuthDeviceAuthorizationByUserCode(ctx context.Context, oauthDeviceAuthorizationUserCode string) (OauthDeviceAuthorization, error) {
+type GetOAuthDeviceAuthorizationByUserCodeRow struct {
+	OauthDeviceAuthorizationID             uuid.UUID  `json:"oauth_device_authorization_id"`
+	OauthDeviceAuthorizationDeviceCodeHash string     `json:"oauth_device_authorization_device_code_hash"`
+	OauthClientID                          string     `json:"oauth_client_id"`
+	OauthDeviceAuthorizationUserCode       string     `json:"oauth_device_authorization_user_code"`
+	OauthDeviceAuthorizationScopes         []string   `json:"oauth_device_authorization_scopes"`
+	OauthDeviceAuthorizationAudience       string     `json:"oauth_device_authorization_audience"`
+	UserUuid                               *uuid.UUID `json:"user_uuid"`
+	OauthDeviceAuthorizationExpiresAt      time.Time  `json:"oauth_device_authorization_expires_at"`
+	OauthDeviceAuthorizationApprovedAt     *time.Time `json:"oauth_device_authorization_approved_at"`
+	OauthDeviceAuthorizationDeniedAt       *time.Time `json:"oauth_device_authorization_denied_at"`
+	OauthDeviceAuthorizationConsumedAt     *time.Time `json:"oauth_device_authorization_consumed_at"`
+	OauthDeviceAuthorizationCreatedAt      time.Time  `json:"oauth_device_authorization_created_at"`
+	OauthDeviceAuthorizationUpdatedAt      time.Time  `json:"oauth_device_authorization_updated_at"`
+}
+
+func (q *Queries) GetOAuthDeviceAuthorizationByUserCode(ctx context.Context, oauthDeviceAuthorizationUserCode *string) (GetOAuthDeviceAuthorizationByUserCodeRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthDeviceAuthorizationByUserCode, oauthDeviceAuthorizationUserCode)
-	var i OauthDeviceAuthorization
+	var i GetOAuthDeviceAuthorizationByUserCodeRow
 	err := row.Scan(
 		&i.OauthDeviceAuthorizationID,
 		&i.OauthDeviceAuthorizationDeviceCodeHash,

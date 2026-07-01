@@ -8,6 +8,8 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const deleteShortcutToken = `-- name: DeleteShortcutToken :exec
@@ -15,8 +17,8 @@ DELETE FROM public.shortcut_tokens
 WHERE shortcut_token_cuid = $1
 `
 
-func (q *Queries) DeleteShortcutToken(ctx context.Context, shortcutTokenCuid string) error {
-	_, err := q.db.Exec(ctx, deleteShortcutToken, shortcutTokenCuid)
+func (q *Queries) DeleteShortcutToken(ctx context.Context, dollar_1 *string) error {
+	_, err := q.db.Exec(ctx, deleteShortcutToken, dollar_1)
 	return err
 }
 
@@ -25,15 +27,25 @@ SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_to
 ORDER BY shortcut_token_created_at DESC
 `
 
-func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]ShortcutToken, error) {
+type GetAllValidShortcutTokensRow struct {
+	ShortcutTokenID        uuid.UUID `json:"shortcut_token_id"`
+	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string    `json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string    `json:"shortcut_token_loaded"`
+	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
+	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
+	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
+}
+
+func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]GetAllValidShortcutTokensRow, error) {
 	rows, err := q.db.Query(ctx, getAllValidShortcutTokens)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ShortcutToken{}
+	items := []GetAllValidShortcutTokensRow{}
 	for rows.Next() {
-		var i ShortcutToken
+		var i GetAllValidShortcutTokensRow
 		if err := rows.Scan(
 			&i.ShortcutTokenID,
 			&i.ShortcutTokenCuid,
@@ -59,9 +71,19 @@ ORDER BY shortcut_token_created_at DESC
 LIMIT 1
 `
 
-func (q *Queries) GetValidShortcutToken(ctx context.Context) (ShortcutToken, error) {
+type GetValidShortcutTokenRow struct {
+	ShortcutTokenID        uuid.UUID `json:"shortcut_token_id"`
+	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
+	ShortcutTokenToken     string    `json:"shortcut_token_token"`
+	ShortcutTokenLoaded    string    `json:"shortcut_token_loaded"`
+	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
+	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
+	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
+}
+
+func (q *Queries) GetValidShortcutToken(ctx context.Context) (GetValidShortcutTokenRow, error) {
 	row := q.db.QueryRow(ctx, getValidShortcutToken)
-	var i ShortcutToken
+	var i GetValidShortcutTokenRow
 	err := row.Scan(
 		&i.ShortcutTokenID,
 		&i.ShortcutTokenCuid,
@@ -81,7 +103,10 @@ INSERT INTO public.shortcut_tokens (
     shortcut_token_loaded,
     shortcut_token_expires_at
 ) VALUES (
-    $1, $2, $3, $4
+    $1,
+    $2,
+    $3,
+    $4
 )
 ON CONFLICT (shortcut_token_cuid) DO UPDATE SET
     shortcut_token_token = EXCLUDED.shortcut_token_token,
@@ -92,20 +117,30 @@ RETURNING shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut
 `
 
 type InsertShortcutTokenParams struct {
+	ShortcutTokenCuid      *string    `json:"shortcut_token_cuid"`
+	ShortcutTokenToken     *string    `json:"shortcut_token_token"`
+	ShortcutTokenLoaded    *string    `json:"shortcut_token_loaded"`
+	ShortcutTokenExpiresAt *time.Time `json:"shortcut_token_expires_at"`
+}
+
+type InsertShortcutTokenRow struct {
+	ShortcutTokenID        uuid.UUID `json:"shortcut_token_id"`
 	ShortcutTokenCuid      string    `json:"shortcut_token_cuid"`
 	ShortcutTokenToken     string    `json:"shortcut_token_token"`
 	ShortcutTokenLoaded    string    `json:"shortcut_token_loaded"`
+	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
+	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
 }
 
-func (q *Queries) InsertShortcutToken(ctx context.Context, arg InsertShortcutTokenParams) (ShortcutToken, error) {
+func (q *Queries) InsertShortcutToken(ctx context.Context, arg InsertShortcutTokenParams) (InsertShortcutTokenRow, error) {
 	row := q.db.QueryRow(ctx, insertShortcutToken,
 		arg.ShortcutTokenCuid,
 		arg.ShortcutTokenToken,
 		arg.ShortcutTokenLoaded,
 		arg.ShortcutTokenExpiresAt,
 	)
-	var i ShortcutToken
+	var i InsertShortcutTokenRow
 	err := row.Scan(
 		&i.ShortcutTokenID,
 		&i.ShortcutTokenCuid,

@@ -39,8 +39,8 @@ returning
 `
 
 type ConsumeWebauthnChallengeParams struct {
-	AuthWebauthnChallengeUuid uuid.UUID `json:"auth_webauthn_challenge_uuid"`
-	AuthWebauthnChallengeFlow string    `json:"auth_webauthn_challenge_flow"`
+	AuthWebauthnChallengeUuid *uuid.UUID `json:"auth_webauthn_challenge_uuid"`
+	AuthWebauthnChallengeFlow *string    `json:"auth_webauthn_challenge_flow"`
 }
 
 type ConsumeWebauthnChallengeRow struct {
@@ -54,7 +54,7 @@ type ConsumeWebauthnChallengeRow struct {
 	AuthWebauthnChallengeDeviceID        *uuid.UUID      `json:"auth_webauthn_challenge_device_id"`
 	AuthWebauthnChallengeConsumedAt      *time.Time      `json:"auth_webauthn_challenge_consumed_at"`
 	AuthWebauthnChallengeCreatedAt       time.Time       `json:"auth_webauthn_challenge_created_at"`
-	UserUuid                             uuid.UUID       `json:"user_uuid"`
+	UserUuid                             *uuid.UUID      `json:"user_uuid"`
 }
 
 func (q *Queries) ConsumeWebauthnChallenge(ctx context.Context, arg ConsumeWebauthnChallengeParams) (ConsumeWebauthnChallengeRow, error) {
@@ -120,9 +120,9 @@ returning
 `
 
 type CreateWebauthnChallengeParams struct {
-	AuthWebauthnChallengeFlow            string          `json:"auth_webauthn_challenge_flow"`
+	AuthWebauthnChallengeFlow            *string         `json:"auth_webauthn_challenge_flow"`
 	AuthWebauthnChallengeSession         json.RawMessage `json:"auth_webauthn_challenge_session"`
-	AuthWebauthnChallengeExpiresAt       time.Time       `json:"auth_webauthn_challenge_expires_at"`
+	AuthWebauthnChallengeExpiresAt       *time.Time      `json:"auth_webauthn_challenge_expires_at"`
 	AuthWebauthnChallengeUserHandle      []byte          `json:"auth_webauthn_challenge_user_handle"`
 	AuthWebauthnChallengeUserDisplayName *string         `json:"auth_webauthn_challenge_user_display_name"`
 	AuthWebauthnChallengeVerifiedEmail   *string         `json:"auth_webauthn_challenge_verified_email"`
@@ -141,7 +141,7 @@ type CreateWebauthnChallengeRow struct {
 	AuthWebauthnChallengeDeviceID        *uuid.UUID      `json:"auth_webauthn_challenge_device_id"`
 	AuthWebauthnChallengeConsumedAt      *time.Time      `json:"auth_webauthn_challenge_consumed_at"`
 	AuthWebauthnChallengeCreatedAt       time.Time       `json:"auth_webauthn_challenge_created_at"`
-	UserUuid                             uuid.UUID       `json:"user_uuid"`
+	UserUuid                             *uuid.UUID      `json:"user_uuid"`
 }
 
 func (q *Queries) CreateWebauthnChallenge(ctx context.Context, arg CreateWebauthnChallengeParams) (CreateWebauthnChallengeRow, error) {

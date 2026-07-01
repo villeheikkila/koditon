@@ -1,13 +1,31 @@
 -- name: ListTransactionMatchPostals :many
 WITH latest AS (
     SELECT DISTINCT ON (c.sale_listing_id, c.prices_transaction_id)
-        c.*
+        c.sale_listing_prices_transaction_match_candidate_id,
+        c.sale_listing_prices_transaction_match_run_id,
+        c.sale_listing_id,
+        c.prices_transaction_id,
+        c.sale_listing_prices_transaction_match_score,
+        c.sale_listing_prices_transaction_match_confidence,
+        c.sale_listing_prices_transaction_match_status,
+        c.sale_listing_prices_transaction_match_reasons,
+        c.sale_listing_prices_transaction_match_price_delta_percent,
+        c.sale_listing_prices_transaction_match_created_at
     FROM public.sale_listing_prices_transaction_match_candidates c
     ORDER BY c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_created_at DESC
 ),
 potential AS (
     SELECT
-        latest.*,
+        latest.sale_listing_prices_transaction_match_candidate_id,
+        latest.sale_listing_prices_transaction_match_run_id,
+        latest.sale_listing_id,
+        latest.prices_transaction_id,
+        latest.sale_listing_prices_transaction_match_score,
+        latest.sale_listing_prices_transaction_match_confidence,
+        latest.sale_listing_prices_transaction_match_status,
+        latest.sale_listing_prices_transaction_match_reasons,
+        latest.sale_listing_prices_transaction_match_price_delta_percent,
+        latest.sale_listing_prices_transaction_match_created_at,
         sl.sale_listing_postal_norm AS postal
     FROM latest
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
@@ -44,12 +62,21 @@ LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_code = potent
 LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 GROUP BY postal, ppc.postal_postal_code_name_fi, pm.postal_municipality_name_fi
 ORDER BY candidate_count DESC, postal
-LIMIT sqlc.arg(limit_count)::int;
+LIMIT @limit_count::int;
 
 -- name: ListTransactionMatchCandidates :many
 WITH latest_candidates AS (
     SELECT DISTINCT ON (c.sale_listing_id, c.prices_transaction_id)
-        c.*
+        c.sale_listing_prices_transaction_match_candidate_id,
+        c.sale_listing_prices_transaction_match_run_id,
+        c.sale_listing_id,
+        c.prices_transaction_id,
+        c.sale_listing_prices_transaction_match_score,
+        c.sale_listing_prices_transaction_match_confidence,
+        c.sale_listing_prices_transaction_match_status,
+        c.sale_listing_prices_transaction_match_reasons,
+        c.sale_listing_prices_transaction_match_price_delta_percent,
+        c.sale_listing_prices_transaction_match_created_at
     FROM public.sale_listing_prices_transaction_match_candidates c
     ORDER BY c.sale_listing_id, c.prices_transaction_id, c.sale_listing_prices_transaction_match_created_at DESC
 ),
@@ -86,10 +113,10 @@ review_rows AS (
         AND source_link.source_type = 'source_listing'
         AND source_link.link_status <> 'rejected'
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE sqlc.narg(transaction_id)::uuid IS NOT NULL
+    WHERE sqlc.narg('transaction_id')::uuid IS NOT NULL
         AND pl.target_type = 'listing'
         AND pl.link_status <> 'rejected'
-        AND pl.prices_transaction_id = sqlc.narg(transaction_id)::uuid
+        AND pl.prices_transaction_id = sqlc.narg('transaction_id')::uuid
         AND NOT EXISTS (
             SELECT 1
             FROM latest_candidates c
@@ -110,9 +137,9 @@ review_rows AS (
         pl.target_id,
         pl.prices_transaction_id
     FROM public.price_links pl
-    WHERE sqlc.narg(transaction_id)::uuid IS NOT NULL
+    WHERE sqlc.narg('transaction_id')::uuid IS NOT NULL
         AND pl.target_type = 'source_listing'
-        AND pl.prices_transaction_id = sqlc.narg(transaction_id)::uuid
+        AND pl.prices_transaction_id = sqlc.narg('transaction_id')::uuid
         AND pl.link_status <> 'rejected'
         AND NOT EXISTS (
             SELECT 1
@@ -202,9 +229,9 @@ LEFT JOIN public.target_sources source_link ON source_link.target_type = 'listin
     AND source_link.source_id = sl.sale_listing_id
     AND source_link.link_status <> 'rejected'
 JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
-WHERE (sqlc.narg(transaction_id)::uuid IS NOT NULL OR latest.status = ANY(ARRAY['candidate'::text, 'ambiguous'::text]))
+WHERE (sqlc.narg('transaction_id')::uuid IS NOT NULL OR latest.status = ANY(ARRAY['candidate'::text, 'ambiguous'::text]))
     AND (
-        sqlc.narg(transaction_id)::uuid IS NOT NULL
+        sqlc.narg('transaction_id')::uuid IS NOT NULL
         OR NOT EXISTS (
             SELECT 1
             FROM public.price_links source_link
@@ -213,10 +240,10 @@ WHERE (sqlc.narg(transaction_id)::uuid IS NOT NULL OR latest.status = ANY(ARRAY[
                 AND source_link.link_status <> 'rejected'
         )
     )
-    AND (sqlc.narg(postal)::text IS NULL OR sl.sale_listing_postal_norm = public.fnc__normalize_postal(sqlc.narg(postal)::text))
-    AND (sqlc.narg(status)::text IS NULL OR latest.status = sqlc.narg(status)::text)
-    AND (sqlc.narg(transaction_id)::uuid IS NULL OR pt.prices_transaction_id = sqlc.narg(transaction_id)::uuid)
-    AND (sqlc.narg(transaction_id)::uuid IS NOT NULL OR NOT EXISTS (
+    AND (sqlc.narg('postal')::text IS NULL OR sl.sale_listing_postal_norm = public.fnc__normalize_postal(sqlc.narg('postal')::text))
+    AND (sqlc.narg('status')::text IS NULL OR latest.status = sqlc.narg('status')::text)
+    AND (sqlc.narg('transaction_id')::uuid IS NULL OR pt.prices_transaction_id = sqlc.narg('transaction_id')::uuid)
+    AND (sqlc.narg('transaction_id')::uuid IS NOT NULL OR NOT EXISTS (
         SELECT 1
         FROM public.price_links linked
         WHERE linked.prices_transaction_id = latest.prices_transaction_id
@@ -227,4 +254,4 @@ ORDER BY
     latest.price_delta_percent ASC NULLS LAST,
     sl.sale_listing_postal_norm,
     sl.sale_listing_street_address
-LIMIT sqlc.arg(limit_count)::int;
+LIMIT @limit_count::int;

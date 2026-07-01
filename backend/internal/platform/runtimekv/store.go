@@ -20,7 +20,7 @@ func New(queries *db.Queries) *Store {
 }
 
 func (s *Store) Get(ctx context.Context, key string) ([]byte, error) {
-	payload, err := s.queries.GetRuntimeKV(ctx, key)
+	payload, err := s.queries.GetRuntimeKV(ctx, &key)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -34,10 +34,11 @@ func (s *Store) Set(ctx context.Context, key string, payload []byte, ttl time.Du
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
+	expiresAt := time.Now().Add(ttl)
 	err := s.queries.UpsertRuntimeKV(ctx, db.UpsertRuntimeKVParams{
-		KvKey:     key,
+		KvKey:     &key,
 		KvValue:   payload,
-		ExpiresAt: time.Now().Add(ttl),
+		ExpiresAt: &expiresAt,
 	})
 	if err != nil {
 		return fmt.Errorf("upsert runtime kv: %w", err)
