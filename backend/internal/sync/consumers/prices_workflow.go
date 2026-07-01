@@ -130,36 +130,16 @@ func (c *Consumer) runPricesMatchSaleListingsFanoutWorkflow(ctx context.Context,
 		return pricesFanoutResult{}, err
 	}
 	return absurd.Step(ctx, "scan-and-spawn-listings", func(ctx context.Context) (pricesFanoutResult, error) {
-		rows, err := c.pool.Query(ctx, `
-SELECT sale_listing_id::text, COALESCE(sale_listing_prices_match_attempt_count, 0)
-FROM public.property_source_offerings
-WHERE sale_listing_source_kind = 'ad'
-    AND prices_transaction_id IS NULL
-    AND sale_listing_last_seen_at IS NOT NULL
-    AND sale_listing_last_seen_at <= now() - interval '7 days'
-    AND sale_listing_last_seen_at >= now() - interval '4 months'
-    AND COALESCE(sale_listing_prices_match_status, 'pending') IN ('pending', 'deferred', 'noop')
-    AND COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days') <= now()
-ORDER BY COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days'), sale_listing_last_seen_at
-LIMIT $1`, payload.Limit)
+		rows, err := c.queries.ListPricesMatchFanoutListings(ctx, payload.Limit)
 		if err != nil {
 			return pricesFanoutResult{}, fmt.Errorf("list sale listings for prices matching: %w", err)
 		}
-		defer rows.Close()
 		enqueued := 0
-		for rows.Next() {
-			var saleListingID string
-			var attempt int32
-			if err := rows.Scan(&saleListingID, &attempt); err != nil {
-				return pricesFanoutResult{}, fmt.Errorf("scan sale listing match fanout row: %w", err)
-			}
-			if err := c.spawnPricesMatchSaleListing(ctx, saleListingID, attempt+1); err != nil {
+		for _, row := range rows {
+			if err := c.spawnPricesMatchSaleListing(ctx, row.SaleListingID, row.AttemptCount+1); err != nil {
 				return pricesFanoutResult{}, err
 			}
 			enqueued++
-		}
-		if err := rows.Err(); err != nil {
-			return pricesFanoutResult{}, fmt.Errorf("iterate sale listing match fanout rows: %w", err)
 		}
 		logger.InfoContext(ctx, "prices sale listing match tasks spawned", "count", enqueued, "outcome", logging.OutcomeSuccess)
 		return pricesFanoutResult{Enqueued: enqueued}, nil

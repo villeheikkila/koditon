@@ -500,7 +500,7 @@ func (s *Service) projectManagerCertificateExtraction(ctx context.Context, docum
 		return claimWriter.count, claimWriter.err
 	}
 	if document.PropertyOfferingID != nil {
-		if _, err := tx.Exec(ctx, `SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1, $2)`, *document.PropertyOfferingID, "document_claims_changed"); err != nil {
+		if _, err := queries.MarkPropertyOfferingDimensionTargetsDirty(ctx, db.MarkPropertyOfferingDimensionTargetsDirtyParams{PropertyOfferingID: *document.PropertyOfferingID, Reason: "document_claims_changed"}); err != nil {
 			return claimWriter.count, fmt.Errorf("mark dimension targets dirty from document: %w", err)
 		}
 	}
@@ -605,34 +605,12 @@ func (w *managerCertificateClaimWriter) insert(entityType string, entityID uuid.
 }
 
 func replaceManagerCertificateRenovations(ctx context.Context, tx pgx.Tx, documentID uuid.UUID, housingCompanyID uuid.UUID, offeringID uuid.UUID, observedAt *time.Time, items []managerCertificateRenovationObject) error {
-	var runID uuid.UUID
-	if err := tx.QueryRow(ctx, `
-INSERT INTO public.property_dimension_projection_runs (
-    projection_type,
-    projection_version,
-    source_table,
-    source_id,
-    status,
-    finished_at
-) VALUES (
-    'renovation_events',
-    'manager-certificate-renovations-v1',
-    'property_documents',
-    $1,
-    'succeeded',
-    now()
-)
-RETURNING property_dimension_projection_run_id`, documentID).Scan(&runID); err != nil {
+	queries := db.New(tx)
+	runID, err := queries.CreateManagerCertificateRenovationProjectionRun(ctx, documentID)
+	if err != nil {
 		return fmt.Errorf("create manager certificate renovation projection run: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `
-DELETE FROM public.property_renovation_events
-WHERE event_scope = 'source'
-    AND target_type = 'housing_company'
-    AND target_id = $1
-    AND source_table = 'property_documents'
-    AND source_id = $2
-    AND projection_version = 'manager-certificate-renovations-v1'`, housingCompanyID, documentID); err != nil {
+	if err := queries.DeleteManagerCertificateRenovationEvents(ctx, db.DeleteManagerCertificateRenovationEventsParams{HousingCompanyID: housingCompanyID, PropertyDocumentID: documentID}); err != nil {
 		return fmt.Errorf("delete previous manager certificate renovations: %w", err)
 	}
 	for _, item := range items {
@@ -645,60 +623,11 @@ WHERE event_scope = 'source'
 		scope := normalizeManagerCertificateRenovationScope(item.Scope)
 		responsibility := normalizeRenovationResponsibility(item.Responsibility)
 		summary := cleanDisplayString(firstNonEmpty(item.Summary, item.SourceLabel))
-		if _, err := tx.Exec(ctx, `
-INSERT INTO public.property_renovation_events (
-    property_dimension_projection_run_id,
-    projection_version,
-    event_scope,
-    target_type,
-    target_id,
-    source_table,
-    source_id,
-    source_field,
-    category,
-    component,
-    status,
-    stage,
-    scope,
-    responsibility,
-    year,
-    start_year,
-    end_year,
-    cost_estimate_eur,
-    summary,
-    evidence,
-    confidence,
-    source_reliability,
-    source_observed_at
-) VALUES ($1, 'manager-certificate-renovations-v1', 'source', 'housing_company', $2, 'property_documents', $3, 'manager_certificate', $4, NULL, $5, $6, $7, $8, $9, $10, $11, $12, $13, jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF($14, ''), 'action', NULLIF($15, ''), 'evidence', NULLIF($16, '')), 0.9, 0.9, $17)
-ON CONFLICT (
-    event_scope,
-    target_type,
-    target_id,
-    source_table,
-    source_id,
-    COALESCE(source_field, ''),
-    category,
-    status,
-    COALESCE(stage, ''),
-    COALESCE(scope, ''),
-    COALESCE(year, -1),
-    COALESCE(start_year, -1),
-    COALESCE(end_year, -1),
-    md5(COALESCE(summary, '')),
-    projection_version
-) DO UPDATE SET
-    responsibility = EXCLUDED.responsibility,
-    start_year = EXCLUDED.start_year,
-    end_year = EXCLUDED.end_year,
-    cost_estimate_eur = EXCLUDED.cost_estimate_eur,
-    confidence = EXCLUDED.confidence,
-    source_observed_at = EXCLUDED.source_observed_at,
-    evidence = EXCLUDED.evidence`, runID, housingCompanyID, documentID, category, status, stage, scope, responsibility, item.Year, item.StartYear, item.EndYear, item.CostEstimateEUR, summary, cleanDisplayString(item.SourceLabel), normalizeManagerCertificateRenovationAction(item.Action), evidenceText(item.Evidence), observedAt); err != nil {
+		if err := queries.InsertManagerCertificateRenovationEvent(ctx, db.InsertManagerCertificateRenovationEventParams{PropertyDimensionProjectionRunID: runID, HousingCompanyID: housingCompanyID, PropertyDocumentID: documentID, Category: category, Status: status, Stage: emptyToNil(stage), Scope: emptyToNil(scope), Responsibility: emptyToNil(responsibility), Year: item.Year, StartYear: item.StartYear, EndYear: item.EndYear, CostEstimateEur: item.CostEstimateEUR, Summary: emptyToNil(summary), SourceLabel: cleanDisplayString(item.SourceLabel), Action: normalizeManagerCertificateRenovationAction(item.Action), EvidenceText: evidenceText(item.Evidence), SourceObservedAt: observedAt}); err != nil {
 			return fmt.Errorf("insert manager certificate renovation: %w", err)
 		}
 	}
-	if _, err := tx.Exec(ctx, `SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1, $2)`, offeringID, "document_renovation_events_changed"); err != nil {
+	if _, err := queries.MarkPropertyOfferingDimensionTargetsDirty(ctx, db.MarkPropertyOfferingDimensionTargetsDirtyParams{PropertyOfferingID: offeringID, Reason: "document_renovation_events_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty from document renovations: %w", err)
 	}
 	return nil

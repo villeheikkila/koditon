@@ -113,43 +113,11 @@ func (c *Consumer) handleCanonicalProjectManagerCertificate(ctx context.Context,
 
 func (c *Consumer) handleCanonicalBackfillBuildingCoordinates(ctx context.Context, logger *slog.Logger) error {
 	logger = logging.With(logger, logging.Op("consumer.canonical.backfill_building_coordinates"))
-	tag, err := c.pool.Exec(ctx, `
-UPDATE public.physical_buildings pb
-SET physical_building_latitude = coordinates.lat,
-    physical_building_longitude = coordinates.lng,
-    physical_building_updated_at = now()
-FROM (
-    SELECT DISTINCT ON (pu.physical_building_id)
-        pu.physical_building_id,
-        COALESCE(fb.frontdoor_building_latitude, sb.shortcut_building_latitude, sl.sale_listing_latitude, postgis.ST_Y(hc.housing_company_geom)::double precision) AS lat,
-        COALESCE(fb.frontdoor_building_longitude, sb.shortcut_building_longitude, sl.sale_listing_longitude, postgis.ST_X(hc.housing_company_geom)::double precision) AS lng
-    FROM public.property_units pu
-    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    LEFT JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    LEFT JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE pu.physical_building_id IS NOT NULL
-    ORDER BY pu.physical_building_id,
-        (fb.frontdoor_building_latitude IS NOT NULL AND fb.frontdoor_building_longitude IS NOT NULL) DESC,
-        (sb.shortcut_building_latitude IS NOT NULL AND sb.shortcut_building_longitude IS NOT NULL) DESC,
-        (sl.sale_listing_latitude IS NOT NULL AND sl.sale_listing_longitude IS NOT NULL) DESC,
-        sl.sale_listing_last_seen_at DESC NULLS LAST
-) coordinates
-WHERE pb.physical_building_id = coordinates.physical_building_id
-  AND coordinates.lat IS NOT NULL
-  AND coordinates.lng IS NOT NULL
-  AND (pb.physical_building_latitude IS NULL OR pb.physical_building_longitude IS NULL)`)
+	rows, err := c.queries.BackfillBuildingCoordinates(ctx)
 	if err != nil {
 		return fmt.Errorf("backfill building coordinates: %w", err)
 	}
-	logger.InfoContext(ctx, "building coordinates backfilled", "rows", tag.RowsAffected(), "outcome", logging.OutcomeSuccess)
+	logger.InfoContext(ctx, "building coordinates backfilled", "rows", rows, "outcome", logging.OutcomeSuccess)
 	return nil
 }
 
@@ -301,28 +269,11 @@ func (c *Consumer) handleCanonicalResolveDimensionTarget(ctx context.Context, lo
 }
 
 func (c *Consumer) listDimensionLayerBackfillListingIDs(ctx context.Context, cursor *uuid.UUID, limit int32) ([]uuid.UUID, error) {
-	rows, err := c.pool.Query(ctx, `
-SELECT source_listing_id
-FROM public.source_listings
-WHERE ($1::uuid IS NULL OR source_listing_id > $1::uuid)
-ORDER BY source_listing_id
-LIMIT $2`, cursor, limit)
+	ids, err := c.queries.ListDimensionLayerBackfillListingIDs(ctx, db.ListDimensionLayerBackfillListingIDsParams{Cursor: cursor, LimitCount: limit})
 	if err != nil {
 		return nil, fmt.Errorf("list dimension layer backfill listings: %w", err)
 	}
-	defer rows.Close()
-	out := make([]uuid.UUID, 0, limit)
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("scan dimension layer backfill listing: %w", err)
-		}
-		out = append(out, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate dimension layer backfill listings: %w", err)
-	}
-	return out, nil
+	return ids, nil
 }
 
 func (c *Consumer) rebuildDimensionLayerForListing(ctx context.Context, saleListingID uuid.UUID, expectedDirtyAt *time.Time) (json.RawMessage, error) {
@@ -412,33 +363,19 @@ func (c *Consumer) enqueueManagerCertificateProjection(ctx context.Context, docu
 }
 
 func (c *Consumer) listDirtyDimensionTargets(ctx context.Context, limit int32) ([]dirtyDimensionTargetRow, error) {
-	rows, err := c.pool.Query(ctx, `
-SELECT target_type, target_id, dirty_at
-FROM public.property_dimension_dirty_targets
-WHERE (resolved_at IS NULL OR resolved_at < dirty_at)
-    AND (queued_at IS NULL OR queued_at < dirty_at OR queued_at < now() - interval '30 minutes')
-ORDER BY dirty_at
-LIMIT $1`, limit)
+	rows, err := c.queries.ListDirtyDimensionTargets(ctx, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list dirty dimension targets: %w", err)
 	}
-	defer rows.Close()
-	targets := make([]dirtyDimensionTargetRow, 0, limit)
-	for rows.Next() {
-		var target dirtyDimensionTargetRow
-		if err := rows.Scan(&target.TargetType, &target.TargetID, &target.DirtyAt); err != nil {
-			return nil, fmt.Errorf("scan dirty dimension target: %w", err)
-		}
-		targets = append(targets, target)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate dirty dimension targets: %w", err)
+	targets := make([]dirtyDimensionTargetRow, 0, len(rows))
+	for _, row := range rows {
+		targets = append(targets, dirtyDimensionTargetRow{TargetType: row.TargetType, TargetID: row.TargetID, DirtyAt: row.DirtyAt})
 	}
 	return targets, nil
 }
 
 func (c *Consumer) markDimensionTargetQueued(ctx context.Context, targetType string, targetID uuid.UUID) error {
-	if _, err := c.pool.Exec(ctx, `SELECT public.fnc__mark_dimension_target_queued($1, $2)`, targetType, targetID); err != nil {
+	if _, err := c.queries.MarkDimensionTargetQueued(ctx, db.MarkDimensionTargetQueuedParams{TargetType: targetType, TargetID: targetID}); err != nil {
 		return fmt.Errorf("mark dimension target queued: %w", err)
 	}
 	return nil

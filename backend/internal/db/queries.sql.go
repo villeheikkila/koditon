@@ -1065,6 +1065,32 @@ func (q *Queries) CreateDetachedPropertyDocument(ctx context.Context, arg Create
 	return i, err
 }
 
+const createManagerCertificateRenovationProjectionRun = `-- name: CreateManagerCertificateRenovationProjectionRun :one
+INSERT INTO public.property_dimension_projection_runs (
+    projection_type,
+    projection_version,
+    source_table,
+    source_id,
+    status,
+    finished_at
+) VALUES (
+    'renovation_events',
+    'manager-certificate-renovations-v1',
+    'property_documents',
+    $1,
+    'succeeded',
+    now()
+)
+RETURNING property_dimension_projection_run_id
+`
+
+func (q *Queries) CreateManagerCertificateRenovationProjectionRun(ctx context.Context, propertyDocumentID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createManagerCertificateRenovationProjectionRun, propertyDocumentID)
+	var property_dimension_projection_run_id uuid.UUID
+	err := row.Scan(&property_dimension_projection_run_id)
+	return property_dimension_projection_run_id, err
+}
+
 const createPropertyDocumentExtractionRun = `-- name: CreatePropertyDocumentExtractionRun :one
 INSERT INTO public.property_document_extraction_runs (
     property_document_id,
@@ -1260,6 +1286,37 @@ WHERE source_type = 'source_listing'
 
 func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, saleListingID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingInsights, saleListingID)
+	return err
+}
+
+const deleteLLMPropertySourceOfferingRenovations = `-- name: DeleteLLMPropertySourceOfferingRenovations :exec
+DELETE FROM public.property_source_offering_renovations
+WHERE sale_listing_id = $1
+    AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text')
+`
+
+func (q *Queries) DeleteLLMPropertySourceOfferingRenovations(ctx context.Context, saleListingID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingRenovations, saleListingID)
+	return err
+}
+
+const deleteManagerCertificateRenovationEvents = `-- name: DeleteManagerCertificateRenovationEvents :exec
+DELETE FROM public.property_renovation_events
+WHERE event_scope = 'source'
+    AND target_type = 'housing_company'
+    AND target_id = $1
+    AND source_table = 'property_documents'
+    AND source_id = $2
+    AND projection_version = 'manager-certificate-renovations-v1'
+`
+
+type DeleteManagerCertificateRenovationEventsParams struct {
+	HousingCompanyID   uuid.UUID `json:"housing_company_id"`
+	PropertyDocumentID uuid.UUID `json:"property_document_id"`
+}
+
+func (q *Queries) DeleteManagerCertificateRenovationEvents(ctx context.Context, arg DeleteManagerCertificateRenovationEventsParams) error {
+	_, err := q.db.Exec(ctx, deleteManagerCertificateRenovationEvents, arg.HousingCompanyID, arg.PropertyDocumentID)
 	return err
 }
 
@@ -2700,6 +2757,29 @@ func (q *Queries) GetRuntimeKV(ctx context.Context, kvKey string) ([]byte, error
 	return kv_value, err
 }
 
+const getSaleListingRenovationExtractionTexts = `-- name: GetSaleListingRenovationExtractionTexts :one
+SELECT
+    COALESCE(pso.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '')::text AS done_text,
+    COALESCE(pso.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '')::text AS planned_text
+FROM public.property_source_offerings pso
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
+WHERE pso.sale_listing_id = $1
+LIMIT 1
+`
+
+type GetSaleListingRenovationExtractionTextsRow struct {
+	DoneText    string `json:"done_text"`
+	PlannedText string `json:"planned_text"`
+}
+
+func (q *Queries) GetSaleListingRenovationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetSaleListingRenovationExtractionTextsRow, error) {
+	row := q.db.QueryRow(ctx, getSaleListingRenovationExtractionTexts, saleListingID)
+	var i GetSaleListingRenovationExtractionTextsRow
+	err := row.Scan(&i.DoneText, &i.PlannedText)
+	return i, err
+}
+
 const getSchemaVersion = `-- name: GetSchemaVersion :one
 SELECT version
 FROM public.schema_migrations
@@ -3105,6 +3185,188 @@ func (q *Queries) InsertDocumentPropertyClaim(ctx context.Context, arg InsertDoc
 		arg.ValueText,
 		arg.ValueNumber,
 		arg.ValueBool,
+	)
+	return err
+}
+
+const insertLLMPropertySourceOfferingRenovation = `-- name: InsertLLMPropertySourceOfferingRenovation :exec
+INSERT INTO public.property_source_offering_renovations (
+    sale_listing_id,
+    property_source_offering_renovation_source_field,
+    property_source_offering_renovation_category,
+    property_source_offering_renovation_status,
+    property_source_offering_renovation_year,
+    property_source_offering_renovation_component,
+    property_source_offering_renovation_scope,
+    property_source_offering_renovation_stage,
+    property_source_offering_renovation_responsibility,
+    property_source_offering_renovation_cost_estimate_eur,
+    property_source_offering_renovation_text,
+    property_source_offering_renovation_confidence
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    NULLIF($6::text, ''),
+    NULLIF($7::text, ''),
+    NULLIF($8::text, ''),
+    NULLIF($9::text, ''),
+    $10,
+    NULLIF($11::text, ''),
+    $12
+)
+`
+
+type InsertLLMPropertySourceOfferingRenovationParams struct {
+	SaleListingID   uuid.UUID `json:"sale_listing_id"`
+	SourceField     string    `json:"source_field"`
+	Category        string    `json:"category"`
+	Status          string    `json:"status"`
+	Year            *int32    `json:"year"`
+	Component       string    `json:"component"`
+	Scope           string    `json:"scope"`
+	Stage           string    `json:"stage"`
+	Responsibility  string    `json:"responsibility"`
+	CostEstimateEur *int64    `json:"cost_estimate_eur"`
+	Summary         string    `json:"summary"`
+	Confidence      int32     `json:"confidence"`
+}
+
+func (q *Queries) InsertLLMPropertySourceOfferingRenovation(ctx context.Context, arg InsertLLMPropertySourceOfferingRenovationParams) error {
+	_, err := q.db.Exec(ctx, insertLLMPropertySourceOfferingRenovation,
+		arg.SaleListingID,
+		arg.SourceField,
+		arg.Category,
+		arg.Status,
+		arg.Year,
+		arg.Component,
+		arg.Scope,
+		arg.Stage,
+		arg.Responsibility,
+		arg.CostEstimateEur,
+		arg.Summary,
+		arg.Confidence,
+	)
+	return err
+}
+
+const insertManagerCertificateRenovationEvent = `-- name: InsertManagerCertificateRenovationEvent :exec
+INSERT INTO public.property_renovation_events (
+    property_dimension_projection_run_id,
+    projection_version,
+    event_scope,
+    target_type,
+    target_id,
+    source_table,
+    source_id,
+    source_field,
+    category,
+    component,
+    status,
+    stage,
+    scope,
+    responsibility,
+    year,
+    start_year,
+    end_year,
+    cost_estimate_eur,
+    summary,
+    evidence,
+    confidence,
+    source_reliability,
+    source_observed_at
+) VALUES (
+    $1,
+    'manager-certificate-renovations-v1',
+    'source',
+    'housing_company',
+    $2,
+    'property_documents',
+    $3,
+    'manager_certificate',
+    $4,
+    NULL,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF($14::text, ''), 'action', NULLIF($15::text, ''), 'evidence', NULLIF($16::text, '')),
+    0.9,
+    0.9,
+    $17
+)
+ON CONFLICT (
+    event_scope,
+    target_type,
+    target_id,
+    source_table,
+    source_id,
+    COALESCE(source_field, ''),
+    category,
+    status,
+    COALESCE(stage, ''),
+    COALESCE(scope, ''),
+    COALESCE(year, -1),
+    COALESCE(start_year, -1),
+    COALESCE(end_year, -1),
+    md5(COALESCE(summary, '')),
+    projection_version
+) DO UPDATE SET
+    responsibility = EXCLUDED.responsibility,
+    start_year = EXCLUDED.start_year,
+    end_year = EXCLUDED.end_year,
+    cost_estimate_eur = EXCLUDED.cost_estimate_eur,
+    confidence = EXCLUDED.confidence,
+    source_observed_at = EXCLUDED.source_observed_at,
+    evidence = EXCLUDED.evidence
+`
+
+type InsertManagerCertificateRenovationEventParams struct {
+	PropertyDimensionProjectionRunID uuid.UUID  `json:"property_dimension_projection_run_id"`
+	HousingCompanyID                 uuid.UUID  `json:"housing_company_id"`
+	PropertyDocumentID               uuid.UUID  `json:"property_document_id"`
+	Category                         string     `json:"category"`
+	Status                           string     `json:"status"`
+	Stage                            *string    `json:"stage"`
+	Scope                            *string    `json:"scope"`
+	Responsibility                   *string    `json:"responsibility"`
+	Year                             *int32     `json:"year"`
+	StartYear                        *int32     `json:"start_year"`
+	EndYear                          *int32     `json:"end_year"`
+	CostEstimateEur                  *int64     `json:"cost_estimate_eur"`
+	Summary                          *string    `json:"summary"`
+	SourceLabel                      string     `json:"source_label"`
+	Action                           string     `json:"action"`
+	EvidenceText                     string     `json:"evidence_text"`
+	SourceObservedAt                 *time.Time `json:"source_observed_at"`
+}
+
+func (q *Queries) InsertManagerCertificateRenovationEvent(ctx context.Context, arg InsertManagerCertificateRenovationEventParams) error {
+	_, err := q.db.Exec(ctx, insertManagerCertificateRenovationEvent,
+		arg.PropertyDimensionProjectionRunID,
+		arg.HousingCompanyID,
+		arg.PropertyDocumentID,
+		arg.Category,
+		arg.Status,
+		arg.Stage,
+		arg.Scope,
+		arg.Responsibility,
+		arg.Year,
+		arg.StartYear,
+		arg.EndYear,
+		arg.CostEstimateEur,
+		arg.Summary,
+		arg.SourceLabel,
+		arg.Action,
+		arg.EvidenceText,
+		arg.SourceObservedAt,
 	)
 	return err
 }
@@ -3695,6 +3957,22 @@ func (q *Queries) MarkListingDimensionTargetsDirty(ctx context.Context, arg Mark
 	return column_1, err
 }
 
+const markPropertyOfferingDimensionTargetsDirty = `-- name: MarkPropertyOfferingDimensionTargetsDirty :one
+SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1::uuid, $2::text)::integer AS count
+`
+
+type MarkPropertyOfferingDimensionTargetsDirtyParams struct {
+	PropertyOfferingID uuid.UUID `json:"property_offering_id"`
+	Reason             string    `json:"reason"`
+}
+
+func (q *Queries) MarkPropertyOfferingDimensionTargetsDirty(ctx context.Context, arg MarkPropertyOfferingDimensionTargetsDirtyParams) (int32, error) {
+	row := q.db.QueryRow(ctx, markPropertyOfferingDimensionTargetsDirty, arg.PropertyOfferingID, arg.Reason)
+	var count int32
+	err := row.Scan(&count)
+	return count, err
+}
+
 const projectDimensionProfileForTarget = `-- name: ProjectDimensionProfileForTarget :one
 SELECT public.fnc__project_dimension_profile_for_target($1::text, $2::uuid)::integer AS count
 `
@@ -3720,6 +3998,148 @@ func (q *Queries) ProjectListingProviderDimensionClaims(ctx context.Context, sal
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const projectListingRenovationEvents = `-- name: ProjectListingRenovationEvents :one
+WITH run AS (
+    INSERT INTO public.property_dimension_projection_runs (
+        projection_type,
+        projection_version,
+        source_table,
+        source_id,
+        status,
+        finished_at
+    ) VALUES (
+        'renovation_events',
+        $1,
+        'property_source_offerings',
+        $2,
+        'succeeded',
+        now()
+    )
+    RETURNING property_dimension_projection_run_id
+),
+deleted AS (
+    DELETE FROM public.property_renovation_events
+    WHERE event_scope = 'source'
+        AND source_table = 'property_source_offerings'
+        AND source_id = $2
+        AND projection_version = $1
+),
+linked AS (
+    SELECT
+        pos.sale_listing_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
+        pu.physical_building_id,
+        pos.sale_listing_last_seen_at,
+        pos.sale_listing_updated_at,
+        pos.sale_listing_created_at
+    FROM public.property_source_offerings pos
+    LEFT JOIN public.target_sources link
+        ON link.source_id = pos.sale_listing_id
+        AND link.target_type = 'listing'
+        AND link.source_type = 'source_listing'
+        AND link.link_status <> 'rejected'
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = link.target_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE pos.sale_listing_id = $2
+    ORDER BY link.link_score DESC NULLS LAST, link.updated_at DESC NULLS LAST
+    LIMIT 1
+),
+inserted AS (
+    INSERT INTO public.property_renovation_events (
+        property_dimension_projection_run_id,
+        projection_version,
+        event_scope,
+        target_type,
+        target_id,
+        source_table,
+        source_id,
+        source_field,
+        category,
+        component,
+        status,
+        stage,
+        scope,
+        responsibility,
+        year,
+        start_year,
+        end_year,
+        cost_estimate_eur,
+        summary,
+        evidence,
+        confidence,
+        source_reliability,
+        source_observed_at
+    )
+    SELECT
+        run.property_dimension_projection_run_id,
+        $1,
+        'source',
+        CASE WHEN linked.housing_company_id IS NOT NULL THEN 'housing_company' ELSE 'building' END,
+        COALESCE(linked.housing_company_id, linked.physical_building_id),
+        'property_source_offerings',
+        linked.sale_listing_id,
+        renovation.property_source_offering_renovation_source_field,
+        renovation.property_source_offering_renovation_category,
+        NULLIF(renovation.property_source_offering_renovation_component, ''),
+        renovation.property_source_offering_renovation_status,
+        NULLIF(renovation.property_source_offering_renovation_stage, ''),
+        NULLIF(renovation.property_source_offering_renovation_scope, ''),
+        NULLIF(renovation.property_source_offering_renovation_responsibility, ''),
+        renovation.property_source_offering_renovation_year,
+        NULL,
+        NULL,
+        renovation.property_source_offering_renovation_cost_estimate_eur,
+        NULLIF(renovation.property_source_offering_renovation_text, ''),
+        jsonb_build_object('evidence_level', CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
+        GREATEST(0, LEAST(1, COALESCE(renovation.property_source_offering_renovation_confidence, 50)::double precision / 100)),
+        CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
+        COALESCE(linked.sale_listing_last_seen_at, linked.sale_listing_updated_at, linked.sale_listing_created_at, now())
+    FROM run
+    JOIN linked ON COALESCE(linked.housing_company_id, linked.physical_building_id) IS NOT NULL
+    JOIN public.property_source_offering_renovations renovation ON renovation.sale_listing_id = linked.sale_listing_id
+    ON CONFLICT (
+        event_scope,
+        target_type,
+        target_id,
+        source_table,
+        source_id,
+        COALESCE(source_field, ''),
+        category,
+        status,
+        COALESCE(stage, ''),
+        COALESCE(scope, ''),
+        COALESCE(year, -1),
+        COALESCE(start_year, -1),
+        COALESCE(end_year, -1),
+        md5(COALESCE(summary, '')),
+        projection_version
+    ) DO UPDATE SET
+        component = EXCLUDED.component,
+        responsibility = EXCLUDED.responsibility,
+        cost_estimate_eur = EXCLUDED.cost_estimate_eur,
+        confidence = EXCLUDED.confidence,
+        source_reliability = EXCLUDED.source_reliability,
+        source_observed_at = EXCLUDED.source_observed_at,
+        evidence = EXCLUDED.evidence
+    RETURNING 1
+)
+SELECT count(*)::bigint AS projected
+FROM inserted
+`
+
+type ProjectListingRenovationEventsParams struct {
+	ProjectionVersion string    `json:"projection_version"`
+	SaleListingID     uuid.UUID `json:"sale_listing_id"`
+}
+
+func (q *Queries) ProjectListingRenovationEvents(ctx context.Context, arg ProjectListingRenovationEventsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, projectListingRenovationEvents, arg.ProjectionVersion, arg.SaleListingID)
+	var projected int64
+	err := row.Scan(&projected)
+	return projected, err
 }
 
 const rebuildListingDimensionLayer = `-- name: RebuildListingDimensionLayer :one

@@ -205,53 +205,16 @@ func (c *Consumer) runCanonicalizeSourceAdsFanoutWorkflow(ctx context.Context, l
 		return canonicalFanoutResult{}, err
 	}
 	result, err := absurd.Step(ctx, "scan-and-spawn-source-ads", func(ctx context.Context) (canonicalFanoutResult, error) {
-		rows, err := c.pool.Query(ctx, `
-(SELECT 'frontdoor_ad'::text AS source_table, frontdoor_ad_id::text AS source_id
- FROM public.frontdoor_ads
- WHERE frontdoor_ad_data IS NOT NULL
-     AND (frontdoor_ad_data_hash IS NULL
-         OR frontdoor_ad_data_normalized_at IS NULL
-         OR frontdoor_ad_data_changed_at > frontdoor_ad_data_normalized_at
-         OR frontdoor_ad_data_normalized_version < $2)
- ORDER BY frontdoor_ad_updated_at ASC
- LIMIT $1)
-UNION ALL
-(SELECT 'shortcut_ad'::text AS source_table, shortcut_ad_id::text AS source_id
- FROM public.shortcut_ads
- WHERE shortcut_ad_data IS NOT NULL
-     AND (shortcut_ad_data_hash IS NULL
-         OR shortcut_ad_data_normalized_at IS NULL
-         OR shortcut_ad_data_changed_at > shortcut_ad_data_normalized_at
-         OR shortcut_ad_data_normalized_version < $2)
- ORDER BY shortcut_ad_updated_at ASC NULLS FIRST
- LIMIT $1)
-UNION ALL
-(SELECT 'frontdoor_building_announcement'::text AS source_table, frontdoor_building_announcement_id::text AS source_id
- FROM public.frontdoor_building_announcements
- WHERE frontdoor_building_announcement_rent_period IS NULL
-     AND frontdoor_building_announcement_rental_unique_no IS NULL
-     AND (frontdoor_building_announcement_data_normalized_at IS NULL
-         OR frontdoor_building_announcement_data_normalized_version < $2)
- ORDER BY frontdoor_building_announcement_last_seen_at ASC
- LIMIT $1)`, payload.Limit, currentSourceAdCanonicalizationVersion)
+		rows, err := c.queries.ListCanonicalizeSourceAdsFanout(ctx, db.ListCanonicalizeSourceAdsFanoutParams{Version: currentSourceAdCanonicalizationVersion, LimitCount: payload.Limit})
 		if err != nil {
 			return canonicalFanoutResult{}, fmt.Errorf("list source ads for canonicalization: %w", err)
 		}
-		defer rows.Close()
 		enqueued := 0
-		for rows.Next() {
-			var sourceTable string
-			var sourceID string
-			if err := rows.Scan(&sourceTable, &sourceID); err != nil {
-				return canonicalFanoutResult{}, fmt.Errorf("scan canonicalize source ad fanout row: %w", err)
-			}
-			if err := c.enqueueCanonicalizeSourceAd(ctx, sourceTable, sourceID, 0); err != nil {
+		for _, row := range rows {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, row.SourceTable, row.SourceID, 0); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			enqueued++
-		}
-		if err := rows.Err(); err != nil {
-			return canonicalFanoutResult{}, fmt.Errorf("iterate canonicalize source ad fanout rows: %w", err)
 		}
 		return canonicalFanoutResult{Enqueued: enqueued}, nil
 	})
@@ -319,37 +282,16 @@ func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *
 		return canonicalFanoutResult{}, err
 	}
 	return absurd.Step(ctx, "scan-and-spawn-listings", func(ctx context.Context) (canonicalFanoutResult, error) {
-		rows, err := c.pool.Query(ctx, `
-SELECT sl.sale_listing_id::text, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
-FROM public.property_source_offerings sl
-JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
-WHERE sl.sale_listing_source_kind = 'ad'
-    AND source_link.target_type = 'listing'
-    AND source_link.source_type = 'source_listing'
-    AND source_link.link_status <> 'rejected'
-    AND source_link.link_method <> 'manual'
-    AND COALESCE(sl.sale_listing_source_match_status, 'pending') IN ('pending', 'deferred', 'noop')
-    AND COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at) <= now()
-ORDER BY COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at), sl.sale_listing_updated_at
-LIMIT $1`, payload.Limit)
+		rows, err := c.queries.ListCanonicalMatchFanoutListings(ctx, payload.Limit)
 		if err != nil {
 			return canonicalFanoutResult{}, fmt.Errorf("list sale listings for canonical source matching: %w", err)
 		}
-		defer rows.Close()
 		enqueued := 0
-		for rows.Next() {
-			var saleListingID string
-			var attempt int32
-			if err := rows.Scan(&saleListingID, &attempt); err != nil {
-				return canonicalFanoutResult{}, fmt.Errorf("scan canonical source match fanout row: %w", err)
-			}
-			if err := c.spawnCanonicalSourceMatchSaleListing(ctx, saleListingID, attempt+1); err != nil {
+		for _, row := range rows {
+			if err := c.spawnCanonicalSourceMatchSaleListing(ctx, row.SaleListingID, row.AttemptCount+1); err != nil {
 				return canonicalFanoutResult{}, err
 			}
 			enqueued++
-		}
-		if err := rows.Err(); err != nil {
-			return canonicalFanoutResult{}, fmt.Errorf("iterate canonical source match fanout rows: %w", err)
 		}
 		logger.InfoContext(ctx, "canonical sale listing source match tasks spawned", "count", enqueued, "outcome", logging.OutcomeSuccess)
 		return canonicalFanoutResult{Enqueued: enqueued}, nil

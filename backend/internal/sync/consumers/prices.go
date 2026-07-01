@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"koditon/internal/db"
 	"koditon/internal/domain/properties"
 )
 
@@ -52,20 +53,19 @@ type pricesMatchRunSummary struct {
 }
 
 func (c *Consumer) loadPricesMatchSaleListing(ctx context.Context, saleListingID string) (pricesMatchSaleListingRow, error) {
-	var row pricesMatchSaleListingRow
-	var transactionID *string
-	err := c.pool.QueryRow(ctx, `
-SELECT
-    sale_listing_id::text,
-    sale_listing_last_seen_at,
-    prices_transaction_id::text,
-    sale_listing_prices_match_status,
-    sale_listing_prices_match_attempt_count,
-    sale_listing_prices_match_expires_at
-FROM public.property_source_offerings
-WHERE sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LastSeenAt, &transactionID, &row.Status, &row.AttemptCount, &row.ExpiresAt)
-	row.TransactionID = transactionID
-	return row, err
+	id, err := uuid.Parse(saleListingID)
+	if err != nil {
+		return pricesMatchSaleListingRow{}, fmt.Errorf("parse sale listing id: %w", err)
+	}
+	result, err := c.queries.LoadPricesMatchSaleListing(ctx, id)
+	if err != nil {
+		return pricesMatchSaleListingRow{}, err
+	}
+	row := pricesMatchSaleListingRow{ID: result.ID, LastSeenAt: result.SaleListingLastSeenAt, Status: result.SaleListingPricesMatchStatus, AttemptCount: result.SaleListingPricesMatchAttemptCount, ExpiresAt: result.SaleListingPricesMatchExpiresAt}
+	if result.TransactionID != "" {
+		row.TransactionID = &result.TransactionID
+	}
+	return row, nil
 }
 
 func (c *Consumer) runPricesMatchForSaleListing(ctx context.Context, saleListingID string) (pricesMatchRunSummary, error) {
@@ -89,26 +89,19 @@ func (c *Consumer) runPricesMatchBackfill(ctx context.Context, scoreThreshold, c
 }
 
 func (c *Consumer) updatePricesMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {
-	_, err := c.pool.Exec(ctx, `
-WITH updated_source AS (
-    UPDATE public.property_source_offerings
-    SET
-        sale_listing_prices_match_status = $2,
-        sale_listing_prices_match_next_attempt_at = $3,
-        sale_listing_prices_match_last_attempted_at = now(),
-        sale_listing_prices_match_attempt_count = sale_listing_prices_match_attempt_count + 1,
-        sale_listing_prices_match_run_id = COALESCE($4::uuid, sale_listing_prices_match_run_id),
-        sale_listing_prices_match_expires_at = COALESCE($5, sale_listing_prices_match_expires_at),
-        sale_listing_updated_at = now()
-    WHERE sale_listing_id = $1::uuid
-    RETURNING sale_listing_id, sale_listing_updated_at
-)
-UPDATE public.source_listings src
-SET normalized_at = updated_source.sale_listing_updated_at,
-    updated_at = updated_source.sale_listing_updated_at
-FROM updated_source
-WHERE src.source_listing_id = updated_source.sale_listing_id`, saleListingID, status, nextAttemptAt, runID, expiresAt)
+	id, err := uuid.Parse(saleListingID)
 	if err != nil {
+		return fmt.Errorf("parse sale listing id: %w", err)
+	}
+	var parsedRunID *uuid.UUID
+	if runID != nil && strings.TrimSpace(*runID) != "" {
+		id, err := uuid.Parse(*runID)
+		if err != nil {
+			return fmt.Errorf("parse prices match run id: %w", err)
+		}
+		parsedRunID = &id
+	}
+	if err := c.queries.UpdatePricesMatchState(ctx, db.UpdatePricesMatchStateParams{Status: status, NextAttemptAt: nextAttemptAt, RunID: parsedRunID, ExpiresAt: expiresAt, SaleListingID: id}); err != nil {
 		return fmt.Errorf("update prices match state: %w", err)
 	}
 	return nil

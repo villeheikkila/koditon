@@ -69,21 +69,12 @@ func (s *Service) extractSourceListingRenovations(ctx context.Context, saleListi
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return RenovationExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	var doneText, plannedText string
-	err := s.db.QueryRow(ctx, `
-SELECT
-    COALESCE(pso.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), ''),
-    COALESCE(pso.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '')
-FROM public.property_source_offerings pso
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
-WHERE pso.sale_listing_id = $1
-LIMIT 1`, saleListingID).Scan(&doneText, &plannedText)
+	row, err := s.queries.GetSaleListingRenovationExtractionTexts(ctx, saleListingID)
 	if err != nil {
 		return RenovationExtractionResult{}, mapNotFound(err)
 	}
-	doneText = cleanDisplayString(doneText)
-	plannedText = cleanDisplayString(plannedText)
+	doneText := cleanDisplayString(row.DoneText)
+	plannedText := cleanDisplayString(row.PlannedText)
 	modelName = firstNonEmpty(modelName, s.renovationExtractorModelName, "~google/gemini-flash-latest")
 	result := RenovationExtractionResult{SaleListingID: saleListingID.String(), Model: modelName}
 	if doneText == "" && plannedText == "" {
@@ -137,35 +128,18 @@ func (s *Service) replaceLLMRenovationRows(ctx context.Context, saleListingID uu
 		return fmt.Errorf("begin renovation extraction transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `
-DELETE FROM public.property_source_offering_renovations
-WHERE sale_listing_id = $1
-    AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text')`, saleListingID); err != nil {
+	queries := db.New(tx)
+	if err := queries.DeleteLLMPropertySourceOfferingRenovations(ctx, saleListingID); err != nil {
 		return fmt.Errorf("delete previous llm renovation rows: %w", err)
 	}
 	for _, item := range items {
-		if _, err := tx.Exec(ctx, `
-INSERT INTO public.property_source_offering_renovations (
-    sale_listing_id,
-    property_source_offering_renovation_source_field,
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component,
-    property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence
-) VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''), $10, NULLIF($11, ''), $12)`, saleListingID, llmRenovationSourceField(item.SourceField), item.Category, item.Status, item.Year, item.Component, item.Scope, item.Stage, item.Responsibility, item.CostEstimateEUR, item.Text, item.Confidence); err != nil {
+		if err := queries.InsertLLMPropertySourceOfferingRenovation(ctx, db.InsertLLMPropertySourceOfferingRenovationParams{SaleListingID: saleListingID, SourceField: llmRenovationSourceField(item.SourceField), Category: item.Category, Status: item.Status, Year: item.Year, Component: item.Component, Scope: item.Scope, Stage: item.Stage, Responsibility: item.Responsibility, CostEstimateEur: item.CostEstimateEUR, Summary: item.Text, Confidence: item.Confidence}); err != nil {
 			return fmt.Errorf("insert llm renovation row: %w", err)
 		}
 	}
 	if err := ProjectListingRenovationEvents(ctx, tx, saleListingID); err != nil {
 		return err
 	}
-	queries := db.New(tx)
 	if _, err := queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "renovation_events_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty after extraction: %w", err)
 	}

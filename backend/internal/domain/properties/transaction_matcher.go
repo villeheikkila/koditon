@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"koditon/internal/db"
 )
 
 type TransactionMatchRunOptions struct {
@@ -112,15 +114,7 @@ func (s *Service) createTransactionMatchRun(ctx context.Context, opts Transactio
 	if opts.AutoLinkSafe {
 		mode = "auto_link_safe"
 	}
-	var runID uuid.UUID
-	err := s.db.QueryRow(ctx, `
-INSERT INTO public.sale_listing_prices_transaction_match_runs (
-    sale_listing_prices_transaction_match_run_mode,
-    sale_listing_prices_transaction_match_score_threshold,
-    sale_listing_prices_transaction_match_competitor_margin
-)
-VALUES ($1, $2, $3)
-RETURNING sale_listing_prices_transaction_match_run_id`, mode, opts.ScoreThreshold, opts.CompetitorMargin).Scan(&runID)
+	runID, err := s.queries.CreateTransactionMatchRun(ctx, db.CreateTransactionMatchRunParams{Mode: mode, ScoreThreshold: opts.ScoreThreshold, CompetitorMargin: opts.CompetitorMargin})
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create transaction match run: %w", err)
 	}
@@ -128,73 +122,13 @@ RETURNING sale_listing_prices_transaction_match_run_id`, mode, opts.ScoreThresho
 }
 
 func (s *Service) loadTransactionMatchCandidateRows(ctx context.Context, targetListingID *uuid.UUID) ([]transactionMatchCandidateRaw, error) {
-	rows, err := s.db.Query(ctx, `
-SELECT
-    sl.sale_listing_id,
-    pt.prices_transaction_id,
-    COALESCE(sl.sale_listing_room_layout, ''),
-    COALESCE(pt.prices_transaction_description, ''),
-    sl.sale_listing_area_value,
-    pt.prices_transaction_area,
-    COALESCE(sl.sale_listing_property_type_code, ''),
-    COALESCE(pt.prices_transaction_type, ''),
-    sl.sale_listing_build_year,
-    pt.prices_transaction_build_year,
-    sl.sale_listing_floor_level,
-    sl.sale_listing_total_floors,
-    COALESCE(pt.prices_transaction_floor, ''),
-    sl.sale_listing_elevator,
-    pt.prices_transaction_elevator,
-    COALESCE(sl.sale_listing_condition, ''),
-    COALESCE(pt.prices_transaction_condition, ''),
-    sl.sale_listing_plot_owned,
-    pt.prices_transaction_plot_owned,
-    COALESCE(sl.sale_listing_energy_efficiency_match_code, ''),
-    COALESCE(pt.prices_transaction_energy_class, ''),
-    sl.sale_listing_asking_price,
-    pt.prices_transaction_price,
-    sl.sale_listing_first_seen_at,
-    sl.sale_listing_last_seen_at,
-    sl.sale_listing_created_at,
-    sl.sale_listing_updated_at,
-    pt.prices_transaction_created_at
-FROM public.property_source_offerings sl
-JOIN public.prices_transactions pt ON true
-JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-WHERE sl.sale_listing_source_kind = 'ad'
-    AND ($1::uuid IS NULL OR sl.sale_listing_id = $1::uuid)
-    AND sl.sale_listing_postal_norm = public.fnc__normalize_postal(COALESCE(ppc.prices_postal_code_code, postal.postal_postal_code_code))
-    AND sl.sale_listing_area_value IS NOT NULL
-    AND sl.sale_listing_area_value = pt.prices_transaction_area
-    AND NOT EXISTS (
-        SELECT 1
-        FROM public.price_links source_link
-        WHERE source_link.target_type = 'source_listing'
-            AND source_link.target_id = sl.sale_listing_id
-            AND source_link.link_status <> 'rejected'
-    )
-    AND NOT EXISTS (
-        SELECT 1
-        FROM public.price_links linked
-        WHERE linked.prices_transaction_id = pt.prices_transaction_id
-            AND linked.link_status <> 'rejected'
-    )`, targetListingID)
+	rows, err := s.queries.LoadTransactionMatchCandidateRows(ctx, targetListingID)
 	if err != nil {
 		return nil, fmt.Errorf("query transaction match candidates: %w", err)
 	}
-	defer rows.Close()
-	out := []transactionMatchCandidateRaw{}
-	for rows.Next() {
-		var row transactionMatchCandidateRaw
-		if err := rows.Scan(&row.ListingID, &row.TransactionID, &row.ListingLayout, &row.TransactionLayout, &row.ListingArea, &row.TransactionArea, &row.ListingType, &row.TransactionType, &row.ListingBuildYear, &row.TransactionYear, &row.ListingFloor, &row.ListingTotalFloors, &row.TransactionFloor, &row.ListingElevator, &row.TransactionElevator, &row.ListingCondition, &row.TransactionCondition, &row.ListingPlotOwned, &row.TransactionPlotOwned, &row.ListingEnergy, &row.TransactionEnergy, &row.ListingPrice, &row.TransactionPrice, &row.ListingFirstSeenAt, &row.ListingLastSeenAt, &row.ListingCreatedAt, &row.ListingUpdatedAt, &row.TransactionCreatedAt); err != nil {
-			return nil, fmt.Errorf("scan transaction match candidate: %w", err)
-		}
-		out = append(out, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate transaction match candidates: %w", err)
+	out := make([]transactionMatchCandidateRaw, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, transactionMatchCandidateRaw{ListingID: row.SaleListingID, TransactionID: row.PricesTransactionID, ListingLayout: row.ListingLayout, TransactionLayout: row.TransactionLayout, ListingArea: row.SaleListingAreaValue, TransactionArea: row.PricesTransactionArea, ListingType: row.ListingType, TransactionType: row.TransactionType, ListingBuildYear: row.SaleListingBuildYear, TransactionYear: row.PricesTransactionBuildYear, ListingFloor: row.SaleListingFloorLevel, ListingTotalFloors: row.SaleListingTotalFloors, TransactionFloor: row.TransactionFloor, ListingElevator: row.SaleListingElevator, TransactionElevator: row.PricesTransactionElevator, ListingCondition: row.ListingCondition, TransactionCondition: row.TransactionCondition, ListingPlotOwned: row.SaleListingPlotOwned, TransactionPlotOwned: row.PricesTransactionPlotOwned, ListingEnergy: row.ListingEnergy, TransactionEnergy: row.TransactionEnergy, ListingPrice: row.SaleListingAskingPrice, TransactionPrice: row.PricesTransactionPrice, ListingFirstSeenAt: row.SaleListingFirstSeenAt, ListingLastSeenAt: row.SaleListingLastSeenAt, ListingCreatedAt: row.SaleListingCreatedAt, ListingUpdatedAt: row.SaleListingUpdatedAt, TransactionCreatedAt: row.PricesTransactionCreatedAt})
 	}
 	return out, nil
 }
@@ -250,18 +184,7 @@ func scoreTransactionMatchCandidate(row transactionMatchCandidateRaw, threshold 
 
 func (s *Service) insertTransactionMatchCandidates(ctx context.Context, runID uuid.UUID, candidates []transactionMatchCandidate) error {
 	for _, candidate := range candidates {
-		_, err := s.db.Exec(ctx, `
-INSERT INTO public.sale_listing_prices_transaction_match_candidates (
-    sale_listing_prices_transaction_match_run_id,
-    sale_listing_id,
-    prices_transaction_id,
-    sale_listing_prices_transaction_match_score,
-    sale_listing_prices_transaction_match_confidence,
-    sale_listing_prices_transaction_match_reasons,
-    sale_listing_prices_transaction_match_price_delta_percent
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7)`, runID, candidate.ListingID, candidate.TransactionID, candidate.Score, candidate.Confidence, candidate.Reasons, candidate.PriceDeltaPercent)
-		if err != nil {
+		if err := s.queries.InsertTransactionMatchCandidate(ctx, db.InsertTransactionMatchCandidateParams{RunID: runID, ListingID: candidate.ListingID, TransactionID: candidate.TransactionID, Score: candidate.Score, Confidence: candidate.Confidence, Reasons: candidate.Reasons, PriceDeltaPercent: candidate.PriceDeltaPercent}); err != nil {
 			return fmt.Errorf("insert transaction match candidate: %w", err)
 		}
 	}
@@ -272,105 +195,30 @@ func (s *Service) applyTransactionMatchLinks(ctx context.Context, runID uuid.UUI
 	selected := selectTransactionMatches(candidates, threshold, margin)
 	var autoLinked int32
 	for _, candidate := range selected {
-		tag, err := s.db.Exec(ctx, `
-WITH updated_source AS (
-    UPDATE public.property_source_offerings
-    SET prices_transaction_id = $2,
-        sale_listing_prices_match_status = 'auto_linked',
-        sale_listing_prices_match_run_id = $3,
-        sale_listing_updated_at = now()
-    WHERE sale_listing_id = $1
-        AND (prices_transaction_id IS NULL OR prices_transaction_id = $2)
-        AND NOT EXISTS (
-            SELECT 1
-            FROM public.price_links existing
-            WHERE existing.prices_transaction_id = $2
-                AND existing.link_status <> 'rejected'
-        )
-    RETURNING sale_listing_id, sale_listing_created_at, sale_listing_updated_at
-)
-INSERT INTO public.price_links (
-    target_type,
-    target_id,
-    prices_transaction_id,
-    link_status,
-    link_method,
-    link_score,
-    link_reasons,
-    created_at,
-    updated_at
-)
-SELECT
-    'source_listing',
-    sale_listing_id,
-    $2,
-    'confirmed',
-    'sync_auto',
-    $4,
-    $5::jsonb,
-    sale_listing_created_at,
-    sale_listing_updated_at
-FROM updated_source
-WHERE NOT EXISTS (
-        SELECT 1
-        FROM public.price_links existing
-        WHERE existing.prices_transaction_id = $2
-            AND existing.link_status <> 'rejected'
-    )
-ON CONFLICT (target_type, target_id, prices_transaction_id) DO UPDATE SET
-    link_status = EXCLUDED.link_status,
-    link_method = EXCLUDED.link_method,
-    link_score = EXCLUDED.link_score,
-    link_reasons = EXCLUDED.link_reasons,
-    updated_at = now()`, candidate.ListingID, candidate.TransactionID, runID, candidate.Score, candidate.Reasons)
+		rowsAffected, err := s.queries.ApplyTransactionMatchLink(ctx, db.ApplyTransactionMatchLinkParams{TransactionID: candidate.TransactionID, Score: candidate.Score, Reasons: candidate.Reasons, RunID: runID, ListingID: candidate.ListingID})
 		if err != nil {
 			return 0, 0, fmt.Errorf("link transaction match: %w", err)
 		}
-		if tag.RowsAffected() == 0 {
+		if rowsAffected == 0 {
 			continue
 		}
-		_, err = s.db.Exec(ctx, `
-UPDATE public.source_listings src
-SET normalized_at = sl.sale_listing_updated_at,
-    updated_at = sl.sale_listing_updated_at
-FROM public.property_source_offerings sl
-WHERE sl.sale_listing_id = $1
-    AND src.source_listing_id = sl.sale_listing_id`, candidate.ListingID)
-		if err != nil {
+		if err := s.queries.SyncSourceListingTransactionMatchState(ctx, candidate.ListingID); err != nil {
 			return 0, 0, fmt.Errorf("sync source listing transaction match state: %w", err)
 		}
 		autoLinked++
-		_, err = s.db.Exec(ctx, `
-UPDATE public.sale_listing_prices_transaction_match_candidates
-SET sale_listing_prices_transaction_match_status = 'auto_linked'
-WHERE sale_listing_prices_transaction_match_run_id = $1
-    AND sale_listing_id = $2
-    AND prices_transaction_id = $3`, runID, candidate.ListingID, candidate.TransactionID)
-		if err != nil {
+		if err := s.queries.MarkTransactionMatchLinked(ctx, db.MarkTransactionMatchLinkedParams{RunID: runID, ListingID: candidate.ListingID, TransactionID: candidate.TransactionID}); err != nil {
 			return 0, 0, fmt.Errorf("mark transaction match linked: %w", err)
 		}
 	}
-	tag, err := s.db.Exec(ctx, `
-UPDATE public.sale_listing_prices_transaction_match_candidates
-SET sale_listing_prices_transaction_match_status = 'ambiguous'
-WHERE sale_listing_prices_transaction_match_run_id = $1
-    AND sale_listing_prices_transaction_match_status = 'candidate'
-    AND sale_listing_prices_transaction_match_score >= $2`, runID, threshold)
+	ambiguous, err := s.queries.MarkAmbiguousTransactionMatches(ctx, db.MarkAmbiguousTransactionMatchesParams{RunID: runID, Threshold: threshold})
 	if err != nil {
 		return 0, 0, fmt.Errorf("mark ambiguous transaction matches: %w", err)
 	}
-	return autoLinked, int32(tag.RowsAffected()), nil
+	return autoLinked, int32(ambiguous), nil
 }
 
 func (s *Service) finishTransactionMatchRun(ctx context.Context, runID uuid.UUID, candidates int32, autoLinked int32, ambiguous int32) error {
-	_, err := s.db.Exec(ctx, `
-UPDATE public.sale_listing_prices_transaction_match_runs
-SET sale_listing_prices_transaction_match_candidates_count = $2,
-    sale_listing_prices_transaction_match_auto_linked_count = $3,
-    sale_listing_prices_transaction_match_ambiguous_count = $4,
-    sale_listing_prices_transaction_match_finished_at = now()
-WHERE sale_listing_prices_transaction_match_run_id = $1`, runID, candidates, autoLinked, ambiguous)
-	if err != nil {
+	if err := s.queries.FinishTransactionMatchRun(ctx, db.FinishTransactionMatchRunParams{Candidates: candidates, AutoLinked: autoLinked, Ambiguous: ambiguous, RunID: runID}); err != nil {
 		return fmt.Errorf("finish transaction match run: %w", err)
 	}
 	return nil

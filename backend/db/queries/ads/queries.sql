@@ -718,6 +718,284 @@ CROSS JOIN LATERAL (
 ) AS renovation(source_field, category, done, year, text)
 WHERE renovation.done IS TRUE;
 
+-- name: GetSaleListingRenovationExtractionTexts :one
+SELECT
+    COALESCE(pso.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '')::text AS done_text,
+    COALESCE(pso.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '')::text AS planned_text
+FROM public.property_source_offerings pso
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
+WHERE pso.sale_listing_id = sqlc.arg(sale_listing_id)
+LIMIT 1;
+
+-- name: DeleteLLMPropertySourceOfferingRenovations :exec
+DELETE FROM public.property_source_offering_renovations
+WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+    AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text');
+
+-- name: InsertLLMPropertySourceOfferingRenovation :exec
+INSERT INTO public.property_source_offering_renovations (
+    sale_listing_id,
+    property_source_offering_renovation_source_field,
+    property_source_offering_renovation_category,
+    property_source_offering_renovation_status,
+    property_source_offering_renovation_year,
+    property_source_offering_renovation_component,
+    property_source_offering_renovation_scope,
+    property_source_offering_renovation_stage,
+    property_source_offering_renovation_responsibility,
+    property_source_offering_renovation_cost_estimate_eur,
+    property_source_offering_renovation_text,
+    property_source_offering_renovation_confidence
+) VALUES (
+    sqlc.arg(sale_listing_id),
+    sqlc.arg(source_field),
+    sqlc.arg(category),
+    sqlc.arg(status),
+    sqlc.narg(year),
+    NULLIF(sqlc.arg(component)::text, ''),
+    NULLIF(sqlc.arg(scope)::text, ''),
+    NULLIF(sqlc.arg(stage)::text, ''),
+    NULLIF(sqlc.arg(responsibility)::text, ''),
+    sqlc.narg(cost_estimate_eur),
+    NULLIF(sqlc.arg(summary)::text, ''),
+    sqlc.arg(confidence)
+);
+
+-- name: ProjectListingRenovationEvents :one
+WITH run AS (
+    INSERT INTO public.property_dimension_projection_runs (
+        projection_type,
+        projection_version,
+        source_table,
+        source_id,
+        status,
+        finished_at
+    ) VALUES (
+        'renovation_events',
+        sqlc.arg(projection_version),
+        'property_source_offerings',
+        sqlc.arg(sale_listing_id),
+        'succeeded',
+        now()
+    )
+    RETURNING property_dimension_projection_run_id
+),
+deleted AS (
+    DELETE FROM public.property_renovation_events
+    WHERE event_scope = 'source'
+        AND source_table = 'property_source_offerings'
+        AND source_id = sqlc.arg(sale_listing_id)
+        AND projection_version = sqlc.arg(projection_version)
+),
+linked AS (
+    SELECT
+        pos.sale_listing_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
+        pu.physical_building_id,
+        pos.sale_listing_last_seen_at,
+        pos.sale_listing_updated_at,
+        pos.sale_listing_created_at
+    FROM public.property_source_offerings pos
+    LEFT JOIN public.target_sources link
+        ON link.source_id = pos.sale_listing_id
+        AND link.target_type = 'listing'
+        AND link.source_type = 'source_listing'
+        AND link.link_status <> 'rejected'
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = link.target_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+    ORDER BY link.link_score DESC NULLS LAST, link.updated_at DESC NULLS LAST
+    LIMIT 1
+),
+inserted AS (
+    INSERT INTO public.property_renovation_events (
+        property_dimension_projection_run_id,
+        projection_version,
+        event_scope,
+        target_type,
+        target_id,
+        source_table,
+        source_id,
+        source_field,
+        category,
+        component,
+        status,
+        stage,
+        scope,
+        responsibility,
+        year,
+        start_year,
+        end_year,
+        cost_estimate_eur,
+        summary,
+        evidence,
+        confidence,
+        source_reliability,
+        source_observed_at
+    )
+    SELECT
+        run.property_dimension_projection_run_id,
+        sqlc.arg(projection_version),
+        'source',
+        CASE WHEN linked.housing_company_id IS NOT NULL THEN 'housing_company' ELSE 'building' END,
+        COALESCE(linked.housing_company_id, linked.physical_building_id),
+        'property_source_offerings',
+        linked.sale_listing_id,
+        renovation.property_source_offering_renovation_source_field,
+        renovation.property_source_offering_renovation_category,
+        NULLIF(renovation.property_source_offering_renovation_component, ''),
+        renovation.property_source_offering_renovation_status,
+        NULLIF(renovation.property_source_offering_renovation_stage, ''),
+        NULLIF(renovation.property_source_offering_renovation_scope, ''),
+        NULLIF(renovation.property_source_offering_renovation_responsibility, ''),
+        renovation.property_source_offering_renovation_year,
+        NULL,
+        NULL,
+        renovation.property_source_offering_renovation_cost_estimate_eur,
+        NULLIF(renovation.property_source_offering_renovation_text, ''),
+        jsonb_build_object('evidence_level', CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
+        GREATEST(0, LEAST(1, COALESCE(renovation.property_source_offering_renovation_confidence, 50)::double precision / 100)),
+        CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
+        COALESCE(linked.sale_listing_last_seen_at, linked.sale_listing_updated_at, linked.sale_listing_created_at, now())
+    FROM run
+    JOIN linked ON COALESCE(linked.housing_company_id, linked.physical_building_id) IS NOT NULL
+    JOIN public.property_source_offering_renovations renovation ON renovation.sale_listing_id = linked.sale_listing_id
+    ON CONFLICT (
+        event_scope,
+        target_type,
+        target_id,
+        source_table,
+        source_id,
+        COALESCE(source_field, ''),
+        category,
+        status,
+        COALESCE(stage, ''),
+        COALESCE(scope, ''),
+        COALESCE(year, -1),
+        COALESCE(start_year, -1),
+        COALESCE(end_year, -1),
+        md5(COALESCE(summary, '')),
+        projection_version
+    ) DO UPDATE SET
+        component = EXCLUDED.component,
+        responsibility = EXCLUDED.responsibility,
+        cost_estimate_eur = EXCLUDED.cost_estimate_eur,
+        confidence = EXCLUDED.confidence,
+        source_reliability = EXCLUDED.source_reliability,
+        source_observed_at = EXCLUDED.source_observed_at,
+        evidence = EXCLUDED.evidence
+    RETURNING 1
+)
+SELECT count(*)::bigint AS projected
+FROM inserted;
+
+-- name: CreateManagerCertificateRenovationProjectionRun :one
+INSERT INTO public.property_dimension_projection_runs (
+    projection_type,
+    projection_version,
+    source_table,
+    source_id,
+    status,
+    finished_at
+) VALUES (
+    'renovation_events',
+    'manager-certificate-renovations-v1',
+    'property_documents',
+    sqlc.arg(property_document_id),
+    'succeeded',
+    now()
+)
+RETURNING property_dimension_projection_run_id;
+
+-- name: DeleteManagerCertificateRenovationEvents :exec
+DELETE FROM public.property_renovation_events
+WHERE event_scope = 'source'
+    AND target_type = 'housing_company'
+    AND target_id = sqlc.arg(housing_company_id)
+    AND source_table = 'property_documents'
+    AND source_id = sqlc.arg(property_document_id)
+    AND projection_version = 'manager-certificate-renovations-v1';
+
+-- name: InsertManagerCertificateRenovationEvent :exec
+INSERT INTO public.property_renovation_events (
+    property_dimension_projection_run_id,
+    projection_version,
+    event_scope,
+    target_type,
+    target_id,
+    source_table,
+    source_id,
+    source_field,
+    category,
+    component,
+    status,
+    stage,
+    scope,
+    responsibility,
+    year,
+    start_year,
+    end_year,
+    cost_estimate_eur,
+    summary,
+    evidence,
+    confidence,
+    source_reliability,
+    source_observed_at
+) VALUES (
+    sqlc.arg(property_dimension_projection_run_id),
+    'manager-certificate-renovations-v1',
+    'source',
+    'housing_company',
+    sqlc.arg(housing_company_id),
+    'property_documents',
+    sqlc.arg(property_document_id),
+    'manager_certificate',
+    sqlc.arg(category),
+    NULL,
+    sqlc.arg(status),
+    sqlc.arg(stage),
+    sqlc.arg(scope),
+    sqlc.arg(responsibility),
+    sqlc.narg(year),
+    sqlc.narg(start_year),
+    sqlc.narg(end_year),
+    sqlc.narg(cost_estimate_eur),
+    sqlc.arg(summary),
+    jsonb_build_object('evidence_level', 'manager_certificate', 'source_label', NULLIF(sqlc.arg(source_label)::text, ''), 'action', NULLIF(sqlc.arg(action)::text, ''), 'evidence', NULLIF(sqlc.arg(evidence_text)::text, '')),
+    0.9,
+    0.9,
+    sqlc.narg(source_observed_at)
+)
+ON CONFLICT (
+    event_scope,
+    target_type,
+    target_id,
+    source_table,
+    source_id,
+    COALESCE(source_field, ''),
+    category,
+    status,
+    COALESCE(stage, ''),
+    COALESCE(scope, ''),
+    COALESCE(year, -1),
+    COALESCE(start_year, -1),
+    COALESCE(end_year, -1),
+    md5(COALESCE(summary, '')),
+    projection_version
+) DO UPDATE SET
+    responsibility = EXCLUDED.responsibility,
+    start_year = EXCLUDED.start_year,
+    end_year = EXCLUDED.end_year,
+    cost_estimate_eur = EXCLUDED.cost_estimate_eur,
+    confidence = EXCLUDED.confidence,
+    source_observed_at = EXCLUDED.source_observed_at,
+    evidence = EXCLUDED.evidence;
+
+-- name: MarkPropertyOfferingDimensionTargetsDirty :one
+SELECT public.fnc__mark_property_offering_dimension_targets_dirty(sqlc.arg(property_offering_id)::uuid, sqlc.arg(reason)::text)::integer AS count;
+
 -- name: RebuildListingDimensionLayer :one
 SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid)::jsonb AS payload;
 
