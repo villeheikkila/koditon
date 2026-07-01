@@ -32,7 +32,9 @@ Run from `backend/` (see root AGENTS.md for details):
 - `NAME=description mise run db:new`: create new timestamped migration
 - `mise run db:migrate`: apply pending migrations
 - `mise run db:status`: show current migration state
-- `mise run db:generate`: regenerate sqlc code from queries
+- `mise run db:generate`: regenerate sqlc code from queries against the live `DATABASE_URL`
+- `mise run db:vet`: run sqlc vet rules against the live `DATABASE_URL`
+- `mise run db:lint`: run postgres-language-server database linting
 
 ## Project Structure
 
@@ -40,7 +42,8 @@ Run from `backend/` (see root AGENTS.md for details):
 backend/
 ├── cmd/
 │   ├── main.go              # Entrypoint; keep minimal, delegate to internal/app
-│   └── cli/                 # CLI binary and private implementation
+│   ├── healthcheck/         # Healthcheck helper binary
+│   └── web/                 # Web entrypoint helper
 ├── internal/
 │   ├── app/                 # Application bootstrap, wiring, lifecycle
 │   ├── clients/             # External provider API clients
@@ -56,7 +59,7 @@ backend/
 ```
 
 ### Package Boundaries
-- `cmd/main.go` imports `internal/app`; binary-specific CLI implementation belongs under `cmd/cli/internal`.
+- `cmd/main.go` imports `internal/app`; keep binary entrypoints minimal and delegate into internal packages.
 - `internal/app` may import all backend subsystems for wiring.
 - `internal/clients/*` contains external API wire types and fetch/parse behavior; it must not import `internal/db`, `internal/sync`, or `internal/transport`.
 - `internal/sync/*` owns provider synchronization, mapping, and DB upserts; it may import `internal/clients/*`, `internal/db`, and `internal/platform/*`.

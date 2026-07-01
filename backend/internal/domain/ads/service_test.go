@@ -2,6 +2,7 @@ package ads
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -485,7 +486,17 @@ func TestRawTransactionScope(t *testing.T) {
 	}
 }
 
+func serviceReportingSQLForTest(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("../../../db/queries/ads/service_reporting.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
+	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
 		"'offering_source'::text AS match_type",
 		"price_link.price_link_id::text || ':' || sl.sale_listing_id::text AS id",
@@ -493,35 +504,37 @@ func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
 		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
 		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
 	} {
-		if !strings.Contains(addressRawTransactionsSQL, want) {
+		if !strings.Contains(sql, want) {
 			t.Fatalf("expected raw transaction SQL to include %q", want)
 		}
 	}
-	if strings.Contains(addressRawTransactionsSQL, "primary_listing.sale_listing_canonical_id") {
+	if strings.Contains(sql, "primary_listing.sale_listing_canonical_id") {
 		t.Fatal("expected raw transaction matches to use offering source rows instead of only the primary listing")
 	}
 }
 
 func TestAddressLookupUsesLiveShortcutAdAvailability(t *testing.T) {
+	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
 		"sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad'",
 		"sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad'",
 		"COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'",
 		"COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'",
 	} {
-		if !strings.Contains(addressLookupSQL, want) {
+		if !strings.Contains(sql, want) {
 			t.Fatalf("expected address lookup SQL to include %q", want)
 		}
 	}
-	if !strings.Contains(addressSourceCandidatesSQL, "candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad'") {
+	if !strings.Contains(sql, "candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad'") {
 		t.Fatal("expected source candidates SQL to include shortcut ad availability")
 	}
-	if !strings.Contains(addressSourceCandidatesSQL, "candidate.sale_listing_last_seen_at >= now() - interval '7 days'") {
+	if !strings.Contains(sql, "candidate.sale_listing_last_seen_at >= now() - interval '7 days'") {
 		t.Fatal("expected source candidates SQL to require recent shortcut sightings")
 	}
 }
 
 func TestAddressSourceCandidatesAreCappedPerSelectedListing(t *testing.T) {
+	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
 		"ranked_latest AS",
 		"row_number() OVER",
@@ -529,16 +542,17 @@ func TestAddressSourceCandidatesAreCappedPerSelectedListing(t *testing.T) {
 		"WHERE latest.candidate_rank <= 5",
 		"LIMIT 250",
 	} {
-		if !strings.Contains(addressSourceCandidatesSQL, want) {
+		if !strings.Contains(sql, want) {
 			t.Fatalf("expected source candidate SQL to include %q", want)
 		}
 	}
-	if strings.Contains(addressSourceCandidatesSQL, "LIMIT 100") {
+	if strings.Contains(sql, "LIMIT 100") {
 		t.Fatal("expected source candidate SQL to avoid a global first-100 cap")
 	}
 }
 
 func TestAddressRawTransactionsKeepLookupLinksOutsideHistoryCap(t *testing.T) {
+	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
 		"WITH raw_transactions",
 		"postal_history_rank",
@@ -546,11 +560,11 @@ func TestAddressRawTransactionsKeepLookupLinksOutsideHistoryCap(t *testing.T) {
 		"WHERE linked_to_lookup OR candidate_to_lookup OR postal_history_rank <= $5::int",
 		"ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, created_at DESC, price ASC",
 	} {
-		if !strings.Contains(addressRawTransactionsSQL, want) {
+		if !strings.Contains(sql, want) {
 			t.Fatalf("expected raw transaction SQL to include %q", want)
 		}
 	}
-	if strings.Contains(addressRawTransactionsSQL, "LIMIT $5::int") {
+	if strings.Contains(sql, "LIMIT $5::int") {
 		t.Fatal("expected raw transaction SQL to avoid a global limit that can hide lookup links")
 	}
 }

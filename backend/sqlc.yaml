@@ -1,12 +1,8 @@
 version: "2"
 sql:
   - engine: postgresql
-    # db:generate uses the dumped table schema plus checked-in view definitions.
-    # db:vet injects database.uri into a temporary config for sqlc/db-prepare.
-    schema:
-      - db/schema.sql
-      - db/schema_views.sql
-      - db/migrations/083_drop_old_derived_property_tables.sql
+    database:
+      uri: ${DATABASE_URL}
     queries:
       - db/queries/ads
       - db/queries/auth
@@ -235,13 +231,15 @@ sql:
             go_type:
               type: "string"
               pointer: true
-    # Vet rules applied via: sqlc vet.
-    # sqlc/db-prepare requires database.uri; see backend/mise.toml db:vet.
+    # Vet rules applied via: mise run db:vet.
+    # sqlc/db-prepare requires a reachable DATABASE_URL.
     rules:
       - sqlc/db-prepare
       - no-pg-catalog
       - no-delete
       - no-select-star
+      - no-seq-scan
+      - query-too-costly
 
 rules:
   - name: no-pg-catalog
@@ -258,3 +256,14 @@ rules:
     message: "Avoid SELECT *; explicitly name columns so generated types stay stable"
     rule: >-
       query.sql.matches("(?i)select\\s+\\*")
+  - name: no-seq-scan
+    message: "Query results in a sequential scan on table with >100 rows; consider adding an index"
+    rule: >-
+      has(postgresql.explain) &&
+      postgresql.explain.plan.node_type == "Seq Scan" &&
+      postgresql.explain.plan.plan_rows > uint(100)
+  - name: query-too-costly
+    message: "Query cost estimate exceeds threshold (>10000); consider optimizing"
+    rule: >-
+      has(postgresql.explain) &&
+      postgresql.explain.plan.total_cost > 10000.0

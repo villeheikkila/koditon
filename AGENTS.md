@@ -45,7 +45,9 @@ Run from project root using `backend:` prefix, or from `backend/` without prefix
 - `NAME=... mise run backend:db:new`: creates a new timestamped migration file
 - `mise run backend:db:migrate`: applies pending database migrations
 - `mise run backend:db:status`: shows current migration state
-- `mise run backend:db:generate`: regenerates `internal/*/db` from `db/schema` and package-level `queries.sql` files
+- `mise run backend:db:generate`: regenerates sqlc code from package-level query files against the live `DATABASE_URL`
+- `mise run backend:db:vet`: runs sqlc vet rules against the live `DATABASE_URL`
+- `mise run backend:db:lint`: runs postgres-language-server database linting
 
 ### Web (run from anywhere)
 - `mise run web:dev`: starts the Vite dev server

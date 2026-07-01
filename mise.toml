@@ -281,6 +281,10 @@ run = "mise -C {{config_root}}/backend run db:dump"
 description = "Run sqlc vet rules"
 run = "mise -C {{config_root}}/backend run db:vet"
 
+[tasks."backend:db:lint"]
+description = "Run postgres-language-server dblint"
+run = "mise -C {{config_root}}/backend run db:lint"
+
 [tasks."backend:db:new"]
 description = "Create a new migration (NAME=<name> required)"
 run = "mise -C {{config_root}}/backend run db:new"

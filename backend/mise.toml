@@ -3,6 +3,7 @@ golangci-lint = "2"
 gofumpt       = "latest"
 sqlc          = "latest"
 watchexec     = "latest"
+"npm:@postgres-language-server/cli" = "latest"
 "go:golang.org/x/tools/cmd/goimports"  = "latest"
 "go:golang.org/x/vuln/cmd/govulncheck" = "latest"
 "go:golang.org/x/tools/cmd/deadcode"   = "latest"
@@ -65,15 +66,28 @@ tern new -m db/migrations "$NAME"
 '''
 
 [tasks."db:migrate"]
-description = "Apply all pending migrations and dump schema"
-run = [
-  "tern migrate --migrations db/migrations",
-  "./scripts/schema/dump_concise_public_schema.sh",
-]
+description = "Apply all pending migrations"
+run = "tern migrate --migrations db/migrations"
 
 [tasks."db:status"]
 description = "Show current migration state"
 run = "tern status --migrations db/migrations"
+
+[tasks."db:wait"]
+description = "Wait for local PostgreSQL to accept connections"
+run = '''
+set -euo pipefail
+TIMEOUT="${TIMEOUT:-30}"
+DEADLINE=$(( $(date +%s) + TIMEOUT ))
+until pg_isready -d "${DATABASE_URL}" >/dev/null 2>&1; do
+  if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
+    echo "database did not become ready within ${TIMEOUT}s"
+    exit 1
+  fi
+  sleep 1
+done
+echo "database is ready"
+'''
 
 [tasks."db:create"]
 description = "Create the database"
@@ -129,9 +143,9 @@ fi
 
 [tasks."db:generate"]
 description = "Generate type-safe Go code from SQL queries"
+depends = ["db:wait"]
 sources = [
   "sqlc.yaml",
-  "db/schema.sql",
   "db/queries/**/*.sql",
 ]
 outputs = ["internal/db/*.go"]
@@ -139,18 +153,13 @@ run = "sqlc generate -f sqlc.yaml"
 
 [tasks."db:vet"]
 description = "Run sqlc vet rules"
-run = """
-TMP_SQLC_CONFIG=".sqlc-vet.yaml.tmp"
-awk '
-  { print }
-  /^  - engine: postgresql$/ {
-    print "    database:"
-    print "      uri: \\"${DATABASE_URL}\\""
-  }
-' sqlc.yaml > "$TMP_SQLC_CONFIG"
-trap 'rm -f "$TMP_SQLC_CONFIG"' EXIT
-sqlc vet -f "$TMP_SQLC_CONFIG"
-"""
+depends = ["db:wait"]
+run = "sqlc vet -f sqlc.yaml"
+
+[tasks."db:lint"]
+description = "Run postgres-language-server dblint"
+depends = ["db:wait"]
+run = "postgres-language-server dblint"
 
 [tasks."db:reset"]
 description = "Drop, create, and migrate the database"
