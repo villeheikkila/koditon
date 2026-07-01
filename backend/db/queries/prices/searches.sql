@@ -54,24 +54,23 @@ SELECT
     ht.prices_transaction_category,
     EXISTS (
         SELECT 1
-        FROM public.property_source_offerings AS sl
-        WHERE sl.prices_transaction_id = ht.prices_transaction_id
-    ) OR EXISTS (
-        SELECT 1
-        FROM public.property_offering_transactions AS pot
-        WHERE pot.prices_transaction_id = ht.prices_transaction_id
-          AND pot.property_offering_transaction_link_status <> 'rejected'
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.link_status <> 'rejected'
     ) AS is_matched,
     (
         SELECT count(*)::integer
-        FROM public.property_source_offerings AS sl
-        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.target_type = 'source_listing'
+          AND pl.link_status <> 'rejected'
     ) AS matched_listing_count,
     (
         SELECT count(*)::integer
-        FROM public.property_offering_transactions AS pot
-        WHERE pot.prices_transaction_id = ht.prices_transaction_id
-          AND pot.property_offering_transaction_link_status <> 'rejected'
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.target_type = 'listing'
+          AND pl.link_status <> 'rejected'
     ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,
@@ -165,24 +164,23 @@ SELECT
     ht.prices_transaction_category,
     EXISTS (
         SELECT 1
-        FROM public.property_source_offerings AS sl
-        WHERE sl.prices_transaction_id = ht.prices_transaction_id
-    ) OR EXISTS (
-        SELECT 1
-        FROM public.property_offering_transactions AS pot
-        WHERE pot.prices_transaction_id = ht.prices_transaction_id
-          AND pot.property_offering_transaction_link_status <> 'rejected'
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.link_status <> 'rejected'
     ) AS is_matched,
     (
         SELECT count(*)::integer
-        FROM public.property_source_offerings AS sl
-        WHERE sl.prices_transaction_id = ht.prices_transaction_id
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.target_type = 'source_listing'
+          AND pl.link_status <> 'rejected'
     ) AS matched_listing_count,
     (
         SELECT count(*)::integer
-        FROM public.property_offering_transactions AS pot
-        WHERE pot.prices_transaction_id = ht.prices_transaction_id
-          AND pot.property_offering_transaction_link_status <> 'rejected'
+        FROM public.price_links AS pl
+        WHERE pl.prices_transaction_id = ht.prices_transaction_id
+          AND pl.target_type = 'listing'
+          AND pl.link_status <> 'rejected'
     ) AS matched_offering_count,
     pn.prices_neighborhood_id,
     pn.prices_neighborhood_name,

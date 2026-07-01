@@ -71,6 +71,58 @@ type DeviceSession struct {
 	DeviceSessionLocationSource      *string    `json:"device_session_location_source"`
 }
 
+type DimensionClaim struct {
+	PropertyDimensionClaimID         uuid.UUID       `json:"property_dimension_claim_id"`
+	PropertyDimensionProjectionRunID uuid.UUID       `json:"property_dimension_projection_run_id"`
+	ProjectionVersion                string          `json:"projection_version"`
+	ClaimScope                       string          `json:"claim_scope"`
+	TargetType                       string          `json:"target_type"`
+	TargetID                         uuid.UUID       `json:"target_id"`
+	DimensionKey                     string          `json:"dimension_key"`
+	Value                            json.RawMessage `json:"value"`
+	ValueKind                        string          `json:"value_kind"`
+	Unit                             *string         `json:"unit"`
+	SourceTable                      string          `json:"source_table"`
+	SourceID                         uuid.UUID       `json:"source_id"`
+	SourceField                      *string         `json:"source_field"`
+	SourceClaimID                    *uuid.UUID      `json:"source_claim_id"`
+	SourceObservedAt                 *time.Time      `json:"source_observed_at"`
+	ValidFrom                        *time.Time      `json:"valid_from"`
+	ValidUntil                       *time.Time      `json:"valid_until"`
+	Confidence                       float64         `json:"confidence"`
+	SourceReliability                float64         `json:"source_reliability"`
+	Evidence                         json.RawMessage `json:"evidence"`
+	ExtractionModel                  *string         `json:"extraction_model"`
+	ExtractionPromptVersion          *string         `json:"extraction_prompt_version"`
+	CreatedAt                        time.Time       `json:"created_at"`
+	UpdatedAt                        time.Time       `json:"updated_at"`
+}
+
+type DimensionProfile struct {
+	TargetType string          `json:"target_type"`
+	TargetID   uuid.UUID       `json:"target_id"`
+	Dimensions json.RawMessage `json:"dimensions"`
+	Metadata   json.RawMessage `json:"metadata"`
+	Conflicts  json.RawMessage `json:"conflicts"`
+	ResolvedAt time.Time       `json:"resolved_at"`
+}
+
+type DimensionValue struct {
+	TargetType         string          `json:"target_type"`
+	TargetID           uuid.UUID       `json:"target_id"`
+	DimensionKey       string          `json:"dimension_key"`
+	Value              json.RawMessage `json:"value"`
+	ValueKind          string          `json:"value_kind"`
+	Unit               *string         `json:"unit"`
+	Confidence         float64         `json:"confidence"`
+	SelectedClaimID    *uuid.UUID      `json:"selected_claim_id"`
+	SelectedReason     string          `json:"selected_reason"`
+	ConflictStatus     string          `json:"conflict_status"`
+	SupportingClaimIds []uuid.UUID     `json:"supporting_claim_ids"`
+	RejectedClaimIds   []uuid.UUID     `json:"rejected_claim_ids"`
+	ResolvedAt         time.Time       `json:"resolved_at"`
+}
+
 type EnergyEfficiencyAlias struct {
 	EnergyEfficiencyAlias        string  `json:"energy_efficiency_alias"`
 	EnergyEfficiencyClassCode    *string `json:"energy_efficiency_class_code"`
@@ -198,6 +250,18 @@ type FrontdoorBuildingAnnouncement struct {
 	FrontdoorBuildingAnnouncementDataNormalizedVersion    int32      `json:"frontdoor_building_announcement_data_normalized_version"`
 }
 
+type House struct {
+	HouseID     uuid.UUID `json:"house_id"`
+	IdentityKey string    `json:"identity_key"`
+	AddressNorm *string   `json:"address_norm"`
+	PostalNorm  *string   `json:"postal_norm"`
+	CityNorm    *string   `json:"city_norm"`
+	Latitude    *float64  `json:"latitude"`
+	Longitude   *float64  `json:"longitude"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type HousingCompany struct {
 	HousingCompanyID                    uuid.UUID       `json:"housing_company_id"`
 	HousingCompanyIdentityKey           string          `json:"housing_company_identity_key"`
@@ -217,23 +281,6 @@ type HousingCompany struct {
 	HousingCompanyGeom                  interface{}     `json:"housing_company_geom"`
 }
 
-type HousingCompanyFact struct {
-	HousingCompanyFactID          uuid.UUID       `json:"housing_company_fact_id"`
-	HousingCompanyID              uuid.UUID       `json:"housing_company_id"`
-	HousingCompanySourceID        *uuid.UUID      `json:"housing_company_source_id"`
-	HousingCompanyFactKey         string          `json:"housing_company_fact_key"`
-	HousingCompanyFactValueText   *string         `json:"housing_company_fact_value_text"`
-	HousingCompanyFactValueNumber *float64        `json:"housing_company_fact_value_number"`
-	HousingCompanyFactValueBool   *bool           `json:"housing_company_fact_value_bool"`
-	HousingCompanyFactValueJson   json.RawMessage `json:"housing_company_fact_value_json"`
-	HousingCompanyFactRawValue    *string         `json:"housing_company_fact_raw_value"`
-	HousingCompanyFactConfidence  int32           `json:"housing_company_fact_confidence"`
-	HousingCompanyFactFirstSeenAt *time.Time      `json:"housing_company_fact_first_seen_at"`
-	HousingCompanyFactLastSeenAt  *time.Time      `json:"housing_company_fact_last_seen_at"`
-	HousingCompanyFactCreatedAt   time.Time       `json:"housing_company_fact_created_at"`
-	HousingCompanyFactUpdatedAt   time.Time       `json:"housing_company_fact_updated_at"`
-}
-
 type HousingCompanyMergeDecision struct {
 	HousingCompanyMergeDecisionID         uuid.UUID       `json:"housing_company_merge_decision_id"`
 	SourceHousingCompanyID                uuid.UUID       `json:"source_housing_company_id"`
@@ -247,23 +294,17 @@ type HousingCompanyMergeDecision struct {
 	HousingCompanyMergeDecisionDecidedAt  time.Time       `json:"housing_company_merge_decision_decided_at"`
 }
 
-type HousingCompanySource struct {
-	HousingCompanySourceID          uuid.UUID       `json:"housing_company_source_id"`
-	HousingCompanyID                uuid.UUID       `json:"housing_company_id"`
-	HousingCompanySourceProvider    string          `json:"housing_company_source_provider"`
-	HousingCompanySourceKind        string          `json:"housing_company_source_kind"`
-	HousingCompanySourceTable       string          `json:"housing_company_source_table"`
-	HousingCompanySourceIDValue     string          `json:"housing_company_source_id_value"`
-	HousingCompanySourceExternalID  *string         `json:"housing_company_source_external_id"`
-	HousingCompanySourceUrl         *string         `json:"housing_company_source_url"`
-	HousingCompanySourceLinkStatus  string          `json:"housing_company_source_link_status"`
-	HousingCompanySourceLinkMethod  string          `json:"housing_company_source_link_method"`
-	HousingCompanySourceLinkScore   int32           `json:"housing_company_source_link_score"`
-	HousingCompanySourceLinkReasons json.RawMessage `json:"housing_company_source_link_reasons"`
-	HousingCompanySourceFirstSeenAt *time.Time      `json:"housing_company_source_first_seen_at"`
-	HousingCompanySourceLastSeenAt  *time.Time      `json:"housing_company_source_last_seen_at"`
-	HousingCompanySourceCreatedAt   time.Time       `json:"housing_company_source_created_at"`
-	HousingCompanySourceUpdatedAt   time.Time       `json:"housing_company_source_updated_at"`
+type Listing struct {
+	ListingID              uuid.UUID  `json:"listing_id"`
+	ListingType            string     `json:"listing_type"`
+	ListingStatus          *string    `json:"listing_status"`
+	PrimarySourceListingID *uuid.UUID `json:"primary_source_listing_id"`
+	UnitID                 *uuid.UUID `json:"unit_id"`
+	HouseID                *uuid.UUID `json:"house_id"`
+	FirstSeenAt            *time.Time `json:"first_seen_at"`
+	LastSeenAt             *time.Time `json:"last_seen_at"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type OauthAuthorizationCode struct {
@@ -414,6 +455,19 @@ type PostalPostalCode struct {
 	PostalPostalCodeNeighborhoodFi *string    `json:"postal_postal_code_neighborhood_fi"`
 }
 
+type PriceLink struct {
+	PriceLinkID         uuid.UUID       `json:"price_link_id"`
+	TargetType          string          `json:"target_type"`
+	TargetID            uuid.UUID       `json:"target_id"`
+	PricesTransactionID uuid.UUID       `json:"prices_transaction_id"`
+	LinkStatus          string          `json:"link_status"`
+	LinkMethod          string          `json:"link_method"`
+	LinkScore           int32           `json:"link_score"`
+	LinkReasons         json.RawMessage `json:"link_reasons"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
 type PricesCity struct {
 	PricesCityID        uuid.UUID `json:"prices_city_id"`
 	PricesCityName      string    `json:"prices_city_name"`
@@ -472,33 +526,6 @@ type PropertyDimensionCatalog struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
-type PropertyDimensionClaim struct {
-	PropertyDimensionClaimID         uuid.UUID       `json:"property_dimension_claim_id"`
-	PropertyDimensionProjectionRunID uuid.UUID       `json:"property_dimension_projection_run_id"`
-	ProjectionVersion                string          `json:"projection_version"`
-	ClaimScope                       string          `json:"claim_scope"`
-	TargetType                       string          `json:"target_type"`
-	TargetID                         uuid.UUID       `json:"target_id"`
-	DimensionKey                     string          `json:"dimension_key"`
-	Value                            json.RawMessage `json:"value"`
-	ValueKind                        string          `json:"value_kind"`
-	Unit                             *string         `json:"unit"`
-	SourceTable                      string          `json:"source_table"`
-	SourceID                         uuid.UUID       `json:"source_id"`
-	SourceField                      *string         `json:"source_field"`
-	SourceClaimID                    *uuid.UUID      `json:"source_claim_id"`
-	SourceObservedAt                 *time.Time      `json:"source_observed_at"`
-	ValidFrom                        *time.Time      `json:"valid_from"`
-	ValidUntil                       *time.Time      `json:"valid_until"`
-	Confidence                       float64         `json:"confidence"`
-	SourceReliability                float64         `json:"source_reliability"`
-	Evidence                         json.RawMessage `json:"evidence"`
-	ExtractionModel                  *string         `json:"extraction_model"`
-	ExtractionPromptVersion          *string         `json:"extraction_prompt_version"`
-	CreatedAt                        time.Time       `json:"created_at"`
-	UpdatedAt                        time.Time       `json:"updated_at"`
-}
-
 type PropertyDimensionDirtyTarget struct {
 	TargetType   string     `json:"target_type"`
 	TargetID     uuid.UUID  `json:"target_id"`
@@ -522,15 +549,6 @@ type PropertyDimensionManualOverride struct {
 	ValidUntil                        *time.Time      `json:"valid_until"`
 	CreatedAt                         time.Time       `json:"created_at"`
 	RevokedAt                         *time.Time      `json:"revoked_at"`
-}
-
-type PropertyDimensionProfile struct {
-	TargetType string          `json:"target_type"`
-	TargetID   uuid.UUID       `json:"target_id"`
-	Dimensions json.RawMessage `json:"dimensions"`
-	Metadata   json.RawMessage `json:"metadata"`
-	Conflicts  json.RawMessage `json:"conflicts"`
-	ResolvedAt time.Time       `json:"resolved_at"`
 }
 
 type PropertyDimensionProjectionRun struct {
@@ -561,22 +579,6 @@ type PropertyDimensionSourcePriority struct {
 	SourceField        *string `json:"source_field"`
 	Priority           int32   `json:"priority"`
 	DefaultReliability float64 `json:"default_reliability"`
-}
-
-type PropertyDimensionValue struct {
-	TargetType         string          `json:"target_type"`
-	TargetID           uuid.UUID       `json:"target_id"`
-	DimensionKey       string          `json:"dimension_key"`
-	Value              json.RawMessage `json:"value"`
-	ValueKind          string          `json:"value_kind"`
-	Unit               *string         `json:"unit"`
-	Confidence         float64         `json:"confidence"`
-	SelectedClaimID    *uuid.UUID      `json:"selected_claim_id"`
-	SelectedReason     string          `json:"selected_reason"`
-	ConflictStatus     string          `json:"conflict_status"`
-	SupportingClaimIds []uuid.UUID     `json:"supporting_claim_ids"`
-	RejectedClaimIds   []uuid.UUID     `json:"rejected_claim_ids"`
-	ResolvedAt         time.Time       `json:"resolved_at"`
 }
 
 type PropertyDocument struct {
@@ -667,7 +669,6 @@ type PropertyOfferingMergeDecision struct {
 	PropertyOfferingMergeDecisionID         uuid.UUID       `json:"property_offering_merge_decision_id"`
 	SourcePropertyOfferingID                uuid.UUID       `json:"source_property_offering_id"`
 	TargetPropertyOfferingID                uuid.UUID       `json:"target_property_offering_id"`
-	PropertyOfferingSourceMatchCandidateID  *uuid.UUID      `json:"property_offering_source_match_candidate_id"`
 	PropertyOfferingMergeDecisionStatus     string          `json:"property_offering_merge_decision_status"`
 	PropertyOfferingMergeDecisionMethod     string          `json:"property_offering_merge_decision_method"`
 	PropertyOfferingMergeDecisionScore      *int32          `json:"property_offering_merge_decision_score"`
@@ -675,57 +676,6 @@ type PropertyOfferingMergeDecision struct {
 	PropertyOfferingMergeDecisionReasons    json.RawMessage `json:"property_offering_merge_decision_reasons"`
 	PropertyOfferingMergeDecisionCreatedAt  time.Time       `json:"property_offering_merge_decision_created_at"`
 	PropertyOfferingMergeDecisionDecidedAt  time.Time       `json:"property_offering_merge_decision_decided_at"`
-}
-
-type PropertyOfferingSource struct {
-	PropertyOfferingSourceID          uuid.UUID       `json:"property_offering_source_id"`
-	PropertyOfferingID                uuid.UUID       `json:"property_offering_id"`
-	SaleListingID                     uuid.UUID       `json:"sale_listing_id"`
-	PropertyOfferingSourceLinkStatus  string          `json:"property_offering_source_link_status"`
-	PropertyOfferingSourceLinkMethod  string          `json:"property_offering_source_link_method"`
-	PropertyOfferingSourceLinkScore   int32           `json:"property_offering_source_link_score"`
-	PropertyOfferingSourceLinkReasons json.RawMessage `json:"property_offering_source_link_reasons"`
-	PropertyOfferingSourceCreatedAt   time.Time       `json:"property_offering_source_created_at"`
-	PropertyOfferingSourceUpdatedAt   time.Time       `json:"property_offering_source_updated_at"`
-}
-
-type PropertyOfferingSourceMatchCandidate struct {
-	PropertyOfferingSourceMatchCandidateID       uuid.UUID       `json:"property_offering_source_match_candidate_id"`
-	PropertyOfferingSourceMatchRunID             uuid.UUID       `json:"property_offering_source_match_run_id"`
-	SourceSaleListingID                          uuid.UUID       `json:"source_sale_listing_id"`
-	SourcePropertyOfferingID                     uuid.UUID       `json:"source_property_offering_id"`
-	TargetPropertyOfferingID                     uuid.UUID       `json:"target_property_offering_id"`
-	TargetSaleListingID                          uuid.UUID       `json:"target_sale_listing_id"`
-	PropertyOfferingSourceMatchScore             int32           `json:"property_offering_source_match_score"`
-	PropertyOfferingSourceMatchConfidence        string          `json:"property_offering_source_match_confidence"`
-	PropertyOfferingSourceMatchStatus            string          `json:"property_offering_source_match_status"`
-	PropertyOfferingSourceMatchReasons           json.RawMessage `json:"property_offering_source_match_reasons"`
-	PropertyOfferingSourceMatchPriceDeltaPercent *float64        `json:"property_offering_source_match_price_delta_percent"`
-	PropertyOfferingSourceMatchCreatedAt         time.Time       `json:"property_offering_source_match_created_at"`
-}
-
-type PropertyOfferingSourceMatchRun struct {
-	PropertyOfferingSourceMatchRunID            uuid.UUID  `json:"property_offering_source_match_run_id"`
-	PropertyOfferingSourceMatchRunMode          string     `json:"property_offering_source_match_run_mode"`
-	PropertyOfferingSourceMatchScoreThreshold   int32      `json:"property_offering_source_match_score_threshold"`
-	PropertyOfferingSourceMatchCompetitorMargin int32      `json:"property_offering_source_match_competitor_margin"`
-	PropertyOfferingSourceMatchCandidatesCount  int32      `json:"property_offering_source_match_candidates_count"`
-	PropertyOfferingSourceMatchAutoLinkedCount  int32      `json:"property_offering_source_match_auto_linked_count"`
-	PropertyOfferingSourceMatchAmbiguousCount   int32      `json:"property_offering_source_match_ambiguous_count"`
-	PropertyOfferingSourceMatchStartedAt        time.Time  `json:"property_offering_source_match_started_at"`
-	PropertyOfferingSourceMatchFinishedAt       *time.Time `json:"property_offering_source_match_finished_at"`
-}
-
-type PropertyOfferingTransaction struct {
-	PropertyOfferingTransactionID          uuid.UUID       `json:"property_offering_transaction_id"`
-	PropertyOfferingID                     uuid.UUID       `json:"property_offering_id"`
-	PricesTransactionID                    uuid.UUID       `json:"prices_transaction_id"`
-	PropertyOfferingTransactionLinkStatus  string          `json:"property_offering_transaction_link_status"`
-	PropertyOfferingTransactionLinkMethod  string          `json:"property_offering_transaction_link_method"`
-	PropertyOfferingTransactionLinkScore   int32           `json:"property_offering_transaction_link_score"`
-	PropertyOfferingTransactionLinkReasons json.RawMessage `json:"property_offering_transaction_link_reasons"`
-	PropertyOfferingTransactionCreatedAt   time.Time       `json:"property_offering_transaction_created_at"`
-	PropertyOfferingTransactionUpdatedAt   time.Time       `json:"property_offering_transaction_updated_at"`
 }
 
 type PropertyRenovationEvent struct {
@@ -828,7 +778,6 @@ type PropertySourceOffering struct {
 	SaleListingSourceMatchNextAttemptAt      *time.Time      `json:"sale_listing_source_match_next_attempt_at"`
 	SaleListingSourceMatchLastAttemptedAt    *time.Time      `json:"sale_listing_source_match_last_attempted_at"`
 	SaleListingSourceMatchAttemptCount       int32           `json:"sale_listing_source_match_attempt_count"`
-	SaleListingSourceMatchRunID              *uuid.UUID      `json:"sale_listing_source_match_run_id"`
 	SaleListingAvailabilityText              *string         `json:"sale_listing_availability_text"`
 	SaleListingRenovationsDoneText           *string         `json:"sale_listing_renovations_done_text"`
 	SaleListingRenovationsPlannedText        *string         `json:"sale_listing_renovations_planned_text"`
@@ -874,20 +823,6 @@ type PropertySourceOffering struct {
 	SaleListingNewDevelopment                *bool           `json:"sale_listing_new_development"`
 }
 
-type PropertySourceOfferingInsight struct {
-	PropertySourceOfferingInsightID          uuid.UUID `json:"property_source_offering_insight_id"`
-	SaleListingID                            uuid.UUID `json:"sale_listing_id"`
-	PropertySourceOfferingInsightSourceField string    `json:"property_source_offering_insight_source_field"`
-	PropertySourceOfferingInsightKey         string    `json:"property_source_offering_insight_key"`
-	PropertySourceOfferingInsightValue       string    `json:"property_source_offering_insight_value"`
-	PropertySourceOfferingInsightDirection   string    `json:"property_source_offering_insight_direction"`
-	PropertySourceOfferingInsightSeverity    string    `json:"property_source_offering_insight_severity"`
-	PropertySourceOfferingInsightConfidence  int32     `json:"property_source_offering_insight_confidence"`
-	PropertySourceOfferingInsightText        *string   `json:"property_source_offering_insight_text"`
-	PropertySourceOfferingInsightCreatedAt   time.Time `json:"property_source_offering_insight_created_at"`
-	PropertySourceOfferingInsightUpdatedAt   time.Time `json:"property_source_offering_insight_updated_at"`
-}
-
 type PropertySourceOfferingRenovation struct {
 	PropertySourceOfferingRenovationID              uuid.UUID `json:"property_source_offering_renovation_id"`
 	SaleListingID                                   uuid.UUID `json:"sale_listing_id"`
@@ -904,45 +839,6 @@ type PropertySourceOfferingRenovation struct {
 	PropertySourceOfferingRenovationStage           *string   `json:"property_source_offering_renovation_stage"`
 	PropertySourceOfferingRenovationResponsibility  *string   `json:"property_source_offering_renovation_responsibility"`
 	PropertySourceOfferingRenovationCostEstimateEur *int64    `json:"property_source_offering_renovation_cost_estimate_eur"`
-}
-
-type PropertySystemProfile struct {
-	TargetType                 string          `json:"target_type"`
-	TargetID                   uuid.UUID       `json:"target_id"`
-	SystemType                 string          `json:"system_type"`
-	Status                     string          `json:"status"`
-	LastRenovatedYear          *int32          `json:"last_renovated_year"`
-	NextExpectedStartYear      *int32          `json:"next_expected_start_year"`
-	NextExpectedEndYear        *int32          `json:"next_expected_end_year"`
-	Stage                      *string         `json:"stage"`
-	Scope                      *string         `json:"scope"`
-	Responsibility             *string         `json:"responsibility"`
-	CostEstimateEur            *int64          `json:"cost_estimate_eur"`
-	Confidence                 float64         `json:"confidence"`
-	SelectedRenovationEventIds []uuid.UUID     `json:"selected_renovation_event_ids"`
-	Metadata                   json.RawMessage `json:"metadata"`
-	UpdatedAt                  time.Time       `json:"updated_at"`
-}
-
-type PropertyTargetSource struct {
-	PropertyTargetSourceID uuid.UUID       `json:"property_target_source_id"`
-	TargetType             string          `json:"target_type"`
-	TargetID               uuid.UUID       `json:"target_id"`
-	SourceProvider         string          `json:"source_provider"`
-	SourceKind             string          `json:"source_kind"`
-	SourceTable            string          `json:"source_table"`
-	SourceID               *uuid.UUID      `json:"source_id"`
-	SourceIDValue          string          `json:"source_id_value"`
-	SourceExternalID       *string         `json:"source_external_id"`
-	SourceUrl              *string         `json:"source_url"`
-	LinkStatus             string          `json:"link_status"`
-	LinkMethod             string          `json:"link_method"`
-	LinkScore              int32           `json:"link_score"`
-	LinkReasons            json.RawMessage `json:"link_reasons"`
-	FirstSeenAt            *time.Time      `json:"first_seen_at"`
-	LastSeenAt             *time.Time      `json:"last_seen_at"`
-	CreatedAt              time.Time       `json:"created_at"`
-	UpdatedAt              time.Time       `json:"updated_at"`
 }
 
 type PropertyUnit struct {
@@ -1130,6 +1026,86 @@ type ShortcutToken struct {
 	ShortcutTokenCreatedAt time.Time `json:"shortcut_token_created_at"`
 	ShortcutTokenUpdatedAt time.Time `json:"shortcut_token_updated_at"`
 	ShortcutTokenExpiresAt time.Time `json:"shortcut_token_expires_at"`
+}
+
+type SourceHousingCompany struct {
+	SourceHousingCompanyID uuid.UUID  `json:"source_housing_company_id"`
+	Provider               string     `json:"provider"`
+	SourceKind             string     `json:"source_kind"`
+	NativeID               *string    `json:"native_id"`
+	RawTable               string     `json:"raw_table"`
+	RawID                  string     `json:"raw_id"`
+	Url                    *string    `json:"url"`
+	FirstSeenAt            *time.Time `json:"first_seen_at"`
+	LastSeenAt             *time.Time `json:"last_seen_at"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+}
+
+type SourceListing struct {
+	SourceListingID   uuid.UUID  `json:"source_listing_id"`
+	Provider          string     `json:"provider"`
+	SourceKind        string     `json:"source_kind"`
+	NativeID          string     `json:"native_id"`
+	CanonicalSourceID string     `json:"canonical_source_id"`
+	RawTable          string     `json:"raw_table"`
+	RawID             string     `json:"raw_id"`
+	Url               *string    `json:"url"`
+	PayloadHash       *string    `json:"payload_hash"`
+	NormalizedVersion int32      `json:"normalized_version"`
+	NormalizedAt      *time.Time `json:"normalized_at"`
+	FirstSeenAt       *time.Time `json:"first_seen_at"`
+	LastSeenAt        *time.Time `json:"last_seen_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type TargetObservation struct {
+	TargetObservationID uuid.UUID       `json:"target_observation_id"`
+	TargetType          string          `json:"target_type"`
+	TargetID            uuid.UUID       `json:"target_id"`
+	ObservationKey      string          `json:"observation_key"`
+	ObservationKind     string          `json:"observation_kind"`
+	Severity            string          `json:"severity"`
+	Direction           string          `json:"direction"`
+	Value               json.RawMessage `json:"value"`
+	Text                *string         `json:"text"`
+	Confidence          float64         `json:"confidence"`
+	SourceType          string          `json:"source_type"`
+	SourceID            uuid.UUID       `json:"source_id"`
+	Evidence            json.RawMessage `json:"evidence"`
+	CreatedAt           time.Time       `json:"created_at"`
+	SupersededAt        *time.Time      `json:"superseded_at"`
+}
+
+type TargetSource struct {
+	TargetSourceID uuid.UUID       `json:"target_source_id"`
+	TargetType     string          `json:"target_type"`
+	TargetID       uuid.UUID       `json:"target_id"`
+	SourceType     string          `json:"source_type"`
+	SourceID       uuid.UUID       `json:"source_id"`
+	LinkStatus     string          `json:"link_status"`
+	LinkMethod     string          `json:"link_method"`
+	LinkScore      int32           `json:"link_score"`
+	LinkReasons    json.RawMessage `json:"link_reasons"`
+	FirstSeenAt    *time.Time      `json:"first_seen_at"`
+	LastSeenAt     *time.Time      `json:"last_seen_at"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type Unit struct {
+	UnitID             uuid.UUID  `json:"unit_id"`
+	HousingCompanyID   uuid.UUID  `json:"housing_company_id"`
+	PhysicalBuildingID *uuid.UUID `json:"physical_building_id"`
+	IdentityKey        string     `json:"identity_key"`
+	AddressNorm        *string    `json:"address_norm"`
+	Apartment          *string    `json:"apartment"`
+	FloorLevel         *int32     `json:"floor_level"`
+	AreaM2             *float64   `json:"area_m2"`
+	RoomLayout         *string    `json:"room_layout"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type User struct {

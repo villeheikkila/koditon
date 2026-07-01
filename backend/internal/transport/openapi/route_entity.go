@@ -233,12 +233,14 @@ func (a *API) entityGrouping(ctx context.Context, canonicalID string) (entityGro
 	var listingID uuid.UUID
 	var offeringID *uuid.UUID
 	err := a.pool.QueryRow(ctx, `
-SELECT sl.sale_listing_id, pos.property_offering_id
+SELECT sl.sale_listing_id, source_link.target_id
 FROM public.property_source_offerings sl
-LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-    AND pos.property_offering_source_link_status <> 'rejected'
+LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
+    AND source_link.target_type = 'listing'
+    AND source_link.source_type = 'source_listing'
+    AND source_link.link_status <> 'rejected'
 WHERE sl.sale_listing_canonical_id = $1
-ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
 LIMIT 1`, canonicalID).Scan(&listingID, &offeringID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -278,9 +280,9 @@ SELECT
         ELSE false
     END,
     sl.sale_listing_last_seen_at,
-    COALESCE(pos.property_offering_source_link_status, ''),
-    COALESCE(pos.property_offering_source_link_method, ''),
-    pos.property_offering_source_link_score::int4,
+    COALESCE(source_link.link_status, ''),
+    COALESCE(source_link.link_method, ''),
+    source_link.link_score::int4,
     price_match.transaction_id,
     COALESCE(price_match.match_scope, ''),
     COALESCE(price_match.match_status, ''),
@@ -292,8 +294,8 @@ SELECT
     COALESCE(price_match.category, ''),
     price_match.updated_at,
     COALESCE(insight_rows.insights_json, '[]'::jsonb)
-FROM public.property_offering_sources pos
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+FROM public.target_sources source_link
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
 LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 LEFT JOIN LATERAL (
@@ -310,26 +312,18 @@ LEFT JOIN LATERAL (
         pt.prices_transaction_updated_at AS updated_at
     FROM (
         SELECT
-            source_listing.prices_transaction_id,
-            'source_listing'::text AS match_scope,
-            COALESCE(source_listing.sale_listing_prices_match_status, 'linked') AS match_status,
-            'prices_service'::text AS match_method,
-            NULL::int4 AS match_score,
-            0 AS priority
-        FROM public.property_source_offerings source_listing
-        WHERE source_listing.sale_listing_id = sl.sale_listing_id
-            AND source_listing.prices_transaction_id IS NOT NULL
-        UNION ALL
-        SELECT
-            pot.prices_transaction_id,
-            'grouped_offering'::text AS match_scope,
-            pot.property_offering_transaction_link_status AS match_status,
-            pot.property_offering_transaction_link_method AS match_method,
-            pot.property_offering_transaction_link_score::int4 AS match_score,
-            1 AS priority
-        FROM public.property_offering_transactions pot
-        WHERE pot.property_offering_id = pos.property_offering_id
-            AND pot.property_offering_transaction_link_status <> 'rejected'
+            pl.prices_transaction_id,
+            pl.target_type AS match_scope,
+            pl.link_status AS match_status,
+            pl.link_method AS match_method,
+            pl.link_score::int4 AS match_score,
+            CASE WHEN pl.target_type = 'source_listing' THEN 0 ELSE 1 END AS priority
+        FROM public.price_links pl
+        WHERE pl.link_status <> 'rejected'
+            AND (
+                (pl.target_type = 'source_listing' AND pl.target_id = sl.sale_listing_id)
+                OR (pl.target_type = 'listing' AND pl.target_id = source_link.target_id)
+            )
     ) match_source
     JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
     ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
@@ -337,19 +331,23 @@ LEFT JOIN LATERAL (
 ) price_match ON true
 LEFT JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
-        'key', insight.property_source_offering_insight_key,
-        'value', insight.property_source_offering_insight_value,
-        'direction', insight.property_source_offering_insight_direction,
-        'severity', insight.property_source_offering_insight_severity,
-        'confidence', insight.property_source_offering_insight_confidence::double precision / 100,
-        'source_field', insight.property_source_offering_insight_source_field,
-        'text', COALESCE(insight.property_source_offering_insight_text, '')
-    ) ORDER BY insight.property_source_offering_insight_severity DESC, insight.property_source_offering_insight_key) AS insights_json
-    FROM public.property_source_offering_insights insight
-    WHERE insight.sale_listing_id = sl.sale_listing_id
+        'key', observation.observation_key,
+        'value', observation.value #>> '{}',
+        'direction', observation.direction,
+        'severity', observation.severity,
+        'confidence', observation.confidence,
+        'source_field', COALESCE(observation.evidence ->> 'source_field', ''),
+        'text', COALESCE(observation.text, '')
+    ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
+    FROM public.target_observations observation
+    WHERE observation.source_type = 'source_listing'
+        AND observation.source_id = sl.sale_listing_id
+        AND observation.superseded_at IS NULL
 ) insight_rows ON true
-WHERE pos.property_offering_id = $1
-    AND pos.property_offering_source_link_status <> 'rejected'
+WHERE source_link.target_type = 'listing'
+    AND source_link.target_id = $1
+    AND source_link.source_type = 'source_listing'
+    AND source_link.link_status <> 'rejected'
 ORDER BY sl.sale_listing_last_seen_at DESC NULLS LAST, sl.sale_listing_source_provider, sl.sale_listing_native_id`, *offeringID)
 	if err != nil {
 		return entityGroupingOutput{}, err
@@ -418,26 +416,18 @@ LEFT JOIN LATERAL (
         pt.prices_transaction_updated_at AS updated_at
     FROM (
         SELECT
-            sl.prices_transaction_id,
-            'source_listing'::text AS match_scope,
-            COALESCE(sl.sale_listing_prices_match_status, 'linked') AS match_status,
-            'prices_service'::text AS match_method,
-            NULL::int4 AS match_score,
-            0 AS priority
-        FROM public.property_source_offerings sl
-        WHERE sl.sale_listing_id = selected.sale_listing_id
-            AND sl.prices_transaction_id IS NOT NULL
-        UNION ALL
-        SELECT
-            pot.prices_transaction_id,
-            'grouped_offering'::text AS match_scope,
-            pot.property_offering_transaction_link_status AS match_status,
-            pot.property_offering_transaction_link_method AS match_method,
-            pot.property_offering_transaction_link_score::int4 AS match_score,
-            1 AS priority
-        FROM public.property_offering_transactions pot
-        WHERE pot.property_offering_id = selected.property_offering_id
-            AND pot.property_offering_transaction_link_status <> 'rejected'
+            pl.prices_transaction_id,
+            pl.target_type AS match_scope,
+            pl.link_status AS match_status,
+            pl.link_method AS match_method,
+            pl.link_score::int4 AS match_score,
+            CASE WHEN pl.target_type = 'source_listing' THEN 0 ELSE 1 END AS priority
+        FROM public.price_links pl
+        WHERE pl.link_status <> 'rejected'
+            AND (
+                (pl.target_type = 'source_listing' AND pl.target_id = selected.sale_listing_id)
+                OR (selected.property_offering_id IS NOT NULL AND pl.target_type = 'listing' AND pl.target_id = selected.property_offering_id)
+            )
     ) match_source
     JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
     ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
@@ -445,16 +435,18 @@ LEFT JOIN LATERAL (
 ) price_match ON true
 LEFT JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
-        'key', insight.property_source_offering_insight_key,
-        'value', insight.property_source_offering_insight_value,
-        'direction', insight.property_source_offering_insight_direction,
-        'severity', insight.property_source_offering_insight_severity,
-        'confidence', insight.property_source_offering_insight_confidence::double precision / 100,
-        'source_field', insight.property_source_offering_insight_source_field,
-        'text', COALESCE(insight.property_source_offering_insight_text, '')
-    ) ORDER BY insight.property_source_offering_insight_severity DESC, insight.property_source_offering_insight_key) AS insights_json
-    FROM public.property_source_offering_insights insight
-    WHERE insight.sale_listing_id = selected.sale_listing_id
+        'key', observation.observation_key,
+        'value', observation.value #>> '{}',
+        'direction', observation.direction,
+        'severity', observation.severity,
+        'confidence', observation.confidence,
+        'source_field', COALESCE(observation.evidence ->> 'source_field', ''),
+        'text', COALESCE(observation.text, '')
+    ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
+    FROM public.target_observations observation
+    WHERE observation.source_type = 'source_listing'
+        AND observation.source_id = selected.sale_listing_id
+        AND observation.superseded_at IS NULL
 ) insight_rows ON true`, listingID, offeringArg).Scan(&transactionID, &priceMatch.Scope, &priceMatch.Status, &priceMatch.Method, &priceMatch.Score, &priceMatch.PriceEUR, &priceMatch.Description, &priceMatch.Type, &priceMatch.Category, &priceMatch.UpdatedAt, &insightsJSON)
 	if err != nil {
 		return entityListingMetadataOutput{}, err

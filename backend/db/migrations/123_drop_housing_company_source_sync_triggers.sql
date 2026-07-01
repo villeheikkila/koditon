@@ -1,0 +1,4 @@
+DROP TRIGGER IF EXISTS trg__sync_source_housing_company_from_legacy ON public.housing_company_sources;
+DROP FUNCTION IF EXISTS public.fnc__sync_source_housing_company_from_legacy();
+DROP TRIGGER IF EXISTS trg__sync_target_source_from_housing_company_source ON public.housing_company_sources;
+DROP FUNCTION IF EXISTS public.fnc__sync_target_source_from_housing_company_source();

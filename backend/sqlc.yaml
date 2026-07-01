@@ -1,10 +1,11 @@
 version: "2"
 sql:
   - engine: postgresql
-    # db:generate intentionally uses db/schema.sql only.
+    # db:generate uses the dumped table schema plus checked-in view definitions.
     # db:vet injects database.uri into a temporary config for sqlc/db-prepare.
     schema:
       - db/schema.sql
+      - db/schema_views.sql
       - db/migrations/083_drop_old_derived_property_tables.sql
     queries:
       - db/queries/ads

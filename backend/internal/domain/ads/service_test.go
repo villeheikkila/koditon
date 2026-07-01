@@ -488,10 +488,10 @@ func TestRawTransactionScope(t *testing.T) {
 func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
 	for _, want := range []string{
 		"'offering_source'::text AS match_type",
-		"pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text AS id",
-		"pot.property_offering_id::text AS offering_id",
-		"JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id",
-		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id",
+		"price_link.price_link_id::text || ':' || sl.sale_listing_id::text AS id",
+		"price_link.target_id::text AS offering_id",
+		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
+		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
 	} {
 		if !strings.Contains(addressRawTransactionsSQL, want) {
 			t.Fatalf("expected raw transaction SQL to include %q", want)

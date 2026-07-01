@@ -56,12 +56,14 @@ func (s *Service) dimensionApartmentProfileForSaleListing(ctx context.Context, s
 	row := s.db.QueryRow(ctx, `
 WITH linked AS (
     SELECT pu.property_unit_id, pu.housing_company_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE pos.sale_listing_id = $1
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC
     LIMIT 1
 )
 SELECT
@@ -98,7 +100,7 @@ SELECT
     'medium'::text,
     p.resolved_at
 FROM linked
-JOIN public.property_dimension_profiles p ON p.target_type = 'unit'
+JOIN public.dimension_profiles p ON p.target_type = 'unit'
     AND p.target_id = linked.property_unit_id`, saleListingID)
 	var profile ApartmentProfile
 	var housingCompanyID, propertyUnitID uuid.UUID
@@ -117,12 +119,14 @@ func (s *Service) enrichSaleListingCanonicalBuildingProfile(ctx context.Context,
 	row := s.db.QueryRow(ctx, `
 WITH linked AS (
     SELECT pu.physical_building_id, pu.housing_company_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE pos.sale_listing_id = $1
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_created_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC NULLS LAST, source_link.created_at DESC
     LIMIT 1
 )
 SELECT
@@ -152,9 +156,9 @@ SELECT
     CASE WHEN hcp.target_id IS NULL THEN '' ELSE 'medium' END,
     hcp.resolved_at
 FROM linked
-LEFT JOIN public.property_dimension_profiles bp ON bp.target_type = 'building'
+LEFT JOIN public.dimension_profiles bp ON bp.target_type = 'building'
     AND bp.target_id = linked.physical_building_id
-LEFT JOIN public.property_dimension_profiles hcp ON hcp.target_type = 'housing_company'
+LEFT JOIN public.dimension_profiles hcp ON hcp.target_type = 'housing_company'
     AND hcp.target_id = linked.housing_company_id`, saleListingID)
 	var buildingID, buildingHousingCompanyID, housingCompanyID *uuid.UUID
 	var buildingUpdatedAt, housingCompanyUpdatedAt *time.Time
@@ -185,12 +189,14 @@ func (s *Service) enrichSaleListingQualityScores(ctx context.Context, listing *S
 	rows, err := s.db.Query(ctx, `
 WITH linked AS (
     SELECT po.property_offering_id, pu.property_unit_id, pu.physical_building_id, pu.housing_company_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE pos.sale_listing_id = $1
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_created_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC NULLS LAST, source_link.created_at DESC
     LIMIT 1
 ),
 targets AS (
@@ -212,7 +218,7 @@ SELECT
     jsonb_build_array(dv.selected_reason),
     dv.resolved_at
 FROM targets
-JOIN public.property_dimension_values dv
+JOIN public.dimension_values dv
     ON dv.target_type = targets.target_type
     AND dv.target_id = targets.target_id
     AND dv.dimension_key LIKE 'score.%'

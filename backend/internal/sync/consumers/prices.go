@@ -90,16 +90,24 @@ func (c *Consumer) runPricesMatchBackfill(ctx context.Context, scoreThreshold, c
 
 func (c *Consumer) updatePricesMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string, expiresAt *time.Time) error {
 	_, err := c.pool.Exec(ctx, `
-UPDATE public.property_source_offerings
-SET
-    sale_listing_prices_match_status = $2,
-    sale_listing_prices_match_next_attempt_at = $3,
-    sale_listing_prices_match_last_attempted_at = now(),
-    sale_listing_prices_match_attempt_count = sale_listing_prices_match_attempt_count + 1,
-    sale_listing_prices_match_run_id = COALESCE($4::uuid, sale_listing_prices_match_run_id),
-    sale_listing_prices_match_expires_at = COALESCE($5, sale_listing_prices_match_expires_at),
-    sale_listing_updated_at = now()
-WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID, expiresAt)
+WITH updated_source AS (
+    UPDATE public.property_source_offerings
+    SET
+        sale_listing_prices_match_status = $2,
+        sale_listing_prices_match_next_attempt_at = $3,
+        sale_listing_prices_match_last_attempted_at = now(),
+        sale_listing_prices_match_attempt_count = sale_listing_prices_match_attempt_count + 1,
+        sale_listing_prices_match_run_id = COALESCE($4::uuid, sale_listing_prices_match_run_id),
+        sale_listing_prices_match_expires_at = COALESCE($5, sale_listing_prices_match_expires_at),
+        sale_listing_updated_at = now()
+    WHERE sale_listing_id = $1::uuid
+    RETURNING sale_listing_id, sale_listing_updated_at
+)
+UPDATE public.source_listings src
+SET normalized_at = updated_source.sale_listing_updated_at,
+    updated_at = updated_source.sale_listing_updated_at
+FROM updated_source
+WHERE src.source_listing_id = updated_source.sale_listing_id`, saleListingID, status, nextAttemptAt, runID, expiresAt)
 	if err != nil {
 		return fmt.Errorf("update prices match state: %w", err)
 	}

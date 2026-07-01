@@ -12,7 +12,7 @@ SELECT
     sl.sale_listing_source_kind,
     sl.sale_listing_native_id,
     sl.sale_listing_canonical_id,
-    po.property_offering_id::text,
+    l.listing_id::text,
     COALESCE(sl.sale_listing_url, ''),
     COALESCE(sl.sale_listing_headline, ''),
     COALESCE(sl.sale_listing_street_address, ''),
@@ -35,16 +35,16 @@ SELECT
     sl.sale_listing_published_at::text,
     COALESCE(sl.sale_listing_street_address, ''),
     source_badges.source_providers
-FROM public.property_offerings po
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
-JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+FROM public.listings l
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = l.primary_source_listing_id
+JOIN public.property_units pu ON pu.property_unit_id = l.unit_id
 LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
 LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
     AND unit_profile.target_id = pu.property_unit_id
-LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
     AND building_profile.target_id = pu.physical_building_id
-LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
     AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
 JOIN LATERAL (
     SELECT
@@ -61,26 +61,32 @@ JOIN LATERAL (
     SELECT array_agg(provider ORDER BY provider)::text[] AS source_providers
     FROM (
         SELECT DISTINCT source_sl.sale_listing_source_provider AS provider
-        FROM public.property_offering_sources source_pos
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
-        WHERE source_pos.property_offering_id = po.property_offering_id
-            AND source_pos.property_offering_source_link_status <> 'rejected'
+        FROM public.target_sources source_link
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
+        WHERE source_link.target_type = 'listing'
+            AND source_link.target_id = l.listing_id
+            AND source_link.source_type = 'source_listing'
+            AND source_link.link_status <> 'rejected'
     ) providers
 ) source_badges ON true
 WHERE EXISTS (
     SELECT 1
-    FROM public.property_offering_sources active_pos
-    WHERE active_pos.property_offering_id = po.property_offering_id
-        AND active_pos.property_offering_source_link_status <> 'rejected'
+    FROM public.target_sources active_link
+    WHERE active_link.target_type = 'listing'
+        AND active_link.target_id = l.listing_id
+        AND active_link.source_type = 'source_listing'
+        AND active_link.link_status <> 'rejected'
 )
   AND (
     $4 = 'all'
     OR EXISTS (
         SELECT 1
-        FROM public.property_offering_sources source_pos
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
-        WHERE source_pos.property_offering_id = po.property_offering_id
-            AND source_pos.property_offering_source_link_status <> 'rejected'
+        FROM public.target_sources source_link
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
+        WHERE source_link.target_type = 'listing'
+            AND source_link.target_id = l.listing_id
+            AND source_link.source_type = 'source_listing'
+            AND source_link.link_status <> 'rejected'
             AND source_sl.sale_listing_source_provider = $4
     )
   )
@@ -157,16 +163,16 @@ LIMIT $3::int OFFSET $2::int`
 
 const countSaleListingsSQL = `
 SELECT count(*)::bigint
-FROM public.property_offerings po
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = po.primary_sale_listing_id
-JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+FROM public.listings l
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = l.primary_source_listing_id
+JOIN public.property_units pu ON pu.property_unit_id = l.unit_id
 LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
 LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
     AND unit_profile.target_id = pu.property_unit_id
-LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
     AND building_profile.target_id = pu.physical_building_id
-LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
     AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
 JOIN LATERAL (
     SELECT
@@ -179,18 +185,22 @@ JOIN LATERAL (
 ) dims ON true
 WHERE EXISTS (
     SELECT 1
-    FROM public.property_offering_sources active_pos
-    WHERE active_pos.property_offering_id = po.property_offering_id
-        AND active_pos.property_offering_source_link_status <> 'rejected'
+    FROM public.target_sources active_link
+    WHERE active_link.target_type = 'listing'
+        AND active_link.target_id = l.listing_id
+        AND active_link.source_type = 'source_listing'
+        AND active_link.link_status <> 'rejected'
 )
   AND (
     $1 = 'all'
     OR EXISTS (
         SELECT 1
-        FROM public.property_offering_sources source_pos
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_pos.sale_listing_id
-        WHERE source_pos.property_offering_id = po.property_offering_id
-            AND source_pos.property_offering_source_link_status <> 'rejected'
+        FROM public.target_sources source_link
+        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
+        WHERE source_link.target_type = 'listing'
+            AND source_link.target_id = l.listing_id
+            AND source_link.source_type = 'source_listing'
+            AND source_link.link_status <> 'rejected'
             AND source_sl.sale_listing_source_provider = $1
     )
   )
@@ -361,14 +371,16 @@ WITH visible_base AS (
     FROM public.housing_companies pb
     JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
     JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
-        AND pos.property_offering_source_link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
-    LEFT JOIN public.property_dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = po.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
+    LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
         AND unit_profile.target_id = pu.property_unit_id
-    LEFT JOIN public.property_dimension_profiles building_profile ON building_profile.target_type = 'building'
+    LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
         AND building_profile.target_id = pu.physical_building_id
-    LEFT JOIN public.property_dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
+    LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
         AND housing_profile.target_id = pb.housing_company_id
     WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
@@ -401,9 +413,10 @@ WITH visible_base AS (
             $28::boolean IS NULL
             OR EXISTS (
                 SELECT 1
-                FROM public.property_offering_transactions pot
-                WHERE pot.property_offering_id = po.property_offering_id
-                    AND pot.property_offering_transaction_link_status <> 'rejected'
+                FROM public.price_links pl
+                WHERE pl.target_type = 'listing'
+                    AND pl.target_id = po.property_offering_id
+                    AND pl.link_status <> 'rejected'
             ) IS NOT DISTINCT FROM $28::boolean
         )
         AND (
@@ -538,9 +551,11 @@ WITH source_rows AS (
     FROM public.housing_companies pb
     JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
     JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
-        AND pos.property_offering_source_link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = po.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
     WHERE pb.housing_company_geom IS NOT NULL
         AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
         AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)

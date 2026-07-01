@@ -66,60 +66,240 @@ func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, saleListin
 	err := c.pool.QueryRow(ctx, `
 SELECT
     sl.sale_listing_id::text,
-    pos.property_offering_source_link_method,
-    pos.property_offering_source_link_status,
+    source_link.link_method,
+    source_link.link_status,
     sl.sale_listing_source_match_status,
     sl.sale_listing_source_match_attempt_count
 FROM public.property_source_offerings sl
-LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-    AND pos.property_offering_source_link_status <> 'rejected'
+LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
+    AND source_link.target_type = 'listing'
+    AND source_link.source_type = 'source_listing'
+    AND source_link.link_status <> 'rejected'
 WHERE sl.sale_listing_id = $1::uuid`, saleListingID).Scan(&row.ID, &row.LinkMethod, &row.LinkStatus, &row.Status, &row.AttemptCount)
 	return row, err
 }
 
 func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, saleListingID string) (canonicalMatchRunSummary, error) {
-	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, 95, 10, $1::uuid)::text`, saleListingID).Scan(&runID); err != nil {
+	runID := uuid.NewString()
+	var summary canonicalMatchRunSummary
+	err := c.pool.QueryRow(ctx, `
+WITH base AS (
+    SELECT
+        sl.sale_listing_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_unit_match_key,
+        link.target_id
+    FROM public.property_source_offerings sl
+    JOIN public.target_sources link ON link.target_type = 'listing'
+        AND link.source_type = 'source_listing'
+        AND link.source_id = sl.sale_listing_id
+        AND link.link_status <> 'rejected'
+    WHERE sl.sale_listing_id = $1::uuid
+        AND sl.sale_listing_source_kind = 'ad'
+        AND COALESCE(sl.sale_listing_unit_match_key, '') <> ''
+    ORDER BY CASE WHEN link.link_status = 'confirmed' THEN 0 ELSE 1 END, link.link_score DESC
+    LIMIT 1
+),
+candidates AS (
+    SELECT
+        candidate.sale_listing_id,
+        candidate.sale_listing_source_provider,
+        candidate.sale_listing_source_kind,
+        candidate.sale_listing_native_id,
+        candidate.sale_listing_first_seen_at,
+        candidate.sale_listing_last_seen_at,
+        active_link.target_source_id AS active_target_source_id,
+        active_link.target_id AS active_target_id,
+        active_link.link_method AS active_link_method
+    FROM base
+    JOIN public.property_source_offerings candidate ON candidate.sale_listing_unit_match_key = base.sale_listing_unit_match_key
+        AND candidate.sale_listing_id <> base.sale_listing_id
+        AND candidate.sale_listing_source_kind = 'ad'
+    LEFT JOIN public.target_sources active_link ON active_link.target_type = 'listing'
+        AND active_link.source_type = 'source_listing'
+        AND active_link.source_id = candidate.sale_listing_id
+        AND active_link.link_status <> 'rejected'
+    WHERE candidate.sale_listing_source_provider <> base.sale_listing_source_provider
+),
+linkable AS (
+    SELECT candidates.*
+    FROM candidates
+    WHERE active_target_source_id IS NULL
+        OR active_target_id = (SELECT target_id FROM base)
+),
+inserted AS (
+    INSERT INTO public.target_sources (
+        target_type,
+        target_id,
+        source_type,
+        source_id,
+        link_status,
+        link_method,
+        link_score,
+        link_reasons,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        'listing',
+        base.target_id,
+        'source_listing',
+        linkable.sale_listing_id,
+        'confirmed',
+        'source_match_auto',
+        100,
+        jsonb_build_object('method', 'unit_match_key_exact', 'matched_source_listing_id', base.sale_listing_id, 'provider', linkable.sale_listing_source_provider, 'native_id', linkable.sale_listing_native_id),
+        linkable.sale_listing_first_seen_at,
+        linkable.sale_listing_last_seen_at,
+        now(),
+        now()
+    FROM base
+    JOIN linkable ON true
+    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
+        link_status = CASE WHEN public.target_sources.link_method = 'manual' THEN public.target_sources.link_status ELSE EXCLUDED.link_status END,
+        link_method = CASE WHEN public.target_sources.link_method = 'manual' THEN public.target_sources.link_method ELSE EXCLUDED.link_method END,
+        link_score = GREATEST(public.target_sources.link_score, EXCLUDED.link_score),
+        link_reasons = public.target_sources.link_reasons || EXCLUDED.link_reasons,
+        first_seen_at = LEAST(COALESCE(public.target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, public.target_sources.first_seen_at)),
+        last_seen_at = GREATEST(COALESCE(public.target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, public.target_sources.last_seen_at)),
+        updated_at = now()
+    RETURNING target_source_id
+)
+SELECT
+    $2::text,
+    (SELECT count(*)::int4 FROM candidates),
+    (SELECT count(*)::int4 FROM inserted),
+    (SELECT count(*)::int4 FROM candidates WHERE active_target_source_id IS NOT NULL AND active_target_id <> (SELECT target_id FROM base))`, saleListingID, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
+	if err != nil {
 		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match: %w", err)
 	}
-	return c.loadCanonicalSourceMatchRun(ctx, runID)
+	return summary, nil
 }
 
 func (c *Consumer) runCanonicalSourceMatchBackfill(ctx context.Context, scoreThreshold, competitorMargin int) (canonicalMatchRunSummary, error) {
-	var runID string
-	if err := c.pool.QueryRow(ctx, `SELECT public.fnc__refresh_property_offering_source_matches(true, $1, $2, NULL::uuid)::text`, scoreThreshold, competitorMargin).Scan(&runID); err != nil {
-		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match backfill: %w", err)
-	}
-	return c.loadCanonicalSourceMatchRun(ctx, runID)
-}
-
-func (c *Consumer) loadCanonicalSourceMatchRun(ctx context.Context, runID string) (canonicalMatchRunSummary, error) {
+	runID := uuid.NewString()
 	var summary canonicalMatchRunSummary
 	err := c.pool.QueryRow(ctx, `
+WITH base AS (
+    SELECT
+        link.target_id,
+        sl.sale_listing_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_unit_match_key
+    FROM public.target_sources link
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = link.source_id
+    WHERE link.target_type = 'listing'
+        AND link.source_type = 'source_listing'
+        AND link.link_status <> 'rejected'
+        AND link.link_method <> 'manual'
+        AND sl.sale_listing_source_kind = 'ad'
+        AND COALESCE(sl.sale_listing_unit_match_key, '') <> ''
+),
+candidate_pairs AS (
+    SELECT
+        base.target_id,
+        base.sale_listing_id AS matched_sale_listing_id,
+        candidate.sale_listing_id,
+        candidate.sale_listing_source_provider,
+        candidate.sale_listing_source_kind,
+        candidate.sale_listing_native_id,
+        candidate.sale_listing_first_seen_at,
+        candidate.sale_listing_last_seen_at,
+        active_link.target_source_id AS active_target_source_id,
+        active_link.target_id AS active_target_id,
+        row_number() OVER (
+            PARTITION BY candidate.sale_listing_id
+            ORDER BY base.target_id, base.sale_listing_id
+        ) AS candidate_rank
+    FROM base
+    JOIN public.property_source_offerings candidate ON candidate.sale_listing_unit_match_key = base.sale_listing_unit_match_key
+        AND candidate.sale_listing_id <> base.sale_listing_id
+        AND candidate.sale_listing_source_kind = 'ad'
+        AND candidate.sale_listing_source_provider <> base.sale_listing_source_provider
+    LEFT JOIN public.target_sources active_link ON active_link.target_type = 'listing'
+        AND active_link.source_type = 'source_listing'
+        AND active_link.source_id = candidate.sale_listing_id
+        AND active_link.link_status <> 'rejected'
+),
+linkable AS (
+    SELECT *
+    FROM candidate_pairs
+    WHERE candidate_rank = 1
+        AND (
+            active_target_source_id IS NULL
+            OR active_target_id = target_id
+        )
+),
+inserted AS (
+    INSERT INTO public.target_sources (
+        target_type,
+        target_id,
+        source_type,
+        source_id,
+        link_status,
+        link_method,
+        link_score,
+        link_reasons,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        'listing',
+        target_id,
+        'source_listing',
+        sale_listing_id,
+        'confirmed',
+        'source_match_auto',
+        100,
+        jsonb_build_object('method', 'unit_match_key_exact_backfill', 'matched_source_listing_id', matched_sale_listing_id, 'provider', sale_listing_source_provider, 'native_id', sale_listing_native_id),
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        now(),
+        now()
+    FROM linkable
+    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
+        link_status = CASE WHEN public.target_sources.link_method = 'manual' THEN public.target_sources.link_status ELSE EXCLUDED.link_status END,
+        link_method = CASE WHEN public.target_sources.link_method = 'manual' THEN public.target_sources.link_method ELSE EXCLUDED.link_method END,
+        link_score = GREATEST(public.target_sources.link_score, EXCLUDED.link_score),
+        link_reasons = public.target_sources.link_reasons || EXCLUDED.link_reasons,
+        first_seen_at = LEAST(COALESCE(public.target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, public.target_sources.first_seen_at)),
+        last_seen_at = GREATEST(COALESCE(public.target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, public.target_sources.last_seen_at)),
+        updated_at = now()
+    RETURNING target_source_id
+)
 SELECT
-    property_offering_source_match_run_id::text,
-    property_offering_source_match_candidates_count,
-    property_offering_source_match_auto_linked_count,
-    property_offering_source_match_ambiguous_count
-FROM public.property_offering_source_match_runs
-WHERE property_offering_source_match_run_id = $1::uuid`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
+    $1::text,
+    (SELECT count(*)::int4 FROM candidate_pairs),
+    (SELECT count(*)::int4 FROM inserted),
+    (SELECT count(*)::int4 FROM candidate_pairs WHERE active_target_source_id IS NOT NULL AND active_target_id <> target_id)`, runID).Scan(&summary.RunID, &summary.Candidates, &summary.AutoLinked, &summary.Ambiguous)
 	if err != nil {
-		return canonicalMatchRunSummary{}, fmt.Errorf("load canonical sale listing source match run: %w", err)
+		return canonicalMatchRunSummary{}, fmt.Errorf("run canonical sale listing source match backfill: %w", err)
 	}
 	return summary, nil
 }
 
 func (c *Consumer) updateCanonicalSourceMatchState(ctx context.Context, saleListingID, status string, nextAttemptAt *time.Time, runID *string) error {
 	_, err := c.pool.Exec(ctx, `
-UPDATE public.property_source_offerings
-SET
-    sale_listing_source_match_status = $2,
-    sale_listing_source_match_next_attempt_at = $3,
-    sale_listing_source_match_last_attempted_at = now(),
-    sale_listing_source_match_attempt_count = sale_listing_source_match_attempt_count + 1,
-    sale_listing_source_match_run_id = COALESCE($4::uuid, sale_listing_source_match_run_id),
-    sale_listing_updated_at = now()
-WHERE sale_listing_id = $1::uuid`, saleListingID, status, nextAttemptAt, runID)
+WITH updated_source AS (
+    UPDATE public.property_source_offerings
+    SET
+        sale_listing_source_match_status = $2,
+        sale_listing_source_match_next_attempt_at = $3,
+        sale_listing_source_match_last_attempted_at = now(),
+        sale_listing_source_match_attempt_count = sale_listing_source_match_attempt_count + 1,
+        sale_listing_updated_at = now()
+    WHERE sale_listing_id = $1::uuid
+    RETURNING sale_listing_id, sale_listing_updated_at
+)
+UPDATE public.source_listings src
+SET normalized_at = updated_source.sale_listing_updated_at,
+    updated_at = updated_source.sale_listing_updated_at
+FROM updated_source
+WHERE src.source_listing_id = updated_source.sale_listing_id`, saleListingID, status, nextAttemptAt)
 	if err != nil {
 		return fmt.Errorf("update canonical source match state: %w", err)
 	}

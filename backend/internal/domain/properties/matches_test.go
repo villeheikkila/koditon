@@ -29,14 +29,14 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 		"review_rows AS",
 		"'candidate'::text AS link_type",
 		"'match_candidate'::text AS link_method",
-		"'offering'::text",
-		"'direct'::text",
-		"FROM public.property_offering_transactions pot",
-		"pot.property_offering_transaction_id::text || ':' || sl.sale_listing_id::text",
-		"JOIN public.property_offering_sources pos ON pos.property_offering_id = pot.property_offering_id",
-		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id",
-		"pot.prices_transaction_id = $3::uuid",
-		"sl.prices_transaction_id = $3::uuid",
+		"'listing'::text",
+		"'source_listing'::text",
+		"FROM public.price_links pl",
+		"pl.price_link_id::text || ':' || sl.sale_listing_id::text",
+		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
+		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
+		"pl.prices_transaction_id = $3::uuid",
+		"pl.target_type = 'source_listing'",
 	} {
 		if !strings.Contains(transactionMatchCandidatesSQL, want) {
 			t.Fatalf("expected transaction review SQL to include %q", want)

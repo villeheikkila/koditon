@@ -48,14 +48,16 @@ linked AS (
         pos.sale_listing_updated_at,
         pos.sale_listing_created_at
     FROM public.property_source_offerings pos
-    LEFT JOIN public.property_offering_sources link
-        ON link.sale_listing_id = pos.sale_listing_id
-        AND link.property_offering_source_link_status <> 'rejected'
-    LEFT JOIN public.property_offerings po ON po.property_offering_id = link.property_offering_id
+    LEFT JOIN public.target_sources link
+        ON link.source_id = pos.sale_listing_id
+        AND link.target_type = 'listing'
+        AND link.source_type = 'source_listing'
+        AND link.link_status <> 'rejected'
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = link.target_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
     WHERE pos.sale_listing_id = $1
-    ORDER BY link.property_offering_source_link_score DESC NULLS LAST, link.property_offering_source_updated_at DESC NULLS LAST
+    ORDER BY link.link_score DESC NULLS LAST, link.updated_at DESC NULLS LAST
     LIMIT 1
 ),
 inserted AS (

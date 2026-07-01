@@ -72,7 +72,6 @@ var definitions = []Definition{
 	{Name: "canonical_resolve_dimension_target", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "canonical_extract_manager_certificate", Queue: QueueCanonicalLLM, DefaultMaxAttempts: 3},
 	{Name: "canonical_project_manager_certificate", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
-	{Name: "canonical_backfill_target_sources", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3, AdminOnly: true},
 	{Name: "canonical_backfill_building_coordinates", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3, AdminOnly: true},
 	{Name: "canonical_backfill_detached_houses", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "postal_sync", Queue: QueuePostal, DefaultMaxAttempts: 3},

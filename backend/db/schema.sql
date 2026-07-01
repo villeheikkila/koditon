@@ -79,6 +79,85 @@ CREATE INDEX idx_device_sessions_user_created ON public.device_sessions USING bt
 CREATE INDEX idx_device_sessions_user_device_id ON public.device_sessions USING btree (device_session_user_device_id);
 CREATE INDEX idx_device_sessions_user_id ON public.device_sessions USING btree (user_id);
 
+create table public.dimension_claims (
+  property_dimension_claim_id uuid default gen_random_uuid() not null constraint dimension_claims_pkey primary key,
+  property_dimension_projection_run_id uuid not null,
+  projection_version text not null,
+  claim_scope text not null,
+  target_type text not null,
+  target_id uuid not null,
+  dimension_key text not null,
+  value jsonb not null,
+  value_kind text not null,
+  unit text,
+  source_table text not null,
+  source_id uuid not null,
+  source_field text,
+  source_claim_id uuid,
+  source_observed_at timestamp with time zone,
+  valid_from date,
+  valid_until date,
+  confidence double precision default 0.5 not null,
+  source_reliability double precision default 0.5 not null,
+  evidence jsonb default '{}'::jsonb not null,
+  extraction_model text,
+  extraction_prompt_version text,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint dimension_claims_claim_scope_check CHECK ((claim_scope = ANY (ARRAY['source'::text, 'manual'::text]))),
+  constraint dimension_claims_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
+  constraint dimension_claims_source_reliability_check CHECK (((source_reliability >= (0)::double precision) AND (source_reliability <= (1)::double precision))),
+  constraint dimension_claims_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
+  constraint dimension_claims_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
+);
+
+CREATE INDEX idx_dimension_claims_dimension ON public.dimension_claims USING btree (dimension_key);
+CREATE INDEX idx_dimension_claims_source ON public.dimension_claims USING btree (source_table, source_id, projection_version);
+CREATE INDEX idx_dimension_claims_source_claim ON public.dimension_claims USING btree (source_claim_id);
+CREATE INDEX idx_dimension_claims_target ON public.dimension_claims USING btree (claim_scope, target_type, target_id, dimension_key);
+CREATE UNIQUE INDEX idx_dimension_claims_unique_source ON public.dimension_claims USING btree (claim_scope, target_type, target_id, dimension_key, source_table, source_id, COALESCE(source_field, ''::text), projection_version);
+CREATE INDEX idx_dimension_claims_value_gin ON public.dimension_claims USING gin (value jsonb_path_ops);
+
+create table public.dimension_profiles (
+  target_type text not null,
+  target_id uuid not null,
+  dimensions jsonb default '{}'::jsonb not null,
+  metadata jsonb default '{}'::jsonb not null,
+  conflicts jsonb default '{}'::jsonb not null,
+  resolved_at timestamp with time zone default now() not null,
+  constraint dimension_profiles_pkey PRIMARY KEY (target_type, target_id),
+  constraint dimension_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
+);
+
+CREATE INDEX idx_dimension_profiles_building_build_year ON public.dimension_profiles USING btree ((((dimensions #>> '{building,build_year}'::text[]))::integer)) WHERE (target_type = 'building'::text);
+CREATE INDEX idx_dimension_profiles_dimensions_gin ON public.dimension_profiles USING gin (dimensions jsonb_path_ops);
+CREATE INDEX idx_dimension_profiles_unit_area ON public.dimension_profiles USING btree ((((dimensions #>> '{unit,area_m2}'::text[]))::double precision)) WHERE (target_type = 'unit'::text);
+CREATE INDEX idx_dimension_profiles_unit_total_charge ON public.dimension_profiles USING btree ((((dimensions #>> '{charges,total_monthly_eur}'::text[]))::double precision)) WHERE (target_type = 'unit'::text);
+
+create table public.dimension_values (
+  target_type text not null,
+  target_id uuid not null,
+  dimension_key text not null,
+  value jsonb not null,
+  value_kind text not null,
+  unit text,
+  confidence double precision not null,
+  selected_claim_id uuid,
+  selected_reason text not null,
+  conflict_status text default 'none'::text not null,
+  supporting_claim_ids uuid[] default '{}'::uuid[] not null,
+  rejected_claim_ids uuid[] default '{}'::uuid[] not null,
+  resolved_at timestamp with time zone default now() not null,
+  constraint dimension_values_pkey PRIMARY KEY (target_type, target_id, dimension_key),
+  constraint dimension_values_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
+  constraint dimension_values_conflict_status_check CHECK ((conflict_status = ANY (ARRAY['none'::text, 'compatible'::text, 'conflicting'::text, 'manual_override'::text]))),
+  constraint dimension_values_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
+  constraint dimension_values_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
+);
+
+CREATE INDEX idx_dimension_values_dimension ON public.dimension_values USING btree (dimension_key);
+CREATE INDEX idx_dimension_values_selected_claim ON public.dimension_values USING btree (selected_claim_id);
+
 create table public.energy_efficiency_aliases (
   energy_efficiency_alias text not null constraint energy_efficiency_aliases_pkey primary key,
   energy_efficiency_class_code text,
@@ -222,6 +301,22 @@ CREATE UNIQUE INDEX frontdoor_buildings_url_unique ON public.frontdoor_buildings
 CREATE INDEX idx_frontdoor_building_business_id ON public.frontdoor_buildings USING btree (frontdoor_building_business_id);
 CREATE INDEX idx_frontdoor_building_processed_at ON public.frontdoor_buildings USING btree (frontdoor_building_processed_at);
 
+create table public.houses (
+  house_id uuid not null constraint houses_pkey primary key,
+  identity_key text not null,
+  address_norm text,
+  postal_norm text,
+  city_norm text,
+  latitude double precision,
+  longitude double precision,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null
+);
+
+CREATE UNIQUE INDEX houses_identity_key_key ON public.houses USING btree (identity_key);
+CREATE INDEX idx_houses_address ON public.houses USING btree (postal_norm, city_norm, address_norm);
+CREATE INDEX idx_houses_lat_lng ON public.houses USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
+
 create table public.housing_companies (
   housing_company_id uuid default gen_random_uuid() not null constraint property_buildings_pkey primary key,
   housing_company_identity_key text not null constraint property_buildings_property_building_identity_key_key unique,
@@ -245,26 +340,6 @@ CREATE INDEX idx_housing_companies_address ON public.housing_companies USING btr
 CREATE INDEX idx_housing_companies_business_id ON public.housing_companies USING btree (housing_company_business_id) WHERE ((housing_company_business_id IS NOT NULL) AND (housing_company_business_id <> ''::text));
 CREATE INDEX idx_housing_companies_geom ON public.housing_companies USING gist (housing_company_geom);
 
-create table public.housing_company_facts (
-  housing_company_fact_id uuid default gen_random_uuid() not null constraint housing_company_facts_pkey primary key,
-  housing_company_id uuid not null constraint housing_company_facts_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
-  housing_company_source_id uuid constraint housing_company_facts_housing_company_source_id_fkey references housing_company_sources(housing_company_source_id) ON DELETE SET NULL,
-  housing_company_fact_key text not null,
-  housing_company_fact_value_text text,
-  housing_company_fact_value_number double precision,
-  housing_company_fact_value_bool boolean,
-  housing_company_fact_value_json jsonb,
-  housing_company_fact_raw_value text,
-  housing_company_fact_confidence integer default 100 not null,
-  housing_company_fact_first_seen_at timestamp with time zone,
-  housing_company_fact_last_seen_at timestamp with time zone,
-  housing_company_fact_created_at timestamp with time zone default now() not null,
-  housing_company_fact_updated_at timestamp with time zone default now() not null
-);
-
-CREATE INDEX idx_housing_company_facts_company_key ON public.housing_company_facts USING btree (housing_company_id, housing_company_fact_key);
-CREATE UNIQUE INDEX idx_housing_company_facts_unique_source_hash ON public.housing_company_facts USING btree (housing_company_id, housing_company_source_id, housing_company_fact_key, md5(COALESCE(housing_company_fact_raw_value, ''::text)));
-
 create table public.housing_company_merge_decisions (
   housing_company_merge_decision_id uuid default gen_random_uuid() not null constraint housing_company_merge_decisions_pkey primary key,
   source_housing_company_id uuid not null constraint housing_company_merge_decisions_source_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
@@ -285,28 +360,24 @@ CREATE UNIQUE INDEX idx_housing_company_merge_decisions_active_pair ON public.ho
 CREATE INDEX idx_housing_company_merge_decisions_source ON public.housing_company_merge_decisions USING btree (source_housing_company_id, housing_company_merge_decision_status);
 CREATE INDEX idx_housing_company_merge_decisions_target ON public.housing_company_merge_decisions USING btree (target_housing_company_id, housing_company_merge_decision_status);
 
-create table public.housing_company_sources (
-  housing_company_source_id uuid default gen_random_uuid() not null constraint housing_company_sources_pkey primary key,
-  housing_company_id uuid not null constraint housing_company_sources_housing_company_id_fkey references housing_companies(housing_company_id) ON DELETE CASCADE,
-  housing_company_source_provider text not null,
-  housing_company_source_kind text not null,
-  housing_company_source_table text not null,
-  housing_company_source_id_value text not null,
-  housing_company_source_external_id text,
-  housing_company_source_url text,
-  housing_company_source_link_status text default 'confirmed'::text not null,
-  housing_company_source_link_method text not null,
-  housing_company_source_link_score integer default 100 not null,
-  housing_company_source_link_reasons jsonb default '{}'::jsonb not null,
-  housing_company_source_first_seen_at timestamp with time zone,
-  housing_company_source_last_seen_at timestamp with time zone,
-  housing_company_source_created_at timestamp with time zone default now() not null,
-  housing_company_source_updated_at timestamp with time zone default now() not null,
-  constraint housing_company_sources_unique_source UNIQUE (housing_company_source_provider, housing_company_source_kind, housing_company_source_table, housing_company_source_id_value),
-  constraint housing_company_sources_status_check CHECK ((housing_company_source_link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text])))
+create table public.listings (
+  listing_id uuid not null constraint listings_pkey primary key,
+  listing_type text not null,
+  listing_status text,
+  primary_source_listing_id uuid,
+  unit_id uuid,
+  house_id uuid,
+  first_seen_at timestamp with time zone,
+  last_seen_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint listings_listing_type_check CHECK ((listing_type = ANY (ARRAY['sale'::text])))
 );
 
-CREATE INDEX idx_housing_company_sources_company ON public.housing_company_sources USING btree (housing_company_id);
+CREATE INDEX idx_listings_house ON public.listings USING btree (house_id) WHERE (house_id IS NOT NULL);
+CREATE INDEX idx_listings_last_seen ON public.listings USING btree (last_seen_at DESC);
+CREATE INDEX idx_listings_primary_source_listing ON public.listings USING btree (primary_source_listing_id);
+CREATE INDEX idx_listings_unit ON public.listings USING btree (unit_id) WHERE (unit_id IS NOT NULL);
 
 create table public.oauth_authorization_codes (
   oauth_authorization_code_id uuid default gen_random_uuid() not null constraint oauth_authorization_codes_pkey primary key,
@@ -491,6 +562,27 @@ CREATE INDEX idx_postal_postal_code_municipality_id ON public.postal_postal_code
 CREATE INDEX idx_postal_postal_code_name_fi ON public.postal_postal_codes USING btree (postal_postal_code_name_fi);
 CREATE INDEX idx_postal_postal_code_neighborhood_fi ON public.postal_postal_codes USING btree (postal_postal_code_neighborhood_fi);
 
+create table public.price_links (
+  price_link_id uuid default gen_random_uuid() not null constraint price_links_pkey primary key,
+  target_type text not null,
+  target_id uuid not null,
+  prices_transaction_id uuid not null constraint price_links_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE CASCADE,
+  link_status text not null,
+  link_method text not null,
+  link_score integer not null,
+  link_reasons jsonb default '{}'::jsonb not null,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint price_links_link_method_check CHECK ((link_method = ANY (ARRAY['sync_auto'::text, 'source_match_auto'::text, 'document_match_auto'::text, 'manual'::text, 'backfill_auto'::text]))),
+  constraint price_links_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text, 'superseded'::text]))),
+  constraint price_links_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'source_listing'::text, 'source_building_announcement'::text, 'building'::text, 'housing_company'::text])))
+);
+
+CREATE INDEX idx_price_links_target ON public.price_links USING btree (target_type, target_id, link_status);
+CREATE INDEX idx_price_links_transaction ON public.price_links USING btree (prices_transaction_id, link_status);
+CREATE UNIQUE INDEX price_links_one_confirmed_listing_per_transaction ON public.price_links USING btree (prices_transaction_id) WHERE ((target_type = 'listing'::text) AND (link_status = 'confirmed'::text));
+CREATE UNIQUE INDEX price_links_unique_target_transaction ON public.price_links USING btree (target_type, target_id, prices_transaction_id);
+
 create table public.prices_cities (
   prices_city_id uuid default uuid_generate_v4() not null constraint prices_cities_pkey primary key,
   prices_city_name text not null constraint prices_cities_prices_cities_name_key unique,
@@ -559,45 +651,6 @@ create table public.property_dimension_catalog (
   constraint property_dimension_catalog_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
 );
 
-create table public.property_dimension_claims (
-  property_dimension_claim_id uuid default gen_random_uuid() not null constraint property_dimension_claims_pkey primary key,
-  property_dimension_projection_run_id uuid not null constraint property_dimension_claims_property_dimension_projection_ru_fkey references property_dimension_projection_runs(property_dimension_projection_run_id) ON DELETE CASCADE,
-  projection_version text not null,
-  claim_scope text not null,
-  target_type text not null,
-  target_id uuid not null,
-  dimension_key text not null,
-  value jsonb not null,
-  value_kind text not null,
-  unit text,
-  source_table text not null,
-  source_id uuid not null,
-  source_field text,
-  source_claim_id uuid constraint property_dimension_claims_source_claim_id_fkey references property_dimension_claims(property_dimension_claim_id) ON DELETE CASCADE,
-  source_observed_at timestamp with time zone,
-  valid_from date,
-  valid_until date,
-  confidence double precision default 0.5 not null,
-  source_reliability double precision default 0.5 not null,
-  evidence jsonb default '{}'::jsonb not null,
-  extraction_model text,
-  extraction_prompt_version text,
-  created_at timestamp with time zone default now() not null,
-  updated_at timestamp with time zone default now() not null,
-  constraint property_dimension_claims_claim_scope_check CHECK ((claim_scope = ANY (ARRAY['source'::text, 'manual'::text]))),
-  constraint property_dimension_claims_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
-  constraint property_dimension_claims_source_reliability_check CHECK (((source_reliability >= (0)::double precision) AND (source_reliability <= (1)::double precision))),
-  constraint property_dimension_claims_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
-  constraint property_dimension_claims_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
-);
-
-CREATE INDEX idx_property_dimension_claims_dimension ON public.property_dimension_claims USING btree (dimension_key);
-CREATE INDEX idx_property_dimension_claims_source ON public.property_dimension_claims USING btree (source_table, source_id, projection_version);
-CREATE INDEX idx_property_dimension_claims_source_claim ON public.property_dimension_claims USING btree (source_claim_id);
-CREATE INDEX idx_property_dimension_claims_target ON public.property_dimension_claims USING btree (claim_scope, target_type, target_id, dimension_key);
-CREATE UNIQUE INDEX idx_property_dimension_claims_unique_source ON public.property_dimension_claims USING btree (claim_scope, target_type, target_id, dimension_key, source_table, source_id, COALESCE(source_field, ''::text), projection_version);
-CREATE INDEX idx_property_dimension_claims_value_gin ON public.property_dimension_claims USING gin (value jsonb_path_ops);
-
 create table public.property_dimension_dirty_targets (
   target_type text not null,
   target_id uuid not null,
@@ -630,22 +683,6 @@ create table public.property_dimension_manual_overrides (
 );
 
 CREATE UNIQUE INDEX idx_property_dimension_manual_overrides_active ON public.property_dimension_manual_overrides USING btree (target_type, target_id, dimension_key) WHERE (revoked_at IS NULL);
-
-create table public.property_dimension_profiles (
-  target_type text not null,
-  target_id uuid not null,
-  dimensions jsonb default '{}'::jsonb not null,
-  metadata jsonb default '{}'::jsonb not null,
-  conflicts jsonb default '{}'::jsonb not null,
-  resolved_at timestamp with time zone default now() not null,
-  constraint property_dimension_profiles_pkey PRIMARY KEY (target_type, target_id),
-  constraint property_dimension_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
-);
-
-CREATE INDEX idx_building_dimension_profiles_build_year ON public.property_dimension_profiles USING btree ((((dimensions #>> '{building,build_year}'::text[]))::integer)) WHERE (target_type = 'building'::text);
-CREATE INDEX idx_property_dimension_profiles_dimensions_gin ON public.property_dimension_profiles USING gin (dimensions jsonb_path_ops);
-CREATE INDEX idx_unit_dimension_profiles_area ON public.property_dimension_profiles USING btree ((((dimensions #>> '{unit,area_m2}'::text[]))::double precision)) WHERE (target_type = 'unit'::text);
-CREATE INDEX idx_unit_dimension_profiles_total_charge ON public.property_dimension_profiles USING btree ((((dimensions #>> '{charges,total_monthly_eur}'::text[]))::double precision)) WHERE (target_type = 'unit'::text);
 
 create table public.property_dimension_projection_runs (
   property_dimension_projection_run_id uuid default gen_random_uuid() not null constraint property_dimension_projection_runs_pkey primary key,
@@ -684,30 +721,6 @@ create table public.property_dimension_source_priorities (
 );
 
 CREATE UNIQUE INDEX idx_property_dimension_source_priorities_unique ON public.property_dimension_source_priorities USING btree (dimension_key, source_table, COALESCE(source_field, ''::text));
-
-create table public.property_dimension_values (
-  target_type text not null,
-  target_id uuid not null,
-  dimension_key text not null,
-  value jsonb not null,
-  value_kind text not null,
-  unit text,
-  confidence double precision not null,
-  selected_claim_id uuid constraint property_dimension_values_selected_claim_id_fkey references property_dimension_claims(property_dimension_claim_id) ON DELETE CASCADE,
-  selected_reason text not null,
-  conflict_status text default 'none'::text not null,
-  supporting_claim_ids uuid[] default '{}'::uuid[] not null,
-  rejected_claim_ids uuid[] default '{}'::uuid[] not null,
-  resolved_at timestamp with time zone default now() not null,
-  constraint property_dimension_values_pkey PRIMARY KEY (target_type, target_id, dimension_key),
-  constraint property_dimension_values_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
-  constraint property_dimension_values_conflict_status_check CHECK ((conflict_status = ANY (ARRAY['none'::text, 'compatible'::text, 'conflicting'::text, 'manual_override'::text]))),
-  constraint property_dimension_values_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text]))),
-  constraint property_dimension_values_value_kind_check CHECK ((value_kind = ANY (ARRAY['string'::text, 'number'::text, 'boolean'::text, 'object'::text, 'array'::text, 'null'::text])))
-);
-
-CREATE INDEX idx_property_dimension_values_dimension ON public.property_dimension_values USING btree (dimension_key);
-CREATE INDEX idx_property_dimension_values_selected_claim ON public.property_dimension_values USING btree (selected_claim_id);
 
 create table public.property_document_extraction_runs (
   property_document_extraction_run_id uuid default gen_random_uuid() not null constraint property_document_extraction_runs_pkey primary key,
@@ -800,7 +813,6 @@ create table public.property_offering_merge_decisions (
   property_offering_merge_decision_id uuid default gen_random_uuid() not null constraint property_offering_merge_decisions_pkey primary key,
   source_property_offering_id uuid not null constraint property_offering_merge_decisi_source_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
   target_property_offering_id uuid not null constraint property_offering_merge_decisi_target_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  property_offering_source_match_candidate_id uuid constraint property_offering_merge_decis_property_offering_source_mat_fkey references property_offering_source_match_candidates(property_offering_source_match_candidate_id) ON DELETE SET NULL,
   property_offering_merge_decision_status text default 'accepted'::text not null,
   property_offering_merge_decision_method text not null,
   property_offering_merge_decision_score integer,
@@ -816,74 +828,6 @@ create table public.property_offering_merge_decisions (
 CREATE UNIQUE INDEX idx_property_offering_merge_decisions_active_pair ON public.property_offering_merge_decisions USING btree (source_property_offering_id, target_property_offering_id) WHERE (property_offering_merge_decision_status <> 'rejected'::text);
 CREATE INDEX idx_property_offering_merge_decisions_source ON public.property_offering_merge_decisions USING btree (source_property_offering_id, property_offering_merge_decision_status);
 CREATE INDEX idx_property_offering_merge_decisions_target ON public.property_offering_merge_decisions USING btree (target_property_offering_id, property_offering_merge_decision_status);
-
-create table public.property_offering_source_match_candidates (
-  property_offering_source_match_candidate_id uuid default gen_random_uuid() not null constraint property_offering_source_match_candidates_pkey primary key,
-  property_offering_source_match_run_id uuid not null constraint property_offering_source_matc_property_offering_source_mat_fkey references property_offering_source_match_runs(property_offering_source_match_run_id) ON DELETE CASCADE,
-  source_sale_listing_id uuid not null constraint property_offering_source_match_cand_source_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
-  source_property_offering_id uuid not null constraint property_offering_source_match_source_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  target_property_offering_id uuid not null constraint property_offering_source_match_target_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  target_sale_listing_id uuid not null constraint property_offering_source_match_cand_target_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
-  property_offering_source_match_score integer not null,
-  property_offering_source_match_confidence text not null,
-  property_offering_source_match_status text default 'candidate'::text not null,
-  property_offering_source_match_reasons jsonb default '{}'::jsonb not null,
-  property_offering_source_match_price_delta_percent double precision,
-  property_offering_source_match_created_at timestamp with time zone default now() not null,
-  constraint property_offering_source_match_candidate_unique UNIQUE (property_offering_source_match_run_id, source_sale_listing_id, target_property_offering_id),
-  constraint property_offering_source_match_confidence_check CHECK ((property_offering_source_match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))),
-  constraint property_offering_source_match_status_check CHECK ((property_offering_source_match_status = ANY (ARRAY['candidate'::text, 'auto_linked'::text, 'ambiguous'::text, 'rejected'::text])))
-);
-
-CREATE INDEX idx_property_offering_source_match_candidates_run_status ON public.property_offering_source_match_candidates USING btree (property_offering_source_match_run_id, property_offering_source_match_status);
-CREATE INDEX idx_property_offering_source_match_candidates_source_score ON public.property_offering_source_match_candidates USING btree (source_sale_listing_id, property_offering_source_match_score DESC);
-CREATE INDEX idx_property_offering_source_match_candidates_target_listing_sc ON public.property_offering_source_match_candidates USING btree (target_sale_listing_id, property_offering_source_match_score DESC);
-CREATE INDEX idx_property_offering_source_match_candidates_target_score ON public.property_offering_source_match_candidates USING btree (target_property_offering_id, property_offering_source_match_score DESC);
-
-create table public.property_offering_source_match_runs (
-  property_offering_source_match_run_id uuid default gen_random_uuid() not null constraint property_offering_source_match_runs_pkey primary key,
-  property_offering_source_match_run_mode text not null,
-  property_offering_source_match_score_threshold integer default 95 not null,
-  property_offering_source_match_competitor_margin integer default 10 not null,
-  property_offering_source_match_candidates_count integer default 0 not null,
-  property_offering_source_match_auto_linked_count integer default 0 not null,
-  property_offering_source_match_ambiguous_count integer default 0 not null,
-  property_offering_source_match_started_at timestamp with time zone default now() not null,
-  property_offering_source_match_finished_at timestamp with time zone,
-  constraint property_offering_source_match_margin_check CHECK ((property_offering_source_match_competitor_margin >= 0)),
-  constraint property_offering_source_match_run_mode_check CHECK ((property_offering_source_match_run_mode = ANY (ARRAY['dry_run'::text, 'auto_link_safe'::text]))),
-  constraint property_offering_source_match_threshold_check CHECK ((property_offering_source_match_score_threshold >= 0))
-);
-
-create table public.property_offering_sources (
-  property_offering_source_id uuid default gen_random_uuid() not null constraint property_offering_sources_pkey primary key,
-  property_offering_id uuid not null constraint property_offering_sources_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  sale_listing_id uuid not null constraint property_offering_sources_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
-  property_offering_source_link_status text not null,
-  property_offering_source_link_method text not null,
-  property_offering_source_link_score integer not null,
-  property_offering_source_link_reasons jsonb default '{}'::jsonb not null,
-  property_offering_source_created_at timestamp with time zone default now() not null,
-  property_offering_source_updated_at timestamp with time zone default now() not null,
-  constraint property_offering_sources_method_check CHECK ((property_offering_source_link_method = ANY (ARRAY['backfill_auto'::text, 'sync_auto'::text, 'source_match_auto'::text, 'manual'::text]))),
-  constraint property_offering_sources_status_check CHECK ((property_offering_source_link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text])))
-);
-
-CREATE UNIQUE INDEX idx_property_offering_sources_active_source ON public.property_offering_sources USING btree (sale_listing_id) WHERE (property_offering_source_link_status <> 'rejected'::text);
-CREATE INDEX idx_property_offering_sources_offering ON public.property_offering_sources USING btree (property_offering_id);
-
-create table public.property_offering_transactions (
-  property_offering_transaction_id uuid default gen_random_uuid() not null constraint property_offering_transactions_pkey primary key,
-  property_offering_id uuid not null constraint property_offering_transactions_property_offering_id_fkey references property_offerings(property_offering_id) ON DELETE CASCADE,
-  prices_transaction_id uuid not null constraint property_offering_transactions_prices_transaction_id_fkey references prices_transactions(prices_transaction_id) ON DELETE CASCADE,
-  property_offering_transaction_link_status text not null,
-  property_offering_transaction_link_method text not null,
-  property_offering_transaction_link_score integer not null,
-  property_offering_transaction_link_reasons jsonb default '{}'::jsonb not null,
-  property_offering_transaction_created_at timestamp with time zone default now() not null,
-  property_offering_transaction_updated_at timestamp with time zone default now() not null,
-  constraint property_offering_transactions_unique UNIQUE (property_offering_id, prices_transaction_id)
-);
 
 create table public.property_offerings (
   property_offering_id uuid default gen_random_uuid() not null constraint property_offerings_pkey primary key,
@@ -948,23 +892,6 @@ CREATE INDEX idx_property_renovation_events_source_event ON public.property_reno
 CREATE INDEX idx_property_renovation_events_target ON public.property_renovation_events USING btree (event_scope, target_type, target_id, category, status);
 CREATE INDEX idx_property_renovation_events_target_observed ON public.property_renovation_events USING btree (event_scope, target_type, target_id, category, status, source_observed_at DESC);
 CREATE UNIQUE INDEX idx_property_renovation_events_unique_source ON public.property_renovation_events USING btree (event_scope, target_type, target_id, source_table, source_id, COALESCE(source_field, ''::text), category, status, COALESCE(stage, ''::text), COALESCE(scope, ''::text), COALESCE(year, '-1'::integer), COALESCE(start_year, '-1'::integer), COALESCE(end_year, '-1'::integer), md5(COALESCE(summary, ''::text)), projection_version);
-
-create table public.property_source_offering_insights (
-  property_source_offering_insight_id uuid default gen_random_uuid() not null constraint property_source_offering_insights_pkey primary key,
-  sale_listing_id uuid not null constraint property_source_offering_insights_sale_listing_id_fkey references property_source_offerings(sale_listing_id) ON DELETE CASCADE,
-  property_source_offering_insight_source_field text not null,
-  property_source_offering_insight_key text not null,
-  property_source_offering_insight_value text not null,
-  property_source_offering_insight_direction text not null,
-  property_source_offering_insight_severity text not null,
-  property_source_offering_insight_confidence integer default 50 not null,
-  property_source_offering_insight_text text,
-  property_source_offering_insight_created_at timestamp with time zone default now() not null,
-  property_source_offering_insight_updated_at timestamp with time zone default now() not null
-);
-
-CREATE INDEX idx_property_source_offering_insights_listing ON public.property_source_offering_insights USING btree (sale_listing_id);
-CREATE UNIQUE INDEX idx_property_source_offering_insights_unique ON public.property_source_offering_insights USING btree (sale_listing_id, property_source_offering_insight_source_field, property_source_offering_insight_key);
 
 create table public.property_source_offering_renovations (
   property_source_offering_renovation_id uuid default gen_random_uuid() not null constraint property_source_offering_renovations_pkey primary key,
@@ -1059,7 +986,6 @@ create table public.property_source_offerings (
   sale_listing_source_match_next_attempt_at timestamp with time zone,
   sale_listing_source_match_last_attempted_at timestamp with time zone,
   sale_listing_source_match_attempt_count integer default 0 not null,
-  sale_listing_source_match_run_id uuid constraint sale_listings_sale_listing_source_match_run_id_fkey references property_offering_source_match_runs(property_offering_source_match_run_id) ON DELETE SET NULL,
   sale_listing_availability_text text,
   sale_listing_renovations_done_text text,
   sale_listing_renovations_planned_text text,
@@ -1141,56 +1067,6 @@ CREATE UNIQUE INDEX sale_listings_frontdoor_ad_id_key ON public.property_source_
 CREATE UNIQUE INDEX sale_listings_frontdoor_building_announcement_id_key ON public.property_source_offerings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
 CREATE UNIQUE INDEX sale_listings_prices_transaction_id_key ON public.property_source_offerings USING btree (prices_transaction_id) WHERE (prices_transaction_id IS NOT NULL);
 CREATE UNIQUE INDEX sale_listings_shortcut_ad_id_key ON public.property_source_offerings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
-
-create table public.property_system_profiles (
-  target_type text not null,
-  target_id uuid not null,
-  system_type text not null,
-  status text not null,
-  last_renovated_year integer,
-  next_expected_start_year integer,
-  next_expected_end_year integer,
-  stage text,
-  scope text,
-  responsibility text,
-  cost_estimate_eur bigint,
-  confidence double precision default 0.5 not null,
-  selected_renovation_event_ids uuid[] default '{}'::uuid[] not null,
-  metadata jsonb default '{}'::jsonb not null,
-  updated_at timestamp with time zone default now() not null,
-  constraint property_system_profiles_pkey PRIMARY KEY (target_type, target_id, system_type),
-  constraint property_system_profiles_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
-  constraint property_system_profiles_target_type_check CHECK ((target_type = ANY (ARRAY['unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
-);
-
-CREATE INDEX idx_property_system_profiles_target ON public.property_system_profiles USING btree (target_type, target_id);
-
-create table public.property_target_sources (
-  property_target_source_id uuid default gen_random_uuid() not null constraint property_target_sources_pkey primary key,
-  target_type text not null,
-  target_id uuid not null,
-  source_provider text not null,
-  source_kind text not null,
-  source_table text not null,
-  source_id uuid,
-  source_id_value text not null,
-  source_external_id text,
-  source_url text,
-  link_status text default 'confirmed'::text not null,
-  link_method text not null,
-  link_score integer default 100 not null,
-  link_reasons jsonb default '{}'::jsonb not null,
-  first_seen_at timestamp with time zone,
-  last_seen_at timestamp with time zone,
-  created_at timestamp with time zone default now() not null,
-  updated_at timestamp with time zone default now() not null,
-  constraint property_target_sources_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text]))),
-  constraint property_target_sources_target_type_check CHECK ((target_type = ANY (ARRAY['offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text, 'document'::text, 'transaction'::text])))
-);
-
-CREATE INDEX idx_property_target_sources_source ON public.property_target_sources USING btree (source_table, source_id_value, link_status);
-CREATE INDEX idx_property_target_sources_target ON public.property_target_sources USING btree (target_type, target_id, link_status);
-CREATE UNIQUE INDEX idx_property_target_sources_unique_source ON public.property_target_sources USING btree (target_type, target_id, source_provider, source_kind, source_table, source_id_value);
 
 create table public.property_units (
   property_unit_id uuid default gen_random_uuid() not null constraint property_units_pkey primary key,
@@ -1400,6 +1276,117 @@ create table public.shortcut_tokens (
 
 CREATE INDEX idx_shortcut_token_cuid ON public.shortcut_tokens USING btree (shortcut_token_cuid);
 CREATE INDEX idx_shortcut_token_expires_at ON public.shortcut_tokens USING btree (shortcut_token_expires_at DESC);
+
+create table public.source_housing_companies (
+  source_housing_company_id uuid not null constraint source_housing_companies_pkey primary key,
+  provider text not null,
+  source_kind text not null,
+  native_id text,
+  raw_table text not null,
+  raw_id text not null,
+  url text,
+  first_seen_at timestamp with time zone,
+  last_seen_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_source_housing_companies_native ON public.source_housing_companies USING btree (provider, source_kind, native_id) WHERE (native_id IS NOT NULL);
+CREATE UNIQUE INDEX source_housing_companies_source_key ON public.source_housing_companies USING btree (provider, source_kind, raw_table, raw_id);
+
+create table public.source_listings (
+  source_listing_id uuid not null constraint source_listings_pkey primary key,
+  provider text not null,
+  source_kind text not null,
+  native_id text not null,
+  canonical_source_id text not null,
+  raw_table text not null,
+  raw_id text not null,
+  url text,
+  payload_hash text,
+  normalized_version integer default 0 not null,
+  normalized_at timestamp with time zone,
+  first_seen_at timestamp with time zone,
+  last_seen_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint source_listings_provider_check CHECK ((provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text]))),
+  constraint source_listings_source_kind_check CHECK ((source_kind = ANY (ARRAY['ad'::text, 'announcement'::text])))
+);
+
+CREATE INDEX idx_source_listings_last_seen ON public.source_listings USING btree (last_seen_at DESC);
+CREATE INDEX idx_source_listings_raw ON public.source_listings USING btree (raw_table, raw_id);
+CREATE UNIQUE INDEX source_listings_canonical_source_id_key ON public.source_listings USING btree (canonical_source_id);
+CREATE UNIQUE INDEX source_listings_provider_kind_native_key ON public.source_listings USING btree (provider, source_kind, native_id);
+
+create table public.target_observations (
+  target_observation_id uuid default gen_random_uuid() not null constraint target_observations_pkey primary key,
+  target_type text not null,
+  target_id uuid not null,
+  observation_key text not null,
+  observation_kind text not null,
+  severity text not null,
+  direction text not null,
+  value jsonb,
+  text text,
+  confidence double precision not null,
+  source_type text not null,
+  source_id uuid not null,
+  evidence jsonb default '{}'::jsonb not null,
+  created_at timestamp with time zone default now() not null,
+  superseded_at timestamp with time zone,
+  constraint target_observations_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
+  constraint target_observations_observation_kind_check CHECK ((observation_kind = ANY (ARRAY['risk'::text, 'opportunity'::text, 'inconsistency'::text, 'summary'::text, 'valuation_note'::text]))),
+  constraint target_observations_source_type_check CHECK ((source_type = ANY (ARRAY['source_listing'::text, 'source_housing_company'::text, 'document'::text, 'price_transaction'::text, 'dimension_claim'::text, 'manual'::text]))),
+  constraint target_observations_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
+);
+
+CREATE INDEX idx_target_observations_source ON public.target_observations USING btree (source_type, source_id) WHERE (superseded_at IS NULL);
+CREATE INDEX idx_target_observations_target ON public.target_observations USING btree (target_type, target_id, observation_kind, severity) WHERE (superseded_at IS NULL);
+CREATE UNIQUE INDEX target_observations_active_unique ON public.target_observations USING btree (target_type, target_id, observation_key, source_type, source_id) WHERE (superseded_at IS NULL);
+
+create table public.target_sources (
+  target_source_id uuid default gen_random_uuid() not null constraint target_sources_pkey primary key,
+  target_type text not null,
+  target_id uuid not null,
+  source_type text not null,
+  source_id uuid not null,
+  link_status text not null,
+  link_method text not null,
+  link_score integer default 0 not null,
+  link_reasons jsonb default '{}'::jsonb not null,
+  first_seen_at timestamp with time zone,
+  last_seen_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint target_sources_link_method_check CHECK ((link_method = ANY (ARRAY['sync_auto'::text, 'source_match_auto'::text, 'document_match_auto'::text, 'manual'::text, 'backfill_auto'::text]))),
+  constraint target_sources_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text, 'superseded'::text]))),
+  constraint target_sources_source_type_check CHECK ((source_type = ANY (ARRAY['source_listing'::text, 'source_housing_company'::text, 'document'::text, 'price_transaction'::text, 'manual'::text]))),
+  constraint target_sources_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
+);
+
+CREATE UNIQUE INDEX target_sources_active_source_listing ON public.target_sources USING btree (source_id) WHERE ((target_type = 'listing'::text) AND (source_type = 'source_listing'::text) AND (link_status <> 'rejected'::text));
+CREATE INDEX target_sources_source ON public.target_sources USING btree (source_type, source_id, link_status);
+CREATE INDEX target_sources_target ON public.target_sources USING btree (target_type, target_id, link_status);
+CREATE UNIQUE INDEX target_sources_unique_target_source ON public.target_sources USING btree (target_type, target_id, source_type, source_id);
+
+create table public.units (
+  unit_id uuid not null constraint units_pkey primary key,
+  housing_company_id uuid not null,
+  physical_building_id uuid,
+  identity_key text not null,
+  address_norm text,
+  apartment text,
+  floor_level integer,
+  area_m2 double precision,
+  room_layout text,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null
+);
+
+CREATE INDEX idx_units_housing_company ON public.units USING btree (housing_company_id);
+CREATE INDEX idx_units_physical_building ON public.units USING btree (physical_building_id) WHERE (physical_building_id IS NOT NULL);
+CREATE UNIQUE INDEX units_identity_key_key ON public.units USING btree (identity_key);
 
 create table public.user_devices (
   user_device_uuid uuid default gen_random_uuid() not null constraint user_devices_uuid_key unique,

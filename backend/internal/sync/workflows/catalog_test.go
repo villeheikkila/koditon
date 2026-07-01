@@ -10,8 +10,8 @@ import (
 func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 	t.Parallel()
 	defs := AllDefinitions()
-	if len(defs) != 27 {
-		t.Fatalf("definition count = %d, want 27", len(defs))
+	if len(defs) != 26 {
+		t.Fatalf("definition count = %d, want 26", len(defs))
 	}
 	wantQueues := map[string]bool{
 		QueueFrontdoor:       false,
@@ -49,7 +49,6 @@ func TestHandlerOnlyCanonicalJobsAreClassified(t *testing.T) {
 		name      string
 		adminOnly bool
 	}{
-		{name: "canonical_backfill_target_sources", adminOnly: true},
 		{name: "canonical_backfill_building_coordinates", adminOnly: true},
 		{name: "canonical_backfill_detached_houses", adminOnly: false},
 	} {

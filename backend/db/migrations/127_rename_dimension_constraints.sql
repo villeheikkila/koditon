@@ -1,0 +1,20 @@
+ALTER TABLE public.dimension_claims
+    RENAME CONSTRAINT property_dimension_claims_claim_scope_check TO dimension_claims_claim_scope_check;
+ALTER TABLE public.dimension_claims
+    RENAME CONSTRAINT property_dimension_claims_confidence_check TO dimension_claims_confidence_check;
+ALTER TABLE public.dimension_claims
+    RENAME CONSTRAINT property_dimension_claims_source_reliability_check TO dimension_claims_source_reliability_check;
+ALTER TABLE public.dimension_claims
+    RENAME CONSTRAINT property_dimension_claims_target_type_check TO dimension_claims_target_type_check;
+ALTER TABLE public.dimension_claims
+    RENAME CONSTRAINT property_dimension_claims_value_kind_check TO dimension_claims_value_kind_check;
+ALTER TABLE public.dimension_profiles
+    RENAME CONSTRAINT property_dimension_profiles_target_type_check TO dimension_profiles_target_type_check;
+ALTER TABLE public.dimension_values
+    RENAME CONSTRAINT property_dimension_values_confidence_check TO dimension_values_confidence_check;
+ALTER TABLE public.dimension_values
+    RENAME CONSTRAINT property_dimension_values_conflict_status_check TO dimension_values_conflict_status_check;
+ALTER TABLE public.dimension_values
+    RENAME CONSTRAINT property_dimension_values_target_type_check TO dimension_values_target_type_check;
+ALTER TABLE public.dimension_values
+    RENAME CONSTRAINT property_dimension_values_value_kind_check TO dimension_values_value_kind_check;

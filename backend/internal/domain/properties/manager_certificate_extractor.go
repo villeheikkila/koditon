@@ -397,6 +397,9 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate property unit: %w", err)
 	}
+	if err := queries.SyncUnitFromPropertyUnit(ctx, unitID); err != nil {
+		return document, fmt.Errorf("sync manager certificate unit: %w", err)
+	}
 	offeringID, err := queries.EnsureManagerCertificatePropertyOffering(ctx, db.EnsureManagerCertificatePropertyOfferingParams{
 		PropertyUnitID:     &unitID,
 		IdentityKey:        "manager_certificate_document:" + documentKey + ":offering",
@@ -405,6 +408,9 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 	})
 	if err != nil {
 		return document, fmt.Errorf("ensure manager certificate property offering: %w", err)
+	}
+	if err := queries.SyncListingFromPropertyOffering(ctx, offeringID); err != nil {
+		return document, fmt.Errorf("sync manager certificate listing: %w", err)
 	}
 	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: document.PropertyDocumentID, PropertyOfferingID: offeringID, Reason: "manager_certificate_target_created"}); err != nil {
 		return document, fmt.Errorf("attach manager certificate document to offering: %w", err)

@@ -1,6 +1,12 @@
 -- name: DeleteSaleListingForShortcutAd :exec
-DELETE FROM public.property_source_offerings
-WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id);
+WITH deleted AS (
+    DELETE FROM public.property_source_offerings
+    WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id)
+    RETURNING sale_listing_id
+)
+DELETE FROM public.source_listings sl
+USING deleted
+WHERE sl.source_listing_id = deleted.sale_listing_id;
 
 -- name: CanonicalizeShortcutAdSaleListing :one
 INSERT INTO public.property_source_offerings (
@@ -232,6 +238,65 @@ ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
     sale_listing_new_development = EXCLUDED.sale_listing_new_development,
     sale_listing_updated_at = now()
 RETURNING sale_listing_id;
+
+-- name: SyncSourceListingFromPropertySourceOffering :exec
+INSERT INTO public.source_listings (
+    source_listing_id,
+    provider,
+    source_kind,
+    native_id,
+    canonical_source_id,
+    raw_table,
+    raw_id,
+    url,
+    payload_hash,
+    normalized_version,
+    normalized_at,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+SELECT
+    sl.sale_listing_id,
+    sl.sale_listing_source_provider,
+    sl.sale_listing_source_kind,
+    sl.sale_listing_native_id,
+    sl.sale_listing_canonical_id,
+    CASE
+        WHEN sl.shortcut_ad_id IS NOT NULL THEN 'shortcut_ads'
+        WHEN sl.frontdoor_ad_id IS NOT NULL THEN 'frontdoor_ads'
+        WHEN sl.frontdoor_building_announcement_id IS NOT NULL THEN 'frontdoor_building_announcements'
+        WHEN sl.prices_transaction_id IS NOT NULL THEN 'prices_transactions'
+        ELSE 'property_source_offerings'
+    END,
+    COALESCE(sl.shortcut_ad_id::text, sl.frontdoor_ad_id::text, sl.frontdoor_building_announcement_id::text, sl.prices_transaction_id::text, sl.sale_listing_id::text),
+    sl.sale_listing_url,
+    COALESCE(sa.shortcut_ad_data_hash, fa.frontdoor_ad_data_hash),
+    GREATEST(COALESCE(sa.shortcut_ad_data_normalized_version, 0), COALESCE(fa.frontdoor_ad_data_normalized_version, 0)),
+    sl.sale_listing_updated_at,
+    sl.sale_listing_first_seen_at,
+    sl.sale_listing_last_seen_at,
+    sl.sale_listing_created_at,
+    sl.sale_listing_updated_at
+FROM public.property_source_offerings sl
+LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+ON CONFLICT (source_listing_id) DO UPDATE SET
+    provider = EXCLUDED.provider,
+    source_kind = EXCLUDED.source_kind,
+    native_id = EXCLUDED.native_id,
+    canonical_source_id = EXCLUDED.canonical_source_id,
+    raw_table = EXCLUDED.raw_table,
+    raw_id = EXCLUDED.raw_id,
+    url = EXCLUDED.url,
+    payload_hash = EXCLUDED.payload_hash,
+    normalized_version = EXCLUDED.normalized_version,
+    normalized_at = EXCLUDED.normalized_at,
+    first_seen_at = EXCLUDED.first_seen_at,
+    last_seen_at = EXCLUDED.last_seen_at,
+    updated_at = EXCLUDED.updated_at;
 
 -- name: CanonicalizeFrontdoorAdSaleListing :one
 INSERT INTO public.property_source_offerings (
@@ -466,8 +531,14 @@ ON CONFLICT (sale_listing_canonical_id) DO UPDATE SET
 RETURNING sale_listing_id;
 
 -- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
-DELETE FROM public.property_source_offerings
-WHERE frontdoor_building_announcement_id = sqlc.arg(frontdoor_building_announcement_id);
+WITH deleted AS (
+    DELETE FROM public.property_source_offerings
+    WHERE frontdoor_building_announcement_id = sqlc.arg(frontdoor_building_announcement_id)
+    RETURNING sale_listing_id
+)
+DELETE FROM public.source_listings sl
+USING deleted
+WHERE sl.source_listing_id = deleted.sale_listing_id;
 
 -- name: CanonicalizeFrontdoorBuildingAnnouncementSourceOffering :one
 INSERT INTO public.property_source_offerings (
@@ -648,22 +719,22 @@ CROSS JOIN LATERAL (
 WHERE renovation.done IS TRUE;
 
 -- name: RebuildListingDimensionLayer :one
-SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid)::jsonb;
+SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid)::jsonb AS payload;
 
 -- name: RebuildListingDimensionLayerAt :one
-SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb;
+SELECT public.fnc__rebuild_listing_dimension_layer(sqlc.arg(sale_listing_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb AS payload;
 
 -- name: ProjectListingProviderDimensionClaims :one
 SELECT public.fnc__project_listing_provider_dimension_claims(sqlc.arg(sale_listing_id)::uuid)::integer;
 
 -- name: ResolveDimensionValuesForTarget :one
-SELECT public.fnc__resolve_dimension_values_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer;
+SELECT public.fnc__resolve_dimension_values_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer AS count;
 
 -- name: ProjectDimensionProfileForTarget :one
-SELECT public.fnc__project_dimension_profile_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer;
+SELECT public.fnc__project_dimension_profile_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer AS count;
 
 -- name: ResolveDimensionTarget :one
-SELECT public.fnc__resolve_dimension_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb;
+SELECT public.fnc__resolve_dimension_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb AS payload;
 
 -- name: MarkListingDimensionTargetsDirty :one
 SELECT public.fnc__mark_listing_dimension_targets_dirty(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(reason)::text)::integer;
@@ -671,17 +742,19 @@ SELECT public.fnc__mark_listing_dimension_targets_dirty(sqlc.arg(sale_listing_id
 -- name: EnsurePhysicalBuildingForSaleListing :exec
 WITH linked AS (
     SELECT
-        pos.sale_listing_id,
+        source_link.source_id AS sale_listing_id,
         pu.property_unit_id,
         pu.housing_company_id,
         hc.housing_company_identity_key
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
     LIMIT 1
 ),
 listing AS (
@@ -692,7 +765,7 @@ listing AS (
         linked.housing_company_identity_key
     FROM public.property_source_offerings sl
     JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
-    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+    WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)::uuid
 ),
 inserted AS (
     INSERT INTO public.physical_buildings (
@@ -736,31 +809,188 @@ inserted AS (
         physical_building_longitude = COALESCE(public.physical_buildings.physical_building_longitude, EXCLUDED.physical_building_longitude),
         physical_building_updated_at = now()
     RETURNING physical_building_id
+),
+updated AS (
+    UPDATE public.property_units pu
+    SET physical_building_id = inserted.physical_building_id,
+        property_unit_updated_at = now()
+    FROM listing, inserted
+    WHERE pu.property_unit_id = listing.property_unit_id
+    RETURNING pu.property_unit_id
 )
-UPDATE public.property_units pu
-SET physical_building_id = inserted.physical_building_id,
-    property_unit_updated_at = now()
-FROM listing, inserted
-WHERE pu.property_unit_id = listing.property_unit_id;
+INSERT INTO public.units (
+    unit_id,
+    housing_company_id,
+    physical_building_id,
+    identity_key,
+    address_norm,
+    apartment,
+    floor_level,
+    area_m2,
+    room_layout,
+    created_at,
+    updated_at
+)
+SELECT
+    pu.property_unit_id,
+    pu.housing_company_id,
+    pu.physical_building_id,
+    pu.property_unit_identity_key,
+    pu.property_unit_address_norm,
+    NULL::text,
+    pu.property_unit_floor_level,
+    pu.property_unit_area_value,
+    pu.property_unit_room_layout,
+    pu.property_unit_created_at,
+    pu.property_unit_updated_at
+FROM updated
+JOIN public.property_units pu ON pu.property_unit_id = updated.property_unit_id
+ON CONFLICT (unit_id) DO UPDATE SET
+    housing_company_id = EXCLUDED.housing_company_id,
+    physical_building_id = EXCLUDED.physical_building_id,
+    identity_key = EXCLUDED.identity_key,
+    address_norm = EXCLUDED.address_norm,
+    apartment = EXCLUDED.apartment,
+    floor_level = EXCLUDED.floor_level,
+    area_m2 = EXCLUDED.area_m2,
+    room_layout = EXCLUDED.room_layout,
+    updated_at = EXCLUDED.updated_at;
 
 -- name: SyncPropertyHouseForSaleListing :one
-SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid)::uuid;
+WITH synced AS (
+    SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid) AS property_house_id
+),
+synced_houses AS (
+    INSERT INTO public.houses (
+        house_id,
+        identity_key,
+        address_norm,
+        postal_norm,
+        city_norm,
+        latitude,
+        longitude,
+        created_at,
+        updated_at
+    )
+    SELECT
+        ph.property_house_id,
+        ph.property_house_identity_key,
+        ph.property_house_address_norm,
+        ph.property_house_postal_norm,
+        ph.property_house_city_norm,
+        ph.property_house_latitude,
+        ph.property_house_longitude,
+        ph.property_house_created_at,
+        ph.property_house_updated_at
+    FROM synced
+    JOIN public.property_houses ph ON ph.property_house_id = synced.property_house_id
+    WHERE synced.property_house_id <> '00000000-0000-0000-0000-000000000000'::uuid
+    ON CONFLICT (house_id) DO UPDATE SET
+        identity_key = EXCLUDED.identity_key,
+        address_norm = EXCLUDED.address_norm,
+        postal_norm = EXCLUDED.postal_norm,
+        city_norm = EXCLUDED.city_norm,
+        latitude = EXCLUDED.latitude,
+        longitude = EXCLUDED.longitude,
+        updated_at = EXCLUDED.updated_at
+    RETURNING house_id
+)
+SELECT property_house_id::uuid FROM synced;
 
 -- name: BackfillDetachedPropertyHouses :one
 WITH candidates AS (
     SELECT sl.sale_listing_id
     FROM public.property_source_offerings sl
-    JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-        AND pos.property_offering_source_link_status <> 'rejected'
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
+        AND source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     WHERE sl.sale_listing_property_type_code = 'detached_house'
         AND po.property_house_id IS NULL
     ORDER BY sl.sale_listing_updated_at DESC NULLS LAST, sl.sale_listing_id
     LIMIT sqlc.arg(batch_size)::int
 ),
 synced AS (
-    SELECT public.fnc__sync_property_house_for_sale_listing(sale_listing_id, 'regroup_v2_backfill') AS property_house_id
+    SELECT sale_listing_id, public.fnc__sync_property_house_for_sale_listing(sale_listing_id, 'regroup_v2_backfill') AS property_house_id
     FROM candidates
+),
+synced_houses AS (
+    INSERT INTO public.houses (
+        house_id,
+        identity_key,
+        address_norm,
+        postal_norm,
+        city_norm,
+        latitude,
+        longitude,
+        created_at,
+        updated_at
+    )
+    SELECT
+        ph.property_house_id,
+        ph.property_house_identity_key,
+        ph.property_house_address_norm,
+        ph.property_house_postal_norm,
+        ph.property_house_city_norm,
+        ph.property_house_latitude,
+        ph.property_house_longitude,
+        ph.property_house_created_at,
+        ph.property_house_updated_at
+    FROM synced
+    JOIN public.property_houses ph ON ph.property_house_id = synced.property_house_id
+    WHERE synced.property_house_id IS NOT NULL
+    ON CONFLICT (house_id) DO UPDATE SET
+        identity_key = EXCLUDED.identity_key,
+        address_norm = EXCLUDED.address_norm,
+        postal_norm = EXCLUDED.postal_norm,
+        city_norm = EXCLUDED.city_norm,
+        latitude = EXCLUDED.latitude,
+        longitude = EXCLUDED.longitude,
+        updated_at = EXCLUDED.updated_at
+    RETURNING house_id
+),
+synced_listings AS (
+    INSERT INTO public.listings (
+        listing_id,
+        listing_type,
+        listing_status,
+        primary_source_listing_id,
+        unit_id,
+        house_id,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        po.property_offering_id,
+        po.property_offering_type,
+        po.property_offering_status,
+        po.primary_sale_listing_id,
+        po.property_unit_id,
+        po.property_house_id,
+        po.property_offering_first_seen_at,
+        po.property_offering_last_seen_at,
+        po.property_offering_created_at,
+        po.property_offering_updated_at
+    FROM synced
+    JOIN public.target_sources source_link ON source_link.source_id = synced.sale_listing_id
+        AND source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    WHERE synced.property_house_id IS NOT NULL
+    ON CONFLICT (listing_id) DO UPDATE SET
+        listing_type = EXCLUDED.listing_type,
+        listing_status = EXCLUDED.listing_status,
+        primary_source_listing_id = EXCLUDED.primary_source_listing_id,
+        unit_id = EXCLUDED.unit_id,
+        house_id = EXCLUDED.house_id,
+        first_seen_at = EXCLUDED.first_seen_at,
+        last_seen_at = EXCLUDED.last_seen_at,
+        updated_at = EXCLUDED.updated_at
+    RETURNING listing_id
 )
 SELECT count(*)::integer
 FROM synced
@@ -815,16 +1045,18 @@ LIMIT 1;
 
 -- name: ListPropertySourceOfferingInsights :many
 SELECT
-    property_source_offering_insight_key,
-    property_source_offering_insight_value,
-    property_source_offering_insight_direction,
-    property_source_offering_insight_severity,
-    property_source_offering_insight_confidence,
-    property_source_offering_insight_source_field,
-    COALESCE(property_source_offering_insight_text, '') AS property_source_offering_insight_text
-FROM public.property_source_offering_insights
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
-ORDER BY property_source_offering_insight_severity DESC, property_source_offering_insight_key;
+    observation.observation_key AS property_source_offering_insight_key,
+    COALESCE(observation.value #>> '{}', '')::text AS property_source_offering_insight_value,
+    observation.direction AS property_source_offering_insight_direction,
+    observation.severity AS property_source_offering_insight_severity,
+    round(observation.confidence * 100)::integer AS property_source_offering_insight_confidence,
+    COALESCE(observation.evidence ->> 'source_field', '')::text AS property_source_offering_insight_source_field,
+    COALESCE(observation.text, '') AS property_source_offering_insight_text
+FROM public.target_observations observation
+WHERE observation.source_type = 'source_listing'
+    AND observation.source_id = sqlc.arg(sale_listing_id)
+    AND observation.superseded_at IS NULL
+ORDER BY observation.severity DESC, observation.observation_key;
 
 -- name: ListPropertyClaimsForEntity :many
 SELECT
@@ -845,7 +1077,7 @@ SELECT
     COALESCE(evidence #>> '{text}', '')::text AS property_claim_evidence_text,
     COALESCE(extraction_model, '')::text AS property_claim_model,
     COALESCE(extraction_prompt_version, '')::text AS property_claim_prompt_version
-FROM public.property_dimension_claims
+FROM public.dimension_claims
 WHERE target_type = public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type))
     AND target_id = sqlc.arg(entity_id)
 ORDER BY property_claim_namespace, property_claim_key;
@@ -1061,6 +1293,45 @@ ON CONFLICT (property_unit_identity_key) DO UPDATE SET
     property_unit_updated_at = now()
 RETURNING property_unit_id;
 
+-- name: SyncUnitFromPropertyUnit :exec
+INSERT INTO public.units (
+    unit_id,
+    housing_company_id,
+    physical_building_id,
+    identity_key,
+    address_norm,
+    apartment,
+    floor_level,
+    area_m2,
+    room_layout,
+    created_at,
+    updated_at
+)
+SELECT
+    property_unit_id,
+    housing_company_id,
+    physical_building_id,
+    property_unit_identity_key,
+    property_unit_address_norm,
+    NULL::text,
+    property_unit_floor_level,
+    property_unit_area_value,
+    property_unit_room_layout,
+    property_unit_created_at,
+    property_unit_updated_at
+FROM public.property_units
+WHERE property_unit_id = sqlc.arg(property_unit_id)
+ON CONFLICT (unit_id) DO UPDATE SET
+    housing_company_id = EXCLUDED.housing_company_id,
+    physical_building_id = EXCLUDED.physical_building_id,
+    identity_key = EXCLUDED.identity_key,
+    address_norm = EXCLUDED.address_norm,
+    apartment = EXCLUDED.apartment,
+    floor_level = EXCLUDED.floor_level,
+    area_m2 = EXCLUDED.area_m2,
+    room_layout = EXCLUDED.room_layout,
+    updated_at = EXCLUDED.updated_at;
+
 -- name: EnsureManagerCertificatePropertyOffering :one
 INSERT INTO public.property_offerings (
     property_unit_id,
@@ -1080,6 +1351,115 @@ ON CONFLICT (property_offering_identity_key) DO UPDATE SET
     property_offering_headline = EXCLUDED.property_offering_headline,
     property_offering_updated_at = now()
 RETURNING property_offering_id;
+
+-- name: SyncListingFromPropertyOffering :exec
+INSERT INTO public.listings (
+    listing_id,
+    listing_type,
+    listing_status,
+    primary_source_listing_id,
+    unit_id,
+    house_id,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+SELECT
+    property_offering_id,
+    property_offering_type,
+    property_offering_status,
+    primary_sale_listing_id,
+    property_unit_id,
+    property_house_id,
+    property_offering_first_seen_at,
+    property_offering_last_seen_at,
+    property_offering_created_at,
+    property_offering_updated_at
+FROM public.property_offerings
+WHERE property_offering_id = sqlc.arg(property_offering_id)
+ON CONFLICT (listing_id) DO UPDATE SET
+    listing_type = EXCLUDED.listing_type,
+    listing_status = EXCLUDED.listing_status,
+    primary_source_listing_id = EXCLUDED.primary_source_listing_id,
+    unit_id = EXCLUDED.unit_id,
+    house_id = EXCLUDED.house_id,
+    first_seen_at = EXCLUDED.first_seen_at,
+    last_seen_at = EXCLUDED.last_seen_at,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: SyncListingFromSourceListing :exec
+INSERT INTO public.listings (
+    listing_id,
+    listing_type,
+    listing_status,
+    primary_source_listing_id,
+    unit_id,
+    house_id,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+SELECT
+    po.property_offering_id,
+    po.property_offering_type,
+    po.property_offering_status,
+    po.primary_sale_listing_id,
+    po.property_unit_id,
+    po.property_house_id,
+    po.property_offering_first_seen_at,
+    po.property_offering_last_seen_at,
+    po.property_offering_created_at,
+    po.property_offering_updated_at
+FROM public.target_sources source_link
+JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+WHERE source_link.target_type = 'listing'
+    AND source_link.source_type = 'source_listing'
+    AND source_link.source_id = sqlc.arg(source_listing_id)
+    AND source_link.link_status <> 'rejected'
+ON CONFLICT (listing_id) DO UPDATE SET
+    listing_type = EXCLUDED.listing_type,
+    listing_status = EXCLUDED.listing_status,
+    primary_source_listing_id = EXCLUDED.primary_source_listing_id,
+    unit_id = EXCLUDED.unit_id,
+    house_id = EXCLUDED.house_id,
+    first_seen_at = EXCLUDED.first_seen_at,
+    last_seen_at = EXCLUDED.last_seen_at,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: SyncHouseFromPropertyHouse :exec
+INSERT INTO public.houses (
+    house_id,
+    identity_key,
+    address_norm,
+    postal_norm,
+    city_norm,
+    latitude,
+    longitude,
+    created_at,
+    updated_at
+)
+SELECT
+    property_house_id,
+    property_house_identity_key,
+    property_house_address_norm,
+    property_house_postal_norm,
+    property_house_city_norm,
+    property_house_latitude,
+    property_house_longitude,
+    property_house_created_at,
+    property_house_updated_at
+FROM public.property_houses
+WHERE property_house_id = sqlc.arg(property_house_id)
+ON CONFLICT (house_id) DO UPDATE SET
+    identity_key = EXCLUDED.identity_key,
+    address_norm = EXCLUDED.address_norm,
+    postal_norm = EXCLUDED.postal_norm,
+    city_norm = EXCLUDED.city_norm,
+    latitude = EXCLUDED.latitude,
+    longitude = EXCLUDED.longitude,
+    updated_at = EXCLUDED.updated_at;
 
 -- name: GetPropertyDocumentDownload :one
 SELECT
@@ -1233,10 +1613,10 @@ SET property_document_extraction_status = sqlc.arg(status),
 WHERE property_document_id = sqlc.arg(property_document_id);
 
 -- name: DeleteLLMPropertyClaimsForDocument :exec
-DELETE FROM public.property_dimension_claims
-WHERE source_table = 'property_documents'
-    AND source_id = sqlc.arg(property_document_id)
-    AND extraction_model IS NOT NULL;
+DELETE FROM public.dimension_claims claims
+WHERE claims.source_table = 'property_documents'
+    AND claims.source_id = sqlc.arg(property_document_id)
+    AND claims.extraction_model IS NOT NULL;
 
 -- name: InsertDocumentPropertyClaim :exec
 WITH run AS (
@@ -1266,7 +1646,7 @@ payload AS (
         public.fnc__legacy_property_dimension_value_kind(sqlc.arg(value_kind)::text, sqlc.narg(value_json)::jsonb) AS value_kind,
         public.fnc__legacy_property_dimension_value(sqlc.arg(value_kind)::text, NULLIF(sqlc.arg(value_text), ''), sqlc.narg(value_number)::double precision, sqlc.narg(value_bool)::boolean, sqlc.narg(value_json)::jsonb) AS value
 )
-INSERT INTO public.property_dimension_claims (
+INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,
     projection_version,
     claim_scope,
@@ -1331,36 +1711,64 @@ ON CONFLICT (
     updated_at = now();
 
 -- name: DeleteLLMPropertySourceOfferingInsights :exec
-DELETE FROM public.property_source_offering_insights
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
-    AND property_source_offering_insight_source_field LIKE 'llm_%';
+UPDATE public.target_observations
+SET superseded_at = now()
+WHERE source_type = 'source_listing'
+    AND source_id = sqlc.arg(sale_listing_id)
+    AND superseded_at IS NULL
+    AND evidence ->> 'source_field' LIKE 'llm_%';
 
 -- name: DeleteLLMPropertyClaimsForEntity :exec
-DELETE FROM public.property_dimension_claims
-WHERE target_type = public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type)::text)
-    AND target_id = sqlc.arg(entity_id)
-    AND extraction_model IS NOT NULL;
+DELETE FROM public.dimension_claims claims
+WHERE claims.target_type = public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type)::text)
+    AND claims.target_id = sqlc.arg(entity_id)
+    AND claims.extraction_model IS NOT NULL;
 
 -- name: InsertPropertySourceOfferingInsight :exec
-INSERT INTO public.property_source_offering_insights (
-    sale_listing_id,
-    property_source_offering_insight_source_field,
-    property_source_offering_insight_key,
-    property_source_offering_insight_value,
-    property_source_offering_insight_direction,
-    property_source_offering_insight_severity,
-    property_source_offering_insight_confidence,
-    property_source_offering_insight_text
-) VALUES (
-    sqlc.arg(sale_listing_id),
-    sqlc.arg(source_field),
+INSERT INTO public.target_observations (
+    target_type,
+    target_id,
+    observation_key,
+    observation_kind,
+    severity,
+    direction,
+    value,
+    text,
+    confidence,
+    source_type,
+    source_id,
+    evidence
+)
+SELECT
+    source_link.target_type,
+    source_link.target_id,
     sqlc.arg(key),
-    sqlc.arg(value),
-    sqlc.arg(direction),
+    CASE
+        WHEN sqlc.arg(direction)::text = 'negative' THEN 'risk'
+        WHEN sqlc.arg(direction)::text = 'positive' THEN 'opportunity'
+        ELSE 'summary'
+    END,
     sqlc.arg(severity),
-    sqlc.arg(confidence),
-    NULLIF(sqlc.arg(text), '')
-);
+    sqlc.arg(direction),
+    to_jsonb(sqlc.arg(value)::text),
+    NULLIF(sqlc.arg(text), ''),
+    sqlc.arg(confidence)::integer::double precision / 100,
+    'source_listing',
+    source_link.source_id,
+    jsonb_build_object('source_field', sqlc.arg(source_field)::text)
+FROM public.target_sources source_link
+WHERE source_link.target_type = 'listing'
+    AND source_link.source_type = 'source_listing'
+    AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+    AND source_link.link_status <> 'rejected'
+ON CONFLICT (target_type, target_id, observation_key, source_type, source_id) WHERE superseded_at IS NULL DO UPDATE SET
+    observation_kind = EXCLUDED.observation_kind,
+    severity = EXCLUDED.severity,
+    direction = EXCLUDED.direction,
+    value = EXCLUDED.value,
+    text = EXCLUDED.text,
+    confidence = EXCLUDED.confidence,
+    evidence = EXCLUDED.evidence;
 
 -- name: InsertPropertyClaim :exec
 WITH run AS (
@@ -1390,7 +1798,7 @@ payload AS (
         public.fnc__legacy_property_dimension_value_kind(sqlc.arg(value_kind)::text, NULL::jsonb) AS value_kind,
         public.fnc__legacy_property_dimension_value(sqlc.arg(value_kind)::text, NULLIF(sqlc.arg(value_text), ''), sqlc.narg(value_number)::double precision, sqlc.narg(value_bool)::boolean, NULL::jsonb) AS value
 )
-INSERT INTO public.property_dimension_claims (
+INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,
     projection_version,
     claim_scope,
@@ -1486,17 +1894,19 @@ WITH unified AS (
     LEFT JOIN LATERAL (
         SELECT
             sl.sale_listing_id,
-            pos.property_offering_id,
+            source_link.target_id AS property_offering_id,
             sl.sale_listing_latitude AS latitude,
             sl.sale_listing_longitude AS longitude,
-            pos.property_offering_source_link_status AS link_status,
-            pos.property_offering_source_link_method AS link_method,
-            pos.property_offering_source_link_score AS link_score
+            source_link.link_status,
+            source_link.link_method,
+            source_link.link_score
         FROM public.property_source_offerings sl
-        LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
+        LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
+            AND source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.link_status <> 'rejected'
         WHERE sl.shortcut_ad_id = sa.shortcut_ad_id
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
     ) linked ON true
     CROSS JOIN LATERAL (
@@ -1541,12 +1951,12 @@ WITH unified AS (
         fa.frontdoor_ad_external_id AS native_id,
         sl.sale_listing_id::text AS canonical_id,
         sl.sale_listing_id::text AS listing_id,
-        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(source_link.target_id::text, '') AS offering_id,
         sl.sale_listing_latitude AS latitude,
         sl.sale_listing_longitude AS longitude,
-        COALESCE(pos.property_offering_source_link_status, '') AS link_status,
-        COALESCE(pos.property_offering_source_link_method, '') AS link_method,
-        pos.property_offering_source_link_score::int4 AS link_score,
+        COALESCE(source_link.link_status, '') AS link_status,
+        COALESCE(source_link.link_method, '') AS link_method,
+        source_link.link_score::int4 AS link_score,
         (fa.frontdoor_ad_page_not_found = false) AS external_url_available,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, fa.frontdoor_ad_external_id) AS headline,
         sl.sale_listing_street_address AS address,
@@ -1564,16 +1974,18 @@ WITH unified AS (
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     LEFT JOIN LATERAL (
         SELECT
-            pos.property_offering_id,
-            pos.property_offering_source_link_status,
-            pos.property_offering_source_link_method,
-            pos.property_offering_source_link_score
-        FROM public.property_offering_sources pos
-        WHERE pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+            source_link.target_id,
+            source_link.link_status,
+            source_link.link_method,
+            source_link.link_score
+        FROM public.target_sources source_link
+        WHERE source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.source_id = sl.sale_listing_id
+            AND source_link.link_status <> 'rejected'
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
-    ) pos ON true
+    ) source_link ON true
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -1581,12 +1993,12 @@ WITH unified AS (
         sl.sale_listing_native_id AS native_id,
         sl.sale_listing_id::text AS canonical_id,
         sl.sale_listing_id::text AS listing_id,
-        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(source_link.target_id::text, '') AS offering_id,
         sl.sale_listing_latitude AS latitude,
         sl.sale_listing_longitude AS longitude,
-        COALESCE(pos.property_offering_source_link_status, '') AS link_status,
-        COALESCE(pos.property_offering_source_link_method, '') AS link_method,
-        pos.property_offering_source_link_score::int4 AS link_score,
+        COALESCE(source_link.link_status, '') AS link_status,
+        COALESCE(source_link.link_method, '') AS link_method,
+        source_link.link_score::int4 AS link_score,
         COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
         sl.sale_listing_street_address AS address,
@@ -1604,16 +2016,18 @@ WITH unified AS (
     LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT
-            pos.property_offering_id,
-            pos.property_offering_source_link_status,
-            pos.property_offering_source_link_method,
-            pos.property_offering_source_link_score
-        FROM public.property_offering_sources pos
-        WHERE pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+            source_link.target_id,
+            source_link.link_status,
+            source_link.link_method,
+            source_link.link_score
+        FROM public.target_sources source_link
+        WHERE source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.source_id = sl.sale_listing_id
+            AND source_link.link_status <> 'rejected'
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
-    ) pos ON true
+    ) source_link ON true
     WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
@@ -1698,44 +2112,29 @@ LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_comp
 LEFT JOIN LATERAL (
     SELECT
         pt.prices_transaction_id AS transaction_id,
-        match_source.match_scope,
-        match_source.match_status,
-        match_source.match_method,
-        match_source.match_score,
+        price_link.target_type AS match_scope,
+        price_link.link_status AS match_status,
+        price_link.link_method AS match_method,
+        price_link.link_score::int4 AS match_score,
         pt.prices_transaction_price AS price_eur
-    FROM (
-        SELECT
-            sl.prices_transaction_id,
-            'source_listing'::text AS match_scope,
-            COALESCE(sl.sale_listing_prices_match_status, 'linked') AS match_status,
-            'prices_service'::text AS match_method,
-            NULL::int4 AS match_score,
-            0 AS priority
-        FROM public.property_source_offerings sl
-        WHERE sl.sale_listing_id::text = u.listing_id
-            AND sl.prices_transaction_id IS NOT NULL
-        UNION ALL
-        SELECT
-            pot.prices_transaction_id,
-            'grouped_offering'::text AS match_scope,
-            pot.property_offering_transaction_link_status AS match_status,
-            pot.property_offering_transaction_link_method AS match_method,
-            pot.property_offering_transaction_link_score::int4 AS match_score,
-            1 AS priority
-        FROM public.property_offering_transactions pot
-        WHERE pot.property_offering_id::text = u.offering_id
-            AND pot.property_offering_transaction_link_status <> 'rejected'
-    ) match_source
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
-    ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+    FROM public.price_links price_link
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
+    WHERE price_link.link_status <> 'rejected'
+        AND (
+            (price_link.target_type = 'source_listing' AND price_link.target_id::text = u.listing_id)
+            OR (price_link.target_type = 'listing' AND price_link.target_id::text = u.offering_id)
+        )
+    ORDER BY CASE WHEN price_link.target_type = 'source_listing' THEN 0 ELSE 1 END, price_link.link_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
     LIMIT 1
 ) price_match ON true
 LEFT JOIN LATERAL (
     SELECT
         count(*)::int4 AS insight_count,
-        max(property_source_offering_insight_severity)::text AS top_severity
-    FROM public.property_source_offering_insights insight
-    WHERE insight.sale_listing_id::text = u.listing_id
+        max(observation.severity)::text AS top_severity
+    FROM public.target_observations observation
+    WHERE observation.source_type = 'source_listing'
+        AND observation.source_id::text = u.listing_id
+        AND observation.superseded_at IS NULL
 ) insight_stats ON true
 ORDER BY
     CASE WHEN sqlc.arg(sort_mode) = 'price_asc' THEN u.price END ASC NULLS LAST,
@@ -1766,12 +2165,14 @@ WITH unified AS (
     FROM public.shortcut_ads sa
     LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     LEFT JOIN LATERAL (
-        SELECT pos.property_offering_id
+        SELECT source_link.target_id AS property_offering_id
         FROM public.property_source_offerings sl
-        JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
+        JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
+            AND source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.link_status <> 'rejected'
         WHERE sl.shortcut_ad_id = sa.shortcut_ad_id
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
     ) linked ON true
     CROSS JOIN LATERAL (
@@ -1799,7 +2200,7 @@ WITH unified AS (
     SELECT
         'frontdoor'::text AS source,
         'ad'::text AS kind,
-        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(source_link.target_id::text, '') AS offering_id,
         sl.sale_listing_city AS city,
         sl.sale_listing_postal AS postal,
         sl.sale_listing_asking_price AS price,
@@ -1810,18 +2211,20 @@ WITH unified AS (
     FROM public.frontdoor_ads fa
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     LEFT JOIN LATERAL (
-        SELECT pos.property_offering_id
-        FROM public.property_offering_sources pos
-        WHERE pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        SELECT source_link.target_id
+        FROM public.target_sources source_link
+        WHERE source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.source_id = sl.sale_listing_id
+            AND source_link.link_status <> 'rejected'
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
-    ) pos ON true
+    ) source_link ON true
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
         'announcement'::text AS kind,
-        COALESCE(pos.property_offering_id::text, '') AS offering_id,
+        COALESCE(source_link.target_id::text, '') AS offering_id,
         sl.sale_listing_city AS city,
         sl.sale_listing_postal AS postal,
         sl.sale_listing_asking_price AS price,
@@ -1831,13 +2234,15 @@ WITH unified AS (
         sl.sale_listing_published_at AS published_at
     FROM public.property_source_offerings sl
     LEFT JOIN LATERAL (
-        SELECT pos.property_offering_id
-        FROM public.property_offering_sources pos
-        WHERE pos.sale_listing_id = sl.sale_listing_id
-            AND pos.property_offering_source_link_status <> 'rejected'
-        ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_updated_at DESC NULLS LAST
+        SELECT source_link.target_id
+        FROM public.target_sources source_link
+        WHERE source_link.target_type = 'listing'
+            AND source_link.source_type = 'source_listing'
+            AND source_link.source_id = sl.sale_listing_id
+            AND source_link.link_status <> 'rejected'
+        ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
         LIMIT 1
-    ) pos ON true
+    ) source_link ON true
     WHERE sl.frontdoor_building_announcement_id IS NOT NULL
     UNION ALL
     SELECT
@@ -2240,15 +2645,6 @@ LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 LIMIT 1;
-
--- name: RelinkPropertyOfferingSource :one
-SELECT public.fnc__relink_property_offering_source(
-    sqlc.arg(sale_listing_id)::uuid,
-    sqlc.arg(property_offering_id)::uuid,
-    sqlc.arg(method)::text,
-    sqlc.arg(score)::integer,
-    sqlc.arg(reasons)::jsonb
-)::jsonb;
 
 -- name: RelinkPropertyUnitBuilding :one
 SELECT public.fnc__relink_property_unit_building(

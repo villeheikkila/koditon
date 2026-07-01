@@ -29,7 +29,6 @@ var canonicalWorkflowKinds = []string{
 	TaskTypeCanonicalRebuildDimensionLayerListing,
 	TaskTypeCanonicalResolveDirtyDimensionTargets,
 	TaskTypeCanonicalResolveDimensionTarget,
-	TaskTypeCanonicalBackfillTargetSources,
 	TaskTypeCanonicalBackfillBuildingCoordinates,
 	TaskTypeCanonicalBackfillDetachedHouses,
 	TaskTypeCanonicalProjectManagerCertificate,
@@ -179,8 +178,6 @@ func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params json.RawM
 		result, err = c.runResolveDirtyDimensionTargetsWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalResolveDimensionTarget:
 		result, err = c.runResolveDimensionTargetWorkflow(ctx, logger, params)
-	case TaskTypeCanonicalBackfillTargetSources:
-		result, err = c.runCanonicalBackfillTargetSourcesWorkflow(ctx, logger)
 	case TaskTypeCanonicalBackfillBuildingCoordinates:
 		result, err = c.runCanonicalBackfillBuildingCoordinatesWorkflow(ctx, logger)
 	case TaskTypeCanonicalBackfillDetachedHouses:
@@ -325,10 +322,12 @@ func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *
 		rows, err := c.pool.Query(ctx, `
 SELECT sl.sale_listing_id::text, COALESCE(sl.sale_listing_source_match_attempt_count, 0)
 FROM public.property_source_offerings sl
-JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
+JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
 WHERE sl.sale_listing_source_kind = 'ad'
-    AND pos.property_offering_source_link_status <> 'rejected'
-    AND pos.property_offering_source_link_method <> 'manual'
+    AND source_link.target_type = 'listing'
+    AND source_link.source_type = 'source_listing'
+    AND source_link.link_status <> 'rejected'
+    AND source_link.link_method <> 'manual'
     AND COALESCE(sl.sale_listing_source_match_status, 'pending') IN ('pending', 'deferred', 'noop')
     AND COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at) <= now()
 ORDER BY COALESCE(sl.sale_listing_source_match_next_attempt_at, sl.sale_listing_updated_at), sl.sale_listing_updated_at
@@ -548,16 +547,6 @@ func (c *Consumer) runResolveDimensionTargetWorkflow(ctx context.Context, logger
 	}
 	logger.InfoContext(ctx, "dimension target resolved", "target_type", payload.TargetType, "target_id", payload.TargetID, "result", string(result), "outcome", logging.OutcomeSuccess)
 	return result, nil
-}
-
-func (c *Consumer) runCanonicalBackfillTargetSourcesWorkflow(ctx context.Context, logger *slog.Logger) (canonicalFanoutResult, error) {
-	_, err := absurd.Step(ctx, "backfill-target-sources", func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.handleCanonicalBackfillTargetSources(ctx, logger)
-	})
-	if err != nil {
-		return canonicalFanoutResult{}, err
-	}
-	return canonicalFanoutResult{Enqueued: 0}, nil
 }
 
 func (c *Consumer) runCanonicalBackfillBuildingCoordinatesWorkflow(ctx context.Context, logger *slog.Logger) (canonicalFanoutResult, error) {

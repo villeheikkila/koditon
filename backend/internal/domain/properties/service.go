@@ -297,12 +297,14 @@ func (s *Service) saleListingValuationClaimTargets(ctx context.Context, saleList
 	rows, err := s.db.Query(ctx, `
 WITH linked AS (
     SELECT pu.property_unit_id, pu.physical_building_id, pu.housing_company_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE pos.sale_listing_id = $1
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
     LIMIT 1
 )
 SELECT 'sale_listing'::text, $1::uuid
@@ -361,13 +363,15 @@ WITH target AS (
     SELECT
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
         pu.physical_building_id
-    FROM public.property_offering_sources pos
-    JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE pos.sale_listing_id = $1
-        AND pos.property_offering_source_link_status <> 'rejected'
-    ORDER BY pos.property_offering_source_link_score DESC, pos.property_offering_source_updated_at DESC
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
     LIMIT 1
 )
 SELECT
@@ -682,7 +686,7 @@ LIMIT 1`, housingCompanyID).Scan(&building.ID, &building.Details.Identity.Key, &
 			"merged_from":          mergedFrom,
 		}
 	}
-	if err := s.enrichBuildingFromFacts(ctx, &building, housingCompanyID); err != nil {
+	if err := s.enrichBuildingFromProfile(ctx, &building, housingCompanyID); err != nil {
 		return Building{}, err
 	}
 	if err := s.enrichBuildingFromOfferingSources(ctx, &building, housingCompanyID); err != nil {
@@ -696,64 +700,68 @@ LIMIT 1`, housingCompanyID).Scan(&building.ID, &building.Details.Identity.Key, &
 	return building, nil
 }
 
-func (s *Service) enrichBuildingFromFacts(ctx context.Context, building *Building, buildingID uuid.UUID) error {
+func (s *Service) enrichBuildingFromProfile(ctx context.Context, building *Building, buildingID uuid.UUID) error {
+	var housingCompany, businessID, energyLabel, buildingMaterial, heating, roofType, roofMaterial, carStorage, description, otherInfo *string
+	var buildYear, floorCount, apartmentCount *int32
+	var elevator *bool
+	err := s.db.QueryRow(ctx, `
+SELECT
+    NULLIF(profile.resolved_values #>> '{housing_company,name}', ''),
+    NULLIF(profile.resolved_values #>> '{housing_company,business_id}', ''),
+    NULLIF(profile.resolved_values #>> '{building,build_year}', '')::int4,
+    NULLIF(profile.resolved_values #>> '{building,floor_count}', '')::int4,
+    NULLIF(profile.resolved_values #>> '{building,apartment_count}', '')::int4,
+    NULLIF(profile.resolved_values #>> '{building,elevator}', '')::bool,
+    NULLIF(profile.resolved_values #>> '{building,energy_class}', ''),
+    NULLIF(profile.resolved_values #>> '{building,material}', ''),
+    NULLIF(profile.resolved_values #>> '{building,heating_method}', ''),
+    NULLIF(profile.resolved_values #>> '{building,roof_type}', ''),
+    NULLIF(profile.resolved_values #>> '{building,roof_material}', ''),
+    NULLIF(profile.resolved_values #>> '{building,car_storage}', ''),
+    NULLIF(profile.resolved_values #>> '{building,description}', ''),
+    NULLIF(profile.resolved_values #>> '{building,other_info}', '')
+FROM public.dimension_profiles profile
+WHERE profile.target_type = 'housing_company'
+    AND profile.target_id = $1
+LIMIT 1`, buildingID).Scan(&housingCompany, &businessID, &buildYear, &floorCount, &apartmentCount, &elevator, &energyLabel, &buildingMaterial, &heating, &roofType, &roofMaterial, &carStorage, &description, &otherInfo)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	building.Details.HousingCompany = firstNonEmpty(building.Details.HousingCompany, valueOrEmpty(housingCompany))
+	building.Details.BusinessID = firstNonEmpty(building.Details.BusinessID, valueOrEmpty(businessID))
+	building.Details.BuildYear = firstInt32(building.Details.BuildYear, buildYear)
+	building.Details.FloorCount = firstInt32(building.Details.FloorCount, floorCount)
+	building.Details.ApartmentCount = firstInt32(building.Details.ApartmentCount, apartmentCount)
+	building.Details.Elevator = firstBool(building.Details.Elevator, elevator)
+	building.Details.EnergyClass = firstNonEmpty(building.Details.EnergyClass, displayEnergyClass(valueOrEmpty(energyLabel)))
+	building.Details.BuildingMaterial = firstNonEmpty(building.Details.BuildingMaterial, valueOrEmpty(buildingMaterial))
+	building.Details.Heating = firstNonEmpty(building.Details.Heating, valueOrEmpty(heating))
+	building.Details.RoofType = firstNonEmpty(building.Details.RoofType, valueOrEmpty(roofType))
+	building.Details.RoofMaterial = firstNonEmpty(building.Details.RoofMaterial, valueOrEmpty(roofMaterial))
+	building.Details.CarStorage = firstNonEmpty(building.Details.CarStorage, valueOrEmpty(carStorage))
+	building.Details.OtherInfo = firstNonEmpty(building.Details.OtherInfo, valueOrEmpty(otherInfo))
+	building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(description), valueOrEmpty(otherInfo))
 	rows, err := s.db.Query(ctx, `
 SELECT
-    housing_company_fact_key,
-    housing_company_fact_value_text,
-    housing_company_fact_value_number::int4,
-    housing_company_fact_value_bool
-FROM public.housing_company_facts
-WHERE housing_company_id = $1
-ORDER BY housing_company_fact_updated_at DESC`, buildingID)
+    event.category,
+    COALESCE(event.year, event.start_year)::int4
+FROM public.property_renovation_events event
+WHERE event.target_type = 'housing_company'
+    AND event.target_id = $1
+    AND event.category <> ''
+    AND event.status = 'done'
+ORDER BY event.category, COALESCE(event.year, event.start_year) NULLS LAST`, buildingID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var key string
-		var text *string
-		var number *int32
-		var valueBool *bool
-		if err := rows.Scan(&key, &text, &number, &valueBool); err != nil {
+		var category string
+		var year *int32
+		if err := rows.Scan(&category, &year); err != nil {
 			return err
 		}
-		switch key {
-		case "housing_company_name":
-			building.Details.HousingCompany = firstNonEmpty(building.Details.HousingCompany, valueOrEmpty(text))
-		case "housing_company_business_id":
-			building.Details.BusinessID = firstNonEmpty(building.Details.BusinessID, valueOrEmpty(text))
-		case "build_year":
-			building.Details.BuildYear = firstInt32(building.Details.BuildYear, number)
-		case "floor_count":
-			building.Details.FloorCount = firstInt32(building.Details.FloorCount, number)
-		case "apartment_count":
-			building.Details.ApartmentCount = firstInt32(building.Details.ApartmentCount, number)
-		case "elevator":
-			building.Details.Elevator = firstBool(building.Details.Elevator, valueBool)
-		case "energy_label":
-			energy := displayEnergyClass(valueOrEmpty(text))
-			building.Details.EnergyClass = firstNonEmpty(building.Details.EnergyClass, energy)
-		case "building_material":
-			building.Details.BuildingMaterial = firstNonEmpty(building.Details.BuildingMaterial, valueOrEmpty(text))
-		case "heating_system":
-			building.Details.Heating = firstNonEmpty(building.Details.Heating, valueOrEmpty(text))
-		case "roof_type":
-			building.Details.RoofType = firstNonEmpty(building.Details.RoofType, valueOrEmpty(text))
-		case "roof_material":
-			building.Details.RoofMaterial = firstNonEmpty(building.Details.RoofMaterial, valueOrEmpty(text))
-		case "car_storage":
-			building.Details.CarStorage = firstNonEmpty(building.Details.CarStorage, valueOrEmpty(text))
-		case "description":
-			building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(text))
-		case "other_info":
-			building.Details.OtherInfo = firstNonEmpty(building.Details.OtherInfo, valueOrEmpty(text))
-			building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(text))
-		default:
-			if strings.HasPrefix(key, "renovation.") {
-				building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(strings.TrimPrefix(key, "renovation."), ptrBool(true), number))
-			}
-		}
+		building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(category, ptrBool(true), year))
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -768,15 +776,17 @@ SELECT
     sl.sale_listing_id
 FROM public.property_units pu
 JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+    AND source_link.target_id = po.property_offering_id
+    AND source_link.source_type = 'source_listing'
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
 WHERE pu.housing_company_id = $1
-    AND pos.property_offering_source_link_status <> 'rejected'
+    AND source_link.link_status <> 'rejected'
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 ORDER BY
     CASE WHEN sl.sale_listing_source_kind = 'ad' THEN 0 ELSE 1 END,
     sl.sale_listing_last_seen_at DESC NULLS LAST,
-    pos.property_offering_source_link_score DESC,
+    source_link.link_score DESC,
     sl.sale_listing_created_at DESC
 LIMIT 200`, buildingID)
 	if err != nil {
@@ -908,20 +918,23 @@ LEFT JOIN LATERAL (
         max(sl.sale_listing_last_seen_at) AS last_seen_at,
         array_agg(DISTINCT sl.sale_listing_source_provider ORDER BY sl.sale_listing_source_provider) AS providers,
         array_agg(DISTINCT sl.sale_listing_source_kind ORDER BY sl.sale_listing_source_kind) AS kinds
-    FROM public.property_offering_sources pos
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
-    WHERE pos.property_offering_id = po.property_offering_id
-        AND pos.property_offering_source_link_status <> 'rejected'
+    FROM public.target_sources source_link
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.target_id = po.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
 ) source_summary ON true
 LEFT JOIN LATERAL (
     SELECT
         pt.prices_transaction_price::bigint AS sold_price,
         pt.prices_transaction_created_at AS sold_at
-    FROM public.property_offering_transactions pot
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = pot.prices_transaction_id
-    WHERE pot.property_offering_id = po.property_offering_id
-        AND pot.property_offering_transaction_link_status <> 'rejected'
-    ORDER BY pot.property_offering_transaction_link_score DESC, pt.prices_transaction_created_at DESC
+    FROM public.price_links pl
+    JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
+    WHERE pl.target_type = 'listing'
+        AND pl.target_id = po.property_offering_id
+        AND pl.link_status <> 'rejected'
+    ORDER BY pl.link_score DESC, pt.prices_transaction_created_at DESC
     LIMIT 1
 ) transaction_summary ON true
 WHERE pu.housing_company_id = $1
@@ -979,7 +992,7 @@ SELECT
     pb.housing_company_id::text,
     pu.property_unit_id::text,
     selected.sale_listing_id,
-    count(DISTINCT pos.property_offering_source_id)::int4,
+    count(DISTINCT source_count.target_source_id)::int4,
     count(DISTINCT merges.source_property_offering_id)::int4,
     COALESCE(array_agg(DISTINCT merges.source_property_offering_id::text) FILTER (WHERE merges.source_property_offering_id IS NOT NULL), ARRAY[]::text[])
 FROM public.property_offerings po
@@ -988,10 +1001,12 @@ JOIN public.housing_companies pb ON pb.housing_company_id = pu.housing_company_i
 JOIN LATERAL (
     SELECT
         sl.sale_listing_id
-    FROM public.property_offering_sources linked
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = linked.sale_listing_id
-    WHERE linked.property_offering_id = po.property_offering_id
-        AND linked.property_offering_source_link_status <> 'rejected'
+    FROM public.target_sources linked
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = linked.source_id
+    WHERE linked.target_type = 'listing'
+        AND linked.target_id = po.property_offering_id
+        AND linked.source_type = 'source_listing'
+        AND linked.link_status <> 'rejected'
     ORDER BY
         CASE WHEN sl.sale_listing_source_kind = 'ad' THEN 0 ELSE 1 END,
         CASE WHEN sl.sale_listing_asking_price IS NOT NULL THEN 0 ELSE 1 END,
@@ -1002,12 +1017,14 @@ JOIN LATERAL (
             ELSE 2
         END,
         sl.sale_listing_last_seen_at DESC NULLS LAST,
-        linked.property_offering_source_link_score DESC,
+        linked.link_score DESC,
         sl.sale_listing_created_at DESC
     LIMIT 1
 ) selected ON true
-LEFT JOIN public.property_offering_sources pos ON pos.property_offering_id = po.property_offering_id
-    AND pos.property_offering_source_link_status <> 'rejected'
+LEFT JOIN public.target_sources source_count ON source_count.target_type = 'listing'
+    AND source_count.target_id = po.property_offering_id
+    AND source_count.source_type = 'source_listing'
+    AND source_count.link_status <> 'rejected'
 LEFT JOIN public.property_offering_merge_decisions merges ON merges.target_property_offering_id = po.property_offering_id
     AND merges.property_offering_merge_decision_status = 'accepted'
 WHERE po.property_offering_id = $1
@@ -1030,13 +1047,15 @@ SELECT
     COALESCE(sl.sale_listing_headline, ''),
     sl.sale_listing_first_seen_at,
     sl.sale_listing_last_seen_at,
-    pos.property_offering_source_link_status,
-    pos.property_offering_source_link_method,
-    pos.property_offering_source_link_score::int4
-FROM public.property_offering_sources pos
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
-WHERE pos.property_offering_id = $1
-    AND pos.property_offering_source_link_status <> 'rejected'
+    source_link.link_status,
+    source_link.link_method,
+    source_link.link_score::int4
+FROM public.target_sources source_link
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
+WHERE source_link.target_type = 'listing'
+    AND source_link.target_id = $1
+    AND source_link.source_type = 'source_listing'
+    AND source_link.link_status <> 'rejected'
 ORDER BY sl.sale_listing_last_seen_at DESC NULLS LAST, sl.sale_listing_created_at DESC`, offeringID)
 	if err != nil {
 		return nil, err
@@ -1449,14 +1468,16 @@ SELECT
         END,
         '{}'::jsonb
     ) AS payload
-FROM public.property_offering_sources pos
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = pos.sale_listing_id
+FROM public.target_sources source_link
+JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
 LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-WHERE pos.property_offering_id = $1
-    AND pos.sale_listing_id = $2
-    AND pos.property_offering_source_link_status <> 'rejected'
+WHERE source_link.target_type = 'listing'
+    AND source_link.target_id = $1
+    AND source_link.source_type = 'source_listing'
+    AND source_link.source_id = $2
+    AND source_link.link_status <> 'rejected'
 LIMIT 1`, offeringID, sourceID).Scan(&out.ID, &out.Provider, &out.Kind, &out.NativeID, &out.Payload)
 	if err != nil {
 		return OfferingSourceRawPayload{}, mapNotFound(err)
@@ -1471,31 +1492,31 @@ func (s *Service) enrichSaleListingFromCanonicalBuilding(ctx context.Context, li
 	var latitude, longitude *float64
 	err := s.db.QueryRow(ctx, `
 SELECT
-    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'housing_company_name'), ''), hc.housing_company_name),
-    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'housing_company_business_id'), ''), hc.housing_company_business_id),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{housing_company,name}', ''), hc.housing_company_name),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{housing_company,business_id}', ''), hc.housing_company_business_id),
     hc.housing_company_address_norm,
     hc.housing_company_postal_norm,
     hc.housing_company_city_norm,
-    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'build_year')::int4, hc.housing_company_build_year),
-    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'floor_count')::int4, hc.housing_company_floor_count),
-    COALESCE(max(hcf.housing_company_fact_value_number) FILTER (WHERE hcf.housing_company_fact_key = 'apartment_count')::int4, hc.housing_company_apartment_count),
-    COALESCE(bool_or(hcf.housing_company_fact_value_bool) FILTER (WHERE hcf.housing_company_fact_key = 'elevator'), hc.housing_company_elevator),
-    COALESCE(NULLIF(max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'energy_label'), ''), hc.housing_company_energy_efficiency_label),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'building_material'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'heating_system'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'roof_material'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'roof_type'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'car_storage'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'description'),
-    max(hcf.housing_company_fact_value_text) FILTER (WHERE hcf.housing_company_fact_key = 'other_info'),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{building,build_year}', '')::int4, hc.housing_company_build_year),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{building,floor_count}', '')::int4, hc.housing_company_floor_count),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{building,apartment_count}', '')::int4, hc.housing_company_apartment_count),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{building,elevator}', '')::bool, hc.housing_company_elevator),
+    COALESCE(NULLIF(hcp.resolved_values #>> '{building,energy_class}', ''), hc.housing_company_energy_efficiency_label),
+    NULLIF(hcp.resolved_values #>> '{building,material}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,heating_method}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,roof_material}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,roof_type}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,car_storage}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,description}', ''),
+    NULLIF(hcp.resolved_values #>> '{building,other_info}', ''),
     CASE WHEN hc.housing_company_geom IS NULL THEN NULL ELSE postgis.ST_Y(hc.housing_company_geom)::double precision END,
     CASE WHEN hc.housing_company_geom IS NULL THEN NULL ELSE postgis.ST_X(hc.housing_company_geom)::double precision END
 FROM public.property_offerings po
 JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-LEFT JOIN public.housing_company_facts hcf ON hcf.housing_company_id = hc.housing_company_id
+LEFT JOIN public.dimension_profiles hcp ON hcp.target_type = 'housing_company'
+    AND hcp.target_id = hc.housing_company_id
 WHERE po.property_offering_id = $1
-GROUP BY hc.housing_company_id
 LIMIT 1`, offeringID).Scan(&housingCompany, &businessID, &address, &postal, &city, &buildYear, &floorCount, &apartmentCount, &elevator, &energyLabel, &buildingMaterial, &heating, &roofMaterial, &roofType, &carStorage, &description, &otherInfo, &latitude, &longitude)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1525,34 +1546,36 @@ LIMIT 1`, offeringID).Scan(&housingCompany, &businessID, &address, &postal, &cit
 	listing.Building.CarStorage = firstNonEmpty(listing.Building.CarStorage, valueOrEmpty(carStorage))
 	listing.Building.OtherInfo = firstNonEmpty(listing.Building.OtherInfo, valueOrEmpty(otherInfo))
 	listing.Texts.Building = firstNonEmpty(listing.Texts.Building, valueOrEmpty(description), valueOrEmpty(otherInfo))
-	if err := s.enrichSaleListingFromHousingCompanyFacts(ctx, listing, offeringID); err != nil {
+	if err := s.enrichSaleListingFromHousingCompanyRenovations(ctx, listing, offeringID); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Service) enrichSaleListingFromHousingCompanyFacts(ctx context.Context, listing *SaleListing, offeringID uuid.UUID) error {
+func (s *Service) enrichSaleListingFromHousingCompanyRenovations(ctx context.Context, listing *SaleListing, offeringID uuid.UUID) error {
 	rows, err := s.db.Query(ctx, `
 SELECT
-    hcf.housing_company_fact_key,
-    hcf.housing_company_fact_value_number::int4
+    event.category,
+    COALESCE(event.year, event.start_year)::int4
 FROM public.property_offerings po
 JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-JOIN public.housing_company_facts hcf ON hcf.housing_company_id = pu.housing_company_id
+JOIN public.property_renovation_events event ON event.target_type = 'housing_company'
+    AND event.target_id = pu.housing_company_id
 WHERE po.property_offering_id = $1
-    AND hcf.housing_company_fact_key LIKE 'renovation.%'
-ORDER BY hcf.housing_company_fact_key, hcf.housing_company_fact_value_number NULLS LAST`, offeringID)
+    AND event.category <> ''
+    AND event.status = 'done'
+ORDER BY event.category, COALESCE(event.year, event.start_year) NULLS LAST`, offeringID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var key string
+		var category string
 		var year *int32
-		if err := rows.Scan(&key, &year); err != nil {
+		if err := rows.Scan(&category, &year); err != nil {
 			return err
 		}
-		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(strings.TrimPrefix(key, "renovation."), ptrBool(true), year))
+		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(category, ptrBool(true), year))
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -1596,11 +1619,11 @@ SELECT
     pc.prices_city_name,
     pn.prices_neighborhood_name,
     ppc.prices_postal_code_code,
-    pot.property_offering_transaction_link_status,
-    COALESCE(c.sale_listing_prices_transaction_match_score, pot.property_offering_transaction_link_score),
+    pl.link_status,
+    COALESCE(c.sale_listing_prices_transaction_match_score, pl.link_score),
     c.sale_listing_prices_transaction_match_confidence
-FROM public.property_offering_transactions pot
-JOIN public.prices_transactions pt ON pt.prices_transaction_id = pot.prices_transaction_id
+FROM public.price_links pl
+JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
 LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
 LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
@@ -1609,16 +1632,19 @@ LEFT JOIN LATERAL (
         c.sale_listing_prices_transaction_match_score,
         c.sale_listing_prices_transaction_match_confidence
     FROM public.sale_listing_prices_transaction_match_candidates c
-    JOIN public.property_offering_sources pos ON pos.sale_listing_id = c.sale_listing_id
-    WHERE pos.property_offering_id = pot.property_offering_id
-        AND pos.property_offering_source_link_status <> 'rejected'
-        AND c.prices_transaction_id = pot.prices_transaction_id
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = pl.target_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = c.sale_listing_id
+        AND source_link.link_status <> 'rejected'
+    WHERE c.prices_transaction_id = pl.prices_transaction_id
     ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
     LIMIT 1
 ) c ON true
-WHERE pot.property_offering_id = $1
-    AND pot.property_offering_transaction_link_status <> 'rejected'
-ORDER BY pot.property_offering_transaction_link_score DESC, pot.property_offering_transaction_updated_at DESC
+WHERE pl.target_type = 'listing'
+    AND pl.target_id = $1
+    AND pl.link_status <> 'rejected'
+ORDER BY pl.link_score DESC, pl.updated_at DESC
 LIMIT 1`, offeringID).Scan(&transactionID, &transactionFirstSeenAt, &transactionUpdatedAt, &description, &transactionType, &category, &area, &price, &pricePerM2, &buildYear, &floor, &elevator, &condition, &plot, &plotOwned, &energyClass, &period, &city, &neighborhood, &postalCode, &matchStatus, &matchScore, &matchConfidence)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -1672,11 +1698,11 @@ SELECT
     pc.prices_city_name,
     pn.prices_neighborhood_name,
     ppc.prices_postal_code_code,
-    sl.sale_listing_prices_match_status,
+    pl.link_status,
     c.sale_listing_prices_transaction_match_score,
     c.sale_listing_prices_transaction_match_confidence
-FROM public.property_source_offerings sl
-LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = sl.prices_transaction_id
+FROM public.price_links pl
+JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
 LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
 LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
@@ -1685,12 +1711,15 @@ LEFT JOIN LATERAL (
         c.sale_listing_prices_transaction_match_score,
         c.sale_listing_prices_transaction_match_confidence
     FROM public.sale_listing_prices_transaction_match_candidates c
-    WHERE c.sale_listing_id = sl.sale_listing_id
-        AND c.prices_transaction_id = sl.prices_transaction_id
+    WHERE c.sale_listing_id = pl.target_id
+        AND c.prices_transaction_id = pl.prices_transaction_id
     ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
     LIMIT 1
 ) c ON true
-WHERE sl.sale_listing_id = $1
+WHERE pl.target_type = 'source_listing'
+    AND pl.target_id = $1
+    AND pl.link_status <> 'rejected'
+ORDER BY pl.link_score DESC, pl.updated_at DESC
 LIMIT 1`, saleListingID).Scan(&transactionID, &transactionFirstSeenAt, &transactionUpdatedAt, &description, &transactionType, &category, &area, &price, &pricePerM2, &buildYear, &floor, &elevator, &condition, &plot, &plotOwned, &energyClass, &period, &city, &neighborhood, &postalCode, &matchStatus, &matchScore, &matchConfidence)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

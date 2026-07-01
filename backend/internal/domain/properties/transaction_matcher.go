@@ -163,16 +163,23 @@ JOIN public.prices_transactions pt ON true
 JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
 LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
 LEFT JOIN public.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-WHERE sl.prices_transaction_id IS NULL
-    AND sl.sale_listing_source_kind = 'ad'
+WHERE sl.sale_listing_source_kind = 'ad'
     AND ($1::uuid IS NULL OR sl.sale_listing_id = $1::uuid)
     AND sl.sale_listing_postal_norm = public.fnc__normalize_postal(COALESCE(ppc.prices_postal_code_code, postal.postal_postal_code_code))
     AND sl.sale_listing_area_value IS NOT NULL
     AND sl.sale_listing_area_value = pt.prices_transaction_area
     AND NOT EXISTS (
         SELECT 1
-        FROM public.property_source_offerings linked
+        FROM public.price_links source_link
+        WHERE source_link.target_type = 'source_listing'
+            AND source_link.target_id = sl.sale_listing_id
+            AND source_link.link_status <> 'rejected'
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM public.price_links linked
         WHERE linked.prices_transaction_id = pt.prices_transaction_id
+            AND linked.link_status <> 'rejected'
     )`, targetListingID)
 	if err != nil {
 		return nil, fmt.Errorf("query transaction match candidates: %w", err)
@@ -266,24 +273,71 @@ func (s *Service) applyTransactionMatchLinks(ctx context.Context, runID uuid.UUI
 	var autoLinked int32
 	for _, candidate := range selected {
 		tag, err := s.db.Exec(ctx, `
-UPDATE public.property_source_offerings
-SET prices_transaction_id = $2,
-    sale_listing_prices_match_status = 'auto_linked',
-    sale_listing_prices_match_run_id = $3,
-    sale_listing_updated_at = now()
-WHERE sale_listing_id = $1
-    AND prices_transaction_id IS NULL
-    AND NOT EXISTS (
+WITH updated_source AS (
+    UPDATE public.property_source_offerings
+    SET prices_transaction_id = $2,
+        sale_listing_prices_match_status = 'auto_linked',
+        sale_listing_prices_match_run_id = $3,
+        sale_listing_updated_at = now()
+    WHERE sale_listing_id = $1
+        AND (prices_transaction_id IS NULL OR prices_transaction_id = $2)
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.price_links existing
+            WHERE existing.prices_transaction_id = $2
+                AND existing.link_status <> 'rejected'
+        )
+    RETURNING sale_listing_id, sale_listing_created_at, sale_listing_updated_at
+)
+INSERT INTO public.price_links (
+    target_type,
+    target_id,
+    prices_transaction_id,
+    link_status,
+    link_method,
+    link_score,
+    link_reasons,
+    created_at,
+    updated_at
+)
+SELECT
+    'source_listing',
+    sale_listing_id,
+    $2,
+    'confirmed',
+    'sync_auto',
+    $4,
+    $5::jsonb,
+    sale_listing_created_at,
+    sale_listing_updated_at
+FROM updated_source
+WHERE NOT EXISTS (
         SELECT 1
-        FROM public.property_source_offerings existing
+        FROM public.price_links existing
         WHERE existing.prices_transaction_id = $2
-            AND existing.sale_listing_id <> $1
-    )`, candidate.ListingID, candidate.TransactionID, runID)
+            AND existing.link_status <> 'rejected'
+    )
+ON CONFLICT (target_type, target_id, prices_transaction_id) DO UPDATE SET
+    link_status = EXCLUDED.link_status,
+    link_method = EXCLUDED.link_method,
+    link_score = EXCLUDED.link_score,
+    link_reasons = EXCLUDED.link_reasons,
+    updated_at = now()`, candidate.ListingID, candidate.TransactionID, runID, candidate.Score, candidate.Reasons)
 		if err != nil {
 			return 0, 0, fmt.Errorf("link transaction match: %w", err)
 		}
 		if tag.RowsAffected() == 0 {
 			continue
+		}
+		_, err = s.db.Exec(ctx, `
+UPDATE public.source_listings src
+SET normalized_at = sl.sale_listing_updated_at,
+    updated_at = sl.sale_listing_updated_at
+FROM public.property_source_offerings sl
+WHERE sl.sale_listing_id = $1
+    AND src.source_listing_id = sl.sale_listing_id`, candidate.ListingID)
+		if err != nil {
+			return 0, 0, fmt.Errorf("sync source listing transaction match state: %w", err)
 		}
 		autoLinked++
 		_, err = s.db.Exec(ctx, `
