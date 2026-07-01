@@ -140,4 +140,4 @@ Inspection and repair:
 
 ## Requirements
 
-Needs `DATABASE_URL` (and other env vars) set via `.env` / `.env.local` in the `backend/` directory — same config as the TUI and API server.
+Needs `DATABASE_URL` (and other env vars) set via `.env` / `.env.local` in the `backend/` directory, same config as the API server.

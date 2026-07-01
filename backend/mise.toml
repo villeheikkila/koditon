@@ -331,10 +331,6 @@ sources = [
 outputs = ["server", "internal/transport/mcp/appdist/mcp-app.html"]
 run = "go build -o server ./cmd"
 
-[tasks.tui]
-description = "Run interactive sync TUI"
-run = "go run ./cmd/tui"
-
 [tasks.clean]
 description = "Remove built artifacts"
 run = "rm -f server coverage.out coverage.html"

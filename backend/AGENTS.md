@@ -40,8 +40,7 @@ Run from `backend/` (see root AGENTS.md for details):
 backend/
 ├── cmd/
 │   ├── main.go              # Entrypoint; keep minimal, delegate to internal/app
-│   ├── cli/                 # CLI binary and private implementation
-│   └── tui/                 # TUI binary and private implementation
+│   └── cli/                 # CLI binary and private implementation
 ├── internal/
 │   ├── app/                 # Application bootstrap, wiring, lifecycle
 │   ├── clients/             # External provider API clients
@@ -57,7 +56,7 @@ backend/
 ```
 
 ### Package Boundaries
-- `cmd/main.go` imports `internal/app`; binary-specific CLI/TUI implementation belongs under `cmd/*/internal`.
+- `cmd/main.go` imports `internal/app`; binary-specific CLI implementation belongs under `cmd/cli/internal`.
 - `internal/app` may import all backend subsystems for wiring.
 - `internal/clients/*` contains external API wire types and fetch/parse behavior; it must not import `internal/db`, `internal/sync`, or `internal/transport`.
 - `internal/sync/*` owns provider synchronization, mapping, and DB upserts; it may import `internal/clients/*`, `internal/db`, and `internal/platform/*`.
@@ -177,23 +176,6 @@ backend/
 - Automatic request/response validation
 - Type-safe handlers with input/output structs
 - Middleware for auth, logging, CORS
-
-### TUI Architecture (`cmd/tui/internal/tui`)
-- Entrypoint is `NewApp(runner).Model()` used by `cmd/tui/main.go`; do not reintroduce a monolithic model.
-- Navigation uses stack router primitives in `router.go` with `Screen` + `Navigator` contracts.
-- Shell layout is centralized in `shell.go`; screens provide `ShellState()` and body content only.
-- Shared UI primitives live in `primitives_*.go` (list, input, fuzzy picker, job view). Reuse primitives before adding screen-local widget logic.
-- Action execution lifecycle is centralized in `runtime.go` (`jobRuntime`), including single-active-job enforcement and cancellation.
-- Screen flow is split by concern in `screens_*.go`: home, actions, city picker, prompt, job.
-- Domain actions remain in `actions.go`; keep business execution there and keep screens focused on interaction state.
-- Global behavior: `q` quits; `ctrl+c` cancels active job first, then quits when no active job exists.
-- When adding screens, preserve push/pop/replace navigation semantics and keep breadcrumb/help text consistent through shell state.
-- Keep rendering deterministic for tests; avoid time/random-dependent output in snapshot paths without test injection.
-
-### TUI Testing
-- Run `go test ./cmd/tui/internal/tui/...` for router/runtime/snapshot coverage.
-- Snapshot fixtures are in `cmd/tui/internal/tui/testdata/*.golden`.
-- Regenerate snapshots with `UPDATE_GOLDEN=1 go test ./cmd/tui/internal/tui -run TestScreenSnapshots`.
 
 ## Common Patterns
 
