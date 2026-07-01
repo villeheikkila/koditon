@@ -7,28 +7,27 @@ import (
 )
 
 func TestSaleListingSearchUsesNormalizedLocationFallbacks(t *testing.T) {
-	for _, sql := range []string{searchSaleListingsSQL, countSaleListingsSQL} {
-		if strings.Contains(sql, "lower(COALESCE(sl.sale_listing_city, ''))") {
+	sql := readPropertySearchSQL(t)
+	for _, queryName := range []string{"SearchSaleListings", "CountSaleListings"} {
+		query := namedSQLSection(t, sql, queryName)
+		if strings.Contains(query, "lower(COALESCE(sl.sale_listing_city, ''))") {
 			t.Fatal("expected city filters to fall back to normalized city")
 		}
-		if strings.Contains(sql, "lower(COALESCE(sl.sale_listing_postal, ''))") {
+		if strings.Contains(query, "lower(COALESCE(sl.sale_listing_postal, ''))") {
 			t.Fatal("expected postal filters to fall back to normalized postal")
 		}
 	}
-	if !strings.Contains(searchSaleListingsSQL, "COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')") {
+	searchQuery := namedSQLSection(t, sql, "SearchSaleListings")
+	if !strings.Contains(searchQuery, "COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '')") {
 		t.Fatal("expected search rows to expose normalized city fallback")
 	}
-	if !strings.Contains(searchSaleListingsSQL, "COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')") {
+	if !strings.Contains(searchQuery, "COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '')") {
 		t.Fatal("expected search rows to expose normalized postal fallback")
 	}
 }
 
 func TestPropertySearchSQLAvoidsRawOnlyListingLocation(t *testing.T) {
-	source, err := os.ReadFile("search.go")
-	if err != nil {
-		t.Fatalf("read search source: %v", err)
-	}
-	text := string(source)
+	text := readPropertySearchSQL(t)
 	for _, rawOnly := range []string{
 		"COALESCE(sl.sale_listing_city, '')",
 		"COALESCE(sl.sale_listing_postal, '')",
@@ -38,4 +37,28 @@ func TestPropertySearchSQLAvoidsRawOnlyListingLocation(t *testing.T) {
 			t.Fatalf("expected property search SQL to avoid raw-only location expression %q", rawOnly)
 		}
 	}
+}
+
+func readPropertySearchSQL(t *testing.T) string {
+	t.Helper()
+	source, err := os.ReadFile("../../../db/queries/ads/property_search.sql")
+	if err != nil {
+		t.Fatalf("read property search sql: %v", err)
+	}
+	return string(source)
+}
+
+func namedSQLSection(t *testing.T, sql string, name string) string {
+	t.Helper()
+	startMarker := "-- name: " + name + " "
+	start := strings.Index(sql, startMarker)
+	if start == -1 {
+		t.Fatalf("missing sqlc query %s", name)
+	}
+	rest := sql[start+len(startMarker):]
+	end := strings.Index(rest, "\n-- name: ")
+	if end == -1 {
+		return rest
+	}
+	return rest[:end]
 }

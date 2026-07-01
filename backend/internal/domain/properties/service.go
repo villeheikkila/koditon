@@ -2,7 +2,6 @@ package properties
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -295,64 +294,30 @@ type valuationClaimTarget struct {
 }
 
 func (s *Service) saleListingValuationClaimTargets(ctx context.Context, saleListingID uuid.UUID) ([]valuationClaimTarget, error) {
-	rows, err := s.db.Query(ctx, `
-WITH linked AS (
-    SELECT pu.property_unit_id, pu.physical_building_id, pu.housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
-    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = $1
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
-    LIMIT 1
-)
-SELECT 'sale_listing'::text, $1::uuid
-UNION ALL SELECT 'property_unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
-UNION ALL SELECT 'physical_building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
-UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL`, saleListingID)
+	rows, err := s.queries.ListSaleListingValuationClaimTargets(ctx, &saleListingID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var targets []valuationClaimTarget
-	for rows.Next() {
-		var target valuationClaimTarget
-		if err := rows.Scan(&target.entityType, &target.entityID); err != nil {
-			return nil, err
-		}
-		targets = append(targets, target)
+	targets := make([]valuationClaimTarget, 0, len(rows))
+	for _, row := range rows {
+		targets = append(targets, valuationClaimTarget{entityType: row.EntityType, entityID: row.EntityID})
 	}
-	return targets, rows.Err()
+	return targets, nil
 }
 
 func (s *Service) enrichSaleListingMediaFromSource(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	var provider, kind, announcementMainImageURI string
-	var shortcutData, frontdoorData []byte
-	err := s.db.QueryRow(ctx, `
-SELECT
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
-    COALESCE(sa.shortcut_ad_data, '{}'::jsonb),
-    COALESCE(fa.frontdoor_ad_data, '{}'::jsonb),
-    COALESCE(fba.frontdoor_building_announcement_main_image_uri, '')
-FROM public.property_source_offerings sl
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-WHERE sl.sale_listing_id = $1`, saleListingID).Scan(&provider, &kind, &shortcutData, &frontdoorData, &announcementMainImageURI)
+	row, err := s.queries.GetSaleListingSourceMediaData(ctx, &saleListingID)
 	if err != nil {
 		return err
 	}
 	var media Media
 	switch {
-	case provider == "shortcut" && len(shortcutData) > 2:
-		media = shortcutMedia(parseShortcutRaw(json.RawMessage(shortcutData)))
-	case provider == "frontdoor" && kind == "ad" && len(frontdoorData) > 2:
-		media = frontdoorMedia(parseFrontdoorRaw(json.RawMessage(frontdoorData)))
-	case provider == "frontdoor" && kind == "announcement":
-		media = frontdoorAnnouncementMedia(announcementMainImageURI)
+	case row.SaleListingSourceProvider == "shortcut" && len(row.ShortcutAdData) > 2:
+		media = shortcutMedia(parseShortcutRaw(row.ShortcutAdData))
+	case row.SaleListingSourceProvider == "frontdoor" && row.SaleListingSourceKind == "ad" && len(row.FrontdoorAdData) > 2:
+		media = frontdoorMedia(parseFrontdoorRaw(row.FrontdoorAdData))
+	case row.SaleListingSourceProvider == "frontdoor" && row.SaleListingSourceKind == "announcement":
+		media = frontdoorAnnouncementMedia(valueOrEmpty(row.FrontdoorBuildingAnnouncementMainImageUri))
 	}
 	mergeMedia(&listing.Media, media)
 	return nil
@@ -437,38 +402,12 @@ type renovationDisplayEvidence struct {
 }
 
 func (s *Service) enrichSaleListingRenovationsFromFallbackRows(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.db.Query(ctx, `
-SELECT
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    COALESCE(property_source_offering_renovation_component, ''),
-    COALESCE(property_source_offering_renovation_scope, ''),
-    COALESCE(property_source_offering_renovation_stage, ''),
-    COALESCE(property_source_offering_renovation_responsibility, ''),
-    property_source_offering_renovation_cost_estimate_eur,
-    COALESCE(property_source_offering_renovation_text, ''),
-    property_source_offering_renovation_confidence,
-    property_source_offering_renovation_source_field
-FROM public.property_source_offering_renovations
-WHERE sale_listing_id = $1
-ORDER BY property_source_offering_renovation_category, property_source_offering_renovation_year NULLS LAST`, saleListingID)
+	rows, err := s.queries.ListSaleListingFallbackRenovations(ctx, &saleListingID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var category, status, component, scope, stage, responsibility, text, source string
-		var year *int32
-		var confidence *int32
-		var costEstimateEUR *int64
-		if err := rows.Scan(&category, &status, &year, &component, &scope, &stage, &responsibility, &costEstimateEUR, &text, &confidence, &source); err != nil {
-			return err
-		}
-		listing.Building.Renovations = append(listing.Building.Renovations, renovationFromEvidence(category, status, year, component, scope, stage, responsibility, costEstimateEUR, text, confidence, source))
-	}
-	if err := rows.Err(); err != nil {
-		return err
+	for _, row := range rows {
+		listing.Building.Renovations = append(listing.Building.Renovations, renovationFromEvidence(row.PropertySourceOfferingRenovationCategory, row.PropertySourceOfferingRenovationStatus, row.PropertySourceOfferingRenovationYear, valueOrEmpty(row.PropertySourceOfferingRenovationComponent), valueOrEmpty(row.PropertySourceOfferingRenovationScope), valueOrEmpty(row.PropertySourceOfferingRenovationStage), valueOrEmpty(row.PropertySourceOfferingRenovationResponsibility), row.PropertySourceOfferingRenovationCostEstimateEur, valueOrEmpty(row.PropertySourceOfferingRenovationText), &row.PropertySourceOfferingRenovationConfidence, row.PropertySourceOfferingRenovationSourceField))
 	}
 	listing.Building.Renovations = compactRenovations(listing.Building.Renovations)
 	return nil
@@ -742,65 +681,25 @@ LIMIT 1`, buildingID).Scan(&housingCompany, &businessID, &buildYear, &floorCount
 	building.Details.CarStorage = firstNonEmpty(building.Details.CarStorage, valueOrEmpty(carStorage))
 	building.Details.OtherInfo = firstNonEmpty(building.Details.OtherInfo, valueOrEmpty(otherInfo))
 	building.Texts.Building = firstNonEmpty(building.Texts.Building, valueOrEmpty(description), valueOrEmpty(otherInfo))
-	rows, err := s.db.Query(ctx, `
-SELECT
-    event.category,
-    COALESCE(event.year, event.start_year)::int4
-FROM public.property_renovation_events event
-WHERE event.target_type = 'housing_company'
-    AND event.target_id = $1
-    AND event.category <> ''
-    AND event.status = 'done'
-ORDER BY event.category, COALESCE(event.year, event.start_year) NULLS LAST`, buildingID)
+	rows, err := s.queries.ListHousingCompanyRenovationEvents(ctx, &buildingID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var category string
-		var year *int32
-		if err := rows.Scan(&category, &year); err != nil {
-			return err
-		}
-		building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(category, ptrBool(true), year))
-	}
-	if err := rows.Err(); err != nil {
-		return err
+	for _, row := range rows {
+		building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(row.Category, ptrBool(true), row.Year))
 	}
 	building.Details.Renovations = compactRenovations(building.Details.Renovations)
 	return nil
 }
 
 func (s *Service) enrichBuildingFromOfferingSources(ctx context.Context, building *Building, buildingID uuid.UUID) error {
-	rows, err := s.db.Query(ctx, `
-SELECT
-    sl.sale_listing_id
-FROM public.property_units pu
-JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-    AND source_link.target_id = po.property_offering_id
-    AND source_link.source_type = 'source_listing'
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-WHERE pu.housing_company_id = $1
-    AND source_link.link_status <> 'rejected'
-    AND sl.sale_listing_source_kind IN ('ad', 'announcement')
-ORDER BY
-    CASE WHEN sl.sale_listing_source_kind = 'ad' THEN 0 ELSE 1 END,
-    sl.sale_listing_last_seen_at DESC NULLS LAST,
-    source_link.link_score DESC,
-    sl.sale_listing_created_at DESC
-LIMIT 200`, buildingID)
+	rows, err := s.queries.ListBuildingOfferingSourceListingIDs(ctx, &buildingID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 	seen := map[string]struct{}{}
 	var renovationCandidate *buildingRenovationSourceCandidate
-	for rows.Next() {
-		var saleListingID uuid.UUID
-		if err := rows.Scan(&saleListingID); err != nil {
-			return err
-		}
+	for _, saleListingID := range rows {
 		sourceKey := saleListingID.String()
 		if _, ok := seen[sourceKey]; ok {
 			continue
@@ -818,9 +717,6 @@ LIMIT 200`, buildingID)
 		mergeTextSections(&building.Texts, listing.Texts)
 		renovationCandidate = selectBuildingRenovationCandidate(renovationCandidate, listing)
 		building.SourceRecords = appendUniqueListingSources(building.SourceRecords, []ListingSource{listing.Source})
-	}
-	if err := rows.Err(); err != nil {
-		return err
 	}
 	if renovationCandidate != nil {
 		building.Details.Renovations = renovationCandidate.renovations
@@ -966,22 +862,30 @@ func (s *Service) resolveListingInput(ctx context.Context, input string, listing
 	if listingType != "rental" {
 		return "", ErrNotFound
 	}
-	var canonicalID string
-	if err := s.db.QueryRow(ctx, resolveRentalPublicIDSQL, strings.TrimSpace(input)).Scan(&canonicalID); err != nil {
+	publicID := strings.TrimSpace(input)
+	canonicalID, err := s.queries.ResolveRentalPublicID(ctx, &publicID)
+	if err != nil {
 		return "", mapNotFound(err)
 	}
-	return canonicalID, nil
+	if canonicalID == nil {
+		return "", ErrNotFound
+	}
+	return *canonicalID, nil
 }
 
 func (s *Service) resolveBuildingInput(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (string, error) {
 	if canonicalID, err := ads.ResolveInput(input, shortcutBase, frontdoorBase); err == nil {
 		return canonicalID, nil
 	}
-	var canonicalID string
-	if err := s.db.QueryRow(ctx, resolveBuildingPublicIDSQL, strings.TrimSpace(input)).Scan(&canonicalID); err != nil {
+	publicID := strings.TrimSpace(input)
+	canonicalID, err := s.queries.ResolveBuildingPublicID(ctx, &publicID)
+	if err != nil {
 		return "", mapNotFound(err)
 	}
-	return canonicalID, nil
+	if canonicalID == nil {
+		return "", ErrNotFound
+	}
+	return *canonicalID, nil
 }
 
 func (s *Service) saleOfferingSource(ctx context.Context, offeringID uuid.UUID) (CanonicalOffering, uuid.UUID, error) {

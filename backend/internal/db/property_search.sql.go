@@ -256,7 +256,34 @@ WITH unified AS (
     JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
 )
-SELECT source, kind, native_id, canonical_id, ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id, url, headline, address, city, postal, price, area, room_layout, NULL::float8, NULL::bigint, NULL::bigint, NULL::int4, NULL::int4, NULL::int4, NULL::int4, NULL::text, NULL::text, NULL::text, last_seen_at::text, published_at::text, address, ARRAY[source]::text[]
+SELECT
+    source,
+    kind,
+    native_id,
+    canonical_id,
+    ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id,
+    url,
+    headline,
+    address,
+    city,
+    postal,
+    price,
+    area,
+    room_layout,
+    NULL::float8 AS price_per_m2,
+    NULL::bigint AS debt_free_price,
+    NULL::bigint AS debt_share_amount,
+    NULL::int4 AS rooms_count,
+    NULL::int4 AS floor_level,
+    NULL::int4 AS total_floors,
+    NULL::int4 AS build_year,
+    NULL::text AS condition,
+    NULL::text AS energy_class,
+    NULL::text AS energy_efficiency_label,
+    last_seen_at::text AS last_seen_at,
+    published_at::text AS published_at,
+    address AS building_key_address,
+    ARRAY[source]::text[] AS source_providers
 FROM unified u
 WHERE ($1 = 'all' OR u.source = $1)
   AND ($2::text IS NULL OR trim($2::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim($2::text)) || '%'))
@@ -295,33 +322,33 @@ type SearchRentalListingsParams struct {
 }
 
 type SearchRentalListingsRow struct {
-	Source      *string  `json:"source"`
-	Kind        *string  `json:"kind"`
-	NativeID    *string  `json:"native_id"`
-	CanonicalID *string  `json:"canonical_id"`
-	PublicID    *string  `json:"public_id"`
-	Url         *string  `json:"url"`
-	Headline    *string  `json:"headline"`
-	Address     *string  `json:"address"`
-	City        *string  `json:"city"`
-	Postal      *string  `json:"postal"`
-	Price       *int64   `json:"price"`
-	Area        *float64 `json:"area"`
-	RoomLayout  *string  `json:"room_layout"`
-	Float8      *float64 `json:"float8"`
-	Int8        *int64   `json:"int8"`
-	Int8_2      *int64   `json:"int8_2"`
-	Int4        *int32   `json:"int4"`
-	Int4_2      *int32   `json:"int4_2"`
-	Int4_3      *int32   `json:"int4_3"`
-	Int4_4      *int32   `json:"int4_4"`
-	Text        *string  `json:"text"`
-	Text_2      *string  `json:"text_2"`
-	Text_3      *string  `json:"text_3"`
-	LastSeenAt  *string  `json:"last_seen_at"`
-	PublishedAt *string  `json:"published_at"`
-	Address_2   *string  `json:"address_2"`
-	Array       []string `json:"array"`
+	Source                *string  `json:"source"`
+	Kind                  *string  `json:"kind"`
+	NativeID              *string  `json:"native_id"`
+	CanonicalID           *string  `json:"canonical_id"`
+	PublicID              *string  `json:"public_id"`
+	Url                   *string  `json:"url"`
+	Headline              *string  `json:"headline"`
+	Address               *string  `json:"address"`
+	City                  *string  `json:"city"`
+	Postal                *string  `json:"postal"`
+	Price                 *int64   `json:"price"`
+	Area                  *float64 `json:"area"`
+	RoomLayout            *string  `json:"room_layout"`
+	PricePerM2            *float64 `json:"price_per_m2"`
+	DebtFreePrice         *int64   `json:"debt_free_price"`
+	DebtShareAmount       *int64   `json:"debt_share_amount"`
+	RoomsCount            *int32   `json:"rooms_count"`
+	FloorLevel            *int32   `json:"floor_level"`
+	TotalFloors           *int32   `json:"total_floors"`
+	BuildYear             *int32   `json:"build_year"`
+	Condition             *string  `json:"condition"`
+	EnergyClass           *string  `json:"energy_class"`
+	EnergyEfficiencyLabel *string  `json:"energy_efficiency_label"`
+	LastSeenAt            *string  `json:"last_seen_at"`
+	PublishedAt           *string  `json:"published_at"`
+	BuildingKeyAddress    *string  `json:"building_key_address"`
+	SourceProviders       []string `json:"source_providers"`
 }
 
 func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalListingsParams) ([]SearchRentalListingsRow, error) {
@@ -361,20 +388,20 @@ func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalList
 			&i.Price,
 			&i.Area,
 			&i.RoomLayout,
-			&i.Float8,
-			&i.Int8,
-			&i.Int8_2,
-			&i.Int4,
-			&i.Int4_2,
-			&i.Int4_3,
-			&i.Int4_4,
-			&i.Text,
-			&i.Text_2,
-			&i.Text_3,
+			&i.PricePerM2,
+			&i.DebtFreePrice,
+			&i.DebtShareAmount,
+			&i.RoomsCount,
+			&i.FloorLevel,
+			&i.TotalFloors,
+			&i.BuildYear,
+			&i.Condition,
+			&i.EnergyClass,
+			&i.EnergyEfficiencyLabel,
 			&i.LastSeenAt,
 			&i.PublishedAt,
-			&i.Address_2,
-			&i.Array,
+			&i.BuildingKeyAddress,
+			&i.SourceProviders,
 		); err != nil {
 			return nil, err
 		}
@@ -388,32 +415,32 @@ func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalList
 
 const searchSaleListings = `-- name: SearchSaleListings :many
 SELECT
-    pso.sale_listing_source_provider,
-    pso.sale_listing_source_kind,
-    pso.sale_listing_native_id,
-    pso.sale_listing_canonical_id,
-    l.listing_id::text,
-    COALESCE(pso.sale_listing_url, ''),
-    COALESCE(pso.sale_listing_headline, ''),
-    COALESCE(pso.sale_listing_street_address, ''),
-    COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, ''),
-    COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, ''),
-    pso.sale_listing_asking_price,
-    COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value),
-    COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), pso.sale_listing_room_layout, ''),
-    pso.sale_listing_price_per_m2,
-    pso.sale_listing_debt_free_price,
-    pso.sale_listing_debt_share_amount,
-    COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, pso.sale_listing_rooms_count),
-    COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, pso.sale_listing_floor_level),
-    COALESCE((unit_profile.dimensions #>> '{unit,total_floors}')::int4, (building_profile.dimensions #>> '{building,floor_count}')::int4, pso.sale_listing_total_floors),
-    COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year),
-    COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), pso.sale_listing_condition),
-    COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), pso.sale_listing_energy_class),
-    pso.sale_listing_energy_efficiency_label,
-    pso.sale_listing_last_seen_at::text,
-    pso.sale_listing_published_at::text,
-    COALESCE(pso.sale_listing_street_address, ''),
+    pso.sale_listing_source_provider AS source,
+    pso.sale_listing_source_kind AS kind,
+    pso.sale_listing_native_id AS native_id,
+    pso.sale_listing_canonical_id AS canonical_id,
+    l.listing_id::text AS public_id,
+    COALESCE(pso.sale_listing_url, '') AS url,
+    COALESCE(pso.sale_listing_headline, '') AS headline,
+    COALESCE(pso.sale_listing_street_address, '') AS address,
+    COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '') AS city,
+    COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '') AS postal,
+    pso.sale_listing_asking_price AS price,
+    COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) AS area,
+    COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), pso.sale_listing_room_layout, '') AS room_layout,
+    pso.sale_listing_price_per_m2 AS price_per_m2,
+    pso.sale_listing_debt_free_price AS debt_free_price,
+    pso.sale_listing_debt_share_amount AS debt_share_amount,
+    COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, pso.sale_listing_rooms_count) AS rooms_count,
+    COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, pso.sale_listing_floor_level) AS floor_level,
+    COALESCE((unit_profile.dimensions #>> '{unit,total_floors}')::int4, (building_profile.dimensions #>> '{building,floor_count}')::int4, pso.sale_listing_total_floors) AS total_floors,
+    COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year) AS build_year,
+    COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), pso.sale_listing_condition) AS condition,
+    COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), pso.sale_listing_energy_class) AS energy_class,
+    pso.sale_listing_energy_efficiency_label AS energy_efficiency_label,
+    pso.sale_listing_last_seen_at::text AS last_seen_at,
+    pso.sale_listing_published_at::text AS published_at,
+    COALESCE(pso.sale_listing_street_address, '') AS building_key_address,
     source_badges.source_providers
 FROM public.listings l
 JOIN public.property_source_offerings pso ON pso.sale_listing_id = l.primary_source_listing_id
@@ -516,33 +543,33 @@ type SearchSaleListingsParams struct {
 }
 
 type SearchSaleListingsRow struct {
-	SaleListingSourceProvider        string   `json:"sale_listing_source_provider"`
-	SaleListingSourceKind            string   `json:"sale_listing_source_kind"`
-	SaleListingNativeID              string   `json:"sale_listing_native_id"`
-	SaleListingCanonicalID           string   `json:"sale_listing_canonical_id"`
-	ListingID                        *string  `json:"listing_id"`
-	Coalesce                         *string  `json:"coalesce"`
-	Coalesce_2                       *string  `json:"coalesce_2"`
-	Coalesce_3                       *string  `json:"coalesce_3"`
-	Coalesce_4                       *string  `json:"coalesce_4"`
-	Coalesce_5                       *string  `json:"coalesce_5"`
-	SaleListingAskingPrice           *int64   `json:"sale_listing_asking_price"`
-	Coalesce_6                       *float64 `json:"coalesce_6"`
-	Coalesce_7                       *string  `json:"coalesce_7"`
-	SaleListingPricePerM2            *float64 `json:"sale_listing_price_per_m2"`
-	SaleListingDebtFreePrice         *int64   `json:"sale_listing_debt_free_price"`
-	SaleListingDebtShareAmount       *int64   `json:"sale_listing_debt_share_amount"`
-	Coalesce_8                       *int32   `json:"coalesce_8"`
-	Coalesce_9                       *int32   `json:"coalesce_9"`
-	Coalesce_10                      *int32   `json:"coalesce_10"`
-	Coalesce_11                      *int32   `json:"coalesce_11"`
-	Coalesce_12                      *string  `json:"coalesce_12"`
-	Coalesce_13                      *string  `json:"coalesce_13"`
-	SaleListingEnergyEfficiencyLabel *string  `json:"sale_listing_energy_efficiency_label"`
-	SaleListingLastSeenAt            *string  `json:"sale_listing_last_seen_at"`
-	SaleListingPublishedAt           *string  `json:"sale_listing_published_at"`
-	Coalesce_14                      *string  `json:"coalesce_14"`
-	SourceProviders                  []string `json:"source_providers"`
+	Source                string   `json:"source"`
+	Kind                  string   `json:"kind"`
+	NativeID              string   `json:"native_id"`
+	CanonicalID           string   `json:"canonical_id"`
+	PublicID              *string  `json:"public_id"`
+	Url                   *string  `json:"url"`
+	Headline              *string  `json:"headline"`
+	Address               *string  `json:"address"`
+	City                  *string  `json:"city"`
+	Postal                *string  `json:"postal"`
+	Price                 *int64   `json:"price"`
+	Area                  *float64 `json:"area"`
+	RoomLayout            *string  `json:"room_layout"`
+	PricePerM2            *float64 `json:"price_per_m2"`
+	DebtFreePrice         *int64   `json:"debt_free_price"`
+	DebtShareAmount       *int64   `json:"debt_share_amount"`
+	RoomsCount            *int32   `json:"rooms_count"`
+	FloorLevel            *int32   `json:"floor_level"`
+	TotalFloors           *int32   `json:"total_floors"`
+	BuildYear             *int32   `json:"build_year"`
+	Condition             *string  `json:"condition"`
+	EnergyClass           *string  `json:"energy_class"`
+	EnergyEfficiencyLabel *string  `json:"energy_efficiency_label"`
+	LastSeenAt            *string  `json:"last_seen_at"`
+	PublishedAt           *string  `json:"published_at"`
+	BuildingKeyAddress    *string  `json:"building_key_address"`
+	SourceProviders       []string `json:"source_providers"`
 }
 
 func (q *Queries) SearchSaleListings(ctx context.Context, arg SearchSaleListingsParams) ([]SearchSaleListingsRow, error) {
@@ -578,32 +605,32 @@ func (q *Queries) SearchSaleListings(ctx context.Context, arg SearchSaleListings
 	for rows.Next() {
 		var i SearchSaleListingsRow
 		if err := rows.Scan(
-			&i.SaleListingSourceProvider,
-			&i.SaleListingSourceKind,
-			&i.SaleListingNativeID,
-			&i.SaleListingCanonicalID,
-			&i.ListingID,
-			&i.Coalesce,
-			&i.Coalesce_2,
-			&i.Coalesce_3,
-			&i.Coalesce_4,
-			&i.Coalesce_5,
-			&i.SaleListingAskingPrice,
-			&i.Coalesce_6,
-			&i.Coalesce_7,
-			&i.SaleListingPricePerM2,
-			&i.SaleListingDebtFreePrice,
-			&i.SaleListingDebtShareAmount,
-			&i.Coalesce_8,
-			&i.Coalesce_9,
-			&i.Coalesce_10,
-			&i.Coalesce_11,
-			&i.Coalesce_12,
-			&i.Coalesce_13,
-			&i.SaleListingEnergyEfficiencyLabel,
-			&i.SaleListingLastSeenAt,
-			&i.SaleListingPublishedAt,
-			&i.Coalesce_14,
+			&i.Source,
+			&i.Kind,
+			&i.NativeID,
+			&i.CanonicalID,
+			&i.PublicID,
+			&i.Url,
+			&i.Headline,
+			&i.Address,
+			&i.City,
+			&i.Postal,
+			&i.Price,
+			&i.Area,
+			&i.RoomLayout,
+			&i.PricePerM2,
+			&i.DebtFreePrice,
+			&i.DebtShareAmount,
+			&i.RoomsCount,
+			&i.FloorLevel,
+			&i.TotalFloors,
+			&i.BuildYear,
+			&i.Condition,
+			&i.EnergyClass,
+			&i.EnergyEfficiencyLabel,
+			&i.LastSeenAt,
+			&i.PublishedAt,
+			&i.BuildingKeyAddress,
 			&i.SourceProviders,
 		); err != nil {
 			return nil, err
