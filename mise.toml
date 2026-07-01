@@ -2,9 +2,18 @@
 experimental = true
 task_output = "prefix"
 
+[tool_alias]
+absurdctl = "github:earendil-works/absurd"
+habitat = "github:earendil-works/absurd"
+traceway = "github:tracewayapp/traceway"
+
 [tools]
 go = "1.26"
 node = "25"
+"npm:@modelcontextprotocol/inspector" = "latest"
+absurdctl = { version = "latest", asset_pattern = "absurdctl", bin = "absurdctl" }
+habitat = { version = "latest", matching = "habitat", exe = "habitat", rename_exe = "habitat" }
+traceway = { version = "latest", exe = "traceway" }
 "go:github.com/jackc/tern/v2" = "latest"
 "go:github.com/rest-sh/restish" = "latest"
 "go:github.com/oligot/go-mod-upgrade" = "latest"
@@ -27,6 +36,20 @@ TRACEWAY_PROJECT_TOKEN = { age = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUk
 description = "Start backend and web dev servers"
 depends = ["backend:dev:preflight"]
 run = "mise run backend:dev:watch ::: web:dev"
+
+[tasks."mcp:inspector"]
+description = "Run the MCP Inspector"
+run = "mcp-inspector"
+
+[tasks.habitat]
+description = "Run Habitat against the local backend database"
+depends = ["infra:local:ensure", "backend:db:wait"]
+run = '''
+set -euo pipefail
+habitat run \
+  -listen "${HABITAT_LISTEN:-:7890}" \
+  -db-url "${HABITAT_DB_URL:-postgres://postgres:postgres@localhost:5432/koditon?sslmode=disable}"
+'''
 
 [tasks."backend:dev:watch"]
 description = "Run backend server with hot reload without preflight"

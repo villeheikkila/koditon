@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export XDG_CONFIG_HOME="${TRACEWAY_XDG_CONFIG_HOME:-$ROOT/.traceway/config}"
+export XDG_STATE_HOME="${TRACEWAY_XDG_STATE_HOME:-$ROOT/.traceway/state}"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_STATE_HOME"
+exec traceway "$@"
