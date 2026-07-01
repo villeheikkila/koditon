@@ -41,6 +41,38 @@ run = "mise run backend:dev:watch ::: web:dev"
 description = "Run the MCP Inspector"
 run = "mcp-inspector"
 
+[tasks."restish:sync:local"]
+description = "Sync local OpenAPI into Restish for generated koditon commands"
+depends = ["restish:config:install:local"]
+run = "restish api sync \"${RESTISH_API_NAME:-koditon}\""
+
+[tasks."restish:config:install:local"]
+description = "Install repo-managed Restish config for the local Koditon API"
+run = "scripts/restish/install_local_config.sh"
+
+[tasks."restish:auth:token"]
+description = "Print a local development API access token for Restish"
+depends = ["backend:dev:preflight"]
+run = "scripts/restish/dev_access_token.sh"
+
+[tasks."restish:call"]
+description = "Call the local API via Restish with a development bearer token"
+depends = ["backend:dev:preflight"]
+run = "scripts/restish/call_local.sh \"$@\""
+
+[tasks."restish:check"]
+description = "Verify Restish can make an authenticated local API call"
+depends = ["backend:dev:preflight"]
+run = "scripts/restish/call_local.sh ping message:restish"
+
+[tasks."agent:api"]
+description = "Agent-friendly alias for authenticated Restish calls"
+run = { task = "restish:call" }
+
+[tasks."agent:api:check"]
+description = "Verify authenticated Restish API access works"
+run = { task = "restish:check" }
+
 [tasks.habitat]
 description = "Run Habitat against the local backend database"
 depends = ["infra:local:ensure", "backend:db:wait"]

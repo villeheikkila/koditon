@@ -1,0 +1,18 @@
+{
+  "$schema": "https://rest.sh/schemas/config.json",
+  "apis": {
+    "koditon": {
+      "base": "http://localhost:8080",
+      "profiles": {
+        "local": {
+          "auth": {
+            "name": "bearer",
+            "params": {
+              "token": "env:KODITON_RESTISH_ACCESS_TOKEN"
+            }
+          }
+        }
+      }
+    }
+  }
+}
