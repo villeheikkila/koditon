@@ -282,7 +282,7 @@ SELECT
 FROM public.property_source_offerings sl
 LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE sl.sale_listing_id = @sale_listing_id
 ON CONFLICT (source_listing_id) DO UPDATE SET
     provider = EXCLUDED.provider,
     source_kind = EXCLUDED.source_kind,
@@ -740,12 +740,12 @@ SELECT
 FROM public.property_source_offerings pso
 LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
 LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
-WHERE pso.sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE pso.sale_listing_id = @sale_listing_id
 LIMIT 1;
 
 -- name: DeleteLLMPropertySourceOfferingRenovations :exec
 DELETE FROM public.property_source_offering_renovations
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE sale_listing_id = @sale_listing_id
     AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text');
 
 -- name: InsertLLMPropertySourceOfferingRenovation :exec
@@ -763,7 +763,7 @@ INSERT INTO public.property_source_offering_renovations (
     property_source_offering_renovation_text,
     property_source_offering_renovation_confidence
 ) VALUES (
-    sqlc.arg(sale_listing_id),
+    @sale_listing_id,
     sqlc.arg(source_field),
     sqlc.arg(category),
     sqlc.arg(status),
@@ -790,7 +790,7 @@ WITH run AS (
         'renovation_events',
         sqlc.arg(projection_version),
         'property_source_offerings',
-        sqlc.arg(sale_listing_id),
+        @sale_listing_id,
         'succeeded',
         now()
     )
@@ -800,7 +800,7 @@ deleted AS (
     DELETE FROM public.property_renovation_events
     WHERE event_scope = 'source'
         AND source_table = 'property_source_offerings'
-        AND source_id = sqlc.arg(sale_listing_id)
+        AND source_id = @sale_listing_id
         AND projection_version = sqlc.arg(projection_version)
 ),
 linked AS (
@@ -820,7 +820,7 @@ linked AS (
     LEFT JOIN public.property_offerings po ON po.property_offering_id = link.target_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE pos.sale_listing_id = sqlc.arg(sale_listing_id)
+    WHERE pos.sale_listing_id = @sale_listing_id
     ORDER BY link.link_score DESC NULLS LAST, link.updated_at DESC NULLS LAST
     LIMIT 1
 ),
@@ -1071,22 +1071,625 @@ WITH targets AS (
 SELECT count(*)::integer AS count FROM marked;
 
 -- name: RebuildListingDimensionLayer :one
-SELECT public.fnc__rebuild_listing_dimension_layer(@sale_listing_id::uuid, NULL::timestamptz)::jsonb AS payload;
+SELECT jsonb_build_object('deprecated', false)::jsonb AS payload;
 
 -- name: RebuildListingDimensionLayerAt :one
-SELECT public.fnc__rebuild_listing_dimension_layer(@sale_listing_id::uuid, sqlc.narg('expected_dirty_at')::timestamptz)::jsonb AS payload;
+SELECT jsonb_build_object('deprecated', false)::jsonb AS payload;
 
 -- name: ProjectListingProviderDimensionClaims :one
-SELECT public.fnc__project_listing_provider_dimension_claims(sqlc.arg(sale_listing_id)::uuid)::integer;
+WITH deleted AS (
+    DELETE FROM public.dimension_claims
+    WHERE claim_scope = 'source'
+        AND source_table = 'property_source_offerings'
+        AND source_id = @sale_listing_id::uuid
+        AND projection_version = 'listing-provider-v1'
+),
+run AS (
+    INSERT INTO public.property_dimension_projection_runs (
+        projection_type,
+        projection_version,
+        source_table,
+        source_id,
+        status,
+        finished_at
+    )
+    VALUES (
+        'source_claims',
+        'listing-provider-v1',
+        'property_source_offerings',
+        @sale_listing_id::uuid,
+        'succeeded',
+        now()
+    )
+    RETURNING property_dimension_projection_run_id
+),
+inserted AS (
+    INSERT INTO public.dimension_claims (
+        property_dimension_projection_run_id,
+        projection_version,
+        claim_scope,
+        target_type,
+        target_id,
+        dimension_key,
+        value,
+        value_kind,
+        unit,
+        source_table,
+        source_id,
+        source_field,
+        source_observed_at,
+        confidence,
+        source_reliability,
+        evidence
+    )
+    SELECT
+        run.property_dimension_projection_run_id,
+        'listing-provider-v1',
+        'source',
+        'listing',
+        sl.sale_listing_id,
+        v.dimension_key,
+        v.value,
+        v.value_kind,
+        c.unit,
+        'property_source_offerings',
+        sl.sale_listing_id,
+        v.source_field,
+        COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_updated_at, sl.sale_listing_created_at, now()),
+        v.confidence,
+        COALESCE(sp.default_reliability, v.source_reliability),
+        jsonb_build_object('provider', sl.sale_listing_source_provider, 'source_kind', sl.sale_listing_source_kind)
+    FROM public.property_source_offerings sl
+    CROSS JOIN run
+    CROSS JOIN LATERAL (
+        VALUES
+            ('sale_listing_area_value','unit.area_m2','number',to_jsonb(sl.sale_listing_area_value),0.95,0.75),
+            ('sale_listing_living_area_value','unit.living_area_m2','number',to_jsonb(sl.sale_listing_living_area_value),0.95,0.75),
+            ('sale_listing_total_area_value','unit.total_area_m2','number',to_jsonb(sl.sale_listing_total_area_value),0.9,0.75),
+            ('sale_listing_other_area_value','unit.other_area_m2','number',to_jsonb(sl.sale_listing_other_area_value),0.9,0.75),
+            ('sale_listing_room_layout','layout.room_layout','string',to_jsonb(NULLIF(sl.sale_listing_room_layout, '')),0.9,0.7),
+            ('sale_listing_rooms_count','layout.room_count','number',to_jsonb(sl.sale_listing_rooms_count),0.95,0.75),
+            ('sale_listing_bedrooms_count','layout.bedroom_count','number',to_jsonb(sl.sale_listing_bedrooms_count),0.85,0.7),
+            ('sale_listing_floor_level','unit.floor_level','number',to_jsonb(sl.sale_listing_floor_level),0.9,0.7),
+            ('sale_listing_total_floors','building.floor_count','number',to_jsonb(sl.sale_listing_total_floors),0.85,0.65),
+            ('sale_listing_condition','condition.unit_condition','string',to_jsonb(NULLIF(sl.sale_listing_condition, '')),0.75,0.6),
+            ('sale_listing_sauna','features.sauna','boolean',to_jsonb(sl.sale_listing_sauna),0.9,0.75),
+            ('sale_listing_balcony','features.balcony','boolean',to_jsonb(sl.sale_listing_balcony),0.9,0.75),
+            ('sale_listing_parking_text','features.parking_type','string',to_jsonb(NULLIF(sl.sale_listing_parking_text, '')),0.65,0.55),
+            ('sale_listing_maintenance_charge_monthly','charges.maintenance_monthly_eur','number',to_jsonb(sl.sale_listing_maintenance_charge_monthly),0.9,0.7),
+            ('sale_listing_total_charge_monthly','charges.total_monthly_eur','number',to_jsonb(sl.sale_listing_total_charge_monthly),0.9,0.7),
+            ('sale_listing_water_charge','charges.water_monthly_eur','number',to_jsonb(sl.sale_listing_water_charge),0.8,0.6),
+            ('sale_listing_debt_share_amount','charges.debt_share_eur','number',to_jsonb(sl.sale_listing_debt_share_amount),0.9,0.7),
+            ('sale_listing_build_year','building.build_year','number',to_jsonb(sl.sale_listing_build_year),0.85,0.65),
+            ('sale_listing_elevator','building.elevator','boolean',to_jsonb(sl.sale_listing_elevator),0.8,0.65),
+            ('sale_listing_heating_system','building.heating_method','string',to_jsonb(NULLIF(sl.sale_listing_heating_system, '')),0.75,0.6),
+            ('sale_listing_energy_efficiency_label','building.energy_class','string',to_jsonb(NULLIF(sl.sale_listing_energy_efficiency_label, '')),0.75,0.6),
+            ('sale_listing_building_material','building.material','string',to_jsonb(NULLIF(sl.sale_listing_building_material, '')),0.75,0.6),
+            ('sale_listing_roof_type','building.roof_type','string',to_jsonb(NULLIF(sl.sale_listing_roof_type, '')),0.75,0.6),
+            ('sale_listing_roof_material','building.roof_material','string',to_jsonb(NULLIF(sl.sale_listing_roof_material, '')),0.75,0.6),
+            ('sale_listing_apartment_count','housing_company.apartment_count','number',to_jsonb(sl.sale_listing_apartment_count),0.75,0.6),
+            ('sale_listing_housing_company_name','housing_company.name','string',to_jsonb(NULLIF(sl.sale_listing_housing_company_name, '')),0.8,0.6),
+            ('sale_listing_housing_company_business_id','housing_company.business_id','string',to_jsonb(NULLIF(sl.sale_listing_housing_company_business_id, '')),0.9,0.65),
+            ('sale_listing_plot_type_code','site.plot_ownership_type','string',to_jsonb(NULLIF(sl.sale_listing_plot_type_code, '')),0.75,0.6)
+    ) AS v(source_field, dimension_key, value_kind, value, confidence, source_reliability)
+    JOIN public.property_dimension_catalog c ON c.dimension_key = v.dimension_key
+    LEFT JOIN public.property_dimension_source_priorities sp
+        ON sp.dimension_key = v.dimension_key
+        AND sp.source_table = 'property_source_offerings'
+        AND sp.source_field = v.source_field
+    WHERE sl.sale_listing_id = @sale_listing_id::uuid
+        AND v.value IS NOT NULL
+    RETURNING 1
+),
+counts AS (
+    SELECT count(*)::integer AS count FROM inserted
+),
+updated_run AS (
+    UPDATE public.property_dimension_projection_runs
+    SET result = jsonb_build_object('claim_count', counts.count)
+    FROM run, counts
+    WHERE property_dimension_projection_runs.property_dimension_projection_run_id = run.property_dimension_projection_run_id
+)
+SELECT count FROM counts;
 
 -- name: ResolveDimensionValuesForTarget :one
-SELECT public.fnc__resolve_dimension_values_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer AS count;
+WITH args AS (
+    SELECT v.target_type, v.target_id FROM (VALUES ($1::text, $2::uuid)) AS v(target_type, target_id)
+),
+deleted AS (
+    DELETE FROM public.dimension_values
+    WHERE target_type = (SELECT target_type FROM args)
+        AND target_id = (SELECT target_id FROM args)
+),
+run AS (
+    INSERT INTO public.property_dimension_projection_runs (
+        projection_type,
+        projection_version,
+        source_table,
+        source_id,
+        status,
+        finished_at
+    )
+    VALUES (
+        'resolved_values',
+        'dimension-resolver-v3',
+        'dimension_claims',
+        (SELECT target_id FROM args),
+        'succeeded',
+        now()
+    )
+    RETURNING property_dimension_projection_run_id
+),
+linked_listings AS (
+    SELECT DISTINCT
+        source_link.source_id AS sale_listing_id,
+        po.property_offering_id,
+        pu.property_unit_id,
+        pu.physical_building_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+        AND (SELECT target_id FROM args) = CASE (SELECT target_type FROM args)
+            WHEN 'offering' THEN po.property_offering_id
+            WHEN 'unit' THEN pu.property_unit_id
+            WHEN 'building' THEN pu.physical_building_id
+            WHEN 'housing_company' THEN COALESCE(pu.housing_company_id, pb.housing_company_id)
+        END
+),
+raw_candidates AS (
+    SELECT c.property_dimension_claim_id, c.dimension_key, c.value, c.value_kind, c.unit, c.confidence, c.source_reliability, c.claim_scope, c.source_table, c.source_field, c.source_observed_at, c.created_at
+    FROM public.dimension_claims c
+    WHERE c.claim_scope = 'manual'
+        AND c.target_type = (SELECT target_type FROM args)
+        AND c.target_id = (SELECT target_id FROM args)
+    UNION ALL
+    SELECT c.property_dimension_claim_id, c.dimension_key, c.value, c.value_kind, c.unit, c.confidence, c.source_reliability, c.claim_scope, c.source_table, c.source_field, c.source_observed_at, c.created_at
+    FROM public.dimension_claims c
+    JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+    WHERE c.claim_scope = 'source'
+        AND c.target_type = (SELECT target_type FROM args)
+        AND c.target_id = (SELECT target_id FROM args)
+        AND catalog.target_type = (SELECT target_type FROM args)
+    UNION ALL
+    SELECT c.property_dimension_claim_id, c.dimension_key, c.value, c.value_kind, c.unit, c.confidence, c.source_reliability, c.claim_scope, c.source_table, c.source_field, c.source_observed_at, c.created_at
+    FROM linked_listings linked
+    JOIN public.dimension_claims c
+        ON c.claim_scope = 'source'
+        AND c.target_type = 'listing'
+        AND c.target_id = linked.sale_listing_id
+    JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+    WHERE catalog.target_type = (SELECT target_type FROM args)
+    UNION ALL
+    SELECT c.property_dimension_claim_id, c.dimension_key, c.value, c.value_kind, c.unit, c.confidence, c.source_reliability, c.claim_scope, c.source_table, c.source_field, c.source_observed_at, c.created_at
+    FROM public.property_documents d
+    JOIN public.dimension_claims c
+        ON c.claim_scope = 'source'
+        AND c.source_table = 'property_documents'
+        AND c.source_id = d.property_document_id
+    JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+    WHERE catalog.target_type = (SELECT target_type FROM args)
+        AND (SELECT target_id FROM args) = CASE (SELECT target_type FROM args)
+            WHEN 'offering' THEN d.property_offering_id
+            WHEN 'unit' THEN d.property_unit_id
+            WHEN 'building' THEN d.physical_building_id
+            WHEN 'housing_company' THEN d.housing_company_id
+        END
+),
+candidates AS (
+    SELECT DISTINCT ON (property_dimension_claim_id)
+        property_dimension_claim_id,
+        (SELECT target_type FROM args) AS target_type,
+        (SELECT target_id FROM args) AS target_id,
+        dimension_key,
+        value,
+        value_kind,
+        unit,
+        confidence,
+        source_reliability,
+        claim_scope,
+        source_table,
+        source_field,
+        source_observed_at,
+        created_at
+    FROM raw_candidates
+    ORDER BY property_dimension_claim_id
+),
+scored AS (
+    SELECT
+        c.property_dimension_claim_id,
+        c.target_type,
+        c.target_id,
+        c.dimension_key,
+        c.value,
+        c.value_kind,
+        c.unit,
+        c.confidence,
+        c.source_reliability,
+        c.claim_scope,
+        c.source_table,
+        c.source_field,
+        c.source_observed_at,
+        c.created_at,
+        COALESCE(sp.priority, CASE WHEN c.claim_scope = 'manual' THEN 1000 ELSE 50 END) AS source_priority,
+        COALESCE(sp.default_reliability, c.source_reliability) AS effective_reliability,
+        p.strategy,
+        p.freshness_half_life_days,
+        CASE
+            WHEN c.claim_scope = 'manual' THEN 1::double precision
+            WHEN p.strategy IN ('stable_identity','document_preferred') AND p.freshness_half_life_days IS NULL THEN 1::double precision
+            WHEN p.freshness_half_life_days IS NULL OR c.source_observed_at IS NULL THEN 1::double precision
+            ELSE power(0.5::double precision, GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - c.source_observed_at)) / 86400::double precision) / p.freshness_half_life_days::double precision)
+        END AS freshness_factor,
+        CASE
+            WHEN c.claim_scope = 'manual' THEN 1::double precision
+            WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
+            WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
+            WHEN p.strategy = 'latest_reliable' AND c.source_table = 'property_source_offerings' THEN 1.05::double precision
+            ELSE 1::double precision
+        END AS authority_factor,
+        CASE
+            WHEN c.claim_scope = 'manual' THEN 1000000::double precision
+            ELSE COALESCE(sp.priority, 50)::double precision *
+                COALESCE(sp.default_reliability, c.source_reliability) *
+                c.confidence *
+                CASE
+                    WHEN p.strategy IN ('stable_identity','document_preferred') AND p.freshness_half_life_days IS NULL THEN 1::double precision
+                    WHEN p.freshness_half_life_days IS NULL OR c.source_observed_at IS NULL THEN 1::double precision
+                    ELSE power(0.5::double precision, GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - c.source_observed_at)) / 86400::double precision) / p.freshness_half_life_days::double precision)
+                END *
+                CASE
+                    WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
+                    WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
+                    WHEN p.strategy = 'latest_reliable' AND c.source_table = 'property_source_offerings' THEN 1.05::double precision
+                    ELSE 1::double precision
+                END
+        END AS score
+    FROM candidates c
+    JOIN public.property_dimension_resolution_policies p ON p.dimension_key = c.dimension_key
+    LEFT JOIN LATERAL (
+        SELECT priority, default_reliability
+        FROM public.property_dimension_source_priorities candidate_priority
+        WHERE candidate_priority.dimension_key = c.dimension_key
+            AND candidate_priority.source_table = c.source_table
+            AND (
+                candidate_priority.source_field IS NULL
+                OR COALESCE(candidate_priority.source_field, '') = COALESCE(c.source_field, '')
+            )
+        ORDER BY CASE WHEN COALESCE(candidate_priority.source_field, '') = COALESCE(c.source_field, '') THEN 0 ELSE 1 END
+        LIMIT 1
+    ) sp ON true
+),
+ranked AS (
+    SELECT
+        property_dimension_claim_id,
+        target_type,
+        target_id,
+        dimension_key,
+        value,
+        value_kind,
+        unit,
+        confidence,
+        source_reliability,
+        claim_scope,
+        source_table,
+        source_field,
+        source_observed_at,
+        created_at,
+        source_priority,
+        effective_reliability,
+        strategy,
+        freshness_half_life_days,
+        freshness_factor,
+        authority_factor,
+        score,
+        row_number() OVER (
+            PARTITION BY dimension_key
+            ORDER BY score DESC, source_observed_at DESC NULLS LAST, created_at DESC, property_dimension_claim_id
+        ) AS selected_rank
+    FROM scored
+),
+stats AS (
+    SELECT
+        dimension_key,
+        count(*) AS claim_count,
+        count(DISTINCT value::text) AS distinct_value_count
+    FROM scored
+    GROUP BY dimension_key
+),
+selected AS (
+    SELECT
+        ranked.property_dimension_claim_id,
+        ranked.target_type,
+        ranked.target_id,
+        ranked.dimension_key,
+        ranked.value,
+        ranked.value_kind,
+        ranked.unit,
+        ranked.confidence,
+        ranked.source_reliability,
+        ranked.claim_scope,
+        ranked.source_table,
+        ranked.source_field,
+        ranked.source_observed_at,
+        ranked.created_at,
+        ranked.source_priority,
+        ranked.effective_reliability,
+        ranked.strategy,
+        ranked.freshness_half_life_days,
+        ranked.freshness_factor,
+        ranked.authority_factor,
+        ranked.score,
+        ranked.selected_rank,
+        stats.claim_count,
+        stats.distinct_value_count
+    FROM ranked
+    JOIN stats ON stats.dimension_key = ranked.dimension_key
+    WHERE ranked.selected_rank = 1
+),
+grouped AS (
+    SELECT
+        s.target_type,
+        s.target_id,
+        s.dimension_key,
+        s.value,
+        s.value_kind,
+        s.unit,
+        s.confidence,
+        s.property_dimension_claim_id AS selected_claim_id,
+        CASE
+            WHEN s.claim_scope = 'manual' THEN 'manual override'
+            ELSE concat(s.strategy, ' score=', round(s.score::numeric, 4)::text, ' priority=', s.source_priority::text, ' reliability=', round(s.effective_reliability::numeric, 3)::text, ' freshness=', round(s.freshness_factor::numeric, 3)::text, ' authority=', round(s.authority_factor::numeric, 3)::text)
+        END AS selected_reason,
+        CASE
+            WHEN s.claim_scope = 'manual' THEN 'manual_override'
+            WHEN s.distinct_value_count > 1 THEN 'conflicting'
+            WHEN s.claim_count > 1 THEN 'compatible'
+            ELSE 'none'
+        END AS conflict_status,
+        array_remove(array_agg(r.property_dimension_claim_id) FILTER (WHERE r.value::text = s.value::text), NULL) AS supporting_claim_ids,
+        array_remove(array_agg(r.property_dimension_claim_id) FILTER (WHERE r.value::text <> s.value::text), NULL) AS rejected_claim_ids
+    FROM selected s
+    JOIN ranked r ON r.dimension_key = s.dimension_key
+    GROUP BY
+        s.target_type,
+        s.target_id,
+        s.dimension_key,
+        s.value,
+        s.value_kind,
+        s.unit,
+        s.confidence,
+        s.property_dimension_claim_id,
+        s.claim_scope,
+        s.strategy,
+        s.score,
+        s.source_priority,
+        s.effective_reliability,
+        s.freshness_factor,
+        s.authority_factor,
+        s.distinct_value_count,
+        s.claim_count
+),
+inserted AS (
+    INSERT INTO public.dimension_values (
+        target_type,
+        target_id,
+        dimension_key,
+        value,
+        value_kind,
+        unit,
+        confidence,
+        selected_claim_id,
+        selected_reason,
+        conflict_status,
+        supporting_claim_ids,
+        rejected_claim_ids,
+        resolved_at
+    )
+    SELECT
+        target_type,
+        target_id,
+        dimension_key,
+        value,
+        value_kind,
+        unit,
+        confidence,
+        selected_claim_id,
+        selected_reason,
+        conflict_status,
+        COALESCE(supporting_claim_ids, ARRAY[]::uuid[]),
+        COALESCE(rejected_claim_ids, ARRAY[]::uuid[]),
+        now()
+    FROM grouped
+    RETURNING 1
+),
+counts AS (
+    SELECT count(*)::integer AS count FROM inserted
+),
+updated_run AS (
+    UPDATE public.property_dimension_projection_runs
+    SET result = jsonb_build_object('resolved_values', counts.count),
+        finished_at = now()
+    FROM run, counts
+    WHERE property_dimension_projection_runs.property_dimension_projection_run_id = run.property_dimension_projection_run_id
+)
+SELECT count FROM counts;
 
 -- name: ProjectDimensionProfileForTarget :one
-SELECT public.fnc__project_dimension_profile_for_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid)::integer AS count;
+WITH args AS (
+    SELECT v.target_type, v.target_id FROM (VALUES ($1::text, $2::uuid)) AS v(target_type, target_id)
+),
+sections AS (
+    SELECT
+        c.profile_section,
+        jsonb_object_agg(c.profile_key, v.value ORDER BY c.profile_key) AS section_json
+    FROM public.dimension_values v
+    JOIN public.property_dimension_catalog c ON c.dimension_key = v.dimension_key
+    WHERE v.target_type = (SELECT target_type FROM args)
+        AND v.target_id = (SELECT target_id FROM args)
+    GROUP BY c.profile_section
+),
+dimensions AS (
+    SELECT COALESCE(jsonb_object_agg(profile_section, section_json ORDER BY profile_section), '{}'::jsonb) AS payload
+    FROM sections
+),
+conflicts AS (
+    SELECT COALESCE(jsonb_object_agg(dimension_key, conflict_status ORDER BY dimension_key), '{}'::jsonb) AS payload
+    FROM public.dimension_values
+    WHERE target_type = (SELECT target_type FROM args)
+        AND target_id = (SELECT target_id FROM args)
+        AND conflict_status <> 'none'
+),
+upserted AS (
+    INSERT INTO public.dimension_profiles (
+        target_type,
+        target_id,
+        dimensions,
+        metadata,
+        conflicts,
+        resolved_at
+    )
+    SELECT
+        (SELECT target_type FROM args),
+        (SELECT target_id FROM args),
+        dimensions.payload,
+        jsonb_build_object('projection_version', 'dimension-profile-v1'),
+        conflicts.payload,
+        now()
+    FROM dimensions, conflicts
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dimensions = EXCLUDED.dimensions,
+        metadata = EXCLUDED.metadata,
+        conflicts = EXCLUDED.conflicts,
+        resolved_at = EXCLUDED.resolved_at
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM upserted;
 
 -- name: ResolveDimensionTarget :one
-SELECT public.fnc__resolve_dimension_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb AS payload;
+SELECT jsonb_build_object('deprecated', false)::jsonb AS payload;
+
+-- name: ListDimensionTargetsForListing :many
+WITH linked AS (
+    SELECT
+        po.property_offering_id,
+        pu.property_unit_id,
+        pu.physical_building_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = @sale_listing_id::uuid
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    LIMIT 1
+),
+target_candidates AS (
+    SELECT
+        catalog.target_type,
+        CASE catalog.target_type
+            WHEN 'offering' THEN linked.property_offering_id
+            WHEN 'unit' THEN linked.property_unit_id
+            WHEN 'building' THEN linked.physical_building_id
+            WHEN 'housing_company' THEN linked.housing_company_id
+        END AS target_id
+    FROM linked
+    JOIN public.dimension_claims c
+        ON c.claim_scope = 'source'
+        AND c.target_type = 'listing'
+        AND c.target_id = @sale_listing_id::uuid
+    JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+    UNION
+    SELECT c.target_type, c.target_id
+    FROM public.dimension_claims c
+    JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
+    WHERE c.claim_scope IN ('source','manual')
+        AND c.source_table = 'property_source_offerings'
+        AND c.source_id = @sale_listing_id::uuid
+        AND c.target_type = catalog.target_type
+)
+SELECT DISTINCT target_type, target_id
+FROM target_candidates
+WHERE target_id IS NOT NULL;
+
+-- name: ClearListingDimensionTargetsDirty :one
+WITH linked AS (
+    SELECT
+        po.property_offering_id,
+        pu.property_unit_id,
+        pu.physical_building_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = @sale_listing_id::uuid
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    LIMIT 1
+),
+targets AS (
+    SELECT 'listing'::text AS target_type, @sale_listing_id::uuid AS target_id
+    UNION ALL SELECT 'offering', property_offering_id FROM linked WHERE property_offering_id IS NOT NULL
+    UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
+    UNION ALL SELECT 'building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
+    UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL
+),
+cleared AS (
+    UPDATE public.property_dimension_dirty_targets dirty
+    SET resolved_at = now()
+    FROM targets
+    WHERE dirty.target_type = targets.target_type
+        AND dirty.target_id = targets.target_id
+        AND dirty.resolved_at IS NULL
+        AND (
+            sqlc.narg('expected_dirty_at')::timestamptz IS NULL
+            OR dirty.dirty_at <= sqlc.narg('expected_dirty_at')::timestamptz
+        )
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM cleared;
+
+-- name: ClearPropertyDimensionTargetDirty :one
+WITH args AS (
+    SELECT v.target_type, v.target_id FROM (VALUES ($1::text, $2::uuid)) AS v(target_type, target_id)
+),
+cleared AS (
+    UPDATE public.property_dimension_dirty_targets
+    SET resolved_at = now()
+    WHERE target_type = (SELECT target_type FROM args)
+        AND target_id = (SELECT target_id FROM args)
+        AND resolved_at IS NULL
+        AND (
+            $3::timestamptz IS NULL
+            OR dirty_at <= $3::timestamptz
+        )
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM cleared;
+
+-- name: ClearPropertyDimensionTargetDirtyAny :one
+WITH args AS (
+    SELECT v.target_type, v.target_id FROM (VALUES ($1::text, $2::uuid)) AS v(target_type, target_id)
+),
+cleared AS (
+    UPDATE public.property_dimension_dirty_targets
+    SET resolved_at = now()
+    WHERE target_type = (SELECT target_type FROM args)
+        AND target_id = (SELECT target_id FROM args)
+        AND resolved_at IS NULL
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM cleared;
 
 -- name: MarkListingDimensionTargetsDirty :one
 WITH linked AS (
@@ -1102,12 +1705,12 @@ WITH linked AS (
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
     WHERE source_link.target_type = 'listing'
         AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+        AND source_link.source_id = @sale_listing_id::uuid
         AND source_link.link_status <> 'rejected'
     ORDER BY source_link.link_score DESC, source_link.updated_at DESC
     LIMIT 1
 ), targets AS (
-    SELECT 'listing'::text AS target_type, sqlc.arg(sale_listing_id)::uuid AS target_id
+    SELECT 'listing'::text AS target_type, @sale_listing_id::uuid AS target_id
     UNION ALL SELECT 'offering', property_offering_id FROM linked WHERE property_offering_id IS NOT NULL
     UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
     UNION ALL SELECT 'house', property_house_id FROM linked WHERE property_house_id IS NOT NULL
@@ -1266,7 +1869,7 @@ ON CONFLICT (unit_id) DO UPDATE SET
 
 -- name: SyncPropertyHouseForSaleListing :one
 WITH synced AS (
-    SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid) AS property_house_id
+    SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(@sale_listing_id::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid) AS property_house_id
 ),
 synced_houses AS (
     INSERT INTO public.houses (
@@ -1410,7 +2013,7 @@ SELECT
     COALESCE(sale_listing_building_description_text, sale_listing_building_other_info_text, '') AS building_text,
     COALESCE(sale_listing_additional_info_text, '') AS additional_info_text
 FROM public.property_source_offerings
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE sale_listing_id = @sale_listing_id
 LIMIT 1;
 
 -- name: GetPropertySourceOfferingValuationExtractionTexts :one
@@ -1448,7 +2051,7 @@ SELECT
     COALESCE(sale_listing_building_other_info_text, '') AS building_other_info_text,
     COALESCE(sale_listing_charges_text, '') AS charges_text
 FROM public.property_source_offerings
-WHERE sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE sale_listing_id = @sale_listing_id
 LIMIT 1;
 
 -- name: ListPropertySourceOfferingInsights :many
@@ -1462,7 +2065,7 @@ SELECT
     COALESCE(observation.text, '') AS property_source_offering_insight_text
 FROM public.target_observations observation
 WHERE observation.source_type = 'source_listing'
-    AND observation.source_id = sqlc.arg(sale_listing_id)
+    AND observation.source_id = @sale_listing_id
     AND observation.superseded_at IS NULL
 ORDER BY observation.severity DESC, observation.observation_key;
 
@@ -2122,7 +2725,7 @@ ON CONFLICT (
 UPDATE public.target_observations
 SET superseded_at = now()
 WHERE source_type = 'source_listing'
-    AND source_id = sqlc.arg(sale_listing_id)
+    AND source_id = @sale_listing_id
     AND superseded_at IS NULL
     AND evidence ->> 'source_field' LIKE 'llm_%';
 
@@ -2167,7 +2770,7 @@ SELECT
 FROM public.target_sources source_link
 WHERE source_link.target_type = 'listing'
     AND source_link.source_type = 'source_listing'
-    AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+    AND source_link.source_id = @sale_listing_id::uuid
     AND source_link.link_status <> 'rejected'
 ON CONFLICT (target_type, target_id, observation_key, source_type, source_id) WHERE superseded_at IS NULL DO UPDATE SET
     observation_kind = EXCLUDED.observation_kind,
@@ -3074,7 +3677,7 @@ SELECT
 FROM public.property_source_offerings sl
 LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-WHERE sl.sale_listing_id = sqlc.arg(sale_listing_id)
+WHERE sl.sale_listing_id = @sale_listing_id
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 LIMIT 1;
 

@@ -73,29 +73,4 @@ BEGIN
   END LOOP;
 END
 $$;
-CREATE OR REPLACE VIEW public.view__prices_transactions AS
- SELECT t.prices_transaction_id,
-    t.prices_transaction_description,
-    t.prices_transaction_type,
-    t.prices_transaction_area,
-    t.prices_transaction_price,
-    t.prices_transaction_price_per_square_meter,
-    t.prices_transaction_build_year,
-    t.prices_transaction_floor,
-    t.prices_transaction_elevator,
-    t.prices_transaction_condition,
-    t.prices_transaction_plot,
-    t.prices_transaction_energy_class,
-    t.prices_transaction_period_identifier,
-    t.prices_transaction_category,
-    t.prices_transaction_created_at,
-    t.prices_transaction_updated_at,
-    n.prices_neighborhood_id,
-    n.prices_neighborhood_name,
-    n.prices_city_id,
-    c.prices_city_name,
-    p.prices_postal_code_code
-   FROM origin.prices_transactions t
-     LEFT JOIN origin.prices_neighborhoods n ON t.prices_neighborhood_id = n.prices_neighborhood_id
-     LEFT JOIN origin.prices_cities c ON n.prices_city_id = c.prices_city_id
-     LEFT JOIN origin.prices_postal_codes p ON n.prices_postal_code_id = p.prices_postal_code_id;
+DROP VIEW IF EXISTS public.view__prices_transactions;

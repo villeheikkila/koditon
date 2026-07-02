@@ -431,7 +431,7 @@ func (c *Consumer) runDimensionLayerListingWorkflow(ctx context.Context, logger 
 		return nil, err
 	}
 	result, err := absurd.Step(ctx, "rebuild-listing-dimension-layer", func(ctx context.Context) (json.RawMessage, error) {
-		return c.queries.RebuildListingDimensionLayerAt(ctx, db.RebuildListingDimensionLayerAtParams{SaleListingID: saleListingID, ExpectedDirtyAt: payload.ExpectedDirtyAt})
+		return c.rebuildListingDimensionLayer(ctx, saleListingID, payload.ExpectedDirtyAt)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("rebuild listing dimension layer: %w", err)
@@ -483,7 +483,7 @@ func (c *Consumer) runResolveDimensionTargetWorkflow(ctx context.Context, logger
 		return nil, fmt.Errorf("parse target id: %w", err)
 	}
 	result, err := absurd.Step(ctx, "resolve-values", func(ctx context.Context) (json.RawMessage, error) {
-		return c.queries.ResolveDimensionTarget(ctx, db.ResolveDimensionTargetParams{TargetType: payload.TargetType, TargetID: targetID, ExpectedDirtyAt: payload.ExpectedDirtyAt})
+		return c.resolveDimensionTarget(ctx, payload.TargetType, targetID, payload.ExpectedDirtyAt)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve dimension target %s:%s: %w", payload.TargetType, payload.TargetID, err)

@@ -25,6 +25,6 @@ WHERE expires_at <= now();
 
 -- name: GetSchemaVersion :one
 SELECT version
-FROM public.schema_migrations
+FROM tern.schema_migrations
 ORDER BY version DESC
 LIMIT 1;

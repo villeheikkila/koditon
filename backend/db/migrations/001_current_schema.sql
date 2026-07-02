@@ -2981,16 +2981,6 @@ CREATE FUNCTION absurd.week_bucket_utc(p_ts timestamp with time zone) RETURNS ti
 $$;
 
 
---
--- Name: fnc__area_match_key(double precision); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__area_match_key(value double precision) RETURNS numeric
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT round(value::numeric, 1)
-$$;
-
 
 --
 -- Name: fnc__canonical_identity_part(text); Type: FUNCTION; Schema: public; Owner: -
@@ -3166,29 +3156,6 @@ CREATE FUNCTION public.fnc__derived_price_per_m2(price bigint, area double preci
 $$;
 
 
---
--- Name: fnc__energy_efficiency_class_code(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__energy_efficiency_class_code(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT energy_efficiency_class_code FROM public.fnc__energy_efficiency_normalized(value)
-$$;
-
-
---
--- Name: fnc__energy_efficiency_label(text[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__energy_efficiency_label(VARIADIC labels text[]) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT NULLIF(trim(value), '')
-    FROM unnest(labels) AS value
-    WHERE NULLIF(trim(value), '') IS NOT NULL
-    LIMIT 1
-$$;
 
 
 --
@@ -3201,35 +3168,6 @@ CREATE FUNCTION public.fnc__energy_efficiency_match_code(value text) RETURNS tex
     SELECT energy_efficiency_match_code FROM public.fnc__energy_efficiency_normalized(value)
 $$;
 
-
---
--- Name: fnc__energy_efficiency_match_label(text[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__energy_efficiency_match_label(VARIADIC labels text[]) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    WITH candidates AS (
-        SELECT ordinality, NULLIF(trim(value), '') AS label
-        FROM unnest(labels) WITH ORDINALITY AS value(value, ordinality)
-        WHERE NULLIF(trim(value), '') IS NOT NULL
-    ),
-    scored AS (
-        SELECT c.ordinality, c.label, n.energy_efficiency_match_code, n.energy_efficiency_status
-        FROM candidates c
-        CROSS JOIN LATERAL public.fnc__energy_efficiency_normalized(c.label) n
-    )
-    SELECT label
-    FROM scored
-    ORDER BY
-        CASE
-            WHEN energy_efficiency_match_code IS NOT NULL THEN 0
-            WHEN energy_efficiency_status IN ('not_required', 'not_available') THEN 1
-            ELSE 2
-        END,
-        ordinality
-    LIMIT 1
-$$;
 
 
 --
@@ -3307,26 +3245,6 @@ CREATE FUNCTION public.fnc__energy_efficiency_normalized(value text) RETURNS TAB
 $_$;
 
 
---
--- Name: fnc__energy_efficiency_standard_year(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__energy_efficiency_standard_year(value text) RETURNS integer
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT energy_efficiency_standard_year FROM public.fnc__energy_efficiency_normalized(value)
-$$;
-
-
---
--- Name: fnc__energy_efficiency_status(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__energy_efficiency_status(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT energy_efficiency_status FROM public.fnc__energy_efficiency_normalized(value)
-$$;
 
 
 --
@@ -3371,67 +3289,6 @@ CREATE FUNCTION public.fnc__layout_exact_match_key(value text) RETURNS text
 $$;
 
 
---
--- Name: fnc__layout_match_code(text, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__layout_match_code(listing_layout text, transaction_description text) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-    WITH values AS (
-        SELECT
-            public.fnc__layout_exact_match_key(listing_layout) AS listing_exact,
-            public.fnc__layout_exact_match_key(regexp_replace(COALESCE(transaction_description, ''), '(\.\.\.|…).*$', '', 'g')) AS transaction_exact,
-            public.fnc__layout_match_key(listing_layout) AS listing_compact,
-            public.fnc__prices_transaction_layout_match_key(transaction_description) AS transaction_compact
-    )
-    SELECT CASE
-        WHEN listing_exact IS NULL OR transaction_exact IS NULL THEN 'none'
-        WHEN listing_exact = transaction_exact THEN 'exact'
-        WHEN length(transaction_exact) >= 2 AND left(listing_exact, length(transaction_exact)) = transaction_exact THEN 'exact_prefix'
-        WHEN length(listing_exact) >= 2 AND left(transaction_exact, length(listing_exact)) = listing_exact THEN 'exact_prefix'
-        WHEN listing_compact = transaction_compact THEN 'space_insensitive'
-        WHEN length(transaction_compact) >= 2 AND left(listing_compact, length(transaction_compact)) = transaction_compact THEN 'compact_prefix'
-        WHEN length(listing_compact) >= 2 AND left(transaction_compact, length(listing_compact)) = listing_compact THEN 'compact_prefix'
-        ELSE 'none'
-    END
-    FROM values
-$_$;
-
-
---
--- Name: fnc__layout_match_key(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__layout_match_key(value text) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT NULLIF(regexp_replace(lower(trim(COALESCE(value, ''))), '[^[:alnum:]åäö]+', '', 'g'), '')
-$$;
-
-
---
--- Name: fnc__layout_prefix_match(text, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__layout_prefix_match(listing_layout text, transaction_description text) RETURNS boolean
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    WITH values AS (
-        SELECT
-            public.fnc__layout_match_key(listing_layout) AS listing_key,
-            public.fnc__prices_transaction_layout_match_key(transaction_description) AS transaction_key,
-            public.fnc__prices_transaction_layout_is_truncated(transaction_description) AS is_truncated
-    )
-    SELECT listing_key IS NOT NULL
-        AND transaction_key IS NOT NULL
-        AND length(transaction_key) >= 2
-        AND CASE
-            WHEN is_truncated THEN left(listing_key, length(transaction_key)) = transaction_key
-            ELSE listing_key = transaction_key
-        END
-    FROM values
-$$;
 
 
 --
@@ -3527,92 +3384,6 @@ END
 $$;
 
 
---
--- Name: fnc__link_sale_listing_prices_transaction(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__link_sale_listing_prices_transaction(target_sale_listing_id uuid, transaction_id uuid) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    existing_listing_id uuid;
-BEGIN
-    IF target_sale_listing_id IS NULL THEN
-        RAISE EXCEPTION 'target_sale_listing_id is required';
-    END IF;
-    IF transaction_id IS NULL THEN
-        RAISE EXCEPTION 'transaction_id is required';
-    END IF;
-    PERFORM 1
-    FROM public.property_source_offerings
-    WHERE sale_listing_id = target_sale_listing_id
-    FOR UPDATE;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'sale listing % not found', target_sale_listing_id;
-    END IF;
-    PERFORM 1
-    FROM public.prices_transactions
-    WHERE prices_transaction_id = transaction_id;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'prices transaction % not found', transaction_id;
-    END IF;
-    SELECT sale_listing_id INTO existing_listing_id
-    FROM public.property_source_offerings
-    WHERE prices_transaction_id = transaction_id
-      AND sale_listing_id <> target_sale_listing_id;
-    IF existing_listing_id IS NOT NULL THEN
-        RAISE EXCEPTION 'prices transaction % is already linked to sale listing %', transaction_id, existing_listing_id;
-    END IF;
-    UPDATE public.property_source_offerings
-    SET prices_transaction_id = transaction_id,
-        sale_listing_updated_at = now()
-    WHERE sale_listing_id = target_sale_listing_id;
-    RETURN target_sale_listing_id;
-END;
-$$;
-
-
---
--- Name: fnc__mark_listing_dimension_targets_dirty(uuid, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__mark_listing_dimension_targets_dirty(p_sale_listing_id uuid, p_reason text DEFAULT 'listing_changed'::text) RETURNS integer
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_count integer := 0;
-    v_target record;
-BEGIN
-    IF p_sale_listing_id IS NULL THEN
-        RETURN 0;
-    END IF;
-    v_count := v_count + public.fnc__mark_property_dimension_target_dirty('listing', p_sale_listing_id, p_reason);
-    FOR v_target IN
-        WITH linked AS (
-            SELECT
-                po.property_offering_id,
-                pu.property_unit_id,
-                pu.physical_building_id,
-                COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
-            FROM public.property_offering_sources pos
-            JOIN public.property_offerings po ON po.property_offering_id = pos.property_offering_id
-            JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-            LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-            WHERE pos.sale_listing_id = p_sale_listing_id
-                AND pos.property_offering_source_link_status <> 'rejected'
-            ORDER BY pos.property_offering_source_link_score DESC NULLS LAST, pos.property_offering_source_created_at DESC
-            LIMIT 1
-        )
-        SELECT 'offering'::text AS target_type, property_offering_id AS target_id FROM linked WHERE property_offering_id IS NOT NULL
-        UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
-        UNION ALL SELECT 'building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
-        UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL
-    LOOP
-        v_count := v_count + public.fnc__mark_property_dimension_target_dirty(v_target.target_type, v_target.target_id, p_reason);
-    END LOOP;
-    RETURN v_count;
-END;
-$$;
 
 
 --
@@ -3752,172 +3523,6 @@ CREATE FUNCTION public.fnc__match_alias_key(value text) RETURNS text
 $$;
 
 
---
--- Name: fnc__merge_housing_companies(uuid, uuid, text, integer, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__merge_housing_companies(source_housing_company_id uuid, target_housing_company_id uuid, merge_method text DEFAULT 'manual'::text, merge_score integer DEFAULT NULL::integer, merge_confidence text DEFAULT NULL::text, merge_reasons jsonb DEFAULT '{}'::jsonb) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    decision_id uuid;
-    merge_source_id uuid := source_housing_company_id;
-    merge_target_id uuid := target_housing_company_id;
-BEGIN
-    IF merge_source_id IS NULL OR merge_target_id IS NULL OR merge_source_id = merge_target_id THEN
-        RETURN NULL;
-    END IF;
-    INSERT INTO public.housing_company_merge_decisions (
-        source_housing_company_id,
-        target_housing_company_id,
-        housing_company_merge_decision_status,
-        housing_company_merge_decision_method,
-        housing_company_merge_decision_score,
-        housing_company_merge_decision_confidence,
-        housing_company_merge_decision_reasons
-    )
-    VALUES (
-        merge_source_id,
-        merge_target_id,
-        'accepted',
-        CASE WHEN merge_method = ANY (ARRAY['source_match_auto'::text, 'backfill_auto'::text]) THEN merge_method ELSE 'manual'::text END,
-        merge_score,
-        merge_confidence,
-        COALESCE(merge_reasons, '{}'::jsonb)
-    )
-    ON CONFLICT DO NOTHING
-    RETURNING housing_company_merge_decision_id INTO decision_id;
-    IF decision_id IS NULL THEN
-        SELECT d.housing_company_merge_decision_id
-        INTO decision_id
-        FROM public.housing_company_merge_decisions d
-        WHERE d.source_housing_company_id = merge_source_id
-            AND d.target_housing_company_id = merge_target_id
-            AND d.housing_company_merge_decision_status <> 'rejected'
-        ORDER BY d.housing_company_merge_decision_created_at DESC
-        LIMIT 1;
-    END IF;
-    UPDATE public.housing_companies target
-    SET
-        housing_company_name = COALESCE(NULLIF(target.housing_company_name, ''), NULLIF(source.housing_company_name, '')),
-        housing_company_business_id = COALESCE(NULLIF(target.housing_company_business_id, ''), NULLIF(source.housing_company_business_id, '')),
-        housing_company_postal_norm = COALESCE(NULLIF(target.housing_company_postal_norm, ''), NULLIF(source.housing_company_postal_norm, '')),
-        housing_company_city_norm = COALESCE(NULLIF(target.housing_company_city_norm, ''), NULLIF(source.housing_company_city_norm, '')),
-        housing_company_address_norm = COALESCE(NULLIF(target.housing_company_address_norm, ''), NULLIF(source.housing_company_address_norm, '')),
-        housing_company_build_year = COALESCE(target.housing_company_build_year, source.housing_company_build_year),
-        housing_company_floor_count = COALESCE(target.housing_company_floor_count, source.housing_company_floor_count),
-        housing_company_apartment_count = COALESCE(target.housing_company_apartment_count, source.housing_company_apartment_count),
-        housing_company_elevator = COALESCE(target.housing_company_elevator, source.housing_company_elevator),
-        housing_company_energy_efficiency_label = COALESCE(NULLIF(target.housing_company_energy_efficiency_label, ''), NULLIF(source.housing_company_energy_efficiency_label, '')),
-        housing_company_geom = COALESCE(target.housing_company_geom, source.housing_company_geom),
-        housing_company_match_reasons = target.housing_company_match_reasons || source.housing_company_match_reasons || COALESCE(merge_reasons, '{}'::jsonb) || jsonb_build_object('merged_from_housing_company_id', merge_source_id, 'merge_decision_id', decision_id),
-        housing_company_updated_at = now()
-    FROM public.housing_companies source
-    WHERE target.housing_company_id = merge_target_id
-        AND source.housing_company_id = merge_source_id;
-    UPDATE public.property_units pu
-    SET
-        housing_company_id = merge_target_id,
-        property_unit_updated_at = now()
-    WHERE pu.housing_company_id = merge_source_id;
-    PERFORM public.fnc__refresh_housing_company_geom(merge_target_id);
-    RETURN decision_id;
-END;
-$$;
-
-
---
--- Name: fnc__merge_property_offerings(uuid, uuid, text, integer, text, jsonb, uuid); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__merge_property_offerings(source_offering_id uuid, target_offering_id uuid, link_method text DEFAULT 'source_match_auto'::text, link_score integer DEFAULT NULL::integer, link_confidence text DEFAULT NULL::text, link_reasons jsonb DEFAULT '{}'::jsonb, match_candidate_id uuid DEFAULT NULL::uuid) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    decision_id uuid;
-BEGIN
-    IF source_offering_id IS NULL OR target_offering_id IS NULL OR source_offering_id = target_offering_id THEN
-        RETURN NULL;
-    END IF;
-    INSERT INTO public.property_offering_merge_decisions (
-        source_property_offering_id,
-        target_property_offering_id,
-        property_offering_source_match_candidate_id,
-        property_offering_merge_decision_status,
-        property_offering_merge_decision_method,
-        property_offering_merge_decision_score,
-        property_offering_merge_decision_confidence,
-        property_offering_merge_decision_reasons
-    )
-    VALUES (
-        source_offering_id,
-        target_offering_id,
-        match_candidate_id,
-        'accepted',
-        CASE WHEN link_method = ANY (ARRAY['manual'::text, 'backfill_auto'::text]) THEN link_method ELSE 'source_match_auto'::text END,
-        link_score,
-        link_confidence,
-        COALESCE(link_reasons, '{}'::jsonb)
-    )
-    ON CONFLICT DO NOTHING
-    RETURNING property_offering_merge_decision_id INTO decision_id;
-    IF decision_id IS NULL THEN
-        SELECT property_offering_merge_decision_id INTO decision_id
-        FROM public.property_offering_merge_decisions
-        WHERE source_property_offering_id = source_offering_id
-            AND target_property_offering_id = target_offering_id
-            AND property_offering_merge_decision_status <> 'rejected'
-        ORDER BY property_offering_merge_decision_created_at DESC
-        LIMIT 1;
-    END IF;
-    UPDATE public.property_offering_sources pos
-    SET
-        property_offering_id = target_offering_id,
-        property_offering_source_link_method = CASE
-            WHEN pos.property_offering_source_link_method = 'manual' THEN 'manual'
-            ELSE CASE WHEN link_method = ANY (ARRAY['manual'::text, 'backfill_auto'::text]) THEN link_method ELSE 'source_match_auto'::text END
-        END,
-        property_offering_source_link_status = 'confirmed',
-        property_offering_source_link_score = GREATEST(pos.property_offering_source_link_score, COALESCE(link_score, pos.property_offering_source_link_score)),
-        property_offering_source_link_reasons = pos.property_offering_source_link_reasons || COALESCE(link_reasons, '{}'::jsonb) || jsonb_build_object('merge_decision_id', decision_id, 'merged_from_property_offering_id', source_offering_id),
-        property_offering_source_updated_at = now()
-    WHERE pos.property_offering_id = source_offering_id
-        AND pos.property_offering_source_link_status <> 'rejected';
-    INSERT INTO public.property_offering_transactions (
-        property_offering_id,
-        prices_transaction_id,
-        property_offering_transaction_link_status,
-        property_offering_transaction_link_method,
-        property_offering_transaction_link_score,
-        property_offering_transaction_link_reasons,
-        property_offering_transaction_updated_at
-    )
-    SELECT
-        target_offering_id,
-        pot.prices_transaction_id,
-        pot.property_offering_transaction_link_status,
-        pot.property_offering_transaction_link_method,
-        pot.property_offering_transaction_link_score,
-        pot.property_offering_transaction_link_reasons || jsonb_build_object('merge_decision_id', decision_id, 'merged_from_property_offering_id', source_offering_id),
-        now()
-    FROM public.property_offering_transactions pot
-    WHERE pot.property_offering_id = source_offering_id
-    ON CONFLICT (property_offering_id, prices_transaction_id) DO UPDATE SET
-        property_offering_transaction_link_score = GREATEST(property_offering_transactions.property_offering_transaction_link_score, EXCLUDED.property_offering_transaction_link_score),
-        property_offering_transaction_link_reasons = property_offering_transactions.property_offering_transaction_link_reasons || EXCLUDED.property_offering_transaction_link_reasons,
-        property_offering_transaction_updated_at = now();
-    DELETE FROM public.property_offering_transactions pot
-    WHERE pot.property_offering_id = source_offering_id;
-    UPDATE public.property_offering_source_match_candidates c
-    SET property_offering_source_match_status = 'auto_linked'
-    WHERE c.property_offering_source_match_candidate_id = match_candidate_id
-        AND c.property_offering_source_match_status <> 'rejected';
-    UPDATE public.property_offerings po
-    SET property_offering_updated_at = now()
-    WHERE po.property_offering_id = ANY (ARRAY[source_offering_id, target_offering_id]);
-    RETURN decision_id;
-END;
-$$;
 
 
 --
@@ -3931,16 +3536,6 @@ CREATE FUNCTION public.fnc__normalize_address_token(value text) RETURNS text
 $$;
 
 
---
--- Name: fnc__normalize_match_text(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__normalize_match_text(value text) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-SELECT NULLIF(regexp_replace(lower(trim(COALESCE(value, ''))), '[^[:alnum:]]+', '', 'g'), '');
-$$;
-
 
 --
 -- Name: fnc__normalize_postal(text); Type: FUNCTION; Schema: public; Owner: -
@@ -3953,33 +3548,75 @@ SELECT NULLIF(regexp_replace(trim(COALESCE(value, '')), '[^0-9]+', '', 'g'), '')
 $$;
 
 
+
+
 --
--- Name: fnc__parse_finnish_address(text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: fnc__prices_transaction_energy_match_code(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.fnc__parse_finnish_address(value text) RETURNS jsonb
-    LANGUAGE plpgsql IMMUTABLE
+CREATE FUNCTION public.fnc__prices_transaction_energy_match_code(value text) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT public.fnc__energy_efficiency_match_code(value)
+$$;
+
+
+--
+-- Name: fnc__prices_transaction_floor_level(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fnc__prices_transaction_floor_level(value text) RETURNS integer
+    LANGUAGE sql IMMUTABLE
     AS $_$
-DECLARE
-    line text;
-    matches text[];
-BEGIN
-    line := NULLIF(trim(split_part(COALESCE(value, ''), ',', 1)), '');
-    IF line IS NULL THEN
-        RETURN '{}'::jsonb;
-    END IF;
-    line := regexp_replace(line, '\s+', ' ', 'g');
-    matches := regexp_match(line, '^(.+?)\s+([0-9]+[[:alpha:]åäöÅÄÖ]?(?:[-/][0-9]+[[:alpha:]åäöÅÄÖ]?)?)(?:\s+([[:alpha:]åäöÅÄÖ]))?(?:\s+([0-9]+[[:alpha:]åäöÅÄÖ]?))?$');
-    IF matches IS NULL THEN
-        RETURN jsonb_build_object('street_name', line);
-    END IF;
-    RETURN jsonb_strip_nulls(jsonb_build_object(
-        'street_name', NULLIF(trim(matches[1]), ''),
-        'street_number', NULLIF(trim(matches[2]), ''),
-        'building_letter', NULLIF(trim(matches[3]), ''),
-        'apartment', NULLIF(trim(matches[4]), '')
-    ));
-END;
+    SELECT NULLIF((regexp_match(COALESCE(value, ''), '^\s*(-?[0-9]+)(?:\s*/\s*-?[0-9]+)?\s*$'))[1], '')::integer
+$_$;
+
+
+--
+-- Name: fnc__layout_match_key(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fnc__layout_match_key(value text) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+    SELECT NULLIF(regexp_replace(lower(trim(COALESCE(value, ''))), '[^[:alnum:]åäö]+', '', 'g'), '')
+$$;
+
+
+
+--
+-- Name: fnc__prices_transaction_layout_is_truncated(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fnc__prices_transaction_layout_is_truncated(value text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    AS $$
+    SELECT COALESCE(value, '') ~ '(\.\.\.|…)'
+$$;
+
+
+--
+-- Name: fnc__prices_transaction_layout_match_key(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fnc__prices_transaction_layout_match_key(value text) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $_$
+    SELECT public.fnc__layout_match_key(regexp_replace(COALESCE(value, ''), '(\.\.\.|…).*$', '', 'g'))
+$_$;
+
+
+
+
+
+--
+-- Name: fnc__prices_transaction_total_floors(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fnc__prices_transaction_total_floors(value text) RETURNS integer
+    LANGUAGE sql IMMUTABLE
+    AS $_$
+    SELECT NULLIF((regexp_match(COALESCE(value, ''), '^\s*-?[0-9]+\s*/\s*([0-9]+)\s*$'))[1], '')::integer
 $_$;
 
 
@@ -4012,137 +3649,6 @@ CREATE FUNCTION public.fnc__plot_owned(value text) RETURNS boolean
         ELSE NULL
     END
 $$;
-
-
---
--- Name: fnc__plot_owned_label(boolean); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__plot_owned_label(value boolean) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT CASE
-        WHEN value IS TRUE THEN 'Owned'
-        WHEN value IS FALSE THEN 'Rented'
-        ELSE NULL
-    END
-$$;
-
-
---
--- Name: fnc__prices_transaction_energy_match_code(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_energy_match_code(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT public.fnc__energy_efficiency_match_code(value)
-$$;
-
-
---
--- Name: fnc__prices_transaction_floor_level(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_floor_level(value text) RETURNS integer
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-    SELECT NULLIF((regexp_match(COALESCE(value, ''), '^\s*(-?[0-9]+)(?:\s*/\s*-?[0-9]+)?\s*$'))[1], '')::integer
-$_$;
-
-
---
--- Name: fnc__prices_transaction_floor_text(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_floor_text(value text) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT public.fnc__sale_listing_floor_text(
-        public.fnc__prices_transaction_floor_level(value),
-        public.fnc__prices_transaction_total_floors(value)
-    )
-$$;
-
-
---
--- Name: fnc__prices_transaction_layout_is_truncated(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_layout_is_truncated(value text) RETURNS boolean
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT COALESCE(value, '') ~ '(\.\.\.|…)'
-$$;
-
-
---
--- Name: fnc__prices_transaction_layout_match_key(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_layout_match_key(value text) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-    SELECT public.fnc__layout_match_key(regexp_replace(COALESCE(value, ''), '(\.\.\.|…).*$', '', 'g'))
-$_$;
-
-
---
--- Name: fnc__prices_transaction_period_month(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_period_month(value text) RETURNS date
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-    SELECT CASE
-        WHEN value ~ '^[0-9]{4}-[0-9]{2}$' THEN to_date(value || '-01', 'YYYY-MM-DD')
-        ELSE NULL
-    END
-$_$;
-
-
---
--- Name: fnc__prices_transaction_plot_type_code(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_plot_type_code(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT public.fnc__sale_listing_plot_type_code(value)
-$$;
-
-
---
--- Name: fnc__prices_transaction_property_type_code(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_property_type_code(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT public.fnc__sale_listing_property_type_code(value)
-$$;
-
-
---
--- Name: fnc__prices_transaction_room_category_code(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_room_category_code(value text) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-    SELECT public.fnc__sale_listing_room_category_code(value)
-$$;
-
-
---
--- Name: fnc__prices_transaction_total_floors(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__prices_transaction_total_floors(value text) RETURNS integer
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-    SELECT NULLIF((regexp_match(COALESCE(value, ''), '^\s*-?[0-9]+\s*/\s*([0-9]+)\s*$'))[1], '')::integer
-$_$;
 
 
 --
@@ -4327,14 +3833,12 @@ CREATE FUNCTION public.fnc__rebuild_listing_dimension_layer(p_sale_listing_id uu
     AS $$
 DECLARE
     v_source_claims integer;
-    v_promoted_claims integer;
     v_values integer := 0;
     v_profiles integer := 0;
     v_cleaned integer := 0;
     v_target record;
 BEGIN
     v_source_claims := public.fnc__project_listing_provider_dimension_claims(p_sale_listing_id);
-    v_promoted_claims := public.fnc__promote_listing_dimension_claims(p_sale_listing_id);
     FOR v_target IN
         WITH linked AS (
             SELECT
@@ -4385,7 +3889,6 @@ BEGIN
     v_cleaned := public.fnc__clear_listing_dimension_targets_dirty(p_sale_listing_id);
     RETURN jsonb_build_object(
         'source_claims', v_source_claims,
-        'promoted_claims', v_promoted_claims,
         'values', v_values,
         'profiles', v_profiles,
         'cleaned_dirty_targets', v_cleaned
@@ -4532,16 +4035,6 @@ END;
 $$;
 
 
---
--- Name: fnc__refresh_property_building_geom(uuid); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__refresh_property_building_geom(target_property_building_id uuid DEFAULT NULL::uuid) RETURNS integer
-    LANGUAGE sql
-    AS $$
-    SELECT public.fnc__refresh_housing_company_geom(target_property_building_id)
-$$;
-
 
 --
 -- Name: fnc__relink_physical_building_housing_company(uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: -
@@ -4658,69 +4151,6 @@ BEGIN
 END;
 $$;
 
-
---
--- Name: fnc__relink_property_offering_source(uuid, uuid, text, integer, jsonb); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__relink_property_offering_source(p_sale_listing_id uuid, p_target_property_offering_id uuid, p_method text DEFAULT 'manual'::text, p_score integer DEFAULT 100, p_reasons jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_old_offering_ids uuid[];
-    v_dirty integer := 0;
-    v_old_id uuid;
-BEGIN
-    SELECT COALESCE(array_agg(property_offering_id), ARRAY[]::uuid[])
-    INTO v_old_offering_ids
-    FROM public.property_offering_sources
-    WHERE sale_listing_id = p_sale_listing_id
-        AND property_offering_source_link_status <> 'rejected';
-    UPDATE public.property_offering_sources
-    SET property_offering_source_link_status = 'rejected',
-        property_offering_source_updated_at = now()
-    WHERE sale_listing_id = p_sale_listing_id
-        AND property_offering_id <> p_target_property_offering_id
-        AND property_offering_source_link_status <> 'rejected';
-    INSERT INTO public.property_offering_sources (
-        property_offering_id,
-        sale_listing_id,
-        property_offering_source_link_status,
-        property_offering_source_link_method,
-        property_offering_source_link_score,
-        property_offering_source_link_reasons,
-        property_offering_source_updated_at
-    )
-    VALUES (
-        p_target_property_offering_id,
-        p_sale_listing_id,
-        'confirmed',
-        COALESCE(NULLIF(p_method, ''), 'manual'),
-        COALESCE(p_score, 100),
-        COALESCE(p_reasons, '{}'::jsonb),
-        now()
-    )
-    ON CONFLICT (sale_listing_id) WHERE property_offering_source_link_status <> 'rejected'
-    DO UPDATE SET
-        property_offering_id = EXCLUDED.property_offering_id,
-        property_offering_source_link_status = EXCLUDED.property_offering_source_link_status,
-        property_offering_source_link_method = EXCLUDED.property_offering_source_link_method,
-        property_offering_source_link_score = EXCLUDED.property_offering_source_link_score,
-        property_offering_source_link_reasons = property_offering_sources.property_offering_source_link_reasons || EXCLUDED.property_offering_source_link_reasons,
-        property_offering_source_updated_at = now();
-    FOREACH v_old_id IN ARRAY v_old_offering_ids LOOP
-        v_dirty := v_dirty + public.fnc__mark_property_offering_dimension_targets_dirty(v_old_id, 'offering_source_relinked_old');
-    END LOOP;
-    v_dirty := v_dirty + public.fnc__mark_property_offering_dimension_targets_dirty(p_target_property_offering_id, 'offering_source_relinked_new');
-    v_dirty := v_dirty + public.fnc__mark_property_dimension_target_dirty('listing', p_sale_listing_id, 'offering_source_relinked');
-    RETURN jsonb_build_object(
-        'sale_listing_id', p_sale_listing_id,
-        'old_property_offering_ids', v_old_offering_ids,
-        'new_property_offering_id', p_target_property_offering_id,
-        'dirty_targets', v_dirty
-    );
-END;
-$$;
 
 
 --
@@ -5193,319 +4623,6 @@ END;
 $$;
 
 
---
--- Name: fnc__sync_canonical_property_for_sale_listing(uuid, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__sync_canonical_property_for_sale_listing(listing_id uuid, link_method text DEFAULT 'sync_auto'::text) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_housing_company_id uuid;
-    unit_id uuid;
-    offering_id uuid;
-    source_link_id uuid;
-BEGIN
-    WITH source_values AS (
-        SELECT
-            sl.sale_listing_id,
-            sl.sale_listing_source_provider,
-            sl.sale_listing_source_kind,
-            sl.sale_listing_native_id,
-            sl.sale_listing_headline,
-            sl.sale_listing_postal_norm,
-            sl.sale_listing_city_norm,
-            sl.sale_listing_address_norm,
-            sl.sale_listing_building_match_key,
-            sl.sale_listing_unit_match_key,
-            sl.sale_listing_floor_level,
-            sl.sale_listing_area_value,
-            sl.sale_listing_rooms_count,
-            sl.sale_listing_room_layout,
-            sl.sale_listing_asking_price,
-            sl.sale_listing_debt_free_price,
-            sl.sale_listing_price_per_m2,
-            sl.sale_listing_first_seen_at,
-            sl.sale_listing_last_seen_at,
-            sl.sale_listing_build_year,
-            sl.sale_listing_total_floors,
-            sl.sale_listing_elevator,
-            sl.sale_listing_energy_efficiency_label,
-            sl.sale_listing_url,
-            sl.shortcut_ad_id,
-            sl.frontdoor_ad_id,
-            sl.frontdoor_building_announcement_id,
-            sa.shortcut_building_id,
-            fba.frontdoor_building_id,
-            COALESCE(
-                sa.shortcut_ad_data #>> '{adData,housingCompanyBusinessId}',
-                fa.frontdoor_ad_data #>> '{property,housingCompany,businessId}',
-                fb.frontdoor_building_business_id
-            ) AS business_id,
-            COALESCE(
-                sa.shortcut_ad_data #>> '{adData,housingCompanyName}',
-                sb.shortcut_building_housing_company,
-                fa.frontdoor_ad_data #>> '{property,housingCompany,name}',
-                fb.frontdoor_building_company_name
-            ) AS housing_company_name,
-            COALESCE(
-                sa.shortcut_ad_data #>> '{buildingId}',
-                sa.shortcut_ad_data #>> '{adData,buildingId}',
-                sb.shortcut_building_external_id::text,
-                sb.shortcut_building_building_id,
-                fa.frontdoor_ad_data #>> '{property,housingCompany,id}',
-                fb.frontdoor_building_housing_company_id::text,
-                fba.frontdoor_building_id::text
-            ) AS provider_building_id
-        FROM public.property_source_offerings sl
-        LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-        LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-        LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-        LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-        LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-        WHERE sl.sale_listing_id = listing_id
-    ),
-    identity_values AS (
-        SELECT
-            *,
-            COALESCE(
-                'business:' || public.fnc__canonical_identity_part(business_id),
-                'provider_housing_company:' || sale_listing_source_provider || ':' || public.fnc__canonical_identity_part(provider_building_id),
-                'address:' || public.fnc__canonical_identity_part(concat_ws('|', sale_listing_postal_norm, sale_listing_city_norm, sale_listing_building_match_key, housing_company_name)),
-                'source:' || sale_listing_source_provider || ':' || sale_listing_source_kind || ':' || sale_listing_native_id
-            ) AS housing_company_key
-        FROM source_values
-    ),
-    inserted AS (
-        INSERT INTO public.housing_companies (
-            housing_company_identity_key,
-            housing_company_postal_norm,
-            housing_company_city_norm,
-            housing_company_address_norm,
-            housing_company_name,
-            housing_company_business_id,
-            housing_company_build_year,
-            housing_company_floor_count,
-            housing_company_elevator,
-            housing_company_energy_efficiency_label,
-            housing_company_match_reasons,
-            housing_company_updated_at
-        )
-        SELECT
-            housing_company_key,
-            sale_listing_postal_norm,
-            sale_listing_city_norm,
-            sale_listing_address_norm,
-            housing_company_name,
-            business_id,
-            sale_listing_build_year,
-            sale_listing_total_floors,
-            sale_listing_elevator,
-            sale_listing_energy_efficiency_label,
-            jsonb_build_object('source', sale_listing_source_provider, 'provider_building_id', provider_building_id),
-            now()
-        FROM identity_values
-        ON CONFLICT (housing_company_identity_key) DO UPDATE SET
-            housing_company_postal_norm = COALESCE(housing_companies.housing_company_postal_norm, EXCLUDED.housing_company_postal_norm),
-            housing_company_city_norm = COALESCE(housing_companies.housing_company_city_norm, EXCLUDED.housing_company_city_norm),
-            housing_company_address_norm = COALESCE(housing_companies.housing_company_address_norm, EXCLUDED.housing_company_address_norm),
-            housing_company_name = COALESCE(housing_companies.housing_company_name, EXCLUDED.housing_company_name),
-            housing_company_business_id = COALESCE(housing_companies.housing_company_business_id, EXCLUDED.housing_company_business_id),
-            housing_company_build_year = COALESCE(housing_companies.housing_company_build_year, EXCLUDED.housing_company_build_year),
-            housing_company_floor_count = COALESCE(housing_companies.housing_company_floor_count, EXCLUDED.housing_company_floor_count),
-            housing_company_elevator = COALESCE(housing_companies.housing_company_elevator, EXCLUDED.housing_company_elevator),
-            housing_company_energy_efficiency_label = COALESCE(housing_companies.housing_company_energy_efficiency_label, EXCLUDED.housing_company_energy_efficiency_label),
-            housing_company_updated_at = now()
-        RETURNING housing_company_id
-    )
-    SELECT inserted.housing_company_id INTO v_housing_company_id FROM inserted;
-    WITH source_values AS (
-        SELECT sl.*, hc.housing_company_id, hc.housing_company_identity_key
-        FROM public.property_source_offerings sl
-        JOIN public.housing_companies hc ON hc.housing_company_id = v_housing_company_id
-        WHERE sl.sale_listing_id = listing_id
-    ),
-    identity_values AS (
-        SELECT
-            *,
-            housing_company_identity_key || ':unit:' || COALESCE(
-                public.fnc__canonical_identity_part(sale_listing_unit_match_key),
-                public.fnc__canonical_identity_part(concat_ws('|', sale_listing_floor_level::text, sale_listing_area_value::text, public.fnc__layout_match_key(sale_listing_room_layout))),
-                sale_listing_id::text
-            ) AS unit_key
-        FROM source_values
-    ),
-    inserted AS (
-        INSERT INTO public.property_units (
-            housing_company_id,
-            property_unit_identity_key,
-            property_unit_address_norm,
-            property_unit_floor_level,
-            property_unit_area_value,
-            property_unit_rooms_count,
-            property_unit_room_layout,
-            property_unit_layout_match_key,
-            property_unit_match_reasons,
-            property_unit_updated_at
-        )
-        SELECT
-            housing_company_id,
-            unit_key,
-            sale_listing_address_norm,
-            sale_listing_floor_level,
-            sale_listing_area_value,
-            sale_listing_rooms_count,
-            sale_listing_room_layout,
-            public.fnc__layout_match_key(sale_listing_room_layout),
-            jsonb_build_object('source_listing_id', sale_listing_id),
-            now()
-        FROM identity_values
-        ON CONFLICT (property_unit_identity_key) DO UPDATE SET
-            housing_company_id = EXCLUDED.housing_company_id,
-            property_unit_address_norm = COALESCE(property_units.property_unit_address_norm, EXCLUDED.property_unit_address_norm),
-            property_unit_floor_level = COALESCE(property_units.property_unit_floor_level, EXCLUDED.property_unit_floor_level),
-            property_unit_area_value = COALESCE(property_units.property_unit_area_value, EXCLUDED.property_unit_area_value),
-            property_unit_rooms_count = COALESCE(property_units.property_unit_rooms_count, EXCLUDED.property_unit_rooms_count),
-            property_unit_room_layout = COALESCE(property_units.property_unit_room_layout, EXCLUDED.property_unit_room_layout),
-            property_unit_layout_match_key = COALESCE(property_units.property_unit_layout_match_key, EXCLUDED.property_unit_layout_match_key),
-            property_unit_updated_at = now()
-        RETURNING property_unit_id
-    )
-    SELECT property_unit_id INTO unit_id FROM inserted;
-    WITH source_values AS (
-        SELECT sl.*, pu.property_unit_id, pu.property_unit_identity_key
-        FROM public.property_source_offerings sl
-        JOIN public.property_units pu ON pu.property_unit_id = unit_id
-        WHERE sl.sale_listing_id = listing_id
-    ),
-    identity_values AS (
-        SELECT *, property_unit_identity_key || ':sale:' || COALESCE(sale_listing_debt_free_price::text, sale_listing_asking_price::text, 'unknown') AS offering_key
-        FROM source_values
-    ),
-    inserted AS (
-        INSERT INTO public.property_offerings (
-            property_unit_id,
-            property_offering_identity_key,
-            property_offering_type,
-            property_offering_headline,
-            property_offering_asking_price,
-            property_offering_debt_free_price,
-            property_offering_price_per_m2,
-            property_offering_first_seen_at,
-            property_offering_last_seen_at,
-            property_offering_status,
-            primary_sale_listing_id,
-            property_offering_match_reasons,
-            property_offering_updated_at
-        )
-        SELECT
-            property_unit_id,
-            offering_key,
-            'sale',
-            sale_listing_headline,
-            sale_listing_asking_price,
-            sale_listing_debt_free_price,
-            sale_listing_price_per_m2,
-            sale_listing_first_seen_at,
-            sale_listing_last_seen_at,
-            sale_listing_prices_match_status,
-            sale_listing_id,
-            jsonb_build_object('source_listing_id', sale_listing_id, 'identity_key', offering_key),
-            now()
-        FROM identity_values
-        ON CONFLICT (property_offering_identity_key) DO UPDATE SET
-            property_offering_headline = CASE WHEN EXCLUDED.property_offering_last_seen_at >= COALESCE(property_offerings.property_offering_last_seen_at, '-infinity'::timestamptz) THEN EXCLUDED.property_offering_headline ELSE property_offerings.property_offering_headline END,
-            property_offering_asking_price = COALESCE(EXCLUDED.property_offering_asking_price, property_offerings.property_offering_asking_price),
-            property_offering_debt_free_price = COALESCE(EXCLUDED.property_offering_debt_free_price, property_offerings.property_offering_debt_free_price),
-            property_offering_price_per_m2 = COALESCE(EXCLUDED.property_offering_price_per_m2, property_offerings.property_offering_price_per_m2),
-            property_offering_first_seen_at = LEAST(COALESCE(property_offerings.property_offering_first_seen_at, EXCLUDED.property_offering_first_seen_at), COALESCE(EXCLUDED.property_offering_first_seen_at, property_offerings.property_offering_first_seen_at)),
-            property_offering_last_seen_at = GREATEST(COALESCE(property_offerings.property_offering_last_seen_at, EXCLUDED.property_offering_last_seen_at), COALESCE(EXCLUDED.property_offering_last_seen_at, property_offerings.property_offering_last_seen_at)),
-            primary_sale_listing_id = CASE WHEN EXCLUDED.property_offering_last_seen_at >= COALESCE(property_offerings.property_offering_last_seen_at, '-infinity'::timestamptz) THEN EXCLUDED.primary_sale_listing_id ELSE property_offerings.primary_sale_listing_id END,
-            property_offering_updated_at = now()
-        RETURNING property_offering_id
-    )
-    SELECT property_offering_id INTO offering_id FROM inserted;
-    INSERT INTO public.property_offering_sources (
-        property_offering_id,
-        sale_listing_id,
-        property_offering_source_link_status,
-        property_offering_source_link_method,
-        property_offering_source_link_score,
-        property_offering_source_link_reasons,
-        property_offering_source_updated_at
-    )
-    VALUES (
-        offering_id,
-        listing_id,
-        'confirmed',
-        link_method,
-        120,
-        jsonb_build_object('matched_by', 'canonical_identity_key'),
-        now()
-    )
-    ON CONFLICT (sale_listing_id) WHERE property_offering_source_link_status <> 'rejected' DO UPDATE SET
-        property_offering_id = CASE WHEN property_offering_sources.property_offering_source_link_method = ANY (ARRAY['manual'::text, 'source_match_auto'::text]) THEN property_offering_sources.property_offering_id ELSE EXCLUDED.property_offering_id END,
-        property_offering_source_link_status = CASE WHEN property_offering_sources.property_offering_source_link_method = ANY (ARRAY['manual'::text, 'source_match_auto'::text]) THEN property_offering_sources.property_offering_source_link_status ELSE EXCLUDED.property_offering_source_link_status END,
-        property_offering_source_link_method = CASE WHEN property_offering_sources.property_offering_source_link_method = ANY (ARRAY['manual'::text, 'source_match_auto'::text]) THEN property_offering_sources.property_offering_source_link_method ELSE EXCLUDED.property_offering_source_link_method END,
-        property_offering_source_link_score = CASE WHEN property_offering_sources.property_offering_source_link_method = ANY (ARRAY['manual'::text, 'source_match_auto'::text]) THEN property_offering_sources.property_offering_source_link_score ELSE EXCLUDED.property_offering_source_link_score END,
-        property_offering_source_link_reasons = CASE WHEN property_offering_sources.property_offering_source_link_method = ANY (ARRAY['manual'::text, 'source_match_auto'::text]) THEN property_offering_sources.property_offering_source_link_reasons ELSE EXCLUDED.property_offering_source_link_reasons END,
-        property_offering_source_updated_at = now();
-    SELECT public.fnc__housing_company_source_upsert(
-        v_housing_company_id,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        'property_source_offerings',
-        sl.sale_listing_id::text,
-        sl.sale_listing_native_id,
-        sl.sale_listing_url,
-        link_method,
-        120,
-        jsonb_build_object('matched_by', 'sale_listing_sync'),
-        sl.sale_listing_first_seen_at,
-        sl.sale_listing_last_seen_at
-    ) INTO source_link_id
-    FROM public.property_source_offerings sl
-    WHERE sl.sale_listing_id = listing_id;
-    INSERT INTO public.property_offering_transactions (
-        property_offering_id,
-        prices_transaction_id,
-        property_offering_transaction_link_status,
-        property_offering_transaction_link_method,
-        property_offering_transaction_link_score,
-        property_offering_transaction_link_reasons,
-        property_offering_transaction_updated_at
-    )
-    SELECT
-        COALESCE(pos.property_offering_id, offering_id),
-        sl.prices_transaction_id,
-        COALESCE(sl.sale_listing_prices_match_status, 'confirmed'),
-        'sync_auto',
-        COALESCE(c.sale_listing_prices_transaction_match_score, 120),
-        COALESCE(c.sale_listing_prices_transaction_match_reasons, '{}'::jsonb),
-        now()
-    FROM public.property_source_offerings sl
-    LEFT JOIN public.property_offering_sources pos ON pos.sale_listing_id = sl.sale_listing_id
-        AND pos.property_offering_source_link_status <> 'rejected'
-    LEFT JOIN LATERAL (
-        SELECT c.sale_listing_prices_transaction_match_score, c.sale_listing_prices_transaction_match_reasons
-        FROM public.sale_listing_prices_transaction_match_candidates c
-        WHERE c.sale_listing_id = sl.sale_listing_id
-            AND c.prices_transaction_id = sl.prices_transaction_id
-        ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
-        LIMIT 1
-    ) c ON true
-    WHERE sl.sale_listing_id = listing_id
-        AND sl.prices_transaction_id IS NOT NULL
-    ON CONFLICT (property_offering_id, prices_transaction_id) DO UPDATE SET
-        property_offering_transaction_link_status = EXCLUDED.property_offering_transaction_link_status,
-        property_offering_transaction_link_method = EXCLUDED.property_offering_transaction_link_method,
-        property_offering_transaction_link_score = EXCLUDED.property_offering_transaction_link_score,
-        property_offering_transaction_link_reasons = EXCLUDED.property_offering_transaction_link_reasons,
-        property_offering_transaction_updated_at = now();
-    RETURN offering_id;
-END;
-$$;
-
 
 --
 -- Name: fnc__sync_property_house_for_sale_listing(uuid, text); Type: FUNCTION; Schema: public; Owner: -
@@ -5718,32 +4835,6 @@ SELECT CASE
 END;
 $$;
 
-
---
--- Name: fnc__unlink_sale_listing_prices_transaction(uuid); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__unlink_sale_listing_prices_transaction(target_sale_listing_id uuid) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF target_sale_listing_id IS NULL THEN
-        RAISE EXCEPTION 'target_sale_listing_id is required';
-    END IF;
-    PERFORM 1
-    FROM public.property_source_offerings
-    WHERE sale_listing_id = target_sale_listing_id
-    FOR UPDATE;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'sale listing % not found', target_sale_listing_id;
-    END IF;
-    UPDATE public.property_source_offerings
-    SET prices_transaction_id = NULL,
-        sale_listing_updated_at = now()
-    WHERE sale_listing_id = target_sale_listing_id;
-    RETURN target_sale_listing_id;
-END;
-$$;
 
 
 SET default_tablespace = '';
@@ -8306,37 +7397,6 @@ ALTER TABLE public.users ALTER COLUMN user_id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-
---
--- Name: view__prices_transactions; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.view__prices_transactions AS
- SELECT t.prices_transaction_id,
-    t.prices_transaction_description,
-    t.prices_transaction_type,
-    t.prices_transaction_area,
-    t.prices_transaction_price,
-    t.prices_transaction_price_per_square_meter,
-    t.prices_transaction_build_year,
-    t.prices_transaction_floor,
-    t.prices_transaction_elevator,
-    t.prices_transaction_condition,
-    t.prices_transaction_plot,
-    t.prices_transaction_energy_class,
-    t.prices_transaction_period_identifier,
-    t.prices_transaction_category,
-    t.prices_transaction_created_at,
-    t.prices_transaction_updated_at,
-    n.prices_neighborhood_id,
-    n.prices_neighborhood_name,
-    n.prices_city_id,
-    c.prices_city_name,
-    p.prices_postal_code_code
-   FROM (((public.prices_transactions t
-     LEFT JOIN public.prices_neighborhoods n ON ((t.prices_neighborhood_id = n.prices_neighborhood_id)))
-     LEFT JOIN public.prices_cities c ON ((n.prices_city_id = c.prices_city_id)))
-     LEFT JOIN public.prices_postal_codes p ON ((n.prices_postal_code_id = p.prices_postal_code_id)));
 
 
 --

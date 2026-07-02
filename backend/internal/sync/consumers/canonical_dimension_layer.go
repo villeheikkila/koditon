@@ -260,7 +260,7 @@ func (c *Consumer) handleCanonicalResolveDimensionTarget(ctx context.Context, lo
 	if err != nil {
 		return newPermanentError(fmt.Errorf("parse target id: %w", err), "invalid payload")
 	}
-	result, err := c.queries.ResolveDimensionTarget(ctx, db.ResolveDimensionTargetParams{TargetType: payload.TargetType, TargetID: targetID, ExpectedDirtyAt: payload.ExpectedDirtyAt})
+	result, err := c.resolveDimensionTarget(ctx, payload.TargetType, targetID, payload.ExpectedDirtyAt)
 	if err != nil {
 		return fmt.Errorf("resolve dimension target %s:%s: %w", payload.TargetType, payload.TargetID, err)
 	}
@@ -283,12 +283,67 @@ func (c *Consumer) rebuildDimensionLayerForListing(ctx context.Context, saleList
 	if err := properties.ProjectListingRenovationEvents(ctx, c.pool, saleListingID); err != nil {
 		return nil, err
 	}
-	result, err := c.queries.RebuildListingDimensionLayerAt(ctx, db.RebuildListingDimensionLayerAtParams{SaleListingID: saleListingID, ExpectedDirtyAt: expectedDirtyAt})
+	result, err := c.rebuildListingDimensionLayer(ctx, saleListingID, expectedDirtyAt)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild listing dimension layer: %w", err)
 	}
 	return result, nil
 }
+
+func (c *Consumer) rebuildListingDimensionLayer(ctx context.Context, saleListingID uuid.UUID, expectedDirtyAt *time.Time) (json.RawMessage, error) {
+	sourceClaims, err := c.queries.ProjectListingProviderDimensionClaims(ctx, saleListingID)
+	if err != nil {
+		return nil, fmt.Errorf("project listing provider dimension claims: %w", err)
+	}
+	targets, err := c.queries.ListDimensionTargetsForListing(ctx, saleListingID)
+	if err != nil {
+		return nil, fmt.Errorf("list dimension targets for listing: %w", err)
+	}
+	values := int32(0)
+	profiles := int32(0)
+	for _, target := range targets {
+		if target.TargetType == nil || target.TargetID == nil {
+			continue
+		}
+		valueCount, err := c.queries.ResolveDimensionValuesForTarget(ctx, db.ResolveDimensionValuesForTargetParams{Column1: *target.TargetType, Column2: *target.TargetID})
+		if err != nil {
+			return nil, fmt.Errorf("resolve dimension values for %s:%s: %w", *target.TargetType, *target.TargetID, err)
+		}
+		profileCount, err := c.queries.ProjectDimensionProfileForTarget(ctx, db.ProjectDimensionProfileForTargetParams{Column1: *target.TargetType, Column2: *target.TargetID})
+		if err != nil {
+			return nil, fmt.Errorf("project dimension profile for %s:%s: %w", *target.TargetType, *target.TargetID, err)
+		}
+		values += int32Value(valueCount)
+		profiles += int32Value(profileCount)
+	}
+	cleaned, err := c.queries.ClearListingDimensionTargetsDirty(ctx, db.ClearListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, ExpectedDirtyAt: expectedDirtyAt})
+	if err != nil {
+		return nil, fmt.Errorf("clear listing dimension dirty targets: %w", err)
+	}
+	return json.Marshal(map[string]int32{"source_claims": int32Value(sourceClaims), "values": values, "profiles": profiles, "cleaned_dirty_targets": int32Value(cleaned)})
+}
+
+func (c *Consumer) resolveDimensionTarget(ctx context.Context, targetType string, targetID uuid.UUID, expectedDirtyAt *time.Time) (json.RawMessage, error) {
+	values, err := c.queries.ResolveDimensionValuesForTarget(ctx, db.ResolveDimensionValuesForTargetParams{Column1: targetType, Column2: targetID})
+	if err != nil {
+		return nil, fmt.Errorf("resolve dimension values: %w", err)
+	}
+	profiles, err := c.queries.ProjectDimensionProfileForTarget(ctx, db.ProjectDimensionProfileForTargetParams{Column1: targetType, Column2: targetID})
+	if err != nil {
+		return nil, fmt.Errorf("project dimension profile: %w", err)
+	}
+	var cleared *int32
+	if expectedDirtyAt != nil {
+		cleared, err = c.queries.ClearPropertyDimensionTargetDirty(ctx, db.ClearPropertyDimensionTargetDirtyParams{Column1: targetType, Column2: targetID, Column3: *expectedDirtyAt})
+	} else {
+		cleared, err = c.queries.ClearPropertyDimensionTargetDirtyAny(ctx, db.ClearPropertyDimensionTargetDirtyAnyParams{Column1: targetType, Column2: targetID})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("clear dimension dirty target: %w", err)
+	}
+	return json.Marshal(map[string]int32{"values": int32Value(values), "profiles": int32Value(profiles), "cleared_dirty_targets": int32Value(cleared)})
+}
+
 
 func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListingID uuid.UUID, reason string, expectedDirtyAt *time.Time) error {
 	payload, err := json.Marshal(dimensionLayerListingPayload{SaleListingID: saleListingID.String(), Reason: reason, ExpectedDirtyAt: expectedDirtyAt})

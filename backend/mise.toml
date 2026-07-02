@@ -67,11 +67,29 @@ tern new -m db/migrations "$NAME"
 
 [tasks."db:migrate"]
 description = "Apply all pending migrations"
-run = "tern migrate --migrations db/migrations"
+run = '''
+set -euo pipefail
+if [ -n "${DATABASE_URL:-}" ]; then
+  CONN="$DATABASE_URL"
+else
+  CONN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+fi
+psql "$CONN" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS tern; DO \$\$ BEGIN IF to_regclass('public.schema_migrations') IS NOT NULL AND to_regclass('tern.schema_migrations') IS NULL THEN ALTER TABLE public.schema_migrations SET SCHEMA tern; END IF; END \$\$;"
+tern migrate --migrations db/migrations
+'''
 
 [tasks."db:status"]
 description = "Show current migration state"
-run = "tern status --migrations db/migrations"
+run = '''
+set -euo pipefail
+if [ -n "${DATABASE_URL:-}" ]; then
+  CONN="$DATABASE_URL"
+else
+  CONN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+fi
+psql "$CONN" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS tern; DO \$\$ BEGIN IF to_regclass('public.schema_migrations') IS NOT NULL AND to_regclass('tern.schema_migrations') IS NULL THEN ALTER TABLE public.schema_migrations SET SCHEMA tern; END IF; END \$\$;"
+tern status --migrations db/migrations
+'''
 
 [tasks."db:wait"]
 description = "Wait for local PostgreSQL to accept connections"
