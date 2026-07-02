@@ -64,12 +64,12 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
 	}
-	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{SaleListingID: saleListingID, LinkMethod: "sync_auto"})
+	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{Column1: saleListingID, Column2: "sync_auto"})
 	if err != nil {
 		return fmt.Errorf("sync detached property house for frontdoor announcement: %w", err)
 	}
-	if houseID != nil && *houseID != uuid.Nil {
-		if err := c.queries.SyncHouseFromPropertyHouse(ctx, houseID); err != nil {
+	if houseID != uuid.Nil {
+		if err := c.queries.SyncHouseFromPropertyHouse(ctx, &houseID); err != nil {
 			return fmt.Errorf("sync house for frontdoor announcement: %w", err)
 		}
 	}
@@ -119,12 +119,12 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	if err := c.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdDataNormalizedVersion: &version, FrontdoorAdExternalID: &ad.FrontdoorAdExternalID, FrontdoorAdDataHash: ad.FrontdoorAdDataHash}); err != nil {
 		return fmt.Errorf("mark frontdoor ad data normalized: %w", err)
 	}
-	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{SaleListingID: saleListingID, LinkMethod: "sync_auto"})
+	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{Column1: saleListingID, Column2: "sync_auto"})
 	if err != nil {
 		return fmt.Errorf("sync detached property house for frontdoor ad: %w", err)
 	}
-	if houseID != nil && *houseID != uuid.Nil {
-		if err := c.queries.SyncHouseFromPropertyHouse(ctx, houseID); err != nil {
+	if houseID != uuid.Nil {
+		if err := c.queries.SyncHouseFromPropertyHouse(ctx, &houseID); err != nil {
 			return fmt.Errorf("sync house for frontdoor ad: %w", err)
 		}
 	}
@@ -177,12 +177,12 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 	if err := c.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdDataNormalizedVersion: &version, ShortcutAdID: &shortcutAdID, ShortcutAdDataHash: ad.ShortcutAdDataHash}); err != nil {
 		return fmt.Errorf("mark shortcut ad data normalized: %w", err)
 	}
-	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{SaleListingID: saleListingID, LinkMethod: "sync_auto"})
+	houseID, err := c.queries.SyncPropertyHouseForSaleListing(ctx, db.SyncPropertyHouseForSaleListingParams{Column1: saleListingID, Column2: "sync_auto"})
 	if err != nil {
 		return fmt.Errorf("sync detached property house for shortcut ad: %w", err)
 	}
-	if houseID != nil && *houseID != uuid.Nil {
-		if err := c.queries.SyncHouseFromPropertyHouse(ctx, houseID); err != nil {
+	if houseID != uuid.Nil {
+		if err := c.queries.SyncHouseFromPropertyHouse(ctx, &houseID); err != nil {
 			return fmt.Errorf("sync house for shortcut ad: %w", err)
 		}
 	}

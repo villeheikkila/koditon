@@ -292,7 +292,7 @@ func (s *Service) AttachPropertyDocumentToOffering(ctx context.Context, document
 		return PropertyDocumentSummary{}, ErrNotFound
 	}
 	reason := "property_document_relinked"
-	row, err := s.queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: &documentID, PropertyOfferingID: &offeringID, Reason: &reason})
+	row, err := s.queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{Column1: &documentID, Column2: &offeringID, Column3: &reason})
 	if err != nil {
 		return PropertyDocumentSummary{}, mapNotFound(err)
 	}
@@ -434,7 +434,7 @@ func (s *Service) ensureManagerCertificateDocumentTarget(ctx context.Context, qu
 		return document, fmt.Errorf("sync manager certificate listing: %w", err)
 	}
 	reason := "manager_certificate_target_created"
-	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{PropertyDocumentID: &document.PropertyDocumentID, PropertyOfferingID: &offeringID, Reason: &reason}); err != nil {
+	if _, err := queries.AttachPropertyDocumentToOffering(ctx, db.AttachPropertyDocumentToOfferingParams{Column1: &document.PropertyDocumentID, Column2: &offeringID, Column3: &reason}); err != nil {
 		return document, fmt.Errorf("attach manager certificate document to offering: %w", err)
 	}
 	updated, err := queries.GetPropertyDocumentForExtraction(ctx, &document.PropertyDocumentID)

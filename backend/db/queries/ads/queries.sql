@@ -1795,7 +1795,7 @@ inserted AS (
     )
     SELECT
         housing_company_id,
-        housing_company_identity_key || ':building:' || COALESCE(public.fnc__canonical_identity_part(sale_listing_address_norm), 'main'),
+        housing_company_identity_key || ':building:' || COALESCE(NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(sale_listing_address_norm, ''))), '[^[:alnum:]åäö]+', '_', 'g')), ''), 'main'),
         sale_listing_address_norm,
         sale_listing_postal_norm,
         sale_listing_city_norm,
@@ -1868,8 +1868,150 @@ ON CONFLICT (unit_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at;
 
 -- name: SyncPropertyHouseForSaleListing :one
-WITH synced AS (
-    SELECT COALESCE(public.fnc__sync_property_house_for_sale_listing(@sale_listing_id::uuid, sqlc.arg(link_method)::text), '00000000-0000-0000-0000-000000000000'::uuid) AS property_house_id
+WITH linked_offering AS (
+    SELECT po.property_offering_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    WHERE source_link.source_id = $1::uuid
+        AND source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    LIMIT 1
+),
+listing AS (
+    SELECT
+        sl.sale_listing_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_source_kind,
+        sl.sale_listing_native_id,
+        sl.sale_listing_address_norm,
+        sl.sale_listing_postal_norm,
+        sl.sale_listing_city_norm,
+        sl.sale_listing_building_match_key,
+        sl.sale_listing_area_value,
+        sl.sale_listing_living_area_value,
+        sl.sale_listing_plot_area_value,
+        sl.sale_listing_rooms_count,
+        sl.sale_listing_latitude,
+        sl.sale_listing_longitude,
+        sl.sale_listing_build_year,
+        sl.sale_listing_first_seen_at,
+        sl.sale_listing_last_seen_at,
+        linked_offering.property_offering_id,
+        COALESCE(
+            'detached_address:' || NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(concat_ws('|', sl.sale_listing_postal_norm, sl.sale_listing_city_norm, sl.sale_listing_building_match_key, sl.sale_listing_area_value::text), ''))), '[^[:alnum:]åäö]+', '_', 'g')), ''),
+            'detached_source:' || sl.sale_listing_source_provider || ':' || sl.sale_listing_source_kind || ':' || sl.sale_listing_native_id
+        ) AS house_key
+    FROM public.property_source_offerings sl
+    JOIN linked_offering ON true
+    WHERE sl.sale_listing_id = $1::uuid
+        AND sl.sale_listing_property_type_code = 'detached_house'
+),
+synced AS (
+    INSERT INTO public.property_houses (
+        property_house_identity_key,
+        property_house_address_norm,
+        property_house_postal_norm,
+        property_house_city_norm,
+        property_house_build_year,
+        property_house_area_value,
+        property_house_plot_area_value,
+        property_house_rooms_count,
+        property_house_latitude,
+        property_house_longitude,
+        property_house_match_reasons,
+        primary_sale_listing_id,
+        property_house_updated_at
+    )
+    SELECT
+        listing.house_key,
+        listing.sale_listing_address_norm,
+        listing.sale_listing_postal_norm,
+        listing.sale_listing_city_norm,
+        listing.sale_listing_build_year,
+        COALESCE(listing.sale_listing_living_area_value, listing.sale_listing_area_value),
+        listing.sale_listing_plot_area_value,
+        listing.sale_listing_rooms_count,
+        COALESCE(listing.sale_listing_latitude, pb.physical_building_latitude, postgis.ST_Y(hc.housing_company_geom)),
+        COALESCE(listing.sale_listing_longitude, pb.physical_building_longitude, postgis.ST_X(hc.housing_company_geom)),
+        jsonb_build_object('source', listing.sale_listing_source_provider, 'method', $2::text, 'source_listing_id', listing.sale_listing_id),
+        listing.sale_listing_id,
+        now()
+    FROM listing
+    LEFT JOIN public.property_offerings current_po ON current_po.property_offering_id = listing.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = current_po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+    WHERE listing.house_key IS NOT NULL
+    ON CONFLICT (property_house_identity_key) DO UPDATE SET
+        property_house_address_norm = COALESCE(public.property_houses.property_house_address_norm, EXCLUDED.property_house_address_norm),
+        property_house_postal_norm = COALESCE(public.property_houses.property_house_postal_norm, EXCLUDED.property_house_postal_norm),
+        property_house_city_norm = COALESCE(public.property_houses.property_house_city_norm, EXCLUDED.property_house_city_norm),
+        property_house_build_year = COALESCE(public.property_houses.property_house_build_year, EXCLUDED.property_house_build_year),
+        property_house_area_value = COALESCE(public.property_houses.property_house_area_value, EXCLUDED.property_house_area_value),
+        property_house_plot_area_value = COALESCE(public.property_houses.property_house_plot_area_value, EXCLUDED.property_house_plot_area_value),
+        property_house_rooms_count = COALESCE(public.property_houses.property_house_rooms_count, EXCLUDED.property_house_rooms_count),
+        property_house_latitude = COALESCE(public.property_houses.property_house_latitude, EXCLUDED.property_house_latitude),
+        property_house_longitude = COALESCE(public.property_houses.property_house_longitude, EXCLUDED.property_house_longitude),
+        primary_sale_listing_id = COALESCE(public.property_houses.primary_sale_listing_id, EXCLUDED.primary_sale_listing_id),
+        property_house_match_reasons = public.property_houses.property_house_match_reasons || EXCLUDED.property_house_match_reasons,
+        property_house_updated_at = now()
+    RETURNING property_house_id
+),
+updated_offering AS (
+    UPDATE public.property_offerings
+    SET property_house_id = synced.property_house_id,
+        property_unit_id = NULL,
+        property_offering_updated_at = now()
+    FROM synced, linked_offering
+    WHERE property_offerings.property_offering_id = linked_offering.property_offering_id
+    RETURNING synced.property_house_id
+),
+target_source AS (
+    INSERT INTO public.target_sources (
+        target_type,
+        target_id,
+        source_type,
+        source_id,
+        link_status,
+        link_method,
+        link_score,
+        link_reasons,
+        first_seen_at,
+        last_seen_at
+    )
+    SELECT
+        'house',
+        updated_offering.property_house_id,
+        'source_listing',
+        listing.sale_listing_id,
+        'confirmed',
+        $2::text,
+        100,
+        jsonb_build_object('source', 'detached_house_listing', 'identity_key', listing.house_key),
+        listing.sale_listing_first_seen_at,
+        listing.sale_listing_last_seen_at
+    FROM listing
+    JOIN updated_offering ON true
+    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
+        link_status = EXCLUDED.link_status,
+        link_method = EXCLUDED.link_method,
+        link_score = EXCLUDED.link_score,
+        link_reasons = target_sources.link_reasons || EXCLUDED.link_reasons,
+        first_seen_at = LEAST(COALESCE(target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, target_sources.first_seen_at)),
+        last_seen_at = GREATEST(COALESCE(target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, target_sources.last_seen_at)),
+        updated_at = now()
+    RETURNING target_id
+),
+dirty AS (
+    INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at)
+    SELECT 'house', property_house_id, ARRAY['detached_house_regroup'], now()
+    FROM updated_offering
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = ARRAY(SELECT DISTINCT unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons)),
+        dirty_at = GREATEST(property_dimension_dirty_targets.dirty_at, EXCLUDED.dirty_at)
+    RETURNING target_id
 ),
 synced_houses AS (
     INSERT INTO public.houses (
@@ -1895,7 +2037,6 @@ synced_houses AS (
         ph.property_house_updated_at
     FROM synced
     JOIN public.property_houses ph ON ph.property_house_id = synced.property_house_id
-    WHERE synced.property_house_id <> '00000000-0000-0000-0000-000000000000'::uuid
     ON CONFLICT (house_id) DO UPDATE SET
         identity_key = EXCLUDED.identity_key,
         address_norm = EXCLUDED.address_norm,
@@ -1906,11 +2047,11 @@ synced_houses AS (
         updated_at = EXCLUDED.updated_at
     RETURNING house_id
 )
-SELECT property_house_id::uuid FROM synced;
+SELECT COALESCE((SELECT property_house_id FROM synced), '00000000-0000-0000-0000-000000000000'::uuid)::uuid;
 
 -- name: BackfillDetachedPropertyHouses :one
 WITH candidates AS (
-    SELECT sl.sale_listing_id
+    SELECT sl.sale_listing_id, po.property_offering_id
     FROM public.property_source_offerings sl
     JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
         AND source_link.target_type = 'listing'
@@ -1920,11 +2061,140 @@ WITH candidates AS (
     WHERE sl.sale_listing_property_type_code = 'detached_house'
         AND po.property_house_id IS NULL
     ORDER BY sl.sale_listing_updated_at DESC NULLS LAST, sl.sale_listing_id
-    LIMIT sqlc.arg(batch_size)::int
+    LIMIT $1::int
+),
+listing AS (
+    SELECT
+        sl.sale_listing_id,
+        sl.sale_listing_source_provider,
+        sl.sale_listing_source_kind,
+        sl.sale_listing_native_id,
+        sl.sale_listing_address_norm,
+        sl.sale_listing_postal_norm,
+        sl.sale_listing_city_norm,
+        sl.sale_listing_building_match_key,
+        sl.sale_listing_area_value,
+        sl.sale_listing_living_area_value,
+        sl.sale_listing_plot_area_value,
+        sl.sale_listing_rooms_count,
+        sl.sale_listing_latitude,
+        sl.sale_listing_longitude,
+        sl.sale_listing_build_year,
+        sl.sale_listing_first_seen_at,
+        sl.sale_listing_last_seen_at,
+        candidates.property_offering_id,
+        COALESCE(
+            'detached_address:' || NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(concat_ws('|', sl.sale_listing_postal_norm, sl.sale_listing_city_norm, sl.sale_listing_building_match_key, sl.sale_listing_area_value::text), ''))), '[^[:alnum:]åäö]+', '_', 'g')), ''),
+            'detached_source:' || sl.sale_listing_source_provider || ':' || sl.sale_listing_source_kind || ':' || sl.sale_listing_native_id
+        ) AS house_key
+    FROM candidates
+    JOIN public.property_source_offerings sl ON sl.sale_listing_id = candidates.sale_listing_id
 ),
 synced AS (
-    SELECT sale_listing_id, public.fnc__sync_property_house_for_sale_listing(sale_listing_id, 'regroup_v2_backfill') AS property_house_id
-    FROM candidates
+    INSERT INTO public.property_houses (
+        property_house_identity_key,
+        property_house_address_norm,
+        property_house_postal_norm,
+        property_house_city_norm,
+        property_house_build_year,
+        property_house_area_value,
+        property_house_plot_area_value,
+        property_house_rooms_count,
+        property_house_latitude,
+        property_house_longitude,
+        property_house_match_reasons,
+        primary_sale_listing_id,
+        property_house_updated_at
+    )
+    SELECT
+        listing.house_key,
+        listing.sale_listing_address_norm,
+        listing.sale_listing_postal_norm,
+        listing.sale_listing_city_norm,
+        listing.sale_listing_build_year,
+        COALESCE(listing.sale_listing_living_area_value, listing.sale_listing_area_value),
+        listing.sale_listing_plot_area_value,
+        listing.sale_listing_rooms_count,
+        COALESCE(listing.sale_listing_latitude, pb.physical_building_latitude, postgis.ST_Y(hc.housing_company_geom)),
+        COALESCE(listing.sale_listing_longitude, pb.physical_building_longitude, postgis.ST_X(hc.housing_company_geom)),
+        jsonb_build_object('source', listing.sale_listing_source_provider, 'method', 'regroup_v2_backfill', 'source_listing_id', listing.sale_listing_id),
+        listing.sale_listing_id,
+        now()
+    FROM listing
+    LEFT JOIN public.property_offerings current_po ON current_po.property_offering_id = listing.property_offering_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = current_po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
+    WHERE listing.house_key IS NOT NULL
+    ON CONFLICT (property_house_identity_key) DO UPDATE SET
+        property_house_address_norm = COALESCE(public.property_houses.property_house_address_norm, EXCLUDED.property_house_address_norm),
+        property_house_postal_norm = COALESCE(public.property_houses.property_house_postal_norm, EXCLUDED.property_house_postal_norm),
+        property_house_city_norm = COALESCE(public.property_houses.property_house_city_norm, EXCLUDED.property_house_city_norm),
+        property_house_build_year = COALESCE(public.property_houses.property_house_build_year, EXCLUDED.property_house_build_year),
+        property_house_area_value = COALESCE(public.property_houses.property_house_area_value, EXCLUDED.property_house_area_value),
+        property_house_plot_area_value = COALESCE(public.property_houses.property_house_plot_area_value, EXCLUDED.property_house_plot_area_value),
+        property_house_rooms_count = COALESCE(public.property_houses.property_house_rooms_count, EXCLUDED.property_house_rooms_count),
+        property_house_latitude = COALESCE(public.property_houses.property_house_latitude, EXCLUDED.property_house_latitude),
+        property_house_longitude = COALESCE(public.property_houses.property_house_longitude, EXCLUDED.property_house_longitude),
+        primary_sale_listing_id = COALESCE(public.property_houses.primary_sale_listing_id, EXCLUDED.primary_sale_listing_id),
+        property_house_match_reasons = public.property_houses.property_house_match_reasons || EXCLUDED.property_house_match_reasons,
+        property_house_updated_at = now()
+    RETURNING primary_sale_listing_id AS sale_listing_id, property_house_id
+),
+updated_offerings AS (
+    UPDATE public.property_offerings
+    SET property_house_id = synced.property_house_id,
+        property_unit_id = NULL,
+        property_offering_updated_at = now()
+    FROM synced
+    JOIN listing ON listing.sale_listing_id = synced.sale_listing_id
+    WHERE property_offerings.property_offering_id = listing.property_offering_id
+    RETURNING listing.sale_listing_id, synced.property_house_id
+),
+target_sources AS (
+    INSERT INTO public.target_sources (
+        target_type,
+        target_id,
+        source_type,
+        source_id,
+        link_status,
+        link_method,
+        link_score,
+        link_reasons,
+        first_seen_at,
+        last_seen_at
+    )
+    SELECT
+        'house',
+        updated_offerings.property_house_id,
+        'source_listing',
+        listing.sale_listing_id,
+        'confirmed',
+        'backfill_auto',
+        100,
+        jsonb_build_object('source', 'detached_house_listing', 'identity_key', listing.house_key),
+        listing.sale_listing_first_seen_at,
+        listing.sale_listing_last_seen_at
+    FROM updated_offerings
+    JOIN listing ON listing.sale_listing_id = updated_offerings.sale_listing_id
+    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
+        link_status = EXCLUDED.link_status,
+        link_method = EXCLUDED.link_method,
+        link_score = EXCLUDED.link_score,
+        link_reasons = target_sources.link_reasons || EXCLUDED.link_reasons,
+        first_seen_at = LEAST(COALESCE(target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, target_sources.first_seen_at)),
+        last_seen_at = GREATEST(COALESCE(target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, target_sources.last_seen_at)),
+        updated_at = now()
+    RETURNING target_id
+),
+dirty AS (
+    INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at)
+    SELECT 'house', property_house_id, ARRAY['detached_house_regroup'], now()
+    FROM updated_offerings
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = ARRAY(SELECT DISTINCT unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons)),
+        dirty_at = GREATEST(property_dimension_dirty_targets.dirty_at, EXCLUDED.dirty_at)
+    RETURNING target_id
 ),
 synced_houses AS (
     INSERT INTO public.houses (
@@ -2193,31 +2463,114 @@ RETURNING
     property_document_extracted_at;
 
 -- name: AttachPropertyDocumentToOffering :one
-WITH relinked AS (
-    SELECT public.fnc__relink_property_document_offering(
-        sqlc.arg(property_document_id)::uuid,
-        sqlc.arg(property_offering_id)::uuid,
-        sqlc.arg(reason)::text
-    ) AS result
+WITH old_document AS (
+    SELECT property_offering_id, property_unit_id, physical_building_id, housing_company_id
+    FROM public.property_documents
+    WHERE property_document_id = $1::uuid
+    FOR UPDATE
+),
+target_offering AS (
+    SELECT po.property_offering_id, po.property_unit_id, pu.physical_building_id, pu.housing_company_id
+    FROM public.property_offerings po
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE po.property_offering_id = $2::uuid
+),
+updated_document AS (
+    UPDATE public.property_documents
+    SET property_offering_id = target_offering.property_offering_id,
+        property_unit_id = target_offering.property_unit_id,
+        physical_building_id = target_offering.physical_building_id,
+        housing_company_id = target_offering.housing_company_id,
+        property_document_updated_at = now()
+    FROM target_offering
+    WHERE property_documents.property_document_id = $1::uuid
+    RETURNING property_documents.property_document_id
+),
+dirty_targets AS (
+    SELECT 'offering'::text AS target_type, old_document.property_offering_id AS target_id, $3::text || '_old' AS reason
+    FROM old_document
+    WHERE old_document.property_offering_id IS NOT NULL
+    UNION
+    SELECT 'unit', po.property_unit_id, $3::text || '_old'
+    FROM old_document
+    JOIN public.property_offerings po ON po.property_offering_id = old_document.property_offering_id
+    WHERE po.property_unit_id IS NOT NULL
+    UNION
+    SELECT 'house', po.property_house_id, $3::text || '_old'
+    FROM old_document
+    JOIN public.property_offerings po ON po.property_offering_id = old_document.property_offering_id
+    WHERE po.property_house_id IS NOT NULL
+    UNION
+    SELECT 'listing', source_link.source_id, $3::text || '_old'
+    FROM old_document
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = old_document.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    WHERE old_document.property_offering_id IS NOT NULL
+    UNION
+    SELECT 'offering', target_offering.property_offering_id, $3::text || '_new'
+    FROM target_offering
+    UNION
+    SELECT 'unit', target_offering.property_unit_id, $3::text || '_new'
+    FROM target_offering
+    WHERE target_offering.property_unit_id IS NOT NULL
+    UNION
+    SELECT 'listing', source_link.source_id, $3::text || '_new'
+    FROM target_offering
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = target_offering.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    UNION
+    SELECT 'building', old_document.physical_building_id, $3::text || '_old'
+    FROM old_document
+    WHERE old_document.physical_building_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', old_document.housing_company_id, $3::text || '_old'
+    FROM old_document
+    WHERE old_document.housing_company_id IS NOT NULL
+    UNION
+    SELECT 'building', target_offering.physical_building_id, $3::text || '_new'
+    FROM target_offering
+    WHERE target_offering.physical_building_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', target_offering.housing_company_id, $3::text || '_new'
+    FROM target_offering
+    WHERE target_offering.housing_company_id IS NOT NULL
+),
+marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at, resolved_at)
+    SELECT target_type, target_id, ARRAY[reason], now(), NULL::timestamptz
+    FROM dirty_targets
+    WHERE target_id IS NOT NULL
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT merged_reason.reason_value ORDER BY merged_reason.reason_value)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS merged_reason(reason_value)
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
 )
 SELECT
-    property_document_id,
-    property_offering_id,
-    property_unit_id,
-    physical_building_id,
-    housing_company_id,
-    property_document_type,
-    property_document_filename,
-    property_document_mime_type,
-    property_document_size_bytes,
-    property_document_sha256,
-    property_document_extraction_status,
-    property_document_extraction_error,
-    property_document_uploaded_at,
-    property_document_extracted_at
+    property_documents.property_document_id,
+    property_documents.property_offering_id,
+    property_documents.property_unit_id,
+    property_documents.physical_building_id,
+    property_documents.housing_company_id,
+    property_documents.property_document_type,
+    property_documents.property_document_filename,
+    property_documents.property_document_mime_type,
+    property_documents.property_document_size_bytes,
+    property_documents.property_document_sha256,
+    property_documents.property_document_extraction_status,
+    property_documents.property_document_extraction_error,
+    property_documents.property_document_uploaded_at,
+    property_documents.property_document_extracted_at
 FROM public.property_documents
-JOIN relinked ON true
-WHERE property_document_id = sqlc.arg(property_document_id);
+JOIN updated_document ON updated_document.property_document_id = property_documents.property_document_id
+WHERE property_documents.property_document_id = $1;
 
 -- name: EnsureManagerCertificateHousingCompany :one
 INSERT INTO public.housing_companies (
@@ -3682,15 +4035,136 @@ WHERE sl.sale_listing_id = @sale_listing_id
 LIMIT 1;
 
 -- name: RelinkPropertyUnitBuilding :one
-SELECT public.fnc__relink_property_unit_building(
-    sqlc.arg(property_unit_id)::uuid,
-    sqlc.arg(physical_building_id)::uuid,
-    sqlc.arg(reason)::text
+WITH old_unit AS (
+    SELECT physical_building_id, housing_company_id
+    FROM public.property_units
+    WHERE property_unit_id = $1::uuid
+    FOR UPDATE
+),
+target_building AS (
+    SELECT physical_building_id, housing_company_id
+    FROM public.physical_buildings
+    WHERE physical_building_id = $2::uuid
+),
+updated_unit AS (
+    UPDATE public.property_units
+    SET physical_building_id = target_building.physical_building_id,
+        housing_company_id = COALESCE(target_building.housing_company_id, property_units.housing_company_id),
+        property_unit_updated_at = now()
+    FROM target_building
+    WHERE property_units.property_unit_id = $1::uuid
+    RETURNING property_units.property_unit_id
+),
+dirty_targets AS (
+    SELECT 'unit'::text AS target_type, updated_unit.property_unit_id AS target_id, $3::text AS reason
+    FROM updated_unit
+    UNION
+    SELECT 'offering', po.property_offering_id, $3::text
+    FROM updated_unit
+    JOIN public.property_offerings po ON po.property_unit_id = updated_unit.property_unit_id
+    UNION
+    SELECT 'listing', source_link.source_id, $3::text
+    FROM updated_unit
+    JOIN public.property_offerings po ON po.property_unit_id = updated_unit.property_unit_id
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = po.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+    UNION
+    SELECT 'building', old_unit.physical_building_id, $3::text || '_old'
+    FROM old_unit
+    WHERE old_unit.physical_building_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', old_unit.housing_company_id, $3::text || '_old'
+    FROM old_unit
+    WHERE old_unit.housing_company_id IS NOT NULL
+),
+marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at, resolved_at)
+    SELECT target_type, target_id, ARRAY[reason], now(), NULL::timestamptz
+    FROM dirty_targets
+    WHERE target_id IS NOT NULL
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT merged_reason.reason_value ORDER BY merged_reason.reason_value)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS merged_reason(reason_value)
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT jsonb_build_object(
+    'property_unit_id', $1::uuid,
+    'old_physical_building_id', (SELECT physical_building_id FROM old_unit),
+    'new_physical_building_id', $2::uuid,
+    'old_housing_company_id', (SELECT housing_company_id FROM old_unit),
+    'new_housing_company_id', (SELECT housing_company_id FROM target_building),
+    'dirty_targets', (SELECT count(*) FROM marked)
 )::jsonb;
 
 -- name: RelinkPhysicalBuildingHousingCompany :one
-SELECT public.fnc__relink_physical_building_housing_company(
-    sqlc.arg(physical_building_id)::uuid,
-    sqlc.arg(housing_company_id)::uuid,
-    sqlc.arg(reason)::text
+WITH old_building AS (
+    SELECT housing_company_id
+    FROM public.physical_buildings
+    WHERE physical_building_id = $1::uuid
+    FOR UPDATE
+),
+updated_building AS (
+    UPDATE public.physical_buildings
+    SET housing_company_id = $2::uuid,
+        physical_building_updated_at = now()
+    WHERE physical_building_id = $1::uuid
+    RETURNING physical_building_id
+),
+updated_units AS (
+    UPDATE public.property_units
+    SET housing_company_id = $2::uuid,
+        property_unit_updated_at = now()
+    WHERE physical_building_id = $1::uuid
+    RETURNING property_unit_id
+),
+dirty_targets AS (
+    SELECT 'building'::text AS target_type, updated_building.physical_building_id AS target_id, $3::text AS reason
+    FROM updated_building
+    UNION
+    SELECT 'housing_company', old_building.housing_company_id, $3::text || '_old'
+    FROM old_building
+    WHERE old_building.housing_company_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', $2::uuid, $3::text || '_new'
+    UNION
+    SELECT 'unit', updated_units.property_unit_id, $3::text
+    FROM updated_units
+    UNION
+    SELECT 'offering', po.property_offering_id, $3::text
+    FROM updated_units
+    JOIN public.property_offerings po ON po.property_unit_id = updated_units.property_unit_id
+    UNION
+    SELECT 'listing', source_link.source_id, $3::text
+    FROM updated_units
+    JOIN public.property_offerings po ON po.property_unit_id = updated_units.property_unit_id
+    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
+        AND source_link.target_id = po.property_offering_id
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+),
+marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at, resolved_at)
+    SELECT target_type, target_id, ARRAY[reason], now(), NULL::timestamptz
+    FROM dirty_targets
+    WHERE target_id IS NOT NULL
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT merged_reason.reason_value ORDER BY merged_reason.reason_value)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS merged_reason(reason_value)
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT jsonb_build_object(
+    'physical_building_id', $1::uuid,
+    'old_housing_company_id', (SELECT housing_company_id FROM old_building),
+    'new_housing_company_id', $2::uuid,
+    'dirty_targets', (SELECT count(*) FROM marked)
 )::jsonb;
