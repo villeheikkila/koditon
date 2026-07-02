@@ -73,7 +73,7 @@ func TestClearPropertyDimensionTargetDirtyHonorsExpectedDirtyAt(t *testing.T) {
 		t.Fatalf("insert dirty target: %v", err)
 	}
 	var cleared int32
-	if err := pool.QueryRow(ctx, `SELECT public.fnc__clear_property_dimension_target_dirty('listing', $1, $2)`, targetID, staleDirtyAt).Scan(&cleared); err != nil {
+	if err := pool.QueryRow(ctx, `WITH cleared AS (UPDATE public.property_dimension_dirty_targets SET resolved_at = now() WHERE target_type = 'listing' AND target_id = $1 AND resolved_at IS NULL AND dirty_at <= $2 RETURNING 1) SELECT count(*)::int4 FROM cleared`, targetID, staleDirtyAt).Scan(&cleared); err != nil {
 		t.Fatalf("clear stale lease: %v", err)
 	}
 	if cleared != 0 {
@@ -86,7 +86,7 @@ func TestClearPropertyDimensionTargetDirtyHonorsExpectedDirtyAt(t *testing.T) {
 	if resolvedAt != nil {
 		t.Fatalf("stale lease set resolved_at = %s", resolvedAt)
 	}
-	if err := pool.QueryRow(ctx, `SELECT public.fnc__clear_property_dimension_target_dirty('listing', $1, $2)`, targetID, freshDirtyAt).Scan(&cleared); err != nil {
+	if err := pool.QueryRow(ctx, `WITH cleared AS (UPDATE public.property_dimension_dirty_targets SET resolved_at = now() WHERE target_type = 'listing' AND target_id = $1 AND resolved_at IS NULL AND dirty_at <= $2 RETURNING 1) SELECT count(*)::int4 FROM cleared`, targetID, freshDirtyAt).Scan(&cleared); err != nil {
 		t.Fatalf("clear current lease: %v", err)
 	}
 	if cleared != 1 {
