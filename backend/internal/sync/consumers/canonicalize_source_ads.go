@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -204,10 +205,14 @@ func (c *Consumer) enqueueCanonicalizeSourceAd(ctx context.Context, sourceTable,
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ad payload: %w", err)
 	}
-	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
+	req := workflows.SpawnTaskRequest{
 		TaskName: TaskTypeCanonicalizeSourceAd,
 		Params:   payload,
-	})
+	}
+	if priority > 0 {
+		req.IdempotencyKey = fmt.Sprintf("source-refresh-canonicalize:%s:%s:%d", sourceTable, sourceID, time.Now().UTC().UnixNano())
+	}
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, req)
 	return err
 }
 

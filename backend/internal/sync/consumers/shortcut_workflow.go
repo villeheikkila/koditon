@@ -227,7 +227,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 			if ad.ShortcutAdDataHash == nil {
 				return shortcutFanoutResult{}, nil
 			}
-			if err := c.enqueueCanonicalizeSourceAd(ctx, "shortcut_ad", params.SourceID, int32(priorityNormal)); err != nil {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, "shortcut_ad", params.SourceID, 1); err != nil {
 				return shortcutFanoutResult{}, err
 			}
 			return shortcutFanoutResult{Enqueued: 1}, nil

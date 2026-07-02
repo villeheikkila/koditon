@@ -29,6 +29,7 @@ var operationIDScopes = map[string][]string{
 	"property-documents-detail":                      {auth.ScopeCoreRead},
 	"property-documents-download":                    {auth.ScopeCoreRead},
 	"property-documents-attachment-set":              {auth.ScopeProfileWrite},
+	"source-refresh":                                 {auth.ScopeProfileWrite},
 	"entity-detail":                                  {},
 	"search":                                         {},
 	"auth-apple-web":                                 {},

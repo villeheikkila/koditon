@@ -171,6 +171,13 @@ func addRoutes(a *API, api huma.API) {
 		op.Description = "Resolve a source URL into a canonical ID for use with detail endpoints"
 		op.Tags = []string{"Entity"}
 	})
+	huma.Post(api, "/api/v1/source-refresh", a.sourceRefreshHandler, func(op *huma.Operation) {
+		op.OperationID = "source-refresh"
+		op.Summary = "Queue source refresh"
+		op.Description = "Queues a provider refresh workflow for one Frontdoor or Shortcut listing/building URL."
+		op.Tags = []string{"Entity"}
+		applyAuth(op, makeMiddleware, resolveScopes("source-refresh"))
+	})
 	huma.Post(api, "/auth/apple", a.appleWebAuthHandler, func(op *huma.Operation) {
 		op.OperationID = "auth-apple-web"
 		op.Summary = "Sign in with Apple (web)"

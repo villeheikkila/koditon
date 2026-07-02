@@ -283,11 +283,11 @@ FROM public.property_source_offerings sl
 LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 WHERE sl.sale_listing_id = @sale_listing_id
-ON CONFLICT (source_listing_id) DO UPDATE SET
+ON CONFLICT (canonical_source_id) DO UPDATE SET
+    source_listing_id = EXCLUDED.source_listing_id,
     provider = EXCLUDED.provider,
     source_kind = EXCLUDED.source_kind,
     native_id = EXCLUDED.native_id,
-    canonical_source_id = EXCLUDED.canonical_source_id,
     raw_table = EXCLUDED.raw_table,
     raw_id = EXCLUDED.raw_id,
     url = EXCLUDED.url,

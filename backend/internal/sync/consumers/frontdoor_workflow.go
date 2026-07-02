@@ -178,7 +178,7 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			if ad.FrontdoorAdDataHash == nil {
 				return frontdoorFanoutResult{}, nil
 			}
-			if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_ad", ad.FrontdoorAdID.String(), int32(priorityNormal)); err != nil {
+			if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_ad", ad.FrontdoorAdID.String(), 1); err != nil {
 				return frontdoorFanoutResult{}, err
 			}
 			return frontdoorFanoutResult{Enqueued: 1}, nil
@@ -202,7 +202,7 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			}
 			enqueued := 0
 			for _, announcement := range announcements {
-				if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_building_announcement", announcement.FrontdoorBuildingAnnouncementID.String(), int32(priorityNormal)); err != nil {
+				if err := c.enqueueCanonicalizeSourceAd(ctx, "frontdoor_building_announcement", announcement.FrontdoorBuildingAnnouncementID.String(), 1); err != nil {
 					return frontdoorFanoutResult{}, err
 				}
 				enqueued++

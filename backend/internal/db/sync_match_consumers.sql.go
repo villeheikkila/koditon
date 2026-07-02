@@ -266,8 +266,8 @@ func (q *Queries) ListPricesMatchFanoutListings(ctx context.Context, limitCount 
 const loadCanonicalMatchSaleListing = `-- name: LoadCanonicalMatchSaleListing :one
 SELECT
     sl.sale_listing_id::text AS id,
-    source_link.link_method,
-    source_link.link_status,
+    COALESCE(source_link.link_method, '') AS link_method,
+    COALESCE(source_link.link_status, '') AS link_status,
     sl.sale_listing_source_match_status,
     sl.sale_listing_source_match_attempt_count
 FROM public.property_source_offerings sl
@@ -280,8 +280,8 @@ WHERE sl.sale_listing_id = $1::uuid
 
 type LoadCanonicalMatchSaleListingRow struct {
 	ID                                 *string `json:"id"`
-	LinkMethod                         string  `json:"link_method"`
-	LinkStatus                         string  `json:"link_status"`
+	LinkMethod                         *string `json:"link_method"`
+	LinkStatus                         *string `json:"link_status"`
 	SaleListingSourceMatchStatus       *string `json:"sale_listing_source_match_status"`
 	SaleListingSourceMatchAttemptCount int32   `json:"sale_listing_source_match_attempt_count"`
 }

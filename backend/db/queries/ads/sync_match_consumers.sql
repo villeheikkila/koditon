@@ -149,8 +149,8 @@ LIMIT @limit_count::int4;
 -- name: LoadCanonicalMatchSaleListing :one
 SELECT
     sl.sale_listing_id::text AS id,
-    source_link.link_method,
-    source_link.link_status,
+    COALESCE(source_link.link_method, '') AS link_method,
+    COALESCE(source_link.link_status, '') AS link_status,
     sl.sale_listing_source_match_status,
     sl.sale_listing_source_match_attempt_count
 FROM public.property_source_offerings sl

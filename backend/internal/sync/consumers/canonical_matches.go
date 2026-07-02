@@ -70,7 +70,7 @@ func (c *Consumer) loadCanonicalMatchSaleListing(ctx context.Context, saleListin
 	if err != nil {
 		return canonicalMatchSaleListingRow{}, err
 	}
-	return canonicalMatchSaleListingRow{ID: stringValue(result.ID), LinkMethod: &result.LinkMethod, LinkStatus: &result.LinkStatus, Status: result.SaleListingSourceMatchStatus, AttemptCount: result.SaleListingSourceMatchAttemptCount}, nil
+	return canonicalMatchSaleListingRow{ID: stringValue(result.ID), LinkMethod: result.LinkMethod, LinkStatus: result.LinkStatus, Status: result.SaleListingSourceMatchStatus, AttemptCount: result.SaleListingSourceMatchAttemptCount}, nil
 }
 
 func (c *Consumer) runCanonicalSourceMatchForSaleListing(ctx context.Context, saleListingID string) (canonicalMatchRunSummary, error) {
