@@ -2359,7 +2359,12 @@ SELECT
     COALESCE(extraction_model, '')::text AS property_claim_model,
     COALESCE(extraction_prompt_version, '')::text AS property_claim_prompt_version
 FROM public.dimension_claims
-WHERE target_type = public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type))
+WHERE target_type = CASE sqlc.arg(entity_type)::text
+        WHEN 'sale_listing' THEN 'listing'
+        WHEN 'property_unit' THEN 'unit'
+        WHEN 'physical_building' THEN 'building'
+        ELSE sqlc.arg(entity_type)::text
+    END
     AND target_id = sqlc.arg(entity_id)
 ORDER BY property_claim_namespace, property_claim_key;
 
@@ -3002,13 +3007,60 @@ WITH run AS (
     )
     RETURNING property_dimension_projection_run_id
 ),
+payload_input AS (
+    SELECT
+        sqlc.arg(entity_type)::text AS entity_type,
+        sqlc.arg(section)::text AS section,
+        sqlc.arg(key)::text AS key,
+        sqlc.arg(value_kind)::text AS raw_value_kind,
+        NULLIF(sqlc.arg(value_text), '') AS value_text,
+        sqlc.narg(value_number)::double precision AS value_number,
+        sqlc.narg(value_bool)::boolean AS value_bool,
+        sqlc.narg(value_json)::jsonb AS value_json
+),
 payload AS (
     SELECT
-        public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type)::text) AS target_type,
-        public.fnc__legacy_property_dimension_claim_scope(sqlc.arg(entity_type)::text) AS claim_scope,
-        public.fnc__legacy_property_dimension_key(sqlc.arg(section)::text, sqlc.arg(key)::text) AS dimension_key,
-        public.fnc__legacy_property_dimension_value_kind(sqlc.arg(value_kind)::text, sqlc.narg(value_json)::jsonb) AS value_kind,
-        public.fnc__legacy_property_dimension_value(sqlc.arg(value_kind)::text, NULLIF(sqlc.arg(value_text), ''), sqlc.narg(value_number)::double precision, sqlc.narg(value_bool)::boolean, sqlc.narg(value_json)::jsonb) AS value
+        CASE entity_type
+            WHEN 'sale_listing' THEN 'listing'
+            WHEN 'property_unit' THEN 'unit'
+            WHEN 'physical_building' THEN 'building'
+            ELSE entity_type
+        END AS target_type,
+        CASE WHEN entity_type = 'manual' THEN 'manual' ELSE 'source' END AS claim_scope,
+        CASE section || '.' || key
+            WHEN 'unit.balcony' THEN 'features.balcony'
+            WHEN 'balcony.has_balcony' THEN 'features.balcony'
+            WHEN 'balcony.glazing' THEN 'features.balcony_glazing'
+            WHEN 'unit.sauna' THEN 'features.sauna'
+            WHEN 'sauna.has_sauna' THEN 'features.sauna'
+            WHEN 'sauna.private_sauna' THEN 'features.private_sauna'
+            WHEN 'parking.parking_text' THEN 'features.parking_type'
+            WHEN 'storage.storage_quality' THEN 'features.storage_quality'
+            WHEN 'views.view_quality' THEN 'features.view_quality'
+            WHEN 'views.noise_risk' THEN 'features.noise_risk'
+            WHEN 'condition.condition' THEN 'condition.unit_condition'
+            WHEN 'layout.layout_quality' THEN 'layout.quality'
+            WHEN 'layout.awkward_layout' THEN 'layout.awkward'
+            WHEN 'heating.heating_method' THEN 'building.heating_method'
+            WHEN 'charges.maintenance_charge_monthly' THEN 'charges.maintenance_monthly_eur'
+            WHEN 'charges.capital_charge_monthly' THEN 'charges.capital_monthly_eur'
+            WHEN 'charges.total_charge_monthly' THEN 'charges.total_monthly_eur'
+            ELSE section || '.' || key
+        END AS dimension_key,
+        CASE raw_value_kind
+            WHEN 'text' THEN 'string'
+            WHEN 'bool' THEN 'boolean'
+            WHEN 'json' THEN COALESCE(jsonb_typeof(value_json), 'object')
+            ELSE raw_value_kind
+        END AS value_kind,
+        CASE raw_value_kind
+            WHEN 'text' THEN to_jsonb(value_text)
+            WHEN 'number' THEN to_jsonb(value_number)
+            WHEN 'bool' THEN to_jsonb(value_bool)
+            WHEN 'json' THEN value_json
+            ELSE NULL::jsonb
+        END AS value
+    FROM payload_input
 )
 INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,
@@ -3084,7 +3136,12 @@ WHERE source_type = 'source_listing'
 
 -- name: DeleteLLMPropertyClaimsForEntity :exec
 DELETE FROM public.dimension_claims claims
-WHERE claims.target_type = public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type)::text)
+WHERE claims.target_type = CASE sqlc.arg(entity_type)::text
+        WHEN 'sale_listing' THEN 'listing'
+        WHEN 'property_unit' THEN 'unit'
+        WHEN 'physical_building' THEN 'building'
+        ELSE sqlc.arg(entity_type)::text
+    END
     AND claims.target_id = sqlc.arg(entity_id)
     AND claims.extraction_model IS NOT NULL;
 
@@ -3154,13 +3211,57 @@ WITH run AS (
     )
     RETURNING property_dimension_projection_run_id
 ),
+payload_input AS (
+    SELECT
+        sqlc.arg(entity_type)::text AS entity_type,
+        sqlc.arg(section)::text AS section,
+        sqlc.arg(key)::text AS key,
+        sqlc.arg(value_kind)::text AS raw_value_kind,
+        NULLIF(sqlc.arg(value_text), '') AS value_text,
+        sqlc.narg(value_number)::double precision AS value_number,
+        sqlc.narg(value_bool)::boolean AS value_bool
+),
 payload AS (
     SELECT
-        public.fnc__legacy_property_dimension_target_type(sqlc.arg(entity_type)::text) AS target_type,
-        public.fnc__legacy_property_dimension_claim_scope(sqlc.arg(entity_type)::text) AS claim_scope,
-        public.fnc__legacy_property_dimension_key(sqlc.arg(section)::text, sqlc.arg(key)::text) AS dimension_key,
-        public.fnc__legacy_property_dimension_value_kind(sqlc.arg(value_kind)::text, NULL::jsonb) AS value_kind,
-        public.fnc__legacy_property_dimension_value(sqlc.arg(value_kind)::text, NULLIF(sqlc.arg(value_text), ''), sqlc.narg(value_number)::double precision, sqlc.narg(value_bool)::boolean, NULL::jsonb) AS value
+        CASE entity_type
+            WHEN 'sale_listing' THEN 'listing'
+            WHEN 'property_unit' THEN 'unit'
+            WHEN 'physical_building' THEN 'building'
+            ELSE entity_type
+        END AS target_type,
+        CASE WHEN entity_type = 'manual' THEN 'manual' ELSE 'source' END AS claim_scope,
+        CASE section || '.' || key
+            WHEN 'unit.balcony' THEN 'features.balcony'
+            WHEN 'balcony.has_balcony' THEN 'features.balcony'
+            WHEN 'balcony.glazing' THEN 'features.balcony_glazing'
+            WHEN 'unit.sauna' THEN 'features.sauna'
+            WHEN 'sauna.has_sauna' THEN 'features.sauna'
+            WHEN 'sauna.private_sauna' THEN 'features.private_sauna'
+            WHEN 'parking.parking_text' THEN 'features.parking_type'
+            WHEN 'storage.storage_quality' THEN 'features.storage_quality'
+            WHEN 'views.view_quality' THEN 'features.view_quality'
+            WHEN 'views.noise_risk' THEN 'features.noise_risk'
+            WHEN 'condition.condition' THEN 'condition.unit_condition'
+            WHEN 'layout.layout_quality' THEN 'layout.quality'
+            WHEN 'layout.awkward_layout' THEN 'layout.awkward'
+            WHEN 'heating.heating_method' THEN 'building.heating_method'
+            WHEN 'charges.maintenance_charge_monthly' THEN 'charges.maintenance_monthly_eur'
+            WHEN 'charges.capital_charge_monthly' THEN 'charges.capital_monthly_eur'
+            WHEN 'charges.total_charge_monthly' THEN 'charges.total_monthly_eur'
+            ELSE section || '.' || key
+        END AS dimension_key,
+        CASE raw_value_kind
+            WHEN 'text' THEN 'string'
+            WHEN 'bool' THEN 'boolean'
+            ELSE raw_value_kind
+        END AS value_kind,
+        CASE raw_value_kind
+            WHEN 'text' THEN to_jsonb(value_text)
+            WHEN 'number' THEN to_jsonb(value_number)
+            WHEN 'bool' THEN to_jsonb(value_bool)
+            ELSE NULL::jsonb
+        END AS value
+    FROM payload_input
 )
 INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,

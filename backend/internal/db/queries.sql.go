@@ -1584,7 +1584,12 @@ func (q *Queries) DeleteLLMPropertyClaimsForDocument(ctx context.Context, proper
 
 const deleteLLMPropertyClaimsForEntity = `-- name: DeleteLLMPropertyClaimsForEntity :exec
 DELETE FROM public.dimension_claims claims
-WHERE claims.target_type = public.fnc__legacy_property_dimension_target_type($1::text)
+WHERE claims.target_type = CASE $1::text
+        WHEN 'sale_listing' THEN 'listing'
+        WHEN 'property_unit' THEN 'unit'
+        WHEN 'physical_building' THEN 'building'
+        ELSE $1::text
+    END
     AND claims.target_id = $2
     AND claims.extraction_model IS NOT NULL
 `
@@ -3422,13 +3427,60 @@ WITH run AS (
     )
     RETURNING property_dimension_projection_run_id
 ),
+payload_input AS (
+    SELECT
+        $9::text AS entity_type,
+        $10::text AS section,
+        $11::text AS key,
+        $12::text AS raw_value_kind,
+        NULLIF($13, '') AS value_text,
+        $14::double precision AS value_number,
+        $15::boolean AS value_bool,
+        $16::jsonb AS value_json
+),
 payload AS (
     SELECT
-        public.fnc__legacy_property_dimension_target_type($9::text) AS target_type,
-        public.fnc__legacy_property_dimension_claim_scope($9::text) AS claim_scope,
-        public.fnc__legacy_property_dimension_key($10::text, $11::text) AS dimension_key,
-        public.fnc__legacy_property_dimension_value_kind($12::text, $13::jsonb) AS value_kind,
-        public.fnc__legacy_property_dimension_value($12::text, NULLIF($14, ''), $15::double precision, $16::boolean, $13::jsonb) AS value
+        CASE entity_type
+            WHEN 'sale_listing' THEN 'listing'
+            WHEN 'property_unit' THEN 'unit'
+            WHEN 'physical_building' THEN 'building'
+            ELSE entity_type
+        END AS target_type,
+        CASE WHEN entity_type = 'manual' THEN 'manual' ELSE 'source' END AS claim_scope,
+        CASE section || '.' || key
+            WHEN 'unit.balcony' THEN 'features.balcony'
+            WHEN 'balcony.has_balcony' THEN 'features.balcony'
+            WHEN 'balcony.glazing' THEN 'features.balcony_glazing'
+            WHEN 'unit.sauna' THEN 'features.sauna'
+            WHEN 'sauna.has_sauna' THEN 'features.sauna'
+            WHEN 'sauna.private_sauna' THEN 'features.private_sauna'
+            WHEN 'parking.parking_text' THEN 'features.parking_type'
+            WHEN 'storage.storage_quality' THEN 'features.storage_quality'
+            WHEN 'views.view_quality' THEN 'features.view_quality'
+            WHEN 'views.noise_risk' THEN 'features.noise_risk'
+            WHEN 'condition.condition' THEN 'condition.unit_condition'
+            WHEN 'layout.layout_quality' THEN 'layout.quality'
+            WHEN 'layout.awkward_layout' THEN 'layout.awkward'
+            WHEN 'heating.heating_method' THEN 'building.heating_method'
+            WHEN 'charges.maintenance_charge_monthly' THEN 'charges.maintenance_monthly_eur'
+            WHEN 'charges.capital_charge_monthly' THEN 'charges.capital_monthly_eur'
+            WHEN 'charges.total_charge_monthly' THEN 'charges.total_monthly_eur'
+            ELSE section || '.' || key
+        END AS dimension_key,
+        CASE raw_value_kind
+            WHEN 'text' THEN 'string'
+            WHEN 'bool' THEN 'boolean'
+            WHEN 'json' THEN COALESCE(jsonb_typeof(value_json), 'object')
+            ELSE raw_value_kind
+        END AS value_kind,
+        CASE raw_value_kind
+            WHEN 'text' THEN to_jsonb(value_text)
+            WHEN 'number' THEN to_jsonb(value_number)
+            WHEN 'bool' THEN to_jsonb(value_bool)
+            WHEN 'json' THEN value_json
+            ELSE NULL::jsonb
+        END AS value
+    FROM payload_input
 )
 INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,
@@ -3508,10 +3560,10 @@ type InsertDocumentPropertyClaimParams struct {
 	Section            *string         `json:"section"`
 	Key                *string         `json:"key"`
 	ValueKind          *string         `json:"value_kind"`
-	ValueJson          json.RawMessage `json:"value_json"`
 	ValueText          *string         `json:"value_text"`
 	ValueNumber        *float64        `json:"value_number"`
 	ValueBool          *bool           `json:"value_bool"`
+	ValueJson          json.RawMessage `json:"value_json"`
 }
 
 func (q *Queries) InsertDocumentPropertyClaim(ctx context.Context, arg InsertDocumentPropertyClaimParams) error {
@@ -3528,10 +3580,10 @@ func (q *Queries) InsertDocumentPropertyClaim(ctx context.Context, arg InsertDoc
 		arg.Section,
 		arg.Key,
 		arg.ValueKind,
-		arg.ValueJson,
 		arg.ValueText,
 		arg.ValueNumber,
 		arg.ValueBool,
+		arg.ValueJson,
 	)
 	return err
 }
@@ -3738,13 +3790,57 @@ WITH run AS (
     )
     RETURNING property_dimension_projection_run_id
 ),
+payload_input AS (
+    SELECT
+        $7::text AS entity_type,
+        $8::text AS section,
+        $9::text AS key,
+        $10::text AS raw_value_kind,
+        NULLIF($11, '') AS value_text,
+        $12::double precision AS value_number,
+        $13::boolean AS value_bool
+),
 payload AS (
     SELECT
-        public.fnc__legacy_property_dimension_target_type($7::text) AS target_type,
-        public.fnc__legacy_property_dimension_claim_scope($7::text) AS claim_scope,
-        public.fnc__legacy_property_dimension_key($8::text, $9::text) AS dimension_key,
-        public.fnc__legacy_property_dimension_value_kind($10::text, NULL::jsonb) AS value_kind,
-        public.fnc__legacy_property_dimension_value($10::text, NULLIF($11, ''), $12::double precision, $13::boolean, NULL::jsonb) AS value
+        CASE entity_type
+            WHEN 'sale_listing' THEN 'listing'
+            WHEN 'property_unit' THEN 'unit'
+            WHEN 'physical_building' THEN 'building'
+            ELSE entity_type
+        END AS target_type,
+        CASE WHEN entity_type = 'manual' THEN 'manual' ELSE 'source' END AS claim_scope,
+        CASE section || '.' || key
+            WHEN 'unit.balcony' THEN 'features.balcony'
+            WHEN 'balcony.has_balcony' THEN 'features.balcony'
+            WHEN 'balcony.glazing' THEN 'features.balcony_glazing'
+            WHEN 'unit.sauna' THEN 'features.sauna'
+            WHEN 'sauna.has_sauna' THEN 'features.sauna'
+            WHEN 'sauna.private_sauna' THEN 'features.private_sauna'
+            WHEN 'parking.parking_text' THEN 'features.parking_type'
+            WHEN 'storage.storage_quality' THEN 'features.storage_quality'
+            WHEN 'views.view_quality' THEN 'features.view_quality'
+            WHEN 'views.noise_risk' THEN 'features.noise_risk'
+            WHEN 'condition.condition' THEN 'condition.unit_condition'
+            WHEN 'layout.layout_quality' THEN 'layout.quality'
+            WHEN 'layout.awkward_layout' THEN 'layout.awkward'
+            WHEN 'heating.heating_method' THEN 'building.heating_method'
+            WHEN 'charges.maintenance_charge_monthly' THEN 'charges.maintenance_monthly_eur'
+            WHEN 'charges.capital_charge_monthly' THEN 'charges.capital_monthly_eur'
+            WHEN 'charges.total_charge_monthly' THEN 'charges.total_monthly_eur'
+            ELSE section || '.' || key
+        END AS dimension_key,
+        CASE raw_value_kind
+            WHEN 'text' THEN 'string'
+            WHEN 'bool' THEN 'boolean'
+            ELSE raw_value_kind
+        END AS value_kind,
+        CASE raw_value_kind
+            WHEN 'text' THEN to_jsonb(value_text)
+            WHEN 'number' THEN to_jsonb(value_number)
+            WHEN 'bool' THEN to_jsonb(value_bool)
+            ELSE NULL::jsonb
+        END AS value
+    FROM payload_input
 )
 INSERT INTO public.dimension_claims (
     property_dimension_projection_run_id,
@@ -4177,7 +4273,12 @@ SELECT
     COALESCE(extraction_model, '')::text AS property_claim_model,
     COALESCE(extraction_prompt_version, '')::text AS property_claim_prompt_version
 FROM public.dimension_claims
-WHERE target_type = public.fnc__legacy_property_dimension_target_type($1)
+WHERE target_type = CASE $1::text
+        WHEN 'sale_listing' THEN 'listing'
+        WHEN 'property_unit' THEN 'unit'
+        WHEN 'physical_building' THEN 'building'
+        ELSE $1::text
+    END
     AND target_id = $2
 ORDER BY property_claim_namespace, property_claim_key
 `
