@@ -750,11 +750,18 @@ func mapGetTransactionAdvancedByIDRow(row db.GetTransactionAdvancedByIDRow) tran
 	return out
 }
 
-func stringFromPtr(value *string) string {
-	if value == nil {
+func stringFromPtr[T interface{ ~string | *string }](value T) string {
+	switch v := any(value).(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case *string:
+		if v == nil {
+			return ""
+		}
+		return strings.TrimSpace(*v)
+	default:
 		return ""
 	}
-	return *value
 }
 
 // ---- result helpers ------------------------------------------------------------

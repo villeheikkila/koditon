@@ -116,8 +116,8 @@ SELECT
     ht.prices_transaction_category,
     pn.prices_neighborhood_name,
     COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
+    ppc.postal_postal_code_name_fi AS postal_area_name_fi,
+    pm.postal_municipality_name_fi AS municipality_name_fi,
     pc.prices_city_name
 FROM origin.prices_transactions AS ht
 JOIN origin.prices_neighborhoods AS pn
@@ -307,9 +307,9 @@ SELECT
     pn.prices_neighborhood_name AS neighborhood,
     ppc.postal_postal_code_id AS postal_code_id,
     COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area,
+    ppc.postal_postal_code_name_fi AS postal_area,
     pm.postal_municipality_id AS municipality_id,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
+    pm.postal_municipality_name_fi AS municipality,
     pc.prices_city_name AS city
 FROM origin.prices_transactions AS ht
 JOIN origin.prices_neighborhoods AS pn

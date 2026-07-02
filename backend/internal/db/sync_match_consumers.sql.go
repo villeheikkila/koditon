@@ -266,8 +266,8 @@ func (q *Queries) ListPricesMatchFanoutListings(ctx context.Context, limitCount 
 const loadCanonicalMatchSaleListing = `-- name: LoadCanonicalMatchSaleListing :one
 SELECT
     sl.sale_listing_id::text AS id,
-    COALESCE(source_link.link_method, '') AS link_method,
-    COALESCE(source_link.link_status, '') AS link_status,
+    NULLIF(source_link.link_method, '') AS link_method,
+    NULLIF(source_link.link_status, '') AS link_status,
     sl.sale_listing_source_match_status,
     sl.sale_listing_source_match_attempt_count
 FROM public.property_source_offerings sl

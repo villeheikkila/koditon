@@ -34,9 +34,9 @@ SELECT
     pn.prices_neighborhood_name AS neighborhood,
     ppc.postal_postal_code_id AS postal_code_id,
     COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area,
+    ppc.postal_postal_code_name_fi AS postal_area,
     pm.postal_municipality_id AS municipality_id,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
+    pm.postal_municipality_name_fi AS municipality,
     pc.prices_city_name AS city
 FROM origin.prices_transactions AS ht
 JOIN origin.prices_neighborhoods AS pn
@@ -74,9 +74,9 @@ type GetTransactionAdvancedByIDRow struct {
 	Neighborhood        string    `json:"neighborhood"`
 	PostalCodeID        uuid.UUID `json:"postal_code_id"`
 	PostalCode          *string   `json:"postal_code"`
-	PostalArea          *string   `json:"postal_area"`
+	PostalArea          string    `json:"postal_area"`
 	MunicipalityID      uuid.UUID `json:"municipality_id"`
-	Municipality        *string   `json:"municipality"`
+	Municipality        string    `json:"municipality"`
 	City                string    `json:"city"`
 }
 
@@ -718,8 +718,8 @@ SELECT
     ht.prices_transaction_category,
     pn.prices_neighborhood_name,
     COALESCE(ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code) AS postal_code,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
+    ppc.postal_postal_code_name_fi AS postal_area_name_fi,
+    pm.postal_municipality_name_fi AS municipality_name_fi,
     pc.prices_city_name
 FROM origin.prices_transactions AS ht
 JOIN origin.prices_neighborhoods AS pn
@@ -772,8 +772,8 @@ type SearchTransactionsByCityAndAddressRow struct {
 	PricesTransactionCategory            string    `json:"prices_transaction_category"`
 	PricesNeighborhoodName               string    `json:"prices_neighborhood_name"`
 	PostalCode                           *string   `json:"postal_code"`
-	PostalAreaNameFi                     *string   `json:"postal_area_name_fi"`
-	MunicipalityNameFi                   *string   `json:"municipality_name_fi"`
+	PostalAreaNameFi                     string    `json:"postal_area_name_fi"`
+	MunicipalityNameFi                   string    `json:"municipality_name_fi"`
 	PricesCityName                       string    `json:"prices_city_name"`
 }
 

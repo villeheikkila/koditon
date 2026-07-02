@@ -72,9 +72,9 @@ func (s *Service) SearchTransactionsByCityAndAddress(ctx context.Context, cityNa
 	for _, row := range rows {
 		result = append(result, SearchTransactionsRow{
 			City:             row.PricesCityName,
-			Municipality:     ptrString(row.MunicipalityNameFi),
+			Municipality:     strings.TrimSpace(row.MunicipalityNameFi),
 			PostalCode:       ptrString(row.PostalCode),
-			PostalArea:       ptrString(row.PostalAreaNameFi),
+			PostalArea:       strings.TrimSpace(row.PostalAreaNameFi),
 			Neighborhood:     row.PricesNeighborhoodName,
 			Description:      row.PricesTransactionDescription,
 			Type:             row.PricesTransactionType,

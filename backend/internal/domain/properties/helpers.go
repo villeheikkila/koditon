@@ -78,11 +78,18 @@ func emptyToNil(value string) *string {
 	return &trimmed
 }
 
-func valueOrEmpty(value *string) string {
-	if value == nil {
+func valueOrEmpty[T interface{ ~string | *string }](value T) string {
+	switch v := any(value).(type) {
+	case string:
+		return cleanDisplayString(v)
+	case *string:
+		if v == nil {
+			return ""
+		}
+		return cleanDisplayString(*v)
+	default:
 		return ""
 	}
-	return cleanDisplayString(*value)
 }
 
 func firstNonEmpty(values ...string) string {

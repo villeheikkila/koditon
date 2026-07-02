@@ -123,19 +123,19 @@ SELECT
     sl.sale_listing_canonical_id,
     sl.sale_listing_source_provider,
     sl.sale_listing_native_id,
-    COALESCE(sl.sale_listing_url, '') AS listing_url,
+    sl.sale_listing_url AS listing_url,
     CASE
         WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
         WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
         ELSE false
     END AS external_url_available,
-    COALESCE(sl.sale_listing_headline, '') AS listing_headline,
-    COALESCE(sl.sale_listing_street_address, '') AS listing_street_address,
+    sl.sale_listing_headline AS listing_headline,
+    sl.sale_listing_street_address AS listing_street_address,
     COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS listing_city,
     COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS listing_postal,
-    COALESCE(sl.sale_listing_room_layout, '') AS listing_room_layout,
-    COALESCE(sl.sale_listing_condition, '') AS listing_condition,
+    sl.sale_listing_room_layout AS listing_room_layout,
+    sl.sale_listing_condition AS listing_condition,
     COALESCE((SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(sl.sale_listing_condition, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input), '')::text AS listing_condition_match_code,
     sl.sale_listing_area_value,
     sl.sale_listing_asking_price,
@@ -144,29 +144,29 @@ SELECT
     sl.sale_listing_floor_level,
     sl.sale_listing_total_floors,
     sl.sale_listing_elevator,
-    COALESCE(sl.sale_listing_energy_efficiency_match_code, '') AS listing_energy_match_code,
-    COALESCE(sl.sale_listing_energy_efficiency_label, '') AS listing_energy_label,
-    COALESCE(sl.sale_listing_plot_type_raw, '') AS listing_plot_ownership_raw,
+    sl.sale_listing_energy_efficiency_match_code AS listing_energy_match_code,
+    sl.sale_listing_energy_efficiency_label AS listing_energy_label,
+    sl.sale_listing_plot_type_raw AS listing_plot_ownership_raw,
     sl.sale_listing_plot_owned,
     COALESCE(sl.sale_listing_first_seen_at::text, '')::text AS listing_first_seen_at,
     COALESCE(sl.sale_listing_last_seen_at::text, '')::text AS listing_last_seen_at,
     pt.prices_transaction_id::text AS transaction_id_text,
-    COALESCE(pt.prices_transaction_description, '') AS transaction_description,
-    COALESCE(pt.prices_transaction_type, '') AS transaction_type,
-    COALESCE(pt.prices_transaction_category, '') AS transaction_category,
+    pt.prices_transaction_description AS transaction_description,
+    pt.prices_transaction_type AS transaction_type,
+    pt.prices_transaction_category AS transaction_category,
     pt.prices_transaction_area,
     pt.prices_transaction_price,
     pt.prices_transaction_price_per_square_meter,
     pt.prices_transaction_build_year,
-    COALESCE(pt.prices_transaction_floor, '') AS transaction_floor,
+    pt.prices_transaction_floor AS transaction_floor,
     pt.prices_transaction_elevator,
-    COALESCE(pt.prices_transaction_condition, '') AS transaction_condition,
+    pt.prices_transaction_condition AS transaction_condition,
     COALESCE((SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(pt.prices_transaction_condition, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input), '')::text AS transaction_condition_match_code,
-    COALESCE(pt.prices_transaction_plot, '') AS transaction_plot,
+    pt.prices_transaction_plot AS transaction_plot,
     pt.prices_transaction_plot_owned,
-    COALESCE(pt.prices_transaction_energy_class, '') AS transaction_energy_class,
+    pt.prices_transaction_energy_class AS transaction_energy_class,
     COALESCE((SELECT COALESCE(mapped.energy_efficiency_match_code, CASE WHEN derived.class_code IS NULL THEN NULL WHEN COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year) IS NULL THEN derived.class_code ELSE derived.class_code || COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year)::text END) FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(pt.prices_transaction_energy_class, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input LEFT JOIN LATERAL (SELECT a.energy_efficiency_class_code, a.energy_efficiency_standard_year, a.energy_efficiency_status, a.energy_efficiency_match_code FROM origin.energy_efficiency_aliases a WHERE a.energy_efficiency_alias = normalized_input.alias_key LIMIT 1) mapped ON true CROSS JOIN LATERAL (SELECT regexp_match(normalized_input.alias_key, '^e([0-9]{2})_([a-h])$') AS provider_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_?((?:19|20|21)[0-9]{2})($|_)') AS label_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_energialuokkaan_((?:19|20|21)[0-9]{2})($|_)') AS energy_label_year_parts, regexp_match(normalized_input.alias_key, '(^|_)energialuokka_([a-h])($|_)') AS energy_label_class_parts, regexp_match(normalized_input.alias_key, '^([a-h])_energiatodistus') AS leading_certificate_parts, regexp_match(normalized_input.alias_key, '^([a-h])$') AS class_only_parts) matches CROSS JOIN LATERAL (SELECT CASE WHEN matches.provider_parts IS NOT NULL THEN upper(matches.provider_parts[2]) WHEN matches.label_parts IS NOT NULL THEN upper(matches.label_parts[2]) WHEN matches.energy_label_year_parts IS NOT NULL THEN upper(matches.energy_label_year_parts[2]) WHEN matches.energy_label_class_parts IS NOT NULL THEN upper(matches.energy_label_class_parts[2]) WHEN matches.leading_certificate_parts IS NOT NULL THEN upper(matches.leading_certificate_parts[1]) WHEN matches.class_only_parts IS NOT NULL THEN upper(matches.class_only_parts[1]) ELSE NULL END AS class_code, CASE WHEN matches.provider_parts IS NULL THEN NULL WHEN matches.provider_parts[1]::integer < 50 THEN 2000 + matches.provider_parts[1]::integer ELSE 1900 + matches.provider_parts[1]::integer END AS provider_year, CASE WHEN matches.label_parts IS NOT NULL THEN matches.label_parts[3]::integer ELSE NULL END AS label_year, CASE WHEN matches.energy_label_year_parts IS NOT NULL THEN matches.energy_label_year_parts[3]::integer ELSE NULL END AS energy_label_year) derived), '')::text AS transaction_energy_match_code,
-    COALESCE(pt.prices_transaction_period_identifier, '') AS transaction_period_identifier,
+    pt.prices_transaction_period_identifier AS transaction_period_identifier,
     COALESCE(pt.prices_transaction_created_at::text, '')::text AS transaction_created_at
 FROM review_rows latest
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
@@ -229,7 +229,7 @@ type ListTransactionMatchCandidatesRow struct {
 	SaleListingNativeID                  string          `json:"sale_listing_native_id"`
 	ListingUrl                           *string         `json:"listing_url"`
 	ExternalUrlAvailable                 *bool           `json:"external_url_available"`
-	ListingHeadline                      *string         `json:"listing_headline"`
+	ListingHeadline                      string          `json:"listing_headline"`
 	ListingStreetAddress                 *string         `json:"listing_street_address"`
 	ListingCity                          *string         `json:"listing_city"`
 	ListingPostal                        *string         `json:"listing_postal"`
@@ -250,9 +250,9 @@ type ListTransactionMatchCandidatesRow struct {
 	ListingFirstSeenAt                   *string         `json:"listing_first_seen_at"`
 	ListingLastSeenAt                    *string         `json:"listing_last_seen_at"`
 	TransactionIDText                    *string         `json:"transaction_id_text"`
-	TransactionDescription               *string         `json:"transaction_description"`
-	TransactionType                      *string         `json:"transaction_type"`
-	TransactionCategory                  *string         `json:"transaction_category"`
+	TransactionDescription               string          `json:"transaction_description"`
+	TransactionType                      string          `json:"transaction_type"`
+	TransactionCategory                  string          `json:"transaction_category"`
 	PricesTransactionArea                float64         `json:"prices_transaction_area"`
 	PricesTransactionPrice               int32           `json:"prices_transaction_price"`
 	PricesTransactionPricePerSquareMeter int32           `json:"prices_transaction_price_per_square_meter"`
@@ -265,7 +265,7 @@ type ListTransactionMatchCandidatesRow struct {
 	PricesTransactionPlotOwned           *bool           `json:"prices_transaction_plot_owned"`
 	TransactionEnergyClass               *string         `json:"transaction_energy_class"`
 	TransactionEnergyMatchCode           *string         `json:"transaction_energy_match_code"`
-	TransactionPeriodIdentifier          *string         `json:"transaction_period_identifier"`
+	TransactionPeriodIdentifier          string          `json:"transaction_period_identifier"`
 	TransactionCreatedAt                 *string         `json:"transaction_created_at"`
 }
 
@@ -398,8 +398,8 @@ potential AS (
 )
 SELECT
     postal,
-    COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_name_fi,
-    COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name,
+    ppc.postal_postal_code_name_fi AS postal_name_fi,
+    pm.postal_municipality_name_fi AS municipality_name,
     count(*)::bigint AS candidate_count,
     count(DISTINCT sale_listing_id)::bigint AS listing_count,
     count(DISTINCT prices_transaction_id)::bigint AS transaction_count,
@@ -418,8 +418,8 @@ LIMIT $1::int
 
 type ListTransactionMatchPostalsRow struct {
 	Postal           *string `json:"postal"`
-	PostalNameFi     *string `json:"postal_name_fi"`
-	MunicipalityName *string `json:"municipality_name"`
+	PostalNameFi     string  `json:"postal_name_fi"`
+	MunicipalityName string  `json:"municipality_name"`
 	CandidateCount   *int64  `json:"candidate_count"`
 	ListingCount     *int64  `json:"listing_count"`
 	TransactionCount *int64  `json:"transaction_count"`

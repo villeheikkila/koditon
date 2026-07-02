@@ -1529,7 +1529,7 @@ func (s *Service) lookupPostalCities(ctx context.Context, postal string) (string
 		}
 		return "", nil, fmt.Errorf("lookup postal city: %w", err)
 	}
-	cityFI := strings.TrimSpace(valueOrEmpty(row.CityFi))
+	cityFI := strings.TrimSpace(row.CityFi)
 	citySV := strings.TrimSpace(valueOrEmpty(row.CitySv))
 	return cityFI, uniqueNonEmptyStrings(cityFI, citySV), nil
 }
@@ -1992,11 +1992,18 @@ func firstInt32(values ...*int32) *int32 {
 	return nil
 }
 
-func valueOrEmpty(value *string) string {
-	if value == nil {
+func valueOrEmpty[T interface{ ~string | *string }](value T) string {
+	switch v := any(value).(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case *string:
+		if v == nil {
+			return ""
+		}
+		return strings.TrimSpace(*v)
+	default:
 		return ""
 	}
-	return strings.TrimSpace(*value)
 }
 
 //go:fix inline

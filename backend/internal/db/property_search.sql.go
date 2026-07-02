@@ -420,9 +420,9 @@ SELECT
     pso.sale_listing_native_id AS native_id,
     pso.sale_listing_canonical_id AS canonical_id,
     l.listing_id::text AS public_id,
-    COALESCE(pso.sale_listing_url, '') AS url,
-    COALESCE(pso.sale_listing_headline, '') AS headline,
-    COALESCE(pso.sale_listing_street_address, '') AS address,
+    pso.sale_listing_url AS url,
+    pso.sale_listing_headline AS headline,
+    pso.sale_listing_street_address AS address,
     COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '') AS city,
     COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '') AS postal,
     pso.sale_listing_asking_price AS price,
@@ -440,7 +440,7 @@ SELECT
     pso.sale_listing_energy_efficiency_label AS energy_efficiency_label,
     pso.sale_listing_last_seen_at::text AS last_seen_at,
     pso.sale_listing_published_at::text AS published_at,
-    COALESCE(pso.sale_listing_street_address, '') AS building_key_address,
+    pso.sale_listing_street_address AS building_key_address,
     source_badges.source_providers
 FROM public.listings l
 JOIN public.property_source_offerings pso ON pso.sale_listing_id = l.primary_source_listing_id
@@ -549,7 +549,7 @@ type SearchSaleListingsRow struct {
 	CanonicalID           string   `json:"canonical_id"`
 	PublicID              *string  `json:"public_id"`
 	Url                   *string  `json:"url"`
-	Headline              *string  `json:"headline"`
+	Headline              string   `json:"headline"`
 	Address               *string  `json:"address"`
 	City                  *string  `json:"city"`
 	Postal                *string  `json:"postal"`

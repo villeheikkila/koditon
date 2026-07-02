@@ -67,7 +67,7 @@ WITH source_rows AS (
     SELECT
         po.property_offering_id,
         COALESCE(hc.housing_company_id::text, '')::text AS housing_company_id,
-        COALESCE(hc.housing_company_name, '') AS housing_company_name,
+        hc.housing_company_name AS housing_company_name,
         COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, pu.property_unit_room_layout, pu.property_unit_address_norm, ph.property_house_address_norm, po.property_offering_id::text) AS headline,
         COALESCE(primary_listing.sale_listing_street_address, pu.property_unit_address_norm, hc.housing_company_address_norm, ph.property_house_address_norm, '') AS address,
         COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '') AS city,
@@ -77,7 +77,7 @@ WITH source_rows AS (
         COALESCE(pu.property_unit_room_layout, primary_listing.sale_listing_room_layout, '') AS room_layout,
         COALESCE(po.property_offering_last_seen_at, offering_matches.source_last_seen_at) AS last_seen_at,
         offering_matches.source_count,
-        COALESCE(offering_matches.sources, '')::text AS sources
+        offering_matches.sources AS sources
     FROM offering_matches
     JOIN public.property_offerings po ON po.property_offering_id = offering_matches.property_offering_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
@@ -100,13 +100,13 @@ SELECT
     row.source_count,
     row.sources,
     COALESCE(price_match.transaction_id::text, '')::text AS price_match_transaction_id,
-    COALESCE(price_match.match_scope, '') AS price_match_scope,
-    COALESCE(price_match.match_status, '') AS price_match_status,
-    COALESCE(price_match.match_method, '') AS price_match_method,
+    NULLIF(price_match.match_scope, '') AS price_match_scope,
+    NULLIF(price_match.match_status, '') AS price_match_status,
+    NULLIF(price_match.match_method, '') AS price_match_method,
     COALESCE(price_match.match_score, 0)::int4 AS price_match_score,
     COALESCE(price_match.price_eur, 0)::bigint AS price_match_price_eur,
     COALESCE(insight_stats.insight_count, 0)::int4 AS insight_count,
-    COALESCE(insight_stats.top_severity, '') AS insight_top_severity
+    insight_stats.top_severity AS insight_top_severity
 FROM offering_rows row
 LEFT JOIN LATERAL (
     SELECT
@@ -239,7 +239,7 @@ selected_listings AS (
         sl.sale_listing_source_kind,
         sl.sale_listing_native_id,
         COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-        COALESCE(sl.sale_listing_street_address, '') AS address,
+        sl.sale_listing_street_address AS address,
         COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
         COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
         sl.sale_listing_latitude,
@@ -247,8 +247,8 @@ selected_listings AS (
         sl.sale_listing_asking_price,
         sl.sale_listing_debt_free_price,
         sl.sale_listing_area_value,
-        COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
-        COALESCE(sl.sale_listing_url, '') AS url,
+        sl.sale_listing_room_layout AS room_layout,
+        sl.sale_listing_url AS url,
         CASE
             WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
             WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
@@ -262,16 +262,16 @@ selected_listings AS (
         sl.sale_listing_updated_at,
         sl.sale_listing_previous_asking_price,
         sl.sale_listing_previous_debt_free_price,
-        COALESCE(direct_price.link_status, '') AS prices_match_status,
-        COALESCE(sl.sale_listing_source_match_status, '') AS source_match_status,
+        NULLIF(direct_price.link_status, '') AS prices_match_status,
+        sl.sale_listing_source_match_status AS source_match_status,
         sli.property_offering_id,
         pu.housing_company_id,
-        COALESCE(hc.housing_company_name, '') AS housing_company_name,
-        COALESCE(sl.sale_listing_availability_text, '') AS availability_text,
-        COALESCE(sl.sale_listing_renovations_done_text, '') AS renovations_done_text,
-        COALESCE(sl.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
-        COALESCE(sl.sale_listing_additional_info_text, '') AS additional_info_text,
-        COALESCE(sl.sale_listing_charges_text, '') AS charges_text,
+        hc.housing_company_name AS housing_company_name,
+        sl.sale_listing_availability_text AS availability_text,
+        sl.sale_listing_renovations_done_text AS renovations_done_text,
+        sl.sale_listing_renovations_planned_text AS renovations_planned_text,
+        sl.sale_listing_additional_info_text AS additional_info_text,
+        sl.sale_listing_charges_text AS charges_text,
         COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json,
         ROW_NUMBER() OVER (
             ORDER BY
@@ -376,7 +376,7 @@ offering_source_records AS (
         sr.sale_listing_source_kind,
         sr.sale_listing_native_id,
         COALESCE(sr.sale_listing_headline, sr.sale_listing_street_address, sr.sale_listing_native_id) AS headline,
-        COALESCE(sr.sale_listing_street_address, '') AS address,
+        sr.sale_listing_street_address AS address,
         COALESCE(sr.sale_listing_city, sr.sale_listing_city_norm, '') AS city,
         COALESCE(sr.sale_listing_postal, sr.sale_listing_postal_norm, '') AS postal,
         sr.sale_listing_latitude,
@@ -384,8 +384,8 @@ offering_source_records AS (
         sr.sale_listing_asking_price,
         sr.sale_listing_debt_free_price,
         sr.sale_listing_area_value,
-        COALESCE(sr.sale_listing_room_layout, '') AS room_layout,
-        COALESCE(sr.sale_listing_url, '') AS url,
+        sr.sale_listing_room_layout AS room_layout,
+        sr.sale_listing_url AS url,
         CASE
             WHEN sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad' THEN sr.shortcut_ad_id IS NOT NULL AND COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'
             WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
@@ -398,15 +398,15 @@ offering_source_records AS (
         sr.sale_listing_previous_asking_price,
         sr.sale_listing_previous_debt_free_price,
         direct_price.prices_transaction_id,
-        COALESCE(direct_price.link_status, '') AS prices_match_status,
-        COALESCE(source_link.link_status, '') AS source_link_status,
-        COALESCE(source_link.link_method, '') AS source_link_method,
+        NULLIF(direct_price.link_status, '') AS prices_match_status,
+        source_link.link_status AS source_link_status,
+        source_link.link_method AS source_link_method,
         source_link.link_score AS property_offering_source_link_score,
-        COALESCE(sr.sale_listing_availability_text, '') AS availability_text,
-        COALESCE(sr.sale_listing_renovations_done_text, '') AS renovations_done_text,
-        COALESCE(sr.sale_listing_renovations_planned_text, '') AS renovations_planned_text,
-        COALESCE(sr.sale_listing_additional_info_text, '') AS additional_info_text,
-        COALESCE(sr.sale_listing_charges_text, '') AS charges_text,
+        sr.sale_listing_availability_text AS availability_text,
+        sr.sale_listing_renovations_done_text AS renovations_done_text,
+        sr.sale_listing_renovations_planned_text AS renovations_planned_text,
+        sr.sale_listing_additional_info_text AS additional_info_text,
+        sr.sale_listing_charges_text AS charges_text,
         COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json
     FROM matched_offerings mo
     JOIN public.target_sources source_link ON source_link.target_id = mo.property_offering_id
@@ -708,14 +708,14 @@ SELECT
     candidate.sale_listing_source_kind,
     candidate.sale_listing_native_id,
     COALESCE(candidate.sale_listing_headline, candidate.sale_listing_street_address, candidate.sale_listing_native_id) AS headline,
-    COALESCE(candidate.sale_listing_street_address, '') AS address,
+    candidate.sale_listing_street_address AS address,
     COALESCE(candidate.sale_listing_city, candidate.sale_listing_city_norm, '') AS city,
     COALESCE(candidate.sale_listing_postal, candidate.sale_listing_postal_norm, '') AS postal,
     candidate.sale_listing_asking_price,
     candidate.sale_listing_debt_free_price,
     candidate.sale_listing_area_value,
-    COALESCE(candidate.sale_listing_room_layout, '') AS room_layout,
-    COALESCE(candidate.sale_listing_url, '') AS url,
+    candidate.sale_listing_room_layout AS room_layout,
+    candidate.sale_listing_url AS url,
     CASE
         WHEN candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad' THEN candidate.shortcut_ad_id IS NOT NULL AND COALESCE(candidate.sale_listing_url, '') <> '' AND candidate.sale_listing_last_seen_at >= now() - interval '7 days'
         WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
@@ -849,7 +849,7 @@ SELECT
                     sl.sale_listing_source_provider AS source,
                     sl.sale_listing_native_id AS native_id,
                     COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-                    COALESCE(sl.sale_listing_street_address, '') AS address,
+                    sl.sale_listing_street_address AS address,
                     COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
                     COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
                     price_link.link_status AS status,
@@ -869,7 +869,7 @@ SELECT
                     sl.sale_listing_source_provider AS source,
                     sl.sale_listing_native_id AS native_id,
                     COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-                    COALESCE(sl.sale_listing_street_address, '') AS address,
+                    sl.sale_listing_street_address AS address,
                     COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
                     COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
                     price_link.link_status AS status,
@@ -932,8 +932,8 @@ WHERE linked_to_lookup OR candidate_to_lookup OR postal_history_rank <= $5::int
 ORDER BY linked_to_lookup DESC, candidate_to_lookup DESC, created_at DESC, price ASC;
 
 -- name: LookupPostalCity :one
-SELECT COALESCE(pm.postal_municipality_name_fi, '')::text AS city_fi,
-    COALESCE(pm.postal_municipality_name_sv, '')::text AS city_sv
+SELECT pm.postal_municipality_name_fi AS city_fi,
+    pm.postal_municipality_name_sv AS city_sv
 FROM origin.postal_postal_codes ppc
 JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE ppc.postal_postal_code_code = NULLIF(regexp_replace(trim(COALESCE(sqlc.arg('postal')::text, '')), '[^0-9]+', '', 'g'), '')

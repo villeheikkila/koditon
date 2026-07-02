@@ -18,7 +18,7 @@ SELECT
     sl.sale_listing_source_kind,
     COALESCE(sa.shortcut_ad_data, '{}'::jsonb) AS shortcut_ad_data,
     COALESCE(fa.frontdoor_ad_data, '{}'::jsonb) AS frontdoor_ad_data,
-    COALESCE(fba.frontdoor_building_announcement_main_image_uri, '') AS frontdoor_building_announcement_main_image_uri
+    fba.frontdoor_building_announcement_main_image_uri AS frontdoor_building_announcement_main_image_uri
 FROM public.property_source_offerings sl
 LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
@@ -129,12 +129,12 @@ SELECT
     property_source_offering_renovation_category,
     property_source_offering_renovation_status,
     property_source_offering_renovation_year,
-    COALESCE(property_source_offering_renovation_component, '') AS property_source_offering_renovation_component,
-    COALESCE(property_source_offering_renovation_scope, '') AS property_source_offering_renovation_scope,
-    COALESCE(property_source_offering_renovation_stage, '') AS property_source_offering_renovation_stage,
-    COALESCE(property_source_offering_renovation_responsibility, '') AS property_source_offering_renovation_responsibility,
+    property_source_offering_renovation_component AS property_source_offering_renovation_component,
+    property_source_offering_renovation_scope AS property_source_offering_renovation_scope,
+    property_source_offering_renovation_stage AS property_source_offering_renovation_stage,
+    property_source_offering_renovation_responsibility AS property_source_offering_renovation_responsibility,
     property_source_offering_renovation_cost_estimate_eur,
-    COALESCE(property_source_offering_renovation_text, '') AS property_source_offering_renovation_text,
+    property_source_offering_renovation_text AS property_source_offering_renovation_text,
     property_source_offering_renovation_confidence,
     property_source_offering_renovation_source_field
 FROM public.property_source_offering_renovations
