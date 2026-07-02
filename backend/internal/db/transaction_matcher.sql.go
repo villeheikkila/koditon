@@ -212,10 +212,10 @@ SELECT
     sl.sale_listing_updated_at,
     pt.prices_transaction_created_at
 FROM public.property_source_offerings sl
-JOIN public.prices_transactions pt ON true
-JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+JOIN origin.prices_transactions pt ON true
+JOIN origin.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+LEFT JOIN origin.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN origin.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 WHERE sl.sale_listing_source_kind = 'ad'
     AND ($1::uuid IS NULL OR sl.sale_listing_id = $1::uuid)
     AND sl.sale_listing_postal_norm = public.fnc__normalize_postal(COALESCE(ppc.prices_postal_code_code, postal.postal_postal_code_code))
@@ -357,7 +357,7 @@ func (q *Queries) MarkTransactionMatchLinked(ctx context.Context, arg MarkTransa
 }
 
 const syncSourceListingTransactionMatchState = `-- name: SyncSourceListingTransactionMatchState :exec
-UPDATE public.source_listings src
+UPDATE origin.source_listings src
 SET normalized_at = sl.sale_listing_updated_at,
     updated_at = sl.sale_listing_updated_at
 FROM public.property_source_offerings sl

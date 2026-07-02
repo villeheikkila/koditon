@@ -14,7 +14,7 @@ import (
 )
 
 const backfillFrontdoorAdDataHash = `-- name: BackfillFrontdoorAdDataHash :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_data = $1::jsonb,
     frontdoor_ad_data_hash = $2,
     frontdoor_ad_data_hash_algorithm = $3,
@@ -40,7 +40,7 @@ func (q *Queries) BackfillFrontdoorAdDataHash(ctx context.Context, arg BackfillF
 }
 
 const backfillShortcutAdDataHash = `-- name: BackfillShortcutAdDataHash :exec
-UPDATE public.shortcut_ads
+UPDATE origin.shortcut_ads
 SET shortcut_ad_data = $1::jsonb,
     shortcut_ad_data_hash = $2,
     shortcut_ad_data_hash_algorithm = $3,
@@ -66,7 +66,7 @@ func (q *Queries) BackfillShortcutAdDataHash(ctx context.Context, arg BackfillSh
 }
 
 const batchUpsertFrontdoorAdsFromSitemap = `-- name: BatchUpsertFrontdoorAdsFromSitemap :many
-INSERT INTO public.frontdoor_ads (
+INSERT INTO origin.frontdoor_ads (
     frontdoor_ad_external_id,
     frontdoor_ad_url,
     frontdoor_ad_first_seen_at,
@@ -138,7 +138,7 @@ func (q *Queries) BatchUpsertFrontdoorAdsFromSitemap(ctx context.Context, arg Ba
 }
 
 const batchUpsertShortcutAdsFromSitemap = `-- name: BatchUpsertShortcutAdsFromSitemap :many
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,
@@ -211,7 +211,7 @@ func (q *Queries) BatchUpsertShortcutAdsFromSitemap(ctx context.Context, arg Bat
 }
 
 const getFrontdoorAdByExternalID = `-- name: GetFrontdoorAdByExternalID :one
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM origin.frontdoor_ads
 WHERE frontdoor_ad_external_id = $1
 `
 
@@ -255,7 +255,7 @@ func (q *Queries) GetFrontdoorAdByExternalID(ctx context.Context, dollar_1 *stri
 }
 
 const getFrontdoorAdByID = `-- name: GetFrontdoorAdByID :one
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM origin.frontdoor_ads
 WHERE frontdoor_ad_id = $1
 `
 
@@ -299,7 +299,7 @@ func (q *Queries) GetFrontdoorAdByID(ctx context.Context, dollar_1 *uuid.UUID) (
 }
 
 const getShortcutAdByID = `-- name: GetShortcutAdByID :one
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM origin.shortcut_ads
 WHERE shortcut_ad_id = $1
 `
 
@@ -343,7 +343,7 @@ func (q *Queries) GetShortcutAdByID(ctx context.Context, dollar_1 *int64) (GetSh
 }
 
 const listFrontdoorAds = `-- name: ListFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM origin.frontdoor_ads
 ORDER BY frontdoor_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -407,7 +407,7 @@ func (q *Queries) ListFrontdoorAds(ctx context.Context, arg ListFrontdoorAdsPara
 
 const listFrontdoorAdsMissingDataHash = `-- name: ListFrontdoorAdsMissingDataHash :many
 SELECT frontdoor_ad_external_id, frontdoor_ad_data
-FROM public.frontdoor_ads
+FROM origin.frontdoor_ads
 WHERE frontdoor_ad_data IS NOT NULL
   AND frontdoor_ad_data_hash IS NULL
 ORDER BY frontdoor_ad_updated_at ASC NULLS FIRST, frontdoor_ad_first_seen_at ASC
@@ -440,7 +440,7 @@ func (q *Queries) ListFrontdoorAdsMissingDataHash(ctx context.Context, dollar_1 
 }
 
 const listShortcutAds = `-- name: ListShortcutAds :many
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM origin.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -504,7 +504,7 @@ func (q *Queries) ListShortcutAds(ctx context.Context, arg ListShortcutAdsParams
 
 const listShortcutAdsMissingDataHash = `-- name: ListShortcutAdsMissingDataHash :many
 SELECT shortcut_ad_id, shortcut_ad_data
-FROM public.shortcut_ads
+FROM origin.shortcut_ads
 WHERE shortcut_ad_data IS NOT NULL
   AND shortcut_ad_data_hash IS NULL
 ORDER BY shortcut_ad_updated_at ASC NULLS FIRST, shortcut_ad_first_seen_at ASC
@@ -537,7 +537,7 @@ func (q *Queries) ListShortcutAdsMissingDataHash(ctx context.Context, dollar_1 *
 }
 
 const listUnprocessedFrontdoorAds = `-- name: ListUnprocessedFrontdoorAds :many
-SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM public.frontdoor_ads
+SELECT frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_first_seen_at, frontdoor_ad_last_seen_at, frontdoor_ad_updated_at, frontdoor_ad_data, frontdoor_ad_processed_at, frontdoor_ad_page_not_found, frontdoor_ad_data_hash, frontdoor_ad_data_hash_algorithm, frontdoor_ad_data_changed_at, frontdoor_ad_data_normalized_at, frontdoor_ad_data_normalized_version FROM origin.frontdoor_ads
 WHERE frontdoor_ad_processed_at IS NULL AND frontdoor_ad_page_not_found = false
 ORDER BY frontdoor_ad_first_seen_at ASC
 LIMIT $1
@@ -596,7 +596,7 @@ func (q *Queries) ListUnprocessedFrontdoorAds(ctx context.Context, dollar_1 *int
 }
 
 const markFrontdoorAdDataNormalized = `-- name: MarkFrontdoorAdDataNormalized :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_data_normalized_at = now(),
     frontdoor_ad_data_normalized_version = $1
 WHERE frontdoor_ad_external_id = $2
@@ -615,7 +615,7 @@ func (q *Queries) MarkFrontdoorAdDataNormalized(ctx context.Context, arg MarkFro
 }
 
 const markFrontdoorAdNotFound = `-- name: MarkFrontdoorAdNotFound :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_page_not_found = true, frontdoor_ad_updated_at = now()
 WHERE frontdoor_ad_id = $1
 `
@@ -626,7 +626,7 @@ func (q *Queries) MarkFrontdoorAdNotFound(ctx context.Context, dollar_1 *uuid.UU
 }
 
 const markFrontdoorAdNotFoundByExternalID = `-- name: MarkFrontdoorAdNotFoundByExternalID :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_page_not_found = true,
     frontdoor_ad_processed_at = NOW(),
     frontdoor_ad_updated_at = NOW()
@@ -639,7 +639,7 @@ func (q *Queries) MarkFrontdoorAdNotFoundByExternalID(ctx context.Context, dolla
 }
 
 const markFrontdoorAdProcessed = `-- name: MarkFrontdoorAdProcessed :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_processed_at = now(), frontdoor_ad_updated_at = now()
 WHERE frontdoor_ad_id = $1
 `
@@ -650,7 +650,7 @@ func (q *Queries) MarkFrontdoorAdProcessed(ctx context.Context, dollar_1 *uuid.U
 }
 
 const markShortcutAdDataNormalized = `-- name: MarkShortcutAdDataNormalized :exec
-UPDATE public.shortcut_ads
+UPDATE origin.shortcut_ads
 SET shortcut_ad_data_normalized_at = now(),
     shortcut_ad_data_normalized_version = $1
 WHERE shortcut_ad_id = $2
@@ -669,7 +669,7 @@ func (q *Queries) MarkShortcutAdDataNormalized(ctx context.Context, arg MarkShor
 }
 
 const updateFrontdoorAdData = `-- name: UpdateFrontdoorAdData :exec
-UPDATE public.frontdoor_ads
+UPDATE origin.frontdoor_ads
 SET frontdoor_ad_data = $1::jsonb,
     frontdoor_ad_data_hash = $2,
     frontdoor_ad_data_hash_algorithm = $3,
@@ -700,7 +700,7 @@ func (q *Queries) UpdateFrontdoorAdData(ctx context.Context, arg UpdateFrontdoor
 }
 
 const upsertFrontdoorAdFromSitemap = `-- name: UpsertFrontdoorAdFromSitemap :one
-INSERT INTO public.frontdoor_ads (
+INSERT INTO origin.frontdoor_ads (
     frontdoor_ad_external_id,
     frontdoor_ad_url,
     frontdoor_ad_first_seen_at,
@@ -758,7 +758,7 @@ func (q *Queries) UpsertFrontdoorAdFromSitemap(ctx context.Context, arg UpsertFr
 }
 
 const upsertFrontdoorAds = `-- name: UpsertFrontdoorAds :exec
-INSERT INTO public.frontdoor_ads (frontdoor_ad_external_id)
+INSERT INTO origin.frontdoor_ads (frontdoor_ad_external_id)
 SELECT unnest($1::text[])
 ON CONFLICT (frontdoor_ad_external_id) DO UPDATE SET
     frontdoor_ad_last_seen_at = NOW(),
@@ -771,7 +771,7 @@ func (q *Queries) UpsertFrontdoorAds(ctx context.Context, dollar_1 []string) err
 }
 
 const upsertShortcutAd = `-- name: UpsertShortcutAd :one
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,
@@ -861,7 +861,7 @@ func (q *Queries) UpsertShortcutAd(ctx context.Context, arg UpsertShortcutAdPara
 }
 
 const upsertShortcutAdFromSitemap = `-- name: UpsertShortcutAdFromSitemap :one
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,

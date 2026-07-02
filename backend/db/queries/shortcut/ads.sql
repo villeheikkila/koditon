@@ -1,14 +1,14 @@
 -- name: GetShortcutAdByID :one
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM origin.shortcut_ads
 WHERE shortcut_ad_id = $1;
 
 -- name: ListShortcutAds :many
-SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM public.shortcut_ads
+SELECT shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version FROM origin.shortcut_ads
 ORDER BY shortcut_ad_last_seen_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: UpsertShortcutAdFromSitemap :one
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,
@@ -23,7 +23,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
 RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version;
 
 -- name: BatchUpsertShortcutAdsFromSitemap :many
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,
@@ -37,7 +37,7 @@ ON CONFLICT (shortcut_ad_id) DO UPDATE SET
 RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_seen_at, shortcut_ad_last_seen_at, shortcut_ad_data, shortcut_ad_updated_at, shortcut_building_id, shortcut_ad_data_schema_version, shortcut_ad_data_hash, shortcut_ad_data_hash_algorithm, shortcut_ad_data_changed_at, shortcut_ad_data_normalized_at, shortcut_ad_data_normalized_version;
 
 -- name: UpsertShortcutAd :one
-INSERT INTO public.shortcut_ads (
+INSERT INTO origin.shortcut_ads (
     shortcut_ad_id,
     shortcut_ad_url,
     shortcut_ad_type,
@@ -68,14 +68,14 @@ RETURNING shortcut_ad_id, shortcut_ad_url, shortcut_ad_type, shortcut_ad_first_s
 
 -- name: ListShortcutAdsMissingDataHash :many
 SELECT shortcut_ad_id, shortcut_ad_data
-FROM public.shortcut_ads
+FROM origin.shortcut_ads
 WHERE shortcut_ad_data IS NOT NULL
   AND shortcut_ad_data_hash IS NULL
 ORDER BY shortcut_ad_updated_at ASC NULLS FIRST, shortcut_ad_first_seen_at ASC
 LIMIT $1;
 
 -- name: BackfillShortcutAdDataHash :exec
-UPDATE public.shortcut_ads
+UPDATE origin.shortcut_ads
 SET shortcut_ad_data = sqlc.arg(shortcut_ad_data)::jsonb,
     shortcut_ad_data_hash = sqlc.arg(shortcut_ad_data_hash),
     shortcut_ad_data_hash_algorithm = sqlc.arg(shortcut_ad_data_hash_algorithm),
@@ -83,7 +83,7 @@ SET shortcut_ad_data = sqlc.arg(shortcut_ad_data)::jsonb,
 WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id);
 
 -- name: MarkShortcutAdDataNormalized :exec
-UPDATE public.shortcut_ads
+UPDATE origin.shortcut_ads
 SET shortcut_ad_data_normalized_at = now(),
     shortcut_ad_data_normalized_version = sqlc.arg(shortcut_ad_data_normalized_version)
 WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id)

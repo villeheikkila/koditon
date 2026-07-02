@@ -30,10 +30,10 @@ FROM (
         AND source_link.source_type = 'source_listing'
         AND source_link.link_status <> 'rejected'
     LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    LEFT JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE pu.physical_building_id IS NOT NULL
     ORDER BY pu.physical_building_id,
         (fb.frontdoor_building_latitude IS NOT NULL AND fb.frontdoor_building_longitude IS NOT NULL) DESC,
@@ -97,7 +97,7 @@ func (q *Queries) ListCanonicalMatchFanoutListings(ctx context.Context, limitCou
 
 const listCanonicalizeSourceAdsFanout = `-- name: ListCanonicalizeSourceAdsFanout :many
 (SELECT 'frontdoor_ad'::text AS source_table, frontdoor_ad_id::text AS source_id
- FROM public.frontdoor_ads
+ FROM origin.frontdoor_ads
  WHERE frontdoor_ad_data IS NOT NULL
      AND (frontdoor_ad_data_hash IS NULL
          OR frontdoor_ad_data_normalized_at IS NULL
@@ -107,7 +107,7 @@ const listCanonicalizeSourceAdsFanout = `-- name: ListCanonicalizeSourceAdsFanou
  LIMIT $2::int4)
 UNION ALL
 (SELECT 'shortcut_ad'::text AS source_table, shortcut_ad_id::text AS source_id
- FROM public.shortcut_ads
+ FROM origin.shortcut_ads
  WHERE shortcut_ad_data IS NOT NULL
      AND (shortcut_ad_data_hash IS NULL
          OR shortcut_ad_data_normalized_at IS NULL
@@ -117,7 +117,7 @@ UNION ALL
  LIMIT $2::int4)
 UNION ALL
 (SELECT 'frontdoor_building_announcement'::text AS source_table, frontdoor_building_announcement_id::text AS source_id
- FROM public.frontdoor_building_announcements
+ FROM origin.frontdoor_building_announcements
  WHERE frontdoor_building_announcement_rent_period IS NULL
      AND frontdoor_building_announcement_rental_unique_no IS NULL
      AND (frontdoor_building_announcement_data_normalized_at IS NULL
@@ -158,7 +158,7 @@ func (q *Queries) ListCanonicalizeSourceAdsFanout(ctx context.Context, arg ListC
 
 const listDimensionLayerBackfillListingIDs = `-- name: ListDimensionLayerBackfillListingIDs :many
 SELECT source_listing_id
-FROM public.source_listings
+FROM origin.source_listings
 WHERE ($1::uuid IS NULL OR source_listing_id > $1::uuid)
 ORDER BY source_listing_id
 LIMIT $2::int4
@@ -622,7 +622,7 @@ WITH updated_source AS (
     WHERE sale_listing_id = $3::uuid
     RETURNING sale_listing_id, sale_listing_updated_at
 )
-UPDATE public.source_listings src
+UPDATE origin.source_listings src
 SET normalized_at = updated_source.sale_listing_updated_at,
     updated_at = updated_source.sale_listing_updated_at
 FROM updated_source
@@ -654,7 +654,7 @@ WITH updated_source AS (
     WHERE sale_listing_id = $5::uuid
     RETURNING sale_listing_id, sale_listing_updated_at
 )
-UPDATE public.source_listings src
+UPDATE origin.source_listings src
 SET normalized_at = updated_source.sale_listing_updated_at,
     updated_at = updated_source.sale_listing_updated_at
 FROM updated_source

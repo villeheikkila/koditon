@@ -1,6 +1,6 @@
 -- Ad Areas
 -- name: UpsertPostalAdAreasBulk :many
-INSERT INTO public.postal_ad_areas (
+INSERT INTO origin.postal_ad_areas (
     postal_ad_area_code,
     postal_ad_area_name_fi,
     postal_ad_area_name_sv,
@@ -26,7 +26,7 @@ RETURNING postal_ad_area_id, postal_ad_area_code, postal_ad_area_name_fi, postal
 
 -- Municipalities
 -- name: UpsertPostalMunicipalitiesBulk :many
-INSERT INTO public.postal_municipalities (
+INSERT INTO origin.postal_municipalities (
     postal_municipality_code,
     postal_municipality_name_fi,
     postal_municipality_name_sv,
@@ -56,7 +56,7 @@ RETURNING postal_municipality_id, postal_municipality_code, postal_municipality_
 
 -- Postal Codes
 -- name: UpsertPostalPostalCodesBulk :execrows
-INSERT INTO public.postal_postal_codes (
+INSERT INTO origin.postal_postal_codes (
     postal_postal_code_date,
     postal_postal_code_code,
     postal_postal_code_name_fi,
@@ -138,8 +138,8 @@ SELECT
     ppc.postal_postal_code_neighborhood_fi,
     ppc.postal_postal_code_created_at,
     ppc.postal_postal_code_updated_at
-FROM public.postal_municipalities AS pm
-JOIN public.postal_postal_codes AS ppc
+FROM origin.postal_municipalities AS pm
+JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
 WHERE ppc.postal_postal_code_type_code = '1'
 ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code;
@@ -150,12 +150,12 @@ SELECT DISTINCT
     pm.postal_municipality_code,
     pm.postal_municipality_name_fi,
     pm.postal_municipality_name_sv
-FROM public.postal_municipalities AS pm
-JOIN public.postal_postal_codes AS ppc
+FROM origin.postal_municipalities AS pm
+JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
-JOIN public.prices_neighborhoods AS pn
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
-JOIN public.prices_transactions AS pt
+JOIN origin.prices_transactions AS pt
     ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
 ORDER BY pm.postal_municipality_name_fi;
 
@@ -165,10 +165,10 @@ SELECT DISTINCT
     ppc.postal_postal_code_code,
     ppc.postal_postal_code_name_fi,
     ppc.postal_postal_code_name_sv
-FROM public.postal_postal_codes AS ppc
-JOIN public.prices_neighborhoods AS pn
+FROM origin.postal_postal_codes AS ppc
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
-JOIN public.prices_transactions AS pt
+JOIN origin.prices_transactions AS pt
     ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
 WHERE ppc.postal_municipality_id = @municipality_id
 ORDER BY ppc.postal_postal_code_code;

@@ -38,16 +38,16 @@ SELECT
     pm.postal_municipality_id AS municipality_id,
     COALESCE(pm.postal_municipality_name_fi, '') AS municipality,
     pc.prices_city_name AS city
-FROM public.prices_transactions AS ht
-JOIN public.prices_neighborhoods AS pn
+FROM origin.prices_transactions AS ht
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-JOIN public.prices_cities AS pc
+JOIN origin.prices_cities AS pc
     ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes AS ppc_prices
+LEFT JOIN origin.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes AS ppc
+LEFT JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities AS pm
+LEFT JOIN origin.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE ht.prices_transaction_id = $1
 LIMIT 1
@@ -137,14 +137,14 @@ SELECT
     hn.prices_neighborhood_name,
     hp.prices_postal_code_code,
     hc.prices_city_name
-FROM public.prices_transactions AS ht
+FROM origin.prices_transactions AS ht
 JOIN selected_neighborhoods AS sn
     ON sn.neighborhood_id = ht.prices_neighborhood_id
-LEFT JOIN public.prices_neighborhoods AS hn
+LEFT JOIN origin.prices_neighborhoods AS hn
     ON ht.prices_neighborhood_id = hn.prices_neighborhood_id
-LEFT JOIN public.prices_postal_codes AS hp
+LEFT JOIN origin.prices_postal_codes AS hp
     ON hn.prices_postal_code_id = hp.prices_postal_code_id
-LEFT JOIN public.prices_cities AS hc
+LEFT JOIN origin.prices_cities AS hc
     ON hn.prices_city_id = hc.prices_city_id
 ORDER BY ht.prices_transaction_created_at DESC
 `
@@ -258,18 +258,18 @@ SELECT
     COALESCE(ppc_scraped.postal_postal_code_name_fi, ppc.postal_postal_code_name_fi, '') AS postal_postal_code_name_fi,
     COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS postal_municipality_id,
     COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS postal_municipality_name_fi
-FROM public.prices_transactions AS ht
-JOIN public.prices_neighborhoods AS pn
+FROM origin.prices_transactions AS ht
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-LEFT JOIN public.prices_postal_codes AS ppc_prices
+LEFT JOIN origin.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes AS ppc_scraped
+LEFT JOIN origin.postal_postal_codes AS ppc_scraped
     ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
-LEFT JOIN public.postal_municipalities AS pm_scraped
+LEFT JOIN origin.postal_municipalities AS pm_scraped
     ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
-LEFT JOIN public.postal_postal_codes AS ppc
+LEFT JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities AS pm
+LEFT JOIN origin.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = $1
   AND (ppc_scraped.postal_postal_code_id = $2 OR ppc.postal_postal_code_id = $2)
@@ -402,18 +402,18 @@ SELECT
     COALESCE(ppc_scraped.postal_postal_code_name_fi, ppc.postal_postal_code_name_fi, '') AS postal_postal_code_name_fi,
     COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS postal_municipality_id,
     COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS postal_municipality_name_fi
-FROM public.prices_transactions AS ht
-JOIN public.prices_neighborhoods AS pn
+FROM origin.prices_transactions AS ht
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-LEFT JOIN public.prices_postal_codes AS ppc_prices
+LEFT JOIN origin.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes AS ppc_scraped
+LEFT JOIN origin.postal_postal_codes AS ppc_scraped
     ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
-LEFT JOIN public.postal_municipalities AS pm_scraped
+LEFT JOIN origin.postal_municipalities AS pm_scraped
     ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
-LEFT JOIN public.postal_postal_codes AS ppc
+LEFT JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities AS pm
+LEFT JOIN origin.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE ($1::uuid[] IS NULL OR COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = ANY($1::uuid[]))
   AND ($2::uuid[] IS NULL OR ppc_scraped.postal_postal_code_id = ANY($2::uuid[]) OR ppc.postal_postal_code_id = ANY($2::uuid[]))
@@ -545,20 +545,20 @@ SELECT
     COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) AS municipality_id,
     COALESCE(pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '') AS municipality,
     pc.prices_city_name AS city
-FROM public.prices_transactions AS ht
-JOIN public.prices_neighborhoods AS pn
+FROM origin.prices_transactions AS ht
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-JOIN public.prices_cities AS pc
+JOIN origin.prices_cities AS pc
     ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes AS ppc_prices
+LEFT JOIN origin.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes AS ppc_scraped
+LEFT JOIN origin.postal_postal_codes AS ppc_scraped
     ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
-LEFT JOIN public.postal_municipalities AS pm_scraped
+LEFT JOIN origin.postal_municipalities AS pm_scraped
     ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
-LEFT JOIN public.postal_postal_codes AS ppc
+LEFT JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities AS pm
+LEFT JOIN origin.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim($1::text)) || '%'))
   AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR COALESCE(pm_scraped.postal_municipality_id, pm.postal_municipality_id) = ANY($2::uuid[]))
@@ -721,16 +721,16 @@ SELECT
     COALESCE(ppc.postal_postal_code_name_fi, '') AS postal_area_name_fi,
     COALESCE(pm.postal_municipality_name_fi, '') AS municipality_name_fi,
     pc.prices_city_name
-FROM public.prices_transactions AS ht
-JOIN public.prices_neighborhoods AS pn
+FROM origin.prices_transactions AS ht
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_id = ht.prices_neighborhood_id
-JOIN public.prices_cities AS pc
+JOIN origin.prices_cities AS pc
     ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes AS ppc_prices
+LEFT JOIN origin.prices_postal_codes AS ppc_prices
     ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes AS ppc
+LEFT JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities AS pm
+LEFT JOIN origin.postal_municipalities AS pm
     ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE lower(trim(pc.prices_city_name)) LIKE ('%' || lower(trim($1)) || '%')
   AND (

@@ -24,9 +24,9 @@ SELECT
     COALESCE(fa.frontdoor_ad_data, '{}'::jsonb) AS frontdoor_ad_data,
     COALESCE(fba.frontdoor_building_announcement_main_image_uri, '') AS frontdoor_building_announcement_main_image_uri
 FROM public.property_source_offerings sl
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 WHERE sl.sale_listing_id = $1;
 
 -- name: ListSaleListingFallbackRenovations :many
@@ -79,11 +79,11 @@ LIMIT 200;
 -- name: ResolveRentalPublicID :one
 WITH unified AS (
     SELECT ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id
-    FROM public.shortcut_ads sa
+    FROM origin.shortcut_ads sa
     WHERE sa.shortcut_ad_type = 'rental'
     UNION ALL
     SELECT ('frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text) AS canonical_id
-    FROM public.frontdoor_building_announcements fba
+    FROM origin.frontdoor_building_announcements fba
     WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
 )
 SELECT canonical_id
@@ -94,10 +94,10 @@ LIMIT 1;
 -- name: ResolveBuildingPublicID :one
 WITH unified AS (
     SELECT ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id
-    FROM public.shortcut_buildings sb
+    FROM origin.shortcut_buildings sb
     UNION ALL
     SELECT ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id
-    FROM public.frontdoor_buildings fb
+    FROM origin.frontdoor_buildings fb
 )
 SELECT canonical_id
 FROM unified

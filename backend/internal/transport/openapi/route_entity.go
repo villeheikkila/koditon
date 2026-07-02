@@ -296,8 +296,8 @@ SELECT
     COALESCE(insight_rows.insights_json, '[]'::jsonb)
 FROM public.target_sources source_link
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 LEFT JOIN LATERAL (
     SELECT
         pt.prices_transaction_id AS transaction_id,
@@ -325,7 +325,7 @@ LEFT JOIN LATERAL (
                 OR (pl.target_type = 'listing' AND pl.target_id = source_link.target_id)
             )
     ) match_source
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
     ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
     LIMIT 1
 ) price_match ON true
@@ -429,7 +429,7 @@ LEFT JOIN LATERAL (
                 OR (selected.property_offering_id IS NOT NULL AND pl.target_type = 'listing' AND pl.target_id = selected.property_offering_id)
             )
     ) match_source
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
     ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
     LIMIT 1
 ) price_match ON true

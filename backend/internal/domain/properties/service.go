@@ -827,7 +827,7 @@ LEFT JOIN LATERAL (
         pt.prices_transaction_price::bigint AS sold_price,
         pt.prices_transaction_created_at AS sold_at
     FROM public.price_links pl
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
     WHERE pl.target_type = 'listing'
         AND pl.target_id = po.property_offering_id
         AND pl.link_status <> 'rejected'
@@ -1375,9 +1375,9 @@ SELECT
     ) AS payload
 FROM public.target_sources source_link
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 WHERE source_link.target_type = 'listing'
     AND source_link.target_id = $1
     AND source_link.source_type = 'source_listing'
@@ -1528,10 +1528,10 @@ SELECT
     COALESCE(c.sale_listing_prices_transaction_match_score, pl.link_score),
     c.sale_listing_prices_transaction_match_confidence
 FROM public.price_links pl
-JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
-LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
+JOIN origin.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
+LEFT JOIN origin.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+LEFT JOIN origin.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN origin.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
 LEFT JOIN LATERAL (
     SELECT
         c.sale_listing_prices_transaction_match_score,
@@ -1607,10 +1607,10 @@ SELECT
     c.sale_listing_prices_transaction_match_score,
     c.sale_listing_prices_transaction_match_confidence
 FROM public.price_links pl
-JOIN public.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
-LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
+JOIN origin.prices_transactions pt ON pt.prices_transaction_id = pl.prices_transaction_id
+LEFT JOIN origin.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+LEFT JOIN origin.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN origin.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
 LEFT JOIN LATERAL (
     SELECT
         c.sale_listing_prices_transaction_match_score,

@@ -58,8 +58,8 @@ SELECT
     count(*) FILTER (WHERE sale_listing_prices_transaction_match_status = 'ambiguous')::bigint AS ambiguous_count,
     COALESCE(max(sale_listing_prices_transaction_match_created_at)::text, '')::text AS latest_at
 FROM potential
-LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_code = potential.postal
-LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+LEFT JOIN origin.postal_postal_codes ppc ON ppc.postal_postal_code_code = potential.postal
+LEFT JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 GROUP BY postal, ppc.postal_postal_code_name_fi, pm.postal_municipality_name_fi
 ORDER BY candidate_count DESC, postal
 LIMIT @limit_count::int;
@@ -222,13 +222,13 @@ SELECT
     COALESCE(pt.prices_transaction_created_at::text, '')::text AS transaction_created_at
 FROM review_rows latest
 JOIN public.property_source_offerings sl ON sl.sale_listing_id = latest.sale_listing_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 LEFT JOIN public.target_sources source_link ON source_link.target_type = 'listing'
     AND source_link.source_type = 'source_listing'
     AND source_link.source_id = sl.sale_listing_id
     AND source_link.link_status <> 'rejected'
-JOIN public.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
+JOIN origin.prices_transactions pt ON pt.prices_transaction_id = latest.prices_transaction_id
 WHERE (sqlc.narg('transaction_id')::uuid IS NOT NULL OR latest.status = ANY(ARRAY['candidate'::text, 'ambiguous'::text]))
     AND (
         sqlc.narg('transaction_id')::uuid IS NOT NULL

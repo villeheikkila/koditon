@@ -700,9 +700,9 @@ WITH building_markers AS (
             OR EXISTS (
                 SELECT 1
                 FROM public.target_sources ts
-                LEFT JOIN public.source_listings tsl ON ts.source_type = 'source_listing'
+                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
                     AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN public.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
+                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
                     AND tsh.source_housing_company_id = ts.source_id
                 WHERE ts.target_type = 'building'
                     AND ts.target_id = pb.physical_building_id
@@ -784,9 +784,9 @@ company_markers AS (
             OR EXISTS (
                 SELECT 1
                 FROM public.target_sources ts
-                LEFT JOIN public.source_listings tsl ON ts.source_type = 'source_listing'
+                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
                     AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN public.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
+                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
                     AND tsh.source_housing_company_id = ts.source_id
                 WHERE ts.target_type = 'housing_company'
                     AND ts.target_id = hc.housing_company_id
@@ -865,9 +865,9 @@ house_markers AS (
             OR EXISTS (
                 SELECT 1
                 FROM public.target_sources ts
-                LEFT JOIN public.source_listings tsl ON ts.source_type = 'source_listing'
+                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
                     AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN public.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
+                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
                     AND tsh.source_housing_company_id = ts.source_id
                 WHERE ts.target_type = 'house'
                     AND ts.target_id = ph.property_house_id
@@ -1393,8 +1393,8 @@ source_links AS (
         END AS external_url_available,
         sl.sale_listing_last_seen_at AS last_seen_at
     FROM linked_listings sl
-    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1407,8 +1407,8 @@ source_links AS (
         COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
         COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
     FROM linked_listings sl
-    JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+    JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1421,8 +1421,8 @@ source_links AS (
         COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         fb.frontdoor_building_last_seen_at AS last_seen_at
     FROM linked_listings sl
-    JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
 SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
@@ -1471,8 +1471,8 @@ source_links AS (
         END AS external_url_available,
         sl.sale_listing_last_seen_at AS last_seen_at
     FROM linked_listings sl
-    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1485,8 +1485,8 @@ source_links AS (
         COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
         COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
     FROM linked_listings sl
-    JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+    JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     UNION ALL
     SELECT DISTINCT
         'Building page'::text AS label,
@@ -1499,8 +1499,8 @@ source_links AS (
         COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
         fb.frontdoor_building_last_seen_at AS last_seen_at
     FROM linked_listings sl
-    JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 )
 SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
@@ -1558,13 +1558,13 @@ SELECT
     ts.link_status,
     ts.last_seen_at
 FROM public.target_sources ts
-LEFT JOIN public.source_listings src ON ts.source_type = 'source_listing'
+LEFT JOIN origin.source_listings src ON ts.source_type = 'source_listing'
     AND src.source_listing_id = ts.source_id
-LEFT JOIN public.source_housing_companies shc ON ts.source_type = 'source_housing_company'
+LEFT JOIN origin.source_housing_companies shc ON ts.source_type = 'source_housing_company'
     AND shc.source_housing_company_id = ts.source_id
 LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = src.source_listing_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
 WHERE ts.target_type = CASE WHEN $1::text = 'offering' THEN 'listing' ELSE $1::text END
     AND ts.target_id = $2
     AND ts.link_status <> 'rejected'
@@ -1669,8 +1669,8 @@ ranked AS (
         AND source_link.source_type = 'source_listing'
         AND source_link.link_status <> 'rejected'
     JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT
             match_source.transaction_id,
@@ -1709,7 +1709,7 @@ ranked AS (
                     OR (pl.target_type = 'listing' AND pl.target_id = target_offerings.property_offering_id)
                 )
         ) match_source
-        JOIN public.prices_transactions pt ON pt.prices_transaction_id = match_source.transaction_id
+        JOIN origin.prices_transactions pt ON pt.prices_transaction_id = match_source.transaction_id
         ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
         LIMIT 1
     ) price_match ON true
@@ -2041,7 +2041,7 @@ LEFT JOIN LATERAL (
         price_link.link_status AS match_status,
         pt.prices_transaction_price AS price_eur
     FROM public.price_links price_link
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
     WHERE price_link.link_status <> 'rejected'
         AND (
             (price_link.target_type = 'source_listing' AND price_link.target_id = po.primary_sale_listing_id)

@@ -213,8 +213,8 @@ selected_listings AS (
     LEFT JOIN public.property_offerings po ON po.property_offering_id = sli.property_offering_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT price_link.link_status
         FROM public.price_links price_link
@@ -335,8 +335,8 @@ offering_source_records AS (
         AND source_link.source_type = 'source_listing'
         AND source_link.link_status <> 'rejected'
     JOIN public.property_source_offerings sr ON sr.sale_listing_id = source_link.source_id
-    LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sr.frontdoor_ad_id
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sr.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sr.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sr.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT price_link.prices_transaction_id, price_link.link_status
         FROM public.price_links price_link
@@ -560,11 +560,11 @@ SELECT
     COALESCE(osr.insights_json, '[]'::jsonb)
 FROM limited_listings sl
 LEFT JOIN dedup_links dl ON dl.sale_listing_id = sl.sale_listing_id
-LEFT JOIN public.prices_transactions pt ON pt.prices_transaction_id = dl.prices_transaction_id
-LEFT JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-LEFT JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN origin.prices_transactions pt ON pt.prices_transaction_id = dl.prices_transaction_id
+LEFT JOIN origin.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+LEFT JOIN origin.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN origin.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN origin.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 LEFT JOIN offering_source_records osr ON osr.property_offering_id = sl.property_offering_id
 ORDER BY sl.listing_rank, dl.link_rank NULLS LAST, dl.score DESC NULLS LAST, pt.prices_transaction_created_at DESC NULLS LAST, osr.sale_listing_source_provider, osr.sale_listing_native_id
 `
@@ -944,14 +944,14 @@ SELECT
         '[]'::jsonb
     ) AS matches,
     row_number() OVER (ORDER BY pt.prices_transaction_created_at DESC, pt.prices_transaction_price ASC) AS postal_history_rank
-FROM public.prices_transactions pt
-JOIN public.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
-JOIN public.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
-LEFT JOIN public.prices_postal_codes ppc_prices ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
-LEFT JOIN public.postal_postal_codes ppc_scraped ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
-LEFT JOIN public.postal_municipalities pm_scraped ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
-LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
-LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+FROM origin.prices_transactions pt
+JOIN origin.prices_neighborhoods pn ON pn.prices_neighborhood_id = pt.prices_neighborhood_id
+JOIN origin.prices_cities pc ON pc.prices_city_id = pn.prices_city_id
+LEFT JOIN origin.prices_postal_codes ppc_prices ON ppc_prices.prices_postal_code_id = pn.prices_postal_code_id
+LEFT JOIN origin.postal_postal_codes ppc_scraped ON ppc_scraped.postal_postal_code_code = ppc_prices.prices_postal_code_code
+LEFT JOIN origin.postal_municipalities pm_scraped ON pm_scraped.postal_municipality_id = ppc_scraped.postal_municipality_id
+LEFT JOIN origin.postal_postal_codes ppc ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
+LEFT JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(COALESCE(pc.prices_city_name, pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
     AND (trim($2::text) = '' OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code, '') = public.fnc__normalize_postal($2::text))
 )
@@ -1160,8 +1160,8 @@ SELECT
     latest.match_created_at
 FROM ranked_latest latest
 JOIN public.property_source_offerings candidate ON candidate.sale_listing_id = latest.candidate_sale_listing_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = candidate.frontdoor_ad_id
-LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = candidate.frontdoor_building_announcement_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = candidate.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = candidate.frontdoor_building_announcement_id
 WHERE latest.candidate_rank <= 5
 ORDER BY latest.selected_sale_listing_id, latest.match_score DESC, latest.match_created_at DESC
 LIMIT 250
@@ -1244,8 +1244,8 @@ func (q *Queries) LookupAddressSourceCandidates(ctx context.Context, listingIds 
 const lookupPostalCity = `-- name: LookupPostalCity :one
 SELECT COALESCE(pm.postal_municipality_name_fi, '')::text AS city_fi,
     COALESCE(pm.postal_municipality_name_sv, '')::text AS city_sv
-FROM public.postal_postal_codes ppc
-JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+FROM origin.postal_postal_codes ppc
+JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE ppc.postal_postal_code_code = public.fnc__normalize_postal($1::text)
 ORDER BY pm.postal_municipality_name_fi
 LIMIT 1
@@ -1353,7 +1353,7 @@ LEFT JOIN LATERAL (
         price_link.link_score::int4 AS match_score,
         pt.prices_transaction_price AS price_eur
     FROM public.price_links price_link
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
     WHERE price_link.link_status <> 'rejected'
         AND (
             (price_link.target_type = 'source_listing' AND EXISTS (

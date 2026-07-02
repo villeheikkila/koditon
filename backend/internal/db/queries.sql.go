@@ -311,7 +311,7 @@ SELECT
     raw.previous_debt_free_price,
     raw.new_development,
     now()
-FROM public.frontdoor_ads fa
+FROM origin.frontdoor_ads fa
 CROSS JOIN LATERAL (
     SELECT
         NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_data #>> '{property,streetNameFreeForm}')), '') AS street_address,
@@ -515,8 +515,8 @@ SELECT
     fba.frontdoor_building_announcement_new_building,
     fba.frontdoor_building_announcement_first_seen_at,
     now()
-FROM public.frontdoor_building_announcements fba
-JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+FROM origin.frontdoor_building_announcements fba
+JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 WHERE fba.frontdoor_building_announcement_id = $1
     AND fba.frontdoor_building_announcement_rent_period IS NULL
     AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
@@ -687,8 +687,8 @@ SELECT
     raw.transport_text,
     raw.new_development,
     now()
-FROM public.shortcut_ads sa
-LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+FROM origin.shortcut_ads sa
+LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
 CROSS JOIN LATERAL (
     SELECT
         public.fnc__shortcut_ad_street_address(sa.shortcut_ad_data) AS street_address,
@@ -819,8 +819,8 @@ WITH unified AS (
         trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable,
         sa.shortcut_ad_type AS listing_type,
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
-    FROM public.shortcut_ads sa
-    LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    FROM origin.shortcut_ads sa
+    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     LEFT JOIN LATERAL (
         SELECT source_link.target_id AS property_offering_id
         FROM public.property_source_offerings sl
@@ -852,7 +852,7 @@ WITH unified AS (
         concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable,
         NULL::text AS listing_type,
         NULL::timestamptz AS published_at
-    FROM public.shortcut_buildings sb
+    FROM origin.shortcut_buildings sb
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -865,7 +865,7 @@ WITH unified AS (
         sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
         sl.sale_listing_published_at AS published_at
-    FROM public.frontdoor_ads fa
+    FROM origin.frontdoor_ads fa
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     LEFT JOIN LATERAL (
         SELECT source_link.target_id
@@ -913,7 +913,7 @@ WITH unified AS (
         concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable,
         NULL::text AS listing_type,
         NULL::timestamptz AS published_at
-    FROM public.frontdoor_buildings fb
+    FROM origin.frontdoor_buildings fb
 )
 SELECT COUNT(*)::bigint AS count
 FROM unified u
@@ -1326,7 +1326,7 @@ WITH deleted AS (
     WHERE frontdoor_building_announcement_id = $1
     RETURNING sale_listing_id
 )
-DELETE FROM public.source_listings sl
+DELETE FROM origin.source_listings sl
 USING deleted
 WHERE sl.source_listing_id = deleted.sale_listing_id
 `
@@ -1342,7 +1342,7 @@ WITH deleted AS (
     WHERE shortcut_ad_id = $1
     RETURNING sale_listing_id
 )
-DELETE FROM public.source_listings sl
+DELETE FROM origin.source_listings sl
 USING deleted
 WHERE sl.source_listing_id = deleted.sale_listing_id
 `
@@ -1705,8 +1705,8 @@ SELECT
     fsl.sale_listing_area_value AS frontdoor_area
 FROM public.property_source_offerings ssl
 JOIN public.property_source_offerings fsl ON fsl.sale_listing_unit_match_key = ssl.sale_listing_unit_match_key
-JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = ssl.shortcut_ad_id
-JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = fsl.frontdoor_ad_id
+JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = ssl.shortcut_ad_id
+JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = fsl.frontdoor_ad_id
 WHERE ssl.sale_listing_source_provider = 'shortcut'
   AND fsl.sale_listing_source_provider = 'frontdoor'
   AND ssl.sale_listing_source_kind = 'ad'
@@ -1868,7 +1868,7 @@ SELECT
     END, false)::boolean AS frontdoor_ad_sauna,
     sl.sale_listing_rooms_count AS frontdoor_ad_rooms_count,
     fa.frontdoor_ad_data
-FROM public.frontdoor_ads fa
+FROM origin.frontdoor_ads fa
 LEFT JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
 WHERE fa.frontdoor_ad_external_id = $1
 LIMIT 1
@@ -2014,8 +2014,8 @@ SELECT
             'municipality', fb.frontdoor_building_municipality
         )
     ) AS raw_json
-FROM public.frontdoor_building_announcements fba
-JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+FROM origin.frontdoor_building_announcements fba
+JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
 WHERE fba.frontdoor_building_announcement_id = $1
 LIMIT 1
 `
@@ -2114,9 +2114,9 @@ SELECT
     fb.frontdoor_building_longitude,
     fb.frontdoor_building_housing_company_id,
     fb.frontdoor_building_housing_company_friendly_id,
-    (SELECT COUNT(*)::bigint FROM public.frontdoor_building_announcements fba WHERE fba.frontdoor_building_id = fb.frontdoor_building_id) AS announcement_count,
+    (SELECT COUNT(*)::bigint FROM origin.frontdoor_building_announcements fba WHERE fba.frontdoor_building_id = fb.frontdoor_building_id) AS announcement_count,
     fb.frontdoor_building_data
-FROM public.frontdoor_buildings fb
+FROM origin.frontdoor_buildings fb
 WHERE fb.frontdoor_building_id = $1
 LIMIT 1
 `
@@ -2488,8 +2488,8 @@ SELECT
     COALESCE(sl.sale_listing_building_description_text, '') AS building_description_text,
     COALESCE(sl.sale_listing_building_other_info_text, '') AS building_other_info_text
 FROM public.property_source_offerings sl
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
 WHERE sl.sale_listing_id = $1
     AND sl.sale_listing_source_kind IN ('ad', 'announcement')
 LIMIT 1
@@ -2785,8 +2785,8 @@ SELECT
     COALESCE(pso.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '')::text AS done_text,
     COALESCE(pso.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '')::text AS planned_text
 FROM public.property_source_offerings pso
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
 WHERE pso.sale_listing_id = $1
 LIMIT 1
 `
@@ -2858,10 +2858,10 @@ SELECT
     sb.shortcut_building_url,
     sb.shortcut_building_address,
     sb.shortcut_building_housing_company,
-    (SELECT COUNT(*)::bigint FROM public.shortcut_building_listings sbl WHERE sbl.shortcut_building_id = sb.shortcut_building_id) AS building_listing_count,
-    (SELECT COUNT(*)::bigint FROM public.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS building_rental_count
-FROM public.shortcut_ads sa
-LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    (SELECT COUNT(*)::bigint FROM origin.shortcut_building_listings sbl WHERE sbl.shortcut_building_id = sb.shortcut_building_id) AS building_listing_count,
+    (SELECT COUNT(*)::bigint FROM origin.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS building_rental_count
+FROM origin.shortcut_ads sa
+LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
 LEFT JOIN public.property_source_offerings sl ON sl.shortcut_ad_id = sa.shortcut_ad_id
 WHERE sa.shortcut_ad_id = $1
 LIMIT 1
@@ -2984,9 +2984,9 @@ SELECT
     sb.shortcut_building_updated_at,
     sb.shortcut_building_processed_at,
     sb.shortcut_building_page_not_found,
-    (SELECT COUNT(*)::bigint FROM public.shortcut_ads sa WHERE sa.shortcut_building_id = sb.shortcut_building_id) AS ad_count,
-    (SELECT COUNT(*)::bigint FROM public.shortcut_building_listings sbl WHERE sbl.shortcut_building_id = sb.shortcut_building_id) AS listing_count,
-    (SELECT COUNT(*)::bigint FROM public.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS rental_count,
+    (SELECT COUNT(*)::bigint FROM origin.shortcut_ads sa WHERE sa.shortcut_building_id = sb.shortcut_building_id) AS ad_count,
+    (SELECT COUNT(*)::bigint FROM origin.shortcut_building_listings sbl WHERE sbl.shortcut_building_id = sb.shortcut_building_id) AS listing_count,
+    (SELECT COUNT(*)::bigint FROM origin.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS rental_count,
     jsonb_build_object(
         'building_id', sb.shortcut_building_id,
         'external_id', sb.shortcut_building_external_id,
@@ -3010,7 +3010,7 @@ SELECT
         'processed_at', sb.shortcut_building_processed_at,
         'page_not_found', sb.shortcut_building_page_not_found
     ) AS raw_json
-FROM public.shortcut_buildings sb
+FROM origin.shortcut_buildings sb
 WHERE sb.shortcut_building_id = $1
 LIMIT 1
 `
@@ -3609,8 +3609,8 @@ SELECT
     ppc.postal_postal_code_neighborhood_fi,
     ppc.postal_postal_code_created_at,
     ppc.postal_postal_code_updated_at
-FROM public.postal_municipalities AS pm
-JOIN public.postal_postal_codes AS ppc
+FROM origin.postal_municipalities AS pm
+JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
 WHERE ppc.postal_postal_code_type_code = '1'
 ORDER BY pm.postal_municipality_name_fi, ppc.postal_postal_code_code
@@ -3672,12 +3672,12 @@ SELECT DISTINCT
     pm.postal_municipality_code,
     pm.postal_municipality_name_fi,
     pm.postal_municipality_name_sv
-FROM public.postal_municipalities AS pm
-JOIN public.postal_postal_codes AS ppc
+FROM origin.postal_municipalities AS pm
+JOIN origin.postal_postal_codes AS ppc
     ON ppc.postal_municipality_id = pm.postal_municipality_id
-JOIN public.prices_neighborhoods AS pn
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
-JOIN public.prices_transactions AS pt
+JOIN origin.prices_transactions AS pt
     ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
 ORDER BY pm.postal_municipality_name_fi
 `
@@ -3720,10 +3720,10 @@ SELECT DISTINCT
     ppc.postal_postal_code_code,
     ppc.postal_postal_code_name_fi,
     ppc.postal_postal_code_name_sv
-FROM public.postal_postal_codes AS ppc
-JOIN public.prices_neighborhoods AS pn
+FROM origin.postal_postal_codes AS ppc
+JOIN origin.prices_neighborhoods AS pn
     ON pn.prices_neighborhood_postal_postal_code_id = ppc.postal_postal_code_id
-JOIN public.prices_transactions AS pt
+JOIN origin.prices_transactions AS pt
     ON pt.prices_neighborhood_id = pn.prices_neighborhood_id
 WHERE ppc.postal_municipality_id = $1
 ORDER BY ppc.postal_postal_code_code
@@ -4318,8 +4318,8 @@ WITH listing AS (
         fb.frontdoor_building_electricity_renovated,
         fb.frontdoor_building_electricity_renovated_year
     FROM public.property_source_offerings sl
-    JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    JOIN public.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE sl.sale_listing_id = $1
 ),
 deleted AS (
@@ -4474,8 +4474,8 @@ WITH unified AS (
         trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable,
         sa.shortcut_ad_type AS listing_type,
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at
-    FROM public.shortcut_ads sa
-    LEFT JOIN public.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    FROM origin.shortcut_ads sa
+    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     LEFT JOIN LATERAL (
         SELECT
             sl.sale_listing_id,
@@ -4528,7 +4528,7 @@ WITH unified AS (
         concat_ws(' ', sb.shortcut_building_id::text, sb.shortcut_building_external_id::text, sb.shortcut_building_url, sb.shortcut_building_address, sb.shortcut_building_housing_company, sb.shortcut_building_building_type, sb.shortcut_building_building_subtype) AS searchable,
         NULL::text AS listing_type,
         NULL::timestamptz AS published_at
-    FROM public.shortcut_buildings sb
+    FROM origin.shortcut_buildings sb
     UNION ALL
     SELECT
         'frontdoor'::text AS source,
@@ -4555,7 +4555,7 @@ WITH unified AS (
         sl.sale_listing_search_text AS searchable,
         NULL::text AS listing_type,
         sl.sale_listing_published_at AS published_at
-    FROM public.frontdoor_ads fa
+    FROM origin.frontdoor_ads fa
     JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
     LEFT JOIN LATERAL (
         SELECT
@@ -4598,7 +4598,7 @@ WITH unified AS (
         NULL::text AS listing_type,
         sl.sale_listing_published_at AS published_at
     FROM public.property_source_offerings sl
-    LEFT JOIN public.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT
             source_link.target_id,
@@ -4640,7 +4640,7 @@ WITH unified AS (
         concat_ws(' ', fb.frontdoor_building_id::text, fb.frontdoor_building_url, fb.frontdoor_building_housing_company_id::text, fb.frontdoor_building_housing_company_friendly_id, fb.frontdoor_building_company_name, fb.frontdoor_building_street_address, fb.frontdoor_building_house_number, fb.frontdoor_building_postcode, fb.frontdoor_building_post_area, fb.frontdoor_building_municipality) AS searchable,
         NULL::text AS listing_type,
         NULL::timestamptz AS published_at
-    FROM public.frontdoor_buildings fb
+    FROM origin.frontdoor_buildings fb
 ), filtered AS (
     SELECT
         u.source,
@@ -4727,7 +4727,7 @@ LEFT JOIN LATERAL (
         price_link.link_score::int4 AS match_score,
         pt.prices_transaction_price AS price_eur
     FROM public.price_links price_link
-    JOIN public.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
+    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
     WHERE price_link.link_status <> 'rejected'
         AND (
             (price_link.target_type = 'source_listing' AND price_link.target_id::text = u.listing_id)
@@ -5063,7 +5063,7 @@ func (q *Queries) SyncPropertyHouseForSaleListing(ctx context.Context, arg SyncP
 }
 
 const syncSourceListingFromPropertySourceOffering = `-- name: SyncSourceListingFromPropertySourceOffering :exec
-INSERT INTO public.source_listings (
+INSERT INTO origin.source_listings (
     source_listing_id,
     provider,
     source_kind,
@@ -5103,8 +5103,8 @@ SELECT
     sl.sale_listing_created_at,
     sl.sale_listing_updated_at
 FROM public.property_source_offerings sl
-LEFT JOIN public.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN public.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
 WHERE sl.sale_listing_id = $1
 ON CONFLICT (source_listing_id) DO UPDATE SET
     provider = EXCLUDED.provider,
@@ -5193,7 +5193,7 @@ func (q *Queries) UpdatePropertyDocumentExtractionStatus(ctx context.Context, ar
 }
 
 const upsertPostalAdAreasBulk = `-- name: UpsertPostalAdAreasBulk :many
-INSERT INTO public.postal_ad_areas (
+INSERT INTO origin.postal_ad_areas (
     postal_ad_area_code,
     postal_ad_area_name_fi,
     postal_ad_area_name_sv,
@@ -5262,7 +5262,7 @@ func (q *Queries) UpsertPostalAdAreasBulk(ctx context.Context, arg UpsertPostalA
 }
 
 const upsertPostalMunicipalitiesBulk = `-- name: UpsertPostalMunicipalitiesBulk :many
-INSERT INTO public.postal_municipalities (
+INSERT INTO origin.postal_municipalities (
     postal_municipality_code,
     postal_municipality_name_fi,
     postal_municipality_name_sv,
@@ -5343,7 +5343,7 @@ func (q *Queries) UpsertPostalMunicipalitiesBulk(ctx context.Context, arg Upsert
 }
 
 const upsertPostalPostalCodesBulk = `-- name: UpsertPostalPostalCodesBulk :execrows
-INSERT INTO public.postal_postal_codes (
+INSERT INTO origin.postal_postal_codes (
     postal_postal_code_date,
     postal_postal_code_code,
     postal_postal_code_name_fi,

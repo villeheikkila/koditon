@@ -13,7 +13,7 @@ import (
 )
 
 const deleteShortcutToken = `-- name: DeleteShortcutToken :exec
-DELETE FROM public.shortcut_tokens
+DELETE FROM origin.shortcut_tokens
 WHERE shortcut_token_cuid = $1
 `
 
@@ -23,7 +23,7 @@ func (q *Queries) DeleteShortcutToken(ctx context.Context, dollar_1 *string) err
 }
 
 const getAllValidShortcutTokens = `-- name: GetAllValidShortcutTokens :many
-SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM public.shortcut_tokens
+SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM origin.shortcut_tokens
 ORDER BY shortcut_token_created_at DESC
 `
 
@@ -66,7 +66,7 @@ func (q *Queries) GetAllValidShortcutTokens(ctx context.Context) ([]GetAllValidS
 }
 
 const getValidShortcutToken = `-- name: GetValidShortcutToken :one
-SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM public.shortcut_tokens
+SELECT shortcut_token_id, shortcut_token_cuid, shortcut_token_token, shortcut_token_loaded, shortcut_token_created_at, shortcut_token_updated_at, shortcut_token_expires_at FROM origin.shortcut_tokens
 ORDER BY shortcut_token_created_at DESC
 LIMIT 1
 `
@@ -97,7 +97,7 @@ func (q *Queries) GetValidShortcutToken(ctx context.Context) (GetValidShortcutTo
 }
 
 const insertShortcutToken = `-- name: InsertShortcutToken :one
-INSERT INTO public.shortcut_tokens (
+INSERT INTO origin.shortcut_tokens (
     shortcut_token_cuid,
     shortcut_token_token,
     shortcut_token_loaded,

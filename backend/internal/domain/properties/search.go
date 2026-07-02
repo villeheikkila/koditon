@@ -329,8 +329,8 @@ postal_rows AS (
         avg(postgis.ST_Y(source_rows.geom))::double precision AS lat,
         avg(postgis.ST_X(source_rows.geom))::double precision AS lng
     FROM source_rows
-    LEFT JOIN public.postal_postal_codes ppc ON ppc.postal_postal_code_code = source_rows.postal
-    LEFT JOIN public.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
+    LEFT JOIN origin.postal_postal_codes ppc ON ppc.postal_postal_code_code = source_rows.postal
+    LEFT JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
     WHERE postal IS NOT NULL
     GROUP BY postal, ppc.postal_postal_code_name_fi, pm.postal_municipality_name_fi
 )
