@@ -1,5 +1,5 @@
 -- name: CreateOAuthDynamicClient :one
-insert into oauth_dynamic_clients (
+insert into auth.oauth_dynamic_clients (
   oauth_dynamic_client_id,
   oauth_dynamic_client_type,
   oauth_dynamic_client_redirect_uris,
@@ -44,8 +44,7 @@ select
   oauth_dynamic_client_disabled_at,
   oauth_dynamic_client_created_at,
   oauth_dynamic_client_updated_at
-from
-  oauth_dynamic_clients
+from auth.oauth_dynamic_clients
 where
   oauth_dynamic_client_id = sqlc.arg(oauth_dynamic_client_id)
   and oauth_dynamic_client_disabled_at is null;

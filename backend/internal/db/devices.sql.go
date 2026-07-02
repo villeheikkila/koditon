@@ -13,7 +13,7 @@ import (
 )
 
 const updateDeviceMetadata = `-- name: UpdateDeviceMetadata :exec
-update user_devices
+update auth.user_devices
 set
   user_device_name = coalesce(nullif($1, ''), user_device_name),
   user_device_os = coalesce(nullif($2, ''), user_device_os),
@@ -51,14 +51,13 @@ func (q *Queries) UpdateDeviceMetadata(ctx context.Context, arg UpdateDeviceMeta
 }
 
 const upsertDevice = `-- name: UpsertDevice :one
-insert into user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
+insert into auth.user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
 values
   ($1,
     (
       select
         user_id
-      from
-        users u
+      from auth.users u
       where
         u.user_uuid = $2),
       $3,
@@ -73,8 +72,7 @@ on conflict (user_device_uuid)
     (
       select
         user_uuid
-      from
-        users u
+      from auth.users u
       where
         u.user_id = user_devices.user_id) as user_uuid,
     user_device_name,

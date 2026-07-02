@@ -1,12 +1,11 @@
 -- name: UpsertDevice :one
-insert into user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
+insert into auth.user_devices (user_device_uuid, user_id, user_device_name, user_device_os, user_device_app_version)
 values
   (sqlc.arg (user_device_id),
     (
       select
         user_id
-      from
-        users u
+      from auth.users u
       where
         u.user_uuid = sqlc.arg (user_uuid)),
       sqlc.arg (user_device_name),
@@ -21,8 +20,7 @@ on conflict (user_device_uuid)
     (
       select
         user_uuid
-      from
-        users u
+      from auth.users u
       where
         u.user_id = user_devices.user_id) as user_uuid,
     user_device_name,
@@ -36,7 +34,7 @@ on conflict (user_device_uuid)
     user_device_last_seen_at;
 
 -- name: UpdateDeviceMetadata :exec
-update user_devices
+update auth.user_devices
 set
   user_device_name = coalesce(nullif(sqlc.narg(user_device_name), ''), user_device_name),
   user_device_os = coalesce(nullif(sqlc.narg(user_device_os), ''), user_device_os),

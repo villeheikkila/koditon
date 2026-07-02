@@ -1,5 +1,5 @@
 -- name: CreateOAuthDeviceAuthorization :one
-insert into oauth_device_authorizations (
+insert into auth.oauth_device_authorizations (
   oauth_device_authorization_device_code_hash,
   oauth_client_id,
   oauth_device_authorization_user_code,
@@ -44,11 +44,11 @@ select
   oauth_device_authorization_consumed_at,
   oauth_device_authorization_created_at,
   oauth_device_authorization_updated_at
-from oauth_device_authorizations
+from auth.oauth_device_authorizations
 where oauth_device_authorization_user_code = sqlc.arg(oauth_device_authorization_user_code);
 
 -- name: ApproveOAuthDeviceAuthorizationByUserCode :one
-update oauth_device_authorizations
+update auth.oauth_device_authorizations
 set
   user_uuid = sqlc.arg(user_uuid),
   oauth_device_authorization_approved_at = now(),
@@ -75,7 +75,7 @@ returning
   oauth_device_authorization_updated_at;
 
 -- name: DenyOAuthDeviceAuthorizationByUserCode :one
-update oauth_device_authorizations
+update auth.oauth_device_authorizations
 set
   oauth_device_authorization_denied_at = now(),
   oauth_device_authorization_updated_at = now()
@@ -114,11 +114,11 @@ select
   oauth_device_authorization_consumed_at,
   oauth_device_authorization_created_at,
   oauth_device_authorization_updated_at
-from oauth_device_authorizations
+from auth.oauth_device_authorizations
 where oauth_device_authorization_device_code_hash = sqlc.arg(oauth_device_authorization_device_code_hash);
 
 -- name: ConsumeOAuthDeviceAuthorizationByID :one
-update oauth_device_authorizations
+update auth.oauth_device_authorizations
 set
   oauth_device_authorization_consumed_at = now(),
   oauth_device_authorization_updated_at = now()

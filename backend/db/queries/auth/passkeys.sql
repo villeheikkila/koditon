@@ -1,5 +1,5 @@
 -- name: CreatePasskey :one
-insert into user_passkeys (
+insert into auth.user_passkeys (
   user_id,
   user_identity_id,
   user_passkey_credential_id,
@@ -19,12 +19,12 @@ insert into user_passkeys (
 values (
   (
     select user_id
-    from users u
+    from auth.users u
     where u.user_uuid = sqlc.arg(user_uuid)
   ),
   (
     select user_identity_id
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_uuid = sqlc.arg(user_identity_uuid)
   ),
   sqlc.arg(user_passkey_credential_id),
@@ -45,12 +45,12 @@ returning
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -75,12 +75,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -99,7 +99,7 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_passkey_credential_id = sqlc.arg(user_passkey_credential_id)
   and user_passkey_revoked_at is null;
 
@@ -108,12 +108,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -132,7 +132,7 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_passkey_user_handle = sqlc.arg(user_passkey_user_handle)
   and user_passkey_credential_id = sqlc.arg(user_passkey_credential_id)
   and user_passkey_revoked_at is null;
@@ -142,12 +142,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -166,10 +166,10 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_id = (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = sqlc.arg(user_uuid)
 )
   and user_passkey_revoked_at is null
@@ -178,16 +178,16 @@ order by user_passkey_created_at desc;
 -- name: CountActivePasskeysByUserID :one
 select
   count(*)::bigint as active_count
-from user_passkeys
+from auth.user_passkeys
 where user_id = (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = sqlc.arg(user_uuid)
 )
   and user_passkey_revoked_at is null;
 
 -- name: UpdatePasskeyUsage :exec
-update user_passkeys
+update auth.user_passkeys
 set
   user_passkey_sign_count = sqlc.arg(user_passkey_sign_count),
   user_passkey_last_used_at = now(),
@@ -199,13 +199,13 @@ where user_passkey_credential_id = sqlc.arg(user_passkey_credential_id)
 -- name: RevokePasskeyByCredentialB64ForUser :one
 with target_user as (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = sqlc.arg(user_uuid)
 ),
 locked as (
   select
     up.user_passkey_id
-  from user_passkeys up
+  from auth.user_passkeys up
   where up.user_id = (select user_id from target_user)
     and up.user_passkey_revoked_at is null
   for update
@@ -216,14 +216,14 @@ active_count as (
 ),
 target as (
   select up.user_passkey_id
-  from user_passkeys up
+  from auth.user_passkeys up
   where up.user_id = (select user_id from target_user)
     and up.user_passkey_revoked_at is null
     and up.user_passkey_credential_id_b64url = sqlc.arg(target_credential_id_b64url)
   for update
 ),
 updated as (
-  update user_passkeys
+  update auth.user_passkeys
   set
     user_passkey_revoked_at = now(),
     user_passkey_updated_at = now()

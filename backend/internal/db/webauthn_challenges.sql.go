@@ -14,7 +14,7 @@ import (
 )
 
 const consumeWebauthnChallenge = `-- name: ConsumeWebauthnChallenge :one
-update auth_webauthn_challenges
+update auth.auth_webauthn_challenges
 set auth_webauthn_challenge_consumed_at = now()
 where auth_webauthn_challenge_uuid = $1
   and auth_webauthn_challenge_flow = $2
@@ -33,7 +33,7 @@ returning
   auth_webauthn_challenge_created_at,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = auth_webauthn_challenges.user_id
   ) as user_uuid
 `
@@ -77,7 +77,7 @@ func (q *Queries) ConsumeWebauthnChallenge(ctx context.Context, arg ConsumeWebau
 }
 
 const createWebauthnChallenge = `-- name: CreateWebauthnChallenge :one
-insert into auth_webauthn_challenges (
+insert into auth.auth_webauthn_challenges (
   auth_webauthn_challenge_flow,
   auth_webauthn_challenge_session,
   auth_webauthn_challenge_expires_at,
@@ -97,7 +97,7 @@ values (
   $7,
   (
     select user_id
-    from users u
+    from auth.users u
     where u.user_uuid = $8
   )
 )
@@ -114,7 +114,7 @@ returning
   auth_webauthn_challenge_created_at,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = auth_webauthn_challenges.user_id
   ) as user_uuid
 `

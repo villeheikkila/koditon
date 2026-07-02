@@ -357,7 +357,7 @@ func TestBeginEmailAuthentication_ReturnsGenericResponseWithoutPasskeys(t *testi
 
 	userID := createAuthTestUser(t, ctx, pool, queries)
 	email := "magic-link-only@example.com"
-	if _, err := pool.Exec(ctx, "update users set user_email = $1 where user_uuid = $2", email, userID); err != nil {
+	if _, err := pool.Exec(ctx, "update auth.users set user_email = $1 where user_uuid = $2", email, userID); err != nil {
 		t.Fatalf("set user email: %v", err)
 	}
 	passkeyProvider := string(AuthProviderPasskey)
@@ -510,7 +510,7 @@ func createAuthTestUser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, q
 		t.Fatalf("create user: %v", err)
 	}
 	t.Cleanup(func() {
-		if _, cleanupErr := pool.Exec(ctx, "delete from users where user_uuid = $1", user.UserUuid); cleanupErr != nil {
+		if _, cleanupErr := pool.Exec(ctx, "delete from auth.users where user_uuid = $1", user.UserUuid); cleanupErr != nil {
 			t.Fatalf("cleanup user: %v", cleanupErr)
 		}
 	})

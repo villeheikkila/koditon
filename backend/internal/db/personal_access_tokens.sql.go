@@ -13,7 +13,7 @@ import (
 )
 
 const createPersonalAccessToken = `-- name: CreatePersonalAccessToken :one
-insert into personal_access_tokens (user_id, personal_access_token_name, personal_access_token_prefix, personal_access_token_token_hash, personal_access_token_scopes, personal_access_token_expires_at)
+insert into auth.personal_access_tokens (user_id, personal_access_token_name, personal_access_token_prefix, personal_access_token_token_hash, personal_access_token_scopes, personal_access_token_expires_at)
   values ($1, $2, $3, $4, $5, $6)
 returning
   personal_access_token_id, user_id, personal_access_token_name, personal_access_token_prefix, personal_access_token_token_hash, personal_access_token_scopes, personal_access_token_created_at, personal_access_token_last_used_at, personal_access_token_expires_at, personal_access_token_revoked_at
@@ -79,9 +79,8 @@ select
   personal_access_token_last_used_at,
   personal_access_token_expires_at,
   personal_access_token_revoked_at
-from
-  personal_access_tokens pat
-  join users u on u.user_id = pat.user_id
+from auth.personal_access_tokens pat
+  join auth.users u on u.user_id = pat.user_id
 where
   personal_access_token_prefix = $1
 `
@@ -120,8 +119,7 @@ func (q *Queries) GetPersonalAccessTokenByPrefix(ctx context.Context, personalAc
 }
 
 const revokePersonalAccessToken = `-- name: RevokePersonalAccessToken :exec
-update
-  personal_access_tokens
+update auth.personal_access_tokens
 set
   personal_access_token_revoked_at = now()
 where
@@ -135,8 +133,7 @@ func (q *Queries) RevokePersonalAccessToken(ctx context.Context, personalAccessT
 }
 
 const updatePersonalAccessTokenLastUsed = `-- name: UpdatePersonalAccessTokenLastUsed :exec
-update
-  personal_access_tokens
+update auth.personal_access_tokens
 set
   personal_access_token_last_used_at = now()
 where

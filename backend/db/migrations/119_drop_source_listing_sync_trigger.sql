@@ -1,2 +1,0 @@
-DROP TRIGGER IF EXISTS trg__sync_source_listing_from_property_source_offering ON public.property_source_offerings;
-DROP FUNCTION IF EXISTS public.fnc__sync_source_listing_from_property_source_offering();

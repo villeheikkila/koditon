@@ -13,20 +13,18 @@ import (
 )
 
 const createSession = `-- name: CreateSession :one
-insert into device_sessions (user_id, device_session_user_device_id, device_session_user_agent, device_session_ip, device_session_provider)
+insert into auth.device_sessions (user_id, device_session_user_device_id, device_session_user_agent, device_session_ip, device_session_provider)
 values
   ((
       select
         user_id
-      from
-        users u
+      from auth.users u
       where
         u.user_uuid = $1),
       (
         select
           user_device_id
-        from
-          user_devices d
+        from auth.user_devices d
         where
           d.user_device_uuid = $2),
         $3,
@@ -37,15 +35,13 @@ values
     (
       select
         user_uuid
-      from
-        users u
+      from auth.users u
       where
         u.user_id = device_sessions.user_id) as user_uuid,
     (
       select
         user_device_uuid
-      from
-        user_devices d
+      from auth.user_devices d
       where
         d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
     device_session_user_agent,
@@ -111,15 +107,13 @@ select
   (
     select
       user_uuid
-    from
-      users u
+    from auth.users u
     where
       u.user_id = device_sessions.user_id) as user_uuid,
   (
     select
       user_device_uuid
-    from
-      user_devices d
+    from auth.user_devices d
     where
       d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
   device_session_user_agent,
@@ -130,8 +124,7 @@ select
   device_session_refreshed_at,
   device_session_not_after,
   device_session_revoked_at
-from
-  device_sessions
+from auth.device_sessions
 where
   device_session_uuid = $1
   and device_session_revoked_at is null
@@ -178,15 +171,13 @@ select
   (
     select
       user_uuid
-    from
-      users u
+    from auth.users u
     where
       u.user_id = device_sessions.user_id) as user_uuid,
   (
     select
       user_device_uuid
-    from
-      user_devices d
+    from auth.user_devices d
     where
       d.user_device_id = device_sessions.device_session_user_device_id) as device_session_user_device_uuid,
   device_session_user_agent,
@@ -197,8 +188,7 @@ select
   device_session_refreshed_at,
   device_session_not_after,
   device_session_revoked_at
-from
-  device_sessions
+from auth.device_sessions
 where
   device_session_uuid = $1
 `
@@ -260,16 +250,14 @@ select
   ds.device_session_location_country_code,
   ds.device_session_location_source,
   d.user_device_last_seen_at
-from
-  device_sessions ds
-  join users u on u.user_id = ds.user_id
-  join user_devices d on d.user_device_id = ds.device_session_user_device_id
+from auth.device_sessions ds
+  join auth.users u on u.user_id = ds.user_id
+  join auth.user_devices d on d.user_device_id = ds.device_session_user_device_id
 where
   ds.user_id = (
     select
       user_id
-    from
-      users u
+    from auth.users u
     where
       u.user_uuid = $1)
   and ds.device_session_revoked_at is null
@@ -347,8 +335,7 @@ func (q *Queries) GetSessionsByUserID(ctx context.Context, userUuid *uuid.UUID) 
 }
 
 const revokeAllUserSessions = `-- name: RevokeAllUserSessions :exec
-update
-  device_sessions
+update auth.device_sessions
 set
   device_session_revoked_at = now(),
   device_session_updated_at = now()
@@ -356,8 +343,7 @@ where
   user_id = (
     select
       user_id
-    from
-      users u
+    from auth.users u
     where
       u.user_uuid = $1)
   and device_session_revoked_at is null
@@ -369,8 +355,7 @@ func (q *Queries) RevokeAllUserSessions(ctx context.Context, userUuid *uuid.UUID
 }
 
 const revokeSession = `-- name: RevokeSession :exec
-update
-  device_sessions
+update auth.device_sessions
 set
   device_session_revoked_at = now(),
   device_session_updated_at = now()
@@ -384,7 +369,7 @@ func (q *Queries) RevokeSession(ctx context.Context, deviceSessionUuid *uuid.UUI
 }
 
 const updateSessionMetadata = `-- name: UpdateSessionMetadata :exec
-update device_sessions
+update auth.device_sessions
 set
   device_session_device_name = nullif($1, ''),
   device_session_device_os = nullif($2, ''),
@@ -433,8 +418,7 @@ func (q *Queries) UpdateSessionMetadata(ctx context.Context, arg UpdateSessionMe
 }
 
 const updateSessionRefreshed = `-- name: UpdateSessionRefreshed :exec
-update
-  device_sessions
+update auth.device_sessions
 set
   device_session_refreshed_at = now(),
   device_session_updated_at = now()

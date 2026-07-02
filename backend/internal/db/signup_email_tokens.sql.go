@@ -13,7 +13,7 @@ import (
 )
 
 const consumeActiveSignupEmailTokenByHash = `-- name: ConsumeActiveSignupEmailTokenByHash :one
-update public.auth_signup_email_tokens
+update auth.auth_signup_email_tokens
 set auth_signup_email_consumed_at = now()
 where auth_signup_email_token_hash = $1
   and auth_signup_email_consumed_at is null
@@ -30,7 +30,7 @@ func (q *Queries) ConsumeActiveSignupEmailTokenByHash(ctx context.Context, authS
 }
 
 const createSignupEmailToken = `-- name: CreateSignupEmailToken :one
-insert into public.auth_signup_email_tokens (
+insert into auth.auth_signup_email_tokens (
   auth_signup_email_target_email,
   auth_signup_email_token_hash,
   auth_signup_email_expires_at
@@ -71,7 +71,7 @@ select
     else 'active'
   end as token_status
 from
-  public.auth_signup_email_tokens
+  auth.auth_signup_email_tokens
 where
   auth_signup_email_token_hash = $1
 order by
@@ -88,7 +88,7 @@ func (q *Queries) GetSignupEmailTokenStatusByHash(ctx context.Context, authSignu
 
 const invalidateActiveSignupEmailTokensForEmail = `-- name: InvalidateActiveSignupEmailTokensForEmail :exec
 update
-  public.auth_signup_email_tokens
+  auth.auth_signup_email_tokens
 set
   auth_signup_email_consumed_at = now()
 where

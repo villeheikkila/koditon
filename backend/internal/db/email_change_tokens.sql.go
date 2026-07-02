@@ -15,7 +15,7 @@ import (
 const consumeActiveEmailChangeTokenByHash = `-- name: ConsumeActiveEmailChangeTokenByHash :one
 with consumed as (
   update
-    public.user_email_change_tokens
+    auth.user_email_change_tokens
   set
     user_email_change_consumed_at = now()
   where
@@ -28,7 +28,7 @@ with consumed as (
 ),
 updated_user as (
   update
-    public.users u
+    auth.users u
   set
     user_email = lower(btrim(c.user_email_change_target_email))
   from
@@ -41,7 +41,7 @@ updated_user as (
 ),
 updated_identity as (
   update
-    public.user_identities ui
+    auth.user_identities ui
   set
     user_identity_external_id = lower(btrim(c.user_email_change_target_email)),
     user_identity_email = lower(btrim(c.user_email_change_target_email)),
@@ -56,7 +56,7 @@ updated_identity as (
     ui.user_identity_id
 ),
 inserted_identity as (
-  insert into public.user_identities (
+  insert into auth.user_identities (
     user_id,
     user_identity_provider,
     user_identity_external_id,
@@ -96,7 +96,7 @@ func (q *Queries) ConsumeActiveEmailChangeTokenByHash(ctx context.Context, userE
 }
 
 const createEmailChangeToken = `-- name: CreateEmailChangeToken :one
-insert into public.user_email_change_tokens (user_id, user_email_change_target_email, user_email_change_token_hash, user_email_change_expires_at)
+insert into auth.user_email_change_tokens (user_id, user_email_change_target_email, user_email_change_token_hash, user_email_change_expires_at)
   values ($1, $2, $3, $4)
 returning
   user_email_change_token_uuid,
@@ -138,7 +138,7 @@ select
     'active'
   end as token_status
 from
-  public.user_email_change_tokens
+  auth.user_email_change_tokens
 where
   user_email_change_token_hash = $1
 order by
@@ -155,7 +155,7 @@ func (q *Queries) GetEmailChangeTokenStatusByHash(ctx context.Context, userEmail
 
 const invalidateActiveEmailChangeTokensForUser = `-- name: InvalidateActiveEmailChangeTokensForUser :exec
 update
-  public.user_email_change_tokens
+  auth.user_email_change_tokens
 set
   user_email_change_consumed_at = now()
 where

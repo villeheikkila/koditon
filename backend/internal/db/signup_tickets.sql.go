@@ -13,7 +13,7 @@ import (
 )
 
 const consumeActiveSignupTicketByHash = `-- name: ConsumeActiveSignupTicketByHash :one
-update public.auth_signup_tickets
+update auth.auth_signup_tickets
 set auth_signup_ticket_consumed_at = now()
 where auth_signup_ticket_hash = $1
   and auth_signup_ticket_consumed_at is null
@@ -30,7 +30,7 @@ func (q *Queries) ConsumeActiveSignupTicketByHash(ctx context.Context, authSignu
 }
 
 const createSignupTicket = `-- name: CreateSignupTicket :one
-insert into public.auth_signup_tickets (
+insert into auth.auth_signup_tickets (
   auth_signup_ticket_target_email,
   auth_signup_ticket_hash,
   auth_signup_ticket_expires_at
@@ -71,7 +71,7 @@ select
     else 'active'
   end as token_status
 from
-  public.auth_signup_tickets
+  auth.auth_signup_tickets
 where
   auth_signup_ticket_hash = $1
 order by

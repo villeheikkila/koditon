@@ -13,7 +13,7 @@ import (
 )
 
 const consumeOAuthAuthorizationCode = `-- name: ConsumeOAuthAuthorizationCode :one
-update oauth_authorization_codes
+update auth.oauth_authorization_codes
 set
   oauth_authorization_code_consumed_at = now(),
   oauth_authorization_code_updated_at = now()
@@ -99,7 +99,7 @@ func (q *Queries) ConsumeOAuthAuthorizationCode(ctx context.Context, arg Consume
 }
 
 const createOAuthAuthorizationCode = `-- name: CreateOAuthAuthorizationCode :one
-insert into oauth_authorization_codes (
+insert into auth.oauth_authorization_codes (
   oauth_authorization_code_code_hash,
   oauth_client_id,
   user_uuid,
@@ -196,7 +196,7 @@ func (q *Queries) CreateOAuthAuthorizationCode(ctx context.Context, arg CreateOA
 }
 
 const createOAuthRefreshToken = `-- name: CreateOAuthRefreshToken :one
-insert into oauth_refresh_tokens (
+insert into auth.oauth_refresh_tokens (
   oauth_refresh_token_token_hash,
   oauth_client_id,
   user_uuid,
@@ -299,8 +299,7 @@ select
   oauth_refresh_token_rotated_from,
   oauth_refresh_token_created_at,
   oauth_refresh_token_updated_at
-from
-  oauth_refresh_tokens
+from auth.oauth_refresh_tokens
 where
   oauth_refresh_token_token_hash = $1
 for update
@@ -349,8 +348,8 @@ with active_tokens as (
     ort.oauth_refresh_token_created_at,
     ort.oauth_refresh_token_updated_at,
     odc.oauth_dynamic_client_name
-  from oauth_refresh_tokens ort
-  left join oauth_dynamic_clients odc
+  from auth.oauth_refresh_tokens ort
+  left join auth.oauth_dynamic_clients odc
     on odc.oauth_dynamic_client_id = ort.oauth_client_id
    and odc.oauth_dynamic_client_disabled_at is null
   where
@@ -410,7 +409,7 @@ func (q *Queries) ListOAuthAppConnectionsByUserID(ctx context.Context, userUuid 
 }
 
 const revokeAllOAuthRefreshTokensByUserID = `-- name: RevokeAllOAuthRefreshTokensByUserID :exec
-update oauth_refresh_tokens
+update auth.oauth_refresh_tokens
 set
   oauth_refresh_token_revoked_at = now(),
   oauth_refresh_token_updated_at = now()
@@ -426,7 +425,7 @@ func (q *Queries) RevokeAllOAuthRefreshTokensByUserID(ctx context.Context, userU
 }
 
 const revokeAllOAuthRefreshTokensByUserIDAndClientID = `-- name: RevokeAllOAuthRefreshTokensByUserIDAndClientID :execrows
-update oauth_refresh_tokens
+update auth.oauth_refresh_tokens
 set
   oauth_refresh_token_revoked_at = now(),
   oauth_refresh_token_updated_at = now()
@@ -451,7 +450,7 @@ func (q *Queries) RevokeAllOAuthRefreshTokensByUserIDAndClientID(ctx context.Con
 }
 
 const revokeOAuthRefreshTokenByHash = `-- name: RevokeOAuthRefreshTokenByHash :one
-update oauth_refresh_tokens
+update auth.oauth_refresh_tokens
 set
   oauth_refresh_token_revoked_at = now(),
   oauth_refresh_token_updated_at = now()
@@ -510,7 +509,7 @@ func (q *Queries) RevokeOAuthRefreshTokenByHash(ctx context.Context, oauthRefres
 }
 
 const revokeOAuthRefreshTokenByHashAndClientID = `-- name: RevokeOAuthRefreshTokenByHashAndClientID :one
-update oauth_refresh_tokens
+update auth.oauth_refresh_tokens
 set
   oauth_refresh_token_revoked_at = now(),
   oauth_refresh_token_updated_at = now()

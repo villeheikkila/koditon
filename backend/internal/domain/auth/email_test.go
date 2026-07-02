@@ -50,15 +50,15 @@ func TestSignInWithEmail_ReusesIdentityAcrossConcurrentRequests(t *testing.T) {
 	normalizedEmail := authenticatedEmail.String()
 
 	t.Cleanup(func() {
-		_, cleanupErr := pool.Exec(ctx, "delete from users where lower(btrim(user_email)) = lower(btrim($1))", normalizedEmail)
+		_, cleanupErr := pool.Exec(ctx, "delete from auth.users where lower(btrim(user_email)) = lower(btrim($1))", normalizedEmail)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup user: %v", cleanupErr)
 		}
-		_, cleanupErr = pool.Exec(ctx, "delete from auth_signup_email_tokens where lower(btrim(auth_signup_email_target_email)) = lower(btrim($1))", normalizedEmail)
+		_, cleanupErr = pool.Exec(ctx, "delete from auth.auth_signup_email_tokens where lower(btrim(auth_signup_email_target_email)) = lower(btrim($1))", normalizedEmail)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup signup email tokens: %v", cleanupErr)
 		}
-		_, cleanupErr = pool.Exec(ctx, "delete from auth_signup_tickets where lower(btrim(auth_signup_ticket_target_email)) = lower(btrim($1))", normalizedEmail)
+		_, cleanupErr = pool.Exec(ctx, "delete from auth.auth_signup_tickets where lower(btrim(auth_signup_ticket_target_email)) = lower(btrim($1))", normalizedEmail)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup signup tickets: %v", cleanupErr)
 		}
@@ -112,7 +112,7 @@ func TestSignInWithEmail_ReusesIdentityAcrossConcurrentRequests(t *testing.T) {
 
 	const countEmailIdentitiesSQL = `
 select count(*)
-from user_identities
+from auth.user_identities
 where user_identity_provider = 'email'
   and user_identity_external_id = $1
 `
@@ -165,15 +165,15 @@ func TestSignInWithEmail_RepairsMissingEmailIdentityFromLegacyUserEmail(t *testi
 		t.Fatalf("create user: %v", err)
 	}
 	t.Cleanup(func() {
-		_, cleanupErr := pool.Exec(ctx, "delete from users where user_uuid = $1", user.UserUuid)
+		_, cleanupErr := pool.Exec(ctx, "delete from auth.users where user_uuid = $1", user.UserUuid)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup user: %v", cleanupErr)
 		}
-		_, cleanupErr = pool.Exec(ctx, "delete from auth_signup_email_tokens where lower(btrim(auth_signup_email_target_email)) = lower(btrim($1))", normalizedEmail)
+		_, cleanupErr = pool.Exec(ctx, "delete from auth.auth_signup_email_tokens where lower(btrim(auth_signup_email_target_email)) = lower(btrim($1))", normalizedEmail)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup signup email tokens: %v", cleanupErr)
 		}
-		_, cleanupErr = pool.Exec(ctx, "delete from auth_signup_tickets where lower(btrim(auth_signup_ticket_target_email)) = lower(btrim($1))", normalizedEmail)
+		_, cleanupErr = pool.Exec(ctx, "delete from auth.auth_signup_tickets where lower(btrim(auth_signup_ticket_target_email)) = lower(btrim($1))", normalizedEmail)
 		if cleanupErr != nil {
 			t.Fatalf("cleanup signup tickets: %v", cleanupErr)
 		}

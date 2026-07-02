@@ -15,10 +15,10 @@ import (
 const countActivePasskeysByUserID = `-- name: CountActivePasskeysByUserID :one
 select
   count(*)::bigint as active_count
-from user_passkeys
+from auth.user_passkeys
 where user_id = (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = $1
 )
   and user_passkey_revoked_at is null
@@ -32,7 +32,7 @@ func (q *Queries) CountActivePasskeysByUserID(ctx context.Context, userUuid *uui
 }
 
 const createPasskey = `-- name: CreatePasskey :one
-insert into user_passkeys (
+insert into auth.user_passkeys (
   user_id,
   user_identity_id,
   user_passkey_credential_id,
@@ -52,12 +52,12 @@ insert into user_passkeys (
 values (
   (
     select user_id
-    from users u
+    from auth.users u
     where u.user_uuid = $1
   ),
   (
     select user_identity_id
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_uuid = $2
   ),
   $3,
@@ -78,12 +78,12 @@ returning
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -192,12 +192,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -216,7 +216,7 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_passkey_credential_id = $1
   and user_passkey_revoked_at is null
 `
@@ -275,12 +275,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -299,7 +299,7 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_passkey_user_handle = $1
   and user_passkey_credential_id = $2
   and user_passkey_revoked_at is null
@@ -364,12 +364,12 @@ select
   user_passkey_uuid,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = user_passkeys.user_id
   ) as user_uuid,
   (
     select user_identity_uuid
-    from user_identities ui
+    from auth.user_identities ui
     where ui.user_identity_id = user_passkeys.user_identity_id
   ) as user_identity_uuid,
   user_passkey_credential_id,
@@ -388,10 +388,10 @@ select
   user_passkey_created_at,
   user_passkey_updated_at,
   user_passkey_revoked_at
-from user_passkeys
+from auth.user_passkeys
 where user_id = (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = $1
 )
   and user_passkey_revoked_at is null
@@ -463,13 +463,13 @@ func (q *Queries) ListPasskeysByUserID(ctx context.Context, userUuid *uuid.UUID)
 const revokePasskeyByCredentialB64ForUser = `-- name: RevokePasskeyByCredentialB64ForUser :one
 with target_user as (
   select user_id
-  from users u
+  from auth.users u
   where u.user_uuid = $1
 ),
 locked as (
   select
     up.user_passkey_id
-  from user_passkeys up
+  from auth.user_passkeys up
   where up.user_id = (select user_id from target_user)
     and up.user_passkey_revoked_at is null
   for update
@@ -480,14 +480,14 @@ active_count as (
 ),
 target as (
   select up.user_passkey_id
-  from user_passkeys up
+  from auth.user_passkeys up
   where up.user_id = (select user_id from target_user)
     and up.user_passkey_revoked_at is null
     and up.user_passkey_credential_id_b64url = $2
   for update
 ),
 updated as (
-  update user_passkeys
+  update auth.user_passkeys
   set
     user_passkey_revoked_at = now(),
     user_passkey_updated_at = now()
@@ -516,7 +516,7 @@ func (q *Queries) RevokePasskeyByCredentialB64ForUser(ctx context.Context, arg R
 }
 
 const updatePasskeyUsage = `-- name: UpdatePasskeyUsage :exec
-update user_passkeys
+update auth.user_passkeys
 set
   user_passkey_sign_count = $1,
   user_passkey_last_used_at = now(),

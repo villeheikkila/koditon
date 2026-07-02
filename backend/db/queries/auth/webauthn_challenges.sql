@@ -1,5 +1,5 @@
 -- name: CreateWebauthnChallenge :one
-insert into auth_webauthn_challenges (
+insert into auth.auth_webauthn_challenges (
   auth_webauthn_challenge_flow,
   auth_webauthn_challenge_session,
   auth_webauthn_challenge_expires_at,
@@ -19,7 +19,7 @@ values (
   sqlc.arg(auth_webauthn_challenge_device_id),
   (
     select user_id
-    from users u
+    from auth.users u
     where u.user_uuid = sqlc.narg(user_uuid)
   )
 )
@@ -36,12 +36,12 @@ returning
   auth_webauthn_challenge_created_at,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = auth_webauthn_challenges.user_id
   ) as user_uuid;
 
 -- name: ConsumeWebauthnChallenge :one
-update auth_webauthn_challenges
+update auth.auth_webauthn_challenges
 set auth_webauthn_challenge_consumed_at = now()
 where auth_webauthn_challenge_uuid = sqlc.arg(auth_webauthn_challenge_uuid)
   and auth_webauthn_challenge_flow = sqlc.arg(auth_webauthn_challenge_flow)
@@ -60,6 +60,6 @@ returning
   auth_webauthn_challenge_created_at,
   (
     select user_uuid
-    from users u
+    from auth.users u
     where u.user_id = auth_webauthn_challenges.user_id
   ) as user_uuid;

@@ -1,6 +1,6 @@
 -- name: InvalidateActiveSignupEmailTokensForEmail :exec
 update
-  public.auth_signup_email_tokens
+  auth.auth_signup_email_tokens
 set
   auth_signup_email_consumed_at = now()
 where
@@ -8,7 +8,7 @@ where
   and auth_signup_email_consumed_at is null;
 
 -- name: CreateSignupEmailToken :one
-insert into public.auth_signup_email_tokens (
+insert into auth.auth_signup_email_tokens (
   auth_signup_email_target_email,
   auth_signup_email_token_hash,
   auth_signup_email_expires_at
@@ -23,7 +23,7 @@ returning
   auth_signup_email_expires_at;
 
 -- name: ConsumeActiveSignupEmailTokenByHash :one
-update public.auth_signup_email_tokens
+update auth.auth_signup_email_tokens
 set auth_signup_email_consumed_at = now()
 where auth_signup_email_token_hash = sqlc.arg(auth_signup_email_token_hash)
   and auth_signup_email_consumed_at is null
@@ -39,7 +39,7 @@ select
     else 'active'
   end as token_status
 from
-  public.auth_signup_email_tokens
+  auth.auth_signup_email_tokens
 where
   auth_signup_email_token_hash = sqlc.arg(auth_signup_email_token_hash)
 order by

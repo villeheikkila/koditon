@@ -12,7 +12,7 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-insert into users (user_uuid, user_email)
+insert into auth.users (user_uuid, user_email)
   values (gen_random_uuid (), $1)
 returning
   user_uuid, user_id as user_id_bigint
@@ -35,8 +35,7 @@ select
   exists (
     select
       1
-    from
-      users
+    from auth.users
     where
       lower(btrim(user_email)) = lower(btrim($1))) as email_exists
 `
@@ -53,8 +52,7 @@ select
   exists (
     select
       1
-    from
-      users
+    from auth.users
     where
       user_id != $1
       and lower(btrim(user_email)) = lower(btrim($2))) as email_exists
@@ -76,8 +74,7 @@ const getUserByEmail = `-- name: GetUserByEmail :one
 select
   user_uuid,
   user_id as user_id_bigint
-from
-  users
+from auth.users
 where
   lower(btrim(user_email)) = lower(btrim($1))
 `
@@ -98,8 +95,7 @@ const getUserByID = `-- name: GetUserByID :one
 select
   user_uuid,
   user_id as user_id_bigint
-from
-  users
+from auth.users
 where
   user_uuid = $1
 `
@@ -119,8 +115,7 @@ func (q *Queries) GetUserByID(ctx context.Context, userUuid *uuid.UUID) (GetUser
 const getUserEmailByIDBigint = `-- name: GetUserEmailByIDBigint :one
 select
   user_email
-from
-  users
+from auth.users
 where
   user_id = $1
 `
@@ -135,8 +130,7 @@ func (q *Queries) GetUserEmailByIDBigint(ctx context.Context, userID *int64) (*s
 const getUserEmailByUUID = `-- name: GetUserEmailByUUID :one
 select
   user_email
-from
-  users
+from auth.users
 where
   user_uuid = $1
 `
@@ -149,8 +143,7 @@ func (q *Queries) GetUserEmailByUUID(ctx context.Context, userUuid *uuid.UUID) (
 }
 
 const updateUserEmailByIDBigint = `-- name: UpdateUserEmailByIDBigint :one
-update
-  users
+update auth.users
 set
   user_email = $1
 where
@@ -172,8 +165,7 @@ func (q *Queries) UpdateUserEmailByIDBigint(ctx context.Context, arg UpdateUserE
 }
 
 const updateUserEmailIfEmptyByIDBigint = `-- name: UpdateUserEmailIfEmptyByIDBigint :one
-update
-  users
+update auth.users
 set
   user_email = COALESCE($1::text, user_email)
 where

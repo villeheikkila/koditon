@@ -1,5 +1,5 @@
 -- name: CreateOAuthAuthorizationHandoff :one
-insert into oauth_authorization_handoffs (
+insert into auth.oauth_authorization_handoffs (
   oauth_authorization_handoff_token_hash,
   oauth_authorization_handoff_user_code,
   oauth_client_id,
@@ -62,7 +62,7 @@ select
   oauth_authorization_handoff_expires_at,
   oauth_authorization_handoff_created_at,
   oauth_authorization_handoff_updated_at
-from oauth_authorization_handoffs
+from auth.oauth_authorization_handoffs
 where oauth_authorization_handoff_id = sqlc.arg(oauth_authorization_handoff_id);
 
 -- name: GetOAuthAuthorizationHandoffByTokenHash :one
@@ -85,7 +85,7 @@ select
   oauth_authorization_handoff_expires_at,
   oauth_authorization_handoff_created_at,
   oauth_authorization_handoff_updated_at
-from oauth_authorization_handoffs
+from auth.oauth_authorization_handoffs
 where oauth_authorization_handoff_token_hash = sqlc.arg(oauth_authorization_handoff_token_hash);
 
 -- name: GetOAuthAuthorizationHandoffByUserCode :one
@@ -108,11 +108,11 @@ select
   oauth_authorization_handoff_expires_at,
   oauth_authorization_handoff_created_at,
   oauth_authorization_handoff_updated_at
-from oauth_authorization_handoffs
+from auth.oauth_authorization_handoffs
 where oauth_authorization_handoff_user_code = sqlc.arg(oauth_authorization_handoff_user_code);
 
 -- name: ApproveOAuthAuthorizationHandoffByID :one
-update oauth_authorization_handoffs
+update auth.oauth_authorization_handoffs
 set
   user_uuid = sqlc.arg(user_uuid),
   oauth_authorization_handoff_authorization_code = sqlc.arg(oauth_authorization_handoff_authorization_code),
@@ -144,7 +144,7 @@ returning
   oauth_authorization_handoff_updated_at;
 
 -- name: DenyOAuthAuthorizationHandoffByID :one
-update oauth_authorization_handoffs
+update auth.oauth_authorization_handoffs
 set
   oauth_authorization_handoff_denied_at = now(),
   oauth_authorization_handoff_updated_at = now()
@@ -174,7 +174,7 @@ returning
   oauth_authorization_handoff_updated_at;
 
 -- name: MarkOAuthAuthorizationHandoffCompletedByID :one
-update oauth_authorization_handoffs
+update auth.oauth_authorization_handoffs
 set
   oauth_authorization_handoff_completed_at = now(),
   oauth_authorization_handoff_updated_at = now()
