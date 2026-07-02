@@ -79,7 +79,15 @@ ORDER BY dirty_at
 LIMIT @limit_count::int4;
 
 -- name: MarkDimensionTargetQueued :one
-SELECT public.fnc__mark_dimension_target_queued(@target_type::text, @target_id::uuid);
+WITH queued AS (
+    UPDATE public.property_dimension_dirty_targets
+    SET queued_at = now()
+    WHERE target_type = @target_type::text
+        AND target_id = @target_id::uuid
+        AND (resolved_at IS NULL OR resolved_at < dirty_at)
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM queued;
 
 -- name: ListPricesMatchFanoutListings :many
 SELECT sale_listing_id::text AS sale_listing_id, COALESCE(sale_listing_prices_match_attempt_count, 0)::int4 AS attempt_count

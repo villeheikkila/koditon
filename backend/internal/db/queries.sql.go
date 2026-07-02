@@ -3965,7 +3965,55 @@ func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleLi
 }
 
 const markListingDimensionTargetsDirty = `-- name: MarkListingDimensionTargetsDirty :one
-SELECT public.fnc__mark_listing_dimension_targets_dirty($1::uuid, $2::text)::integer
+WITH linked AS (
+    SELECT
+        po.property_offering_id,
+        po.property_unit_id,
+        po.property_house_id,
+        pu.physical_building_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = $1::uuid
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    LIMIT 1
+), targets AS (
+    SELECT 'listing'::text AS target_type, $1::uuid AS target_id
+    UNION ALL SELECT 'offering', property_offering_id FROM linked WHERE property_offering_id IS NOT NULL
+    UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
+    UNION ALL SELECT 'house', property_house_id FROM linked WHERE property_house_id IS NOT NULL
+    UNION ALL SELECT 'building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
+    UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL
+), marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (
+        target_type,
+        target_id,
+        dirty_reasons,
+        dirty_at,
+        resolved_at
+    )
+    SELECT
+        target_type,
+        target_id,
+        ARRAY[COALESCE(NULLIF($2::text, ''), 'changed')],
+        now(),
+        NULL::timestamptz
+    FROM targets
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT reason ORDER BY reason)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS reason
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM marked
 `
 
 type MarkListingDimensionTargetsDirtyParams struct {
@@ -3973,15 +4021,74 @@ type MarkListingDimensionTargetsDirtyParams struct {
 	Reason        string    `json:"reason"`
 }
 
-func (q *Queries) MarkListingDimensionTargetsDirty(ctx context.Context, arg MarkListingDimensionTargetsDirtyParams) (int32, error) {
+func (q *Queries) MarkListingDimensionTargetsDirty(ctx context.Context, arg MarkListingDimensionTargetsDirtyParams) (*int32, error) {
 	row := q.db.QueryRow(ctx, markListingDimensionTargetsDirty, arg.SaleListingID, arg.Reason)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
+	var count *int32
+	err := row.Scan(&count)
+	return count, err
 }
 
 const markPropertyOfferingDimensionTargetsDirty = `-- name: MarkPropertyOfferingDimensionTargetsDirty :one
-SELECT public.fnc__mark_property_offering_dimension_targets_dirty($1::uuid, $2::text)::integer AS count
+WITH targets AS (
+    SELECT 'offering'::text AS target_type, po.property_offering_id AS target_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = $1::uuid
+    UNION
+    SELECT 'unit', po.property_unit_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = $1::uuid
+        AND po.property_unit_id IS NOT NULL
+    UNION
+    SELECT 'house', po.property_house_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = $1::uuid
+        AND po.property_house_id IS NOT NULL
+    UNION
+    SELECT 'building', pu.physical_building_id
+    FROM public.property_offerings po
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE po.property_offering_id = $1::uuid
+        AND pu.physical_building_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', COALESCE(pu.housing_company_id, pb.housing_company_id)
+    FROM public.property_offerings po
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE po.property_offering_id = $1::uuid
+        AND COALESCE(pu.housing_company_id, pb.housing_company_id) IS NOT NULL
+    UNION
+    SELECT 'listing', source_link.source_id
+    FROM public.target_sources source_link
+    WHERE source_link.target_type = 'listing'
+        AND source_link.target_id = $1::uuid
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+), marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (
+        target_type,
+        target_id,
+        dirty_reasons,
+        dirty_at,
+        resolved_at
+    )
+    SELECT
+        target_type,
+        target_id,
+        ARRAY[COALESCE(NULLIF($2::text, ''), 'changed')],
+        now(),
+        NULL::timestamptz
+    FROM targets
+    WHERE target_id IS NOT NULL
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT reason ORDER BY reason)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS reason
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM marked
 `
 
 type MarkPropertyOfferingDimensionTargetsDirtyParams struct {
@@ -3989,9 +4096,9 @@ type MarkPropertyOfferingDimensionTargetsDirtyParams struct {
 	Reason             string    `json:"reason"`
 }
 
-func (q *Queries) MarkPropertyOfferingDimensionTargetsDirty(ctx context.Context, arg MarkPropertyOfferingDimensionTargetsDirtyParams) (int32, error) {
+func (q *Queries) MarkPropertyOfferingDimensionTargetsDirty(ctx context.Context, arg MarkPropertyOfferingDimensionTargetsDirtyParams) (*int32, error) {
 	row := q.db.QueryRow(ctx, markPropertyOfferingDimensionTargetsDirty, arg.PropertyOfferingID, arg.Reason)
-	var count int32
+	var count *int32
 	err := row.Scan(&count)
 	return count, err
 }

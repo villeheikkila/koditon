@@ -335,7 +335,15 @@ func (q *Queries) LoadPricesMatchSaleListing(ctx context.Context, saleListingID 
 }
 
 const markDimensionTargetQueued = `-- name: MarkDimensionTargetQueued :one
-SELECT public.fnc__mark_dimension_target_queued($1::text, $2::uuid)
+WITH queued AS (
+    UPDATE public.property_dimension_dirty_targets
+    SET queued_at = now()
+    WHERE target_type = $1::text
+        AND target_id = $2::uuid
+        AND (resolved_at IS NULL OR resolved_at < dirty_at)
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM queued
 `
 
 type MarkDimensionTargetQueuedParams struct {
@@ -345,9 +353,9 @@ type MarkDimensionTargetQueuedParams struct {
 
 func (q *Queries) MarkDimensionTargetQueued(ctx context.Context, arg MarkDimensionTargetQueuedParams) (*int32, error) {
 	row := q.db.QueryRow(ctx, markDimensionTargetQueued, arg.TargetType, arg.TargetID)
-	var fnc__mark_dimension_target_queued *int32
-	err := row.Scan(&fnc__mark_dimension_target_queued)
-	return fnc__mark_dimension_target_queued, err
+	var count *int32
+	err := row.Scan(&count)
+	return count, err
 }
 
 const runCanonicalSourceMatchBackfill = `-- name: RunCanonicalSourceMatchBackfill :one

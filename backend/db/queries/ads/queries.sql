@@ -1009,7 +1009,66 @@ ON CONFLICT (
     evidence = EXCLUDED.evidence;
 
 -- name: MarkPropertyOfferingDimensionTargetsDirty :one
-SELECT public.fnc__mark_property_offering_dimension_targets_dirty(sqlc.arg(property_offering_id)::uuid, sqlc.arg(reason)::text)::integer AS count;
+WITH targets AS (
+    SELECT 'offering'::text AS target_type, po.property_offering_id AS target_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
+    UNION
+    SELECT 'unit', po.property_unit_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
+        AND po.property_unit_id IS NOT NULL
+    UNION
+    SELECT 'house', po.property_house_id
+    FROM public.property_offerings po
+    WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
+        AND po.property_house_id IS NOT NULL
+    UNION
+    SELECT 'building', pu.physical_building_id
+    FROM public.property_offerings po
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
+        AND pu.physical_building_id IS NOT NULL
+    UNION
+    SELECT 'housing_company', COALESCE(pu.housing_company_id, pb.housing_company_id)
+    FROM public.property_offerings po
+    JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
+        AND COALESCE(pu.housing_company_id, pb.housing_company_id) IS NOT NULL
+    UNION
+    SELECT 'listing', source_link.source_id
+    FROM public.target_sources source_link
+    WHERE source_link.target_type = 'listing'
+        AND source_link.target_id = sqlc.arg(property_offering_id)::uuid
+        AND source_link.source_type = 'source_listing'
+        AND source_link.link_status <> 'rejected'
+), marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (
+        target_type,
+        target_id,
+        dirty_reasons,
+        dirty_at,
+        resolved_at
+    )
+    SELECT
+        target_type,
+        target_id,
+        ARRAY[COALESCE(NULLIF(sqlc.arg(reason)::text, ''), 'changed')],
+        now(),
+        NULL::timestamptz
+    FROM targets
+    WHERE target_id IS NOT NULL
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT reason ORDER BY reason)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS reason
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM marked;
 
 -- name: RebuildListingDimensionLayer :one
 SELECT public.fnc__rebuild_listing_dimension_layer(@sale_listing_id::uuid, NULL::timestamptz)::jsonb AS payload;
@@ -1030,7 +1089,55 @@ SELECT public.fnc__project_dimension_profile_for_target(sqlc.arg(target_type)::t
 SELECT public.fnc__resolve_dimension_target(sqlc.arg(target_type)::text, sqlc.arg(target_id)::uuid, sqlc.narg(expected_dirty_at)::timestamptz)::jsonb AS payload;
 
 -- name: MarkListingDimensionTargetsDirty :one
-SELECT public.fnc__mark_listing_dimension_targets_dirty(sqlc.arg(sale_listing_id)::uuid, sqlc.arg(reason)::text)::integer;
+WITH linked AS (
+    SELECT
+        po.property_offering_id,
+        po.property_unit_id,
+        po.property_house_id,
+        pu.physical_building_id,
+        COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
+    FROM public.target_sources source_link
+    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
+    LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
+    WHERE source_link.target_type = 'listing'
+        AND source_link.source_type = 'source_listing'
+        AND source_link.source_id = sqlc.arg(sale_listing_id)::uuid
+        AND source_link.link_status <> 'rejected'
+    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    LIMIT 1
+), targets AS (
+    SELECT 'listing'::text AS target_type, sqlc.arg(sale_listing_id)::uuid AS target_id
+    UNION ALL SELECT 'offering', property_offering_id FROM linked WHERE property_offering_id IS NOT NULL
+    UNION ALL SELECT 'unit', property_unit_id FROM linked WHERE property_unit_id IS NOT NULL
+    UNION ALL SELECT 'house', property_house_id FROM linked WHERE property_house_id IS NOT NULL
+    UNION ALL SELECT 'building', physical_building_id FROM linked WHERE physical_building_id IS NOT NULL
+    UNION ALL SELECT 'housing_company', housing_company_id FROM linked WHERE housing_company_id IS NOT NULL
+), marked AS (
+    INSERT INTO public.property_dimension_dirty_targets (
+        target_type,
+        target_id,
+        dirty_reasons,
+        dirty_at,
+        resolved_at
+    )
+    SELECT
+        target_type,
+        target_id,
+        ARRAY[COALESCE(NULLIF(sqlc.arg(reason)::text, ''), 'changed')],
+        now(),
+        NULL::timestamptz
+    FROM targets
+    ON CONFLICT (target_type, target_id) DO UPDATE SET
+        dirty_reasons = (
+            SELECT array_agg(DISTINCT reason ORDER BY reason)
+            FROM unnest(property_dimension_dirty_targets.dirty_reasons || EXCLUDED.dirty_reasons) AS reason
+        ),
+        dirty_at = now(),
+        resolved_at = NULL
+    RETURNING 1
+)
+SELECT count(*)::integer AS count FROM marked;
 
 -- name: EnsurePhysicalBuildingForSaleListing :exec
 WITH linked AS (
