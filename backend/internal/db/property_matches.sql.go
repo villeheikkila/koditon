@@ -136,7 +136,7 @@ SELECT
     COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS listing_postal,
     COALESCE(sl.sale_listing_room_layout, '') AS listing_room_layout,
     COALESCE(sl.sale_listing_condition, '') AS listing_condition,
-    COALESCE(public.fnc__condition_match_code(sl.sale_listing_condition), '')::text AS listing_condition_match_code,
+    COALESCE((SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(sl.sale_listing_condition, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input), '')::text AS listing_condition_match_code,
     sl.sale_listing_area_value,
     sl.sale_listing_asking_price,
     sl.sale_listing_price_per_m2,
@@ -161,11 +161,11 @@ SELECT
     COALESCE(pt.prices_transaction_floor, '') AS transaction_floor,
     pt.prices_transaction_elevator,
     COALESCE(pt.prices_transaction_condition, '') AS transaction_condition,
-    COALESCE(public.fnc__condition_match_code(pt.prices_transaction_condition), '')::text AS transaction_condition_match_code,
+    COALESCE((SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(pt.prices_transaction_condition, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input), '')::text AS transaction_condition_match_code,
     COALESCE(pt.prices_transaction_plot, '') AS transaction_plot,
     pt.prices_transaction_plot_owned,
     COALESCE(pt.prices_transaction_energy_class, '') AS transaction_energy_class,
-    COALESCE(public.fnc__prices_transaction_energy_match_code(pt.prices_transaction_energy_class), '')::text AS transaction_energy_match_code,
+    COALESCE((SELECT COALESCE(mapped.energy_efficiency_match_code, CASE WHEN derived.class_code IS NULL THEN NULL WHEN COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year) IS NULL THEN derived.class_code ELSE derived.class_code || COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year)::text END) FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(pt.prices_transaction_energy_class, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input LEFT JOIN LATERAL (SELECT a.energy_efficiency_class_code, a.energy_efficiency_standard_year, a.energy_efficiency_status, a.energy_efficiency_match_code FROM origin.energy_efficiency_aliases a WHERE a.energy_efficiency_alias = normalized_input.alias_key LIMIT 1) mapped ON true CROSS JOIN LATERAL (SELECT regexp_match(normalized_input.alias_key, '^e([0-9]{2})_([a-h])$') AS provider_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_?((?:19|20|21)[0-9]{2})($|_)') AS label_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_energialuokkaan_((?:19|20|21)[0-9]{2})($|_)') AS energy_label_year_parts, regexp_match(normalized_input.alias_key, '(^|_)energialuokka_([a-h])($|_)') AS energy_label_class_parts, regexp_match(normalized_input.alias_key, '^([a-h])_energiatodistus') AS leading_certificate_parts, regexp_match(normalized_input.alias_key, '^([a-h])$') AS class_only_parts) matches CROSS JOIN LATERAL (SELECT CASE WHEN matches.provider_parts IS NOT NULL THEN upper(matches.provider_parts[2]) WHEN matches.label_parts IS NOT NULL THEN upper(matches.label_parts[2]) WHEN matches.energy_label_year_parts IS NOT NULL THEN upper(matches.energy_label_year_parts[2]) WHEN matches.energy_label_class_parts IS NOT NULL THEN upper(matches.energy_label_class_parts[2]) WHEN matches.leading_certificate_parts IS NOT NULL THEN upper(matches.leading_certificate_parts[1]) WHEN matches.class_only_parts IS NOT NULL THEN upper(matches.class_only_parts[1]) ELSE NULL END AS class_code, CASE WHEN matches.provider_parts IS NULL THEN NULL WHEN matches.provider_parts[1]::integer < 50 THEN 2000 + matches.provider_parts[1]::integer ELSE 1900 + matches.provider_parts[1]::integer END AS provider_year, CASE WHEN matches.label_parts IS NOT NULL THEN matches.label_parts[3]::integer ELSE NULL END AS label_year, CASE WHEN matches.energy_label_year_parts IS NOT NULL THEN matches.energy_label_year_parts[3]::integer ELSE NULL END AS energy_label_year) derived), '')::text AS transaction_energy_match_code,
     COALESCE(pt.prices_transaction_period_identifier, '') AS transaction_period_identifier,
     COALESCE(pt.prices_transaction_created_at::text, '')::text AS transaction_created_at
 FROM review_rows latest
@@ -188,7 +188,7 @@ WHERE ($1::uuid IS NOT NULL OR latest.status = ANY(ARRAY['candidate'::text, 'amb
                 AND source_link.link_status <> 'rejected'
         )
     )
-    AND ($2::text IS NULL OR sl.sale_listing_postal_norm = public.fnc__normalize_postal($2::text))
+    AND ($2::text IS NULL OR sl.sale_listing_postal_norm = NULLIF(regexp_replace(trim(COALESCE($2::text, '')), '[^0-9]+', '', 'g'), ''))
     AND ($3::text IS NULL OR latest.status = $3::text)
     AND ($1::uuid IS NULL OR pt.prices_transaction_id = $1::uuid)
     AND ($1::uuid IS NOT NULL OR NOT EXISTS (

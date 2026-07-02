@@ -150,15 +150,21 @@ LIMIT sqlc.arg('limit_count')::int
 OFFSET sqlc.arg('offset_count')::int;
 
 -- name: LookupAddressListings :many
-WITH lookup_input AS (
+WITH lookup_input_raw AS (
     SELECT
-        public.fnc__normalize_address_token($1::text) AS address_norm,
-        translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') AS address_ascii_norm,
-        substring(public.fnc__normalize_address_token($1::text) from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_norm,
-        substring(translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_ascii_norm,
-        substring(public.fnc__normalize_address_token($1::text) from '\s([0-9]+)(\s*[[:alpha:]])?\s*$') AS street_number_norm,
-        substring(translate(public.fnc__normalize_address_token($1::text), 'åäö', 'aao') from '\s[0-9]+\s*([[:alpha:]])\s*$') AS building_letter_ascii_norm,
-        public.fnc__normalize_postal($3::text) AS postal_norm
+        NULLIF(trim(regexp_replace(lower(regexp_replace(trim($1::text), '[^[:alnum:]åäöÅÄÖ]+', ' ', 'g')), '\s+', ' ', 'g')), '') AS address_norm,
+        NULLIF(regexp_replace(trim(COALESCE($3::text, '')), '[^0-9]+', '', 'g'), '') AS postal_norm
+),
+lookup_input AS (
+    SELECT
+        address_norm,
+        translate(address_norm, 'åäö', 'aao') AS address_ascii_norm,
+        substring(address_norm from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_norm,
+        substring(translate(address_norm, 'åäö', 'aao') from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_ascii_norm,
+        substring(address_norm from '\s([0-9]+)(\s*[[:alpha:]])?\s*$') AS street_number_norm,
+        substring(translate(address_norm, 'åäö', 'aao') from '\s[0-9]+\s*([[:alpha:]])\s*$') AS building_letter_ascii_norm,
+        postal_norm
+    FROM lookup_input_raw
 ),
 selected_listing_matches AS (
     SELECT
@@ -173,7 +179,7 @@ selected_listing_matches AS (
     WHERE ($4::text = 'all' OR sl.sale_listing_source_provider = $4::text)
         AND sl.sale_listing_source_kind = ANY(ARRAY['ad'::text, 'announcement'::text])
         AND trim($3::text) <> ''
-        AND COALESCE(sl.sale_listing_postal_norm, public.fnc__normalize_postal(sl.sale_listing_postal)) = li.postal_norm
+        AND COALESCE(sl.sale_listing_postal_norm, NULLIF(regexp_replace(trim(COALESCE(sl.sale_listing_postal, '')), '[^0-9]+', '', 'g'), '')) = li.postal_norm
         AND (
             sl.sale_listing_address_norm = li.address_norm
             OR translate(sl.sale_listing_address_norm, 'åäö', 'aao') = li.address_ascii_norm
@@ -893,7 +899,7 @@ LEFT JOIN origin.postal_municipalities pm_scraped ON pm_scraped.postal_municipal
 LEFT JOIN origin.postal_postal_codes ppc ON ppc.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 LEFT JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
 WHERE (trim($1::text) = '' OR lower(COALESCE(pc.prices_city_name, pm_scraped.postal_municipality_name_fi, pm.postal_municipality_name_fi, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
-    AND (trim($2::text) = '' OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code, '') = public.fnc__normalize_postal($2::text))
+    AND (trim($2::text) = '' OR COALESCE(ppc_scraped.postal_postal_code_code, ppc.postal_postal_code_code, ppc_prices.prices_postal_code_code, '') = NULLIF(regexp_replace(trim(COALESCE($2::text, '')), '[^0-9]+', '', 'g'), ''))
 )
 SELECT
     transaction_id,
@@ -930,6 +936,6 @@ SELECT COALESCE(pm.postal_municipality_name_fi, '')::text AS city_fi,
     COALESCE(pm.postal_municipality_name_sv, '')::text AS city_sv
 FROM origin.postal_postal_codes ppc
 JOIN origin.postal_municipalities pm ON pm.postal_municipality_id = ppc.postal_municipality_id
-WHERE ppc.postal_postal_code_code = public.fnc__normalize_postal(sqlc.arg('postal')::text)
+WHERE ppc.postal_postal_code_code = NULLIF(regexp_replace(trim(COALESCE(sqlc.arg('postal')::text, '')), '[^0-9]+', '', 'g'), '')
 ORDER BY pm.postal_municipality_name_fi
 LIMIT 1;

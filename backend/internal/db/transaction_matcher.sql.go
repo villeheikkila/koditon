@@ -218,7 +218,7 @@ LEFT JOIN origin.prices_postal_codes ppc ON ppc.prices_postal_code_id = pn.price
 LEFT JOIN origin.postal_postal_codes postal ON postal.postal_postal_code_id = pn.prices_neighborhood_postal_postal_code_id
 WHERE sl.sale_listing_source_kind = 'ad'
     AND ($1::uuid IS NULL OR sl.sale_listing_id = $1::uuid)
-    AND sl.sale_listing_postal_norm = public.fnc__normalize_postal(COALESCE(ppc.prices_postal_code_code, postal.postal_postal_code_code))
+    AND sl.sale_listing_postal_norm = NULLIF(regexp_replace(trim(COALESCE(COALESCE(ppc.prices_postal_code_code, postal.postal_postal_code_code), '')), '[^0-9]+', '', 'g'), '')
     AND sl.sale_listing_area_value IS NOT NULL
     AND sl.sale_listing_area_value = pt.prices_transaction_area
     AND NOT EXISTS (
