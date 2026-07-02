@@ -1,2 +1,0 @@
-CREATE SCHEMA IF NOT EXISTS tern;
-ALTER TABLE IF EXISTS public.schema_migrations SET SCHEMA tern;
