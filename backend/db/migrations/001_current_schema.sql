@@ -3013,19 +3013,6 @@ $$;
 
 
 --
--- Name: fnc__derived_price_per_m2(bigint, double precision, double precision); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.fnc__derived_price_per_m2(price bigint, area double precision, existing double precision) RETURNS double precision
-    LANGUAGE sql IMMUTABLE
-    AS $$
-    SELECT COALESCE(existing, CASE WHEN price IS NOT NULL AND area IS NOT NULL AND area > 0 THEN price::double precision / area ELSE NULL END)
-$$;
-
-
-
-
---
 -- Name: fnc__energy_efficiency_match_code(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
