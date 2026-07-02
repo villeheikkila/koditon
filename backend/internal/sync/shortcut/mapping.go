@@ -47,20 +47,20 @@ func mapUpsertAdParams(adID int64, url string, adType string, data []byte, schem
 		return db.UpsertShortcutAdParams{}, fmt.Errorf("hash shortcut ad payload: %w", err)
 	}
 	return db.UpsertShortcutAdParams{
-		ShortcutAdID:                ptr(adID),
-		ShortcutAdUrl:               ptr(url),
-		ShortcutAdType:              ptr(adType),
+		ShortcutAdID:                new(adID),
+		ShortcutAdUrl:               new(url),
+		ShortcutAdType:              new(adType),
 		ShortcutAdData:              canonical,
 		ShortcutAdDataHash:          &hash,
 		ShortcutAdDataHashAlgorithm: ptr(sourcejson.HashAlgorithmSHA256),
-		ShortcutAdDataSchemaVersion: ptr(schemaVersion),
+		ShortcutAdDataSchemaVersion: new(schemaVersion),
 		ShortcutBuildingID:          shortcutBuildingID,
 	}, nil
 }
 
 func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *client.ScrapedBuilding) db.UpsertShortcutBuildingParams {
 	return db.UpsertShortcutBuildingParams{
-		ShortcutBuildingExternalID:              ptr(shortcutBuildingID),
+		ShortcutBuildingExternalID:              new(shortcutBuildingID),
 		ShortcutBuildingBuildingID:              scraped.BuildingID,
 		ShortcutBuildingBuildingType:            scraped.BuildingType,
 		ShortcutBuildingBuildingSubtype:         scraped.BuildingSubtype,
@@ -77,7 +77,7 @@ func mapScrapedBuildingParams(shortcutBuildingID int64, url string, scraped *cli
 		ShortcutBuildingLatitude:                scraped.Latitude,
 		ShortcutBuildingLongitude:               scraped.Longitude,
 		ShortcutBuildingAdditionalAddresses:     scraped.AdditionalAddresses,
-		ShortcutBuildingUrl:                     ptr(url),
+		ShortcutBuildingUrl:                     new(url),
 		ShortcutBuildingAddress:                 &scraped.Address,
 		ShortcutBuildingFrameConstructionMethod: scraped.FrameConstructionMethod,
 		ShortcutBuildingHousingCompany:          scraped.HousingCompany,
@@ -107,6 +107,7 @@ func mapRentalParams(buildingID uuid.UUID, rental *client.RentalListing) db.Upse
 	}
 }
 
+//go:fix inline
 func ptr[T any](value T) *T {
-	return &value
+	return new(value)
 }

@@ -26,19 +26,19 @@ func BuildInput(listing SaleListing) ValuationInputs {
 		}
 	}
 	if input.Floor.FloorLevel != nil {
-		input.Floor.GroundFloor = boolPtrFromValue(*input.Floor.FloorLevel <= 1)
-		input.Floor.HighFloor = boolPtrFromValue(*input.Floor.FloorLevel >= 4)
+		input.Floor.GroundFloor = new(*input.Floor.FloorLevel <= 1)
+		input.Floor.HighFloor = new(*input.Floor.FloorLevel >= 4)
 	}
 	if input.Floor.FloorLevel != nil && input.Floor.TotalFloors != nil {
-		input.Floor.TopFloor = boolPtrFromValue(*input.Floor.FloorLevel == *input.Floor.TotalFloors)
+		input.Floor.TopFloor = new(*input.Floor.FloorLevel == *input.Floor.TotalFloors)
 	}
 	input.Layout.KitchenType = inferKitchenType(listing.Unit.RoomLayout + " " + listing.Unit.KitchenDescription)
 	if input.Layout.KitchenType != "" {
-		input.Layout.SeparateKitchen = boolPtrFromValue(input.Layout.KitchenType == "separate")
-		input.Layout.OpenKitchen = boolPtrFromValue(input.Layout.KitchenType == "open")
+		input.Layout.SeparateKitchen = new(input.Layout.KitchenType == "separate")
+		input.Layout.OpenKitchen = new(input.Layout.KitchenType == "open")
 	}
 	if strings.Contains(strings.ToLower(listing.Unit.RoomLayout), "alk") {
-		input.Layout.Alcove = boolPtrFromValue(true)
+		input.Layout.Alcove = new(true)
 	}
 	input = applyInputFacts(input)
 	input.Floor.ElevatorRelevance = elevatorRelevance(input.Floor)
@@ -369,8 +369,9 @@ func inferKitchenType(value string) string {
 	}
 }
 
+//go:fix inline
 func boolPtrFromValue(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 func attachRenovationForecast(input ValuationInputs, forecast []ApartmentRenovationNeed) ValuationInputs {

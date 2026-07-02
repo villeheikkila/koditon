@@ -84,7 +84,7 @@ func (s *Service) extractSourceListingDescriptionInsights(ctx context.Context, s
 	if err != nil {
 		return DescriptionExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[descriptionExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
+	objectResult, err := fantasyobject.Generate[descriptionExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: new(operation.MaxOutputTokens)})
 	if err != nil {
 		return DescriptionExtractionResult{}, fmt.Errorf("extract description insights with fantasy: %w", err)
 	}

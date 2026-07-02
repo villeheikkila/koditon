@@ -187,6 +187,7 @@ func mapAnnouncementParams(ann frontdoorpayload.Announcement, buildingID uuid.UU
 	}
 }
 
+//go:fix inline
 func ptr[T any](value T) *T {
-	return &value
+	return new(value)
 }

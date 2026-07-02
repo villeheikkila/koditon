@@ -134,7 +134,7 @@ func mcpCrossOriginProtection(cfg config.Config) *http.CrossOriginProtection {
 	for _, origin := range allowedCORSOrigins {
 		_ = protection.AddTrustedOrigin(origin)
 	}
-	for _, origin := range strings.Split(cfg.CORSAllowedOrigins, ",") {
+	for origin := range strings.SplitSeq(cfg.CORSAllowedOrigins, ",") {
 		if trimmed := strings.TrimSpace(origin); trimmed != "" {
 			_ = protection.AddTrustedOrigin(trimmed)
 		}

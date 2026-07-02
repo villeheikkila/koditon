@@ -173,7 +173,7 @@ func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPas
 	}
 	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
 		AuthWebauthnChallengeUuid: &req.ChallengeID,
-		AuthWebauthnChallengeFlow: ptr(passkeyFlowAuthenticate),
+		AuthWebauthnChallengeFlow: new(passkeyFlowAuthenticate),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -221,7 +221,7 @@ func (s *Service) FinishPasskeyAuthentication(ctx context.Context, req FinishPas
 	qtx := s.queries.WithTx(tx)
 
 	if err := qtx.UpdatePasskeyUsage(ctx, db.UpdatePasskeyUsageParams{
-		UserPasskeySignCount:    ptr(int64(parsedCredential.Authenticator.SignCount)),
+		UserPasskeySignCount:    new(int64(parsedCredential.Authenticator.SignCount)),
 		UserPasskeyCredentialID: resolvedPasskey.UserPasskeyCredentialID,
 		UserPasskeyBackupState:  boolPtr(parsedCredential.Flags.BackupState),
 	}); err != nil {
@@ -316,7 +316,7 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 	}
 	challenge, err := s.queries.ConsumeWebauthnChallenge(ctx, db.ConsumeWebauthnChallengeParams{
 		AuthWebauthnChallengeUuid: &req.ChallengeID,
-		AuthWebauthnChallengeFlow: ptr(passkeyFlowRegister),
+		AuthWebauthnChallengeFlow: new(passkeyFlowRegister),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -379,10 +379,10 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 	})
 	identity, err := qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 		UserUuid:                  &req.UserID,
-		UserIdentityProvider:      ptr(string(provider)),
+		UserIdentityProvider:      new(string(provider)),
 		UserIdentityExternalID:    &credentialID,
 		UserIdentityEmail:         userEmail,
-		UserIdentityEmailVerified: ptr(userEmail != nil),
+		UserIdentityEmailVerified: new(userEmail != nil),
 		UserIdentityData:          identityData,
 	})
 	if err != nil {
@@ -398,7 +398,7 @@ func (s *Service) FinishPasskeyRegistration(ctx context.Context, req FinishPassk
 		UserPasskeyAttestationType:    &credential.AttestationType,
 		UserPasskeyTransports:         credentialTransports(credential.Transport),
 		UserPasskeyUserHandle:         challenge.AuthWebauthnChallengeUserHandle,
-		UserPasskeySignCount:          ptr(int64(credential.Authenticator.SignCount)),
+		UserPasskeySignCount:          new(int64(credential.Authenticator.SignCount)),
 		UserPasskeyFlags:              int32Ptr(int32(credential.Flags.ProtocolValue())),
 		UserPasskeyAaguid:             uuidPtrFromBytes(credential.Authenticator.AAGUID),
 		UserPasskeyName:               &label,

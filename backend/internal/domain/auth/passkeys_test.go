@@ -559,7 +559,7 @@ func createPasskeyAuthFixture(
 		UserPasskeyUserHandle:         []byte("user-handle-a"),
 		UserPasskeySignCount:          &signCount,
 		UserPasskeyFlags:              &flags,
-		UserPasskeyAaguid:             uuidPtr(uuid.MustParse("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")),
+		UserPasskeyAaguid:             new(uuid.MustParse("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")),
 		UserPasskeyName:               &name,
 		UserPasskeyBackupEligible:     &backupEligible,
 		UserPasskeyBackupState:        &backupState,
@@ -608,6 +608,7 @@ func createPasskeyChallenge(
 	return challenge.AuthWebauthnChallengeUuid
 }
 
+//go:fix inline
 func uuidPtr(value uuid.UUID) *uuid.UUID {
-	return &value
+	return new(value)
 }

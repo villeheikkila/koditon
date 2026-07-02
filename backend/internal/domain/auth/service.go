@@ -219,7 +219,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 	logger.DebugContext(ctx, "looking up existing identity", "provider", "apple", "external_id", identity.Subject)
 	provider := AuthProviderApple
 	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   ptr(string(provider)),
+		UserIdentityProvider:   new(string(provider)),
 		UserIdentityExternalID: &identity.Subject,
 	})
 	var userID uuid.UUID
@@ -241,7 +241,7 @@ func (s *Service) SignInWithApple(ctx context.Context, req SignInWithAppleReques
 		appleProvider := AuthProviderApple
 		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 			UserUuid:                  &userID,
-			UserIdentityProvider:      ptr(string(appleProvider)),
+			UserIdentityProvider:      new(string(appleProvider)),
 			UserIdentityExternalID:    &identity.Subject,
 			UserIdentityEmail:         email,
 			UserIdentityEmailVerified: &emailVerified,
@@ -360,7 +360,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 	})
 	provider := AuthProviderApple
 	existingIdentity, err := qtx.GetIdentityByProviderAndExternalID(ctx, db.GetIdentityByProviderAndExternalIDParams{
-		UserIdentityProvider:   ptr(string(provider)),
+		UserIdentityProvider:   new(string(provider)),
 		UserIdentityExternalID: &identity.Subject,
 	})
 	var userID uuid.UUID
@@ -378,7 +378,7 @@ func (s *Service) SignInWithAppleWeb(ctx context.Context, req SignInWithAppleWeb
 		appleProvider := AuthProviderApple
 		_, err = qtx.CreateIdentity(ctx, db.CreateIdentityParams{
 			UserUuid:                  &userID,
-			UserIdentityProvider:      ptr(string(appleProvider)),
+			UserIdentityProvider:      new(string(appleProvider)),
 			UserIdentityExternalID:    &identity.Subject,
 			UserIdentityEmail:         email,
 			UserIdentityEmailVerified: &emailVerified,

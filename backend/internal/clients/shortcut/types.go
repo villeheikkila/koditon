@@ -28,8 +28,8 @@ func (l LocationResponse) LocationString() string {
 }
 
 type Coordinates struct {
-	Latitude  FloatOrString `json:"latitude,omitempty"`
-	Longitude FloatOrString `json:"longitude,omitempty"`
+	Latitude  FloatOrString `json:"latitude"`
+	Longitude FloatOrString `json:"longitude"`
 }
 
 type BuildingData struct {

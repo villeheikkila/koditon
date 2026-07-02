@@ -290,16 +290,19 @@ func boolPtrValue(value *bool) bool {
 	return value != nil && *value
 }
 
+//go:fix inline
 func ptrBool(value bool) *bool {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func ptrFloat64(value float64) *float64 {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func ptrInt64(value int64) *int64 {
-	return &value
+	return new(value)
 }
 
 func ptrInt32Value(value *int32) int32 {
@@ -430,8 +433,8 @@ func normalizeFrontdoorImageTemplate(uri string) string {
 	if strings.HasPrefix(trimmed, "//") {
 		return "https:" + trimmed
 	}
-	if strings.HasPrefix(trimmed, "http://") {
-		return "https://" + strings.TrimPrefix(trimmed, "http://")
+	if after, ok := strings.CutPrefix(trimmed, "http://"); ok {
+		return "https://" + after
 	}
 	return trimmed
 }
@@ -487,8 +490,9 @@ func int32FromAny(value any) *int32 {
 	}
 }
 
+//go:fix inline
 func ptrInt32(value int32) *int32 {
-	return &value
+	return new(value)
 }
 
 func stringSliceValue(value any) []string {

@@ -76,7 +76,7 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if err != nil {
 		return ValuationInputExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[valuationInputExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
+	objectResult, err := fantasyobject.Generate[valuationInputExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: new(operation.MaxOutputTokens)})
 	if err != nil {
 		return ValuationInputExtractionResult{}, fmt.Errorf("extract valuation inputs with fantasy: %w", err)
 	}

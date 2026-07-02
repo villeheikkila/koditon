@@ -56,9 +56,9 @@ func namedSQLSection(t *testing.T, sql string, name string) string {
 		t.Fatalf("missing sqlc query %s", name)
 	}
 	rest := sql[start+len(startMarker):]
-	end := strings.Index(rest, "\n-- name: ")
-	if end == -1 {
+	before, _, ok := strings.Cut(rest, "\n-- name: ")
+	if !ok {
 		return rest
 	}
-	return rest[:end]
+	return before
 }

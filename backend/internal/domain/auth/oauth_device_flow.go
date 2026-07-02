@@ -415,7 +415,7 @@ func (s *Service) CreateOAuthAuthorizationCodeFromApprovedDevice(ctx context.Con
 		OauthAuthorizationCodeAudience:            &audience,
 		OauthAuthorizationCodeCodeChallenge:       &codeChallenge,
 		OauthAuthorizationCodeCodeChallengeMethod: &codeChallengeMethod,
-		OauthAuthorizationCodeExpiresAt:           ptr(time.Now().Add(OAuthAuthorizationCodeTTL)),
+		OauthAuthorizationCodeExpiresAt:           new(time.Now().Add(OAuthAuthorizationCodeTTL)),
 	}); err != nil {
 		return "", fmt.Errorf("persist oauth authorization code: %w", err)
 	}

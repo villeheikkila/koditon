@@ -344,7 +344,6 @@ func (c *Consumer) resolveDimensionTarget(ctx context.Context, targetType string
 	return json.Marshal(map[string]int32{"values": int32Value(values), "profiles": int32Value(profiles), "cleared_dirty_targets": int32Value(cleared)})
 }
 
-
 func (c *Consumer) enqueueDimensionLayerListing(ctx context.Context, saleListingID uuid.UUID, reason string, expectedDirtyAt *time.Time) error {
 	payload, err := json.Marshal(dimensionLayerListingPayload{SaleListingID: saleListingID.String(), Reason: reason, ExpectedDirtyAt: expectedDirtyAt})
 	if err != nil {

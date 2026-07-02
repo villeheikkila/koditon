@@ -19,12 +19,12 @@ type PropertyQueryInput struct {
 	PropertyTypes  []string               `json:"property_types,omitempty" jsonschema:"Portal property type filters such as apartment, house, row_house, plot, or commercial."`
 	ListingTypes   []string               `json:"listing_types,omitempty" jsonschema:"Listing type filters such as listing, rental, sale, or all."`
 	OwnershipTypes []string               `json:"ownership_types,omitempty" jsonschema:"Ownership filters such as own, rental, right_of_occupancy, or shared_plot."`
-	Price          PropertyRangeInt64     `json:"price,omitempty" jsonschema:"Asking or sale price range in EUR."`
-	DebtFreePrice  PropertyRangeInt64     `json:"debt_free_price,omitempty" jsonschema:"Debt-free price range in EUR."`
-	AreaM2         PropertyRangeFloat64   `json:"area_m2,omitempty" jsonschema:"Area range in square meters."`
-	Rooms          PropertyRangeFloat64   `json:"rooms,omitempty" jsonschema:"Room count range."`
-	BuildYear      PropertyRangeInt32     `json:"build_year,omitempty" jsonschema:"Build year range."`
-	Floor          PropertyRangeInt32     `json:"floor,omitempty" jsonschema:"Floor range."`
+	Price          PropertyRangeInt64     `json:"price" jsonschema:"Asking or sale price range in EUR."`
+	DebtFreePrice  PropertyRangeInt64     `json:"debt_free_price" jsonschema:"Debt-free price range in EUR."`
+	AreaM2         PropertyRangeFloat64   `json:"area_m2" jsonschema:"Area range in square meters."`
+	Rooms          PropertyRangeFloat64   `json:"rooms" jsonschema:"Room count range."`
+	BuildYear      PropertyRangeInt32     `json:"build_year" jsonschema:"Build year range."`
+	Floor          PropertyRangeInt32     `json:"floor" jsonschema:"Floor range."`
 	Condition      []string               `json:"condition,omitempty" jsonschema:"Condition filters."`
 	EnergyClass    []string               `json:"energy_class,omitempty" jsonschema:"Energy class filters."`
 	Features       []string               `json:"features,omitempty" jsonschema:"Feature filters such as sauna, balcony, elevator, parking, or floorplan."`
@@ -34,7 +34,7 @@ type PropertyQueryInput struct {
 	Sort           string                 `json:"sort,omitempty" jsonschema:"Sort mode such as seen_desc, price_asc, price_desc, area_asc, area_desc, newest, cheapest, or expensive."`
 	Page           *int32                 `json:"page,omitempty" jsonschema:"One-based result page for listings."`
 	PageSize       *int32                 `json:"page_size,omitempty" jsonschema:"Listing result count. Must be 25, 50, or 100 for search mode; address lookup is capped at 100."`
-	Include        propertyIncludeOptions `json:"include,omitempty" jsonschema:"Controls optional linked records and raw payloads."`
+	Include        propertyIncludeOptions `json:"include" jsonschema:"Controls optional linked records and raw payloads."`
 	Source         string                 `json:"source,omitempty" jsonschema:"Source filter: shortcut, frontdoor, or all."`
 	Kind           string                 `json:"kind,omitempty" jsonschema:"Entity kind filter: ad, building, announcement, rental, or all."`
 	ListingType    string                 `json:"listing_type,omitempty" jsonschema:"Compatibility listing type filter: listing, rental, or all."`
@@ -71,9 +71,9 @@ type PropertyQueryResult struct {
 	Query        PropertyQueryEcho        `json:"query"`
 	Rows         []PropertySummary        `json:"rows"`
 	Transactions []ComparableSale         `json:"transactions,omitempty"`
-	Facets       propertyQueryFacets      `json:"facets,omitempty"`
+	Facets       propertyQueryFacets      `json:"facets"`
 	DataQuality  PropertyDataQuality      `json:"data_quality"`
-	Diagnostics  propertyQueryDiagnostics `json:"diagnostics,omitempty"`
+	Diagnostics  propertyQueryDiagnostics `json:"diagnostics"`
 	WebURL       string                   `json:"web_url,omitempty"`
 	Total        int64                    `json:"total"`
 	Page         int32                    `json:"page"`
@@ -90,14 +90,14 @@ type PropertyQueryEcho struct {
 	ListingTypes   []string               `json:"listing_types,omitempty"`
 	City           string                 `json:"city,omitempty"`
 	Postal         string                 `json:"postal,omitempty"`
-	Price          PropertyRangeInt64     `json:"price,omitempty"`
-	DebtFreePrice  PropertyRangeInt64     `json:"debt_free_price,omitempty"`
-	AreaM2         PropertyRangeFloat64   `json:"area_m2,omitempty"`
+	Price          PropertyRangeInt64     `json:"price"`
+	DebtFreePrice  PropertyRangeInt64     `json:"debt_free_price"`
+	AreaM2         PropertyRangeFloat64   `json:"area_m2"`
 	PropertyTypes  []string               `json:"property_types,omitempty"`
 	OwnershipTypes []string               `json:"ownership_types,omitempty"`
 	Features       []string               `json:"features,omitempty"`
 	Sort           string                 `json:"sort,omitempty"`
-	Include        propertyIncludeOptions `json:"include,omitempty"`
+	Include        propertyIncludeOptions `json:"include"`
 }
 
 type PropertySummary struct {
@@ -137,8 +137,8 @@ type PropertySummary struct {
 	ExternalURLAvailable bool                    `json:"external_url_available,omitempty"`
 	WebURL               string                  `json:"web_url,omitempty"`
 	LastSeenAt           *time.Time              `json:"last_seen_at,omitempty"`
-	Match                propertyMatchSummary    `json:"match,omitempty"`
-	Insights             propertyInsightSummary  `json:"insights,omitempty"`
+	Match                propertyMatchSummary    `json:"match"`
+	Insights             propertyInsightSummary  `json:"insights"`
 	Transactions         []ComparableSale        `json:"transactions,omitempty"`
 	SourceRecords        []propertySourceSummary `json:"source_records,omitempty"`
 }
@@ -249,7 +249,7 @@ type MarketContext struct {
 }
 
 type ComparableSale struct {
-	Schema              PropertySchema `json:"schema,omitempty"`
+	Schema              PropertySchema `json:"schema"`
 	ID                  string         `json:"id,omitempty"`
 	TransactionID       string         `json:"transaction_id,omitempty"`
 	Description         string         `json:"description,omitempty"`

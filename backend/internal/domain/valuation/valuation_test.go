@@ -246,6 +246,7 @@ func findRenovationNeed(t *testing.T, needs []ApartmentRenovationNeed, category 
 	return ApartmentRenovationNeed{}
 }
 
+//go:fix inline
 func ptrInt64(value int64) *int64 {
-	return &value
+	return new(value)
 }

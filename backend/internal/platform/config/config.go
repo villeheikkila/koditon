@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -277,7 +278,7 @@ func firstNonEmpty(values ...string) string {
 
 func parseOTLPHeaders(value string) map[string]string {
 	headers := map[string]string{}
-	for _, part := range strings.Split(value, ",") {
+	for part := range strings.SplitSeq(value, ",") {
 		key, val, ok := strings.Cut(strings.TrimSpace(part), "=")
 		if !ok {
 			continue
@@ -636,17 +637,15 @@ func validateURL(errs *[]error, name string, value string, schemes ...string) {
 	if len(schemes) == 0 {
 		return
 	}
-	for _, scheme := range schemes {
-		if parsed.Scheme == scheme {
-			return
-		}
+	if slices.Contains(schemes, parsed.Scheme) {
+		return
 	}
 	*errs = append(*errs, fmt.Errorf("%s must use one of these URL schemes: %s", name, strings.Join(schemes, ", ")))
 }
 
 func validateOrigins(errs *[]error, name string, value string) {
-	parts := strings.Split(value, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(value, ",")
+	for part := range parts {
 		origin := strings.TrimSpace(part)
 		if origin == "" {
 			continue

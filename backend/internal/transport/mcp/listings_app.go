@@ -204,7 +204,7 @@ func (t *toolImpl) mapAddressListingAppRow(row ads.AddressListing) listingAppRow
 	for _, transaction := range row.Transactions {
 		transactions = append(transactions, mapLinkedAddressTransactionAppRow(transaction))
 	}
-	priceChanged := boolPtr(row.PreviousAskingPrice != nil || row.PreviousDebtFreePrice != nil)
+	priceChanged := new(row.PreviousAskingPrice != nil || row.PreviousDebtFreePrice != nil)
 	return listingAppRow{CanonicalID: row.CanonicalID, NativeID: row.NativeID, ListingID: row.ListingID, OfferingID: row.OfferingID, GroupingID: firstNonEmpty(row.HousingCompanyID, row.HousingCompanyName), Source: row.Source, Kind: row.Kind, Title: firstNonEmpty(row.Headline, row.Address, row.CanonicalID), Address: row.Address, City: row.City, Postal: row.Postal, Latitude: row.Latitude, Longitude: row.Longitude, Price: firstInt64Ptr(row.AskingPrice, row.DebtFreePrice), Area: row.Area, RoomLayout: row.RoomLayout, URL: row.URL, ExternalURLAvailable: row.ExternalURLAvailable, WebURL: t.listingWebURL(row.CanonicalID, row.Kind, row.OfferingID), FirstSeenAt: row.FirstSeenAt, LastSeenAt: row.LastSeenAt, PriceChanged: priceChanged, MatchStatus: firstNonEmpty(row.SourceMatchStatus, row.PriceMatchStatus), InsightCount: int32(len(row.Insights)), Transactions: transactions}
 }
 
@@ -396,6 +396,7 @@ func firstInt32Ptr(values ...*int32) *int32 {
 	return nil
 }
 
+//go:fix inline
 func boolPtr(value bool) *bool {
-	return &value
+	return new(value)
 }

@@ -2,6 +2,7 @@ package valuation
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -39,7 +40,7 @@ var apartmentHouseRenovationRules = []renovationForecastRule{
 	{ID: "apartment.window.default", Category: "window", Label: "window renewal", HouseTypes: []string{"apartment"}, Lifecycles: renovationLifecycles(35, 15, 3), Severity: "medium", ForecastFromBuildYear: true, WindowYears: 4, DependsOn: []string{"facade"}, PriceMechanisms: []string{"housing company debt", "energy efficiency", "maintenance charge pressure"}},
 	{ID: "apartment.balcony.post_1940", Category: "balcony", Label: "balcony repair", HouseTypes: []string{"apartment"}, BuildYearMin: int32Ptr(1940), Lifecycles: renovationLifecycles(25, 12, 3), Severity: "medium", ForecastFromBuildYear: false, WindowYears: 4, DependsOn: []string{"facade"}, PriceMechanisms: []string{"housing company debt", "use value", "buyer demand"}},
 	{ID: "apartment.electricity.default", Category: "electricity", Label: "electrical system renewal", HouseTypes: []string{"apartment"}, Lifecycles: renovationLifecycles(40, 20, 3), Severity: "high", ForecastFromBuildYear: true, WindowYears: 5, DependsOn: []string{"pipe", "telecom"}, PriceMechanisms: majorRenovationPriceMechanisms()},
-	{ID: "apartment.elevator.present", Category: "elevator", Label: "elevator modernization", HouseTypes: []string{"apartment"}, RequiresElevator: ptrBool(true), Lifecycles: renovationLifecycles(30, 15, 3), Severity: "high", ForecastFromBuildYear: false, WindowYears: 4, PriceMechanisms: []string{"housing company debt", "maintenance charge pressure", "accessibility demand"}},
+	{ID: "apartment.elevator.present", Category: "elevator", Label: "elevator modernization", HouseTypes: []string{"apartment"}, RequiresElevator: new(true), Lifecycles: renovationLifecycles(30, 15, 3), Severity: "high", ForecastFromBuildYear: false, WindowYears: 4, PriceMechanisms: []string{"housing company debt", "maintenance charge pressure", "accessibility demand"}},
 	{ID: "apartment.heating.default", Category: "heating", Label: "heating system renewal", HouseTypes: []string{"apartment"}, Lifecycles: renovationLifecycles(25, 12, 3), Severity: "medium", ForecastFromBuildYear: true, WindowYears: 4, DependsOn: []string{"energy"}, PriceMechanisms: []string{"energy efficiency", "maintenance charge pressure", "operational risk"}},
 	{ID: "apartment.ventilation.default", Category: "ventilation", Label: "ventilation renewal", HouseTypes: []string{"apartment"}, Lifecycles: renovationLifecycles(30, 15, 3), Severity: "medium", ForecastFromBuildYear: true, WindowYears: 4, DependsOn: []string{"energy"}, PriceMechanisms: []string{"indoor air quality", "maintenance charge pressure", "buyer demand"}},
 	{ID: "apartment.drainage.default", Category: "drainage", Label: "drainage renewal", HouseTypes: []string{"apartment"}, Lifecycles: renovationLifecycles(40, 20, 3), Severity: "medium", ForecastFromBuildYear: true, WindowYears: 5, DependsOn: []string{"yard", "foundation"}, PriceMechanisms: []string{"water damage risk", "housing company debt", "maintenance charge pressure"}},
@@ -88,12 +89,7 @@ func renovationHouseTypeMatches(expected []string, building BuildingDetails) boo
 	if actual == "" {
 		actual = "apartment"
 	}
-	for _, value := range expected {
-		if actual == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(expected, actual)
 }
 
 func normalizedRenovationHouseType(building BuildingDetails) string {
@@ -264,6 +260,7 @@ func majorRenovationPriceMechanisms() []string {
 	return []string{"housing company debt", "maintenance charge pressure", "buyer demand", "debt share uncertainty"}
 }
 
+//go:fix inline
 func int32Ptr(value int32) *int32 {
-	return &value
+	return new(value)
 }

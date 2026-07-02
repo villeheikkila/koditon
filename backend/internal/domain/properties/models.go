@@ -321,7 +321,7 @@ type CommercialDetails struct {
 	MainImageHidden                   *bool                  `json:"main_image_hidden,omitempty"`
 	IsCompanyAnnouncement             *bool                  `json:"is_company_announcement,omitempty"`
 	ShowBiddingIndicators             *bool                  `json:"show_bidding_indicators,omitempty"`
-	Charges                           Charges                `json:"charges,omitempty"`
+	Charges                           Charges                `json:"charges"`
 	MatchedTransaction                *PriceTransactionMatch `json:"matched_transaction,omitempty"`
 }
 
@@ -520,9 +520,9 @@ type SaleListingSummary struct {
 	Headline        string            `json:"headline"`
 	Unit            UnitDetails       `json:"unit"`
 	Building        BuildingDetails   `json:"building"`
-	Site            SiteDetails       `json:"site,omitempty"`
+	Site            SiteDetails       `json:"site"`
 	Commercial      CommercialDetails `json:"commercial"`
-	Media           Media             `json:"media,omitempty"`
+	Media           Media             `json:"media"`
 }
 
 type RentalSummary struct {
@@ -531,9 +531,9 @@ type RentalSummary struct {
 	Headline   string            `json:"headline"`
 	Unit       UnitDetails       `json:"unit"`
 	Building   BuildingDetails   `json:"building"`
-	Site       SiteDetails       `json:"site,omitempty"`
+	Site       SiteDetails       `json:"site"`
 	Commercial CommercialDetails `json:"commercial"`
-	Media      Media             `json:"media,omitempty"`
+	Media      Media             `json:"media"`
 }
 
 type SaleListing struct {
@@ -544,21 +544,21 @@ type SaleListing struct {
 	Headline         string                        `json:"headline"`
 	Unit             UnitDetails                   `json:"unit"`
 	Building         BuildingDetails               `json:"building"`
-	Site             SiteDetails                   `json:"site,omitempty"`
+	Site             SiteDetails                   `json:"site"`
 	Commercial       CommercialDetails             `json:"commercial"`
-	Texts            TextSections                  `json:"texts,omitempty"`
-	Media            Media                         `json:"media,omitempty"`
+	Texts            TextSections                  `json:"texts"`
+	Media            Media                         `json:"media"`
 	Contacts         []Contact                     `json:"contacts,omitempty"`
 	Showings         []Showing                     `json:"showings,omitempty"`
 	Links            []Link                        `json:"links,omitempty"`
-	Insights         ListingInsights               `json:"insights,omitempty"`
-	ApartmentProfile ApartmentProfile              `json:"apartment_profile,omitempty"`
-	BuildingProfile  BuildingProfile               `json:"building_profile,omitempty"`
-	HousingProfile   HousingCompanyProfile         `json:"housing_company_profile,omitempty"`
+	Insights         ListingInsights               `json:"insights"`
+	ApartmentProfile ApartmentProfile              `json:"apartment_profile"`
+	BuildingProfile  BuildingProfile               `json:"building_profile"`
+	HousingProfile   HousingCompanyProfile         `json:"housing_company_profile"`
 	QualityScores    []PropertyQualityScore        `json:"quality_scores,omitempty"`
 	Documents        []PropertyDocumentSummary     `json:"documents,omitempty"`
-	HouseOverview    HouseOverview                 `json:"house_overview,omitempty"`
-	ValuationInputs  valuation.ValuationInputs     `json:"valuation_inputs,omitempty"`
+	HouseOverview    HouseOverview                 `json:"house_overview"`
+	ValuationInputs  valuation.ValuationInputs     `json:"valuation_inputs"`
 	Valuation        *valuation.ApartmentValuation `json:"valuation,omitempty"`
 }
 
@@ -599,7 +599,7 @@ type ApartmentProfile struct {
 
 type CanonicalProfileProjectionResult struct {
 	SaleListingID    string           `json:"sale_listing_id"`
-	ApartmentProfile ApartmentProfile `json:"apartment_profile,omitempty"`
+	ApartmentProfile ApartmentProfile `json:"apartment_profile"`
 }
 
 type BuildingProfile struct {
@@ -724,24 +724,24 @@ type Rental struct {
 	Headline   string            `json:"headline"`
 	Unit       UnitDetails       `json:"unit"`
 	Building   BuildingDetails   `json:"building"`
-	Site       SiteDetails       `json:"site,omitempty"`
+	Site       SiteDetails       `json:"site"`
 	Commercial CommercialDetails `json:"commercial"`
-	Texts      TextSections      `json:"texts,omitempty"`
-	Media      Media             `json:"media,omitempty"`
+	Texts      TextSections      `json:"texts"`
+	Media      Media             `json:"media"`
 	Contacts   []Contact         `json:"contacts,omitempty"`
 	Showings   []Showing         `json:"showings,omitempty"`
 	Links      []Link            `json:"links,omitempty"`
-	Insights   ListingInsights   `json:"insights,omitempty"`
+	Insights   ListingInsights   `json:"insights"`
 }
 
 type Building struct {
 	ID            string           `json:"id"`
 	Details       BuildingDetails  `json:"details"`
-	Site          SiteDetails      `json:"site,omitempty"`
+	Site          SiteDetails      `json:"site"`
 	SourceRecords []ListingSource  `json:"source_records"`
-	Texts         TextSections     `json:"texts,omitempty"`
-	Related       RelatedListings  `json:"related,omitempty"`
-	Insights      BuildingInsights `json:"insights,omitempty"`
+	Texts         TextSections     `json:"texts"`
+	Related       RelatedListings  `json:"related"`
+	Insights      BuildingInsights `json:"insights"`
 	Metadata      map[string]any   `json:"metadata,omitempty"`
 }
 

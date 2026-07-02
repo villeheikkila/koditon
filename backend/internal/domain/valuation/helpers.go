@@ -23,8 +23,9 @@ func cleanDisplayString(value string) string {
 	return trimmed
 }
 
+//go:fix inline
 func ptrBool(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 func compactRenovations(values []BuildingRenovation) []BuildingRenovation {

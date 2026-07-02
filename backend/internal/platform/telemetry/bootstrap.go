@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"io"
 	"log/slog"
 )
 
@@ -19,7 +18,7 @@ func Bootstrap(ctx context.Context, cfg *Config, environment string, baseHandler
 		logger = slog.Default()
 	}
 	if baseHandler == nil {
-		baseHandler = slog.NewTextHandler(io.Discard, nil)
+		baseHandler = slog.DiscardHandler
 	}
 	telemetryCfg := Config{Enabled: cfg != nil, Environment: environment}
 	if cfg != nil {
@@ -40,7 +39,7 @@ func Bootstrap(ctx context.Context, cfg *Config, environment string, baseHandler
 		enabled = false
 		result = InitResult{
 			Shutdown:   func(context.Context) error { return nil },
-			LogHandler: slog.NewTextHandler(io.Discard, nil),
+			LogHandler: slog.DiscardHandler,
 		}
 		logger.WarnContext(ctx, "telemetry init failed, continuing without telemetry", "error", err)
 	}

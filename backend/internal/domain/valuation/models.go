@@ -141,15 +141,15 @@ type Insight struct {
 }
 
 type ValuationInputs struct {
-	Unit        UnitInput           `json:"unit,omitempty"`
-	Layout      LayoutInput         `json:"layout,omitempty"`
-	Floor       FloorInput          `json:"floor,omitempty"`
-	Building    BuildingInput       `json:"building,omitempty"`
-	Site        SiteInput           `json:"site,omitempty"`
-	Charges     ChargesInput        `json:"charges,omitempty"`
-	Renovations RenovationsInput    `json:"renovations,omitempty"`
-	Market      MarketInput         `json:"market,omitempty"`
-	Documents   DocumentsInput      `json:"documents,omitempty"`
+	Unit        UnitInput           `json:"unit"`
+	Layout      LayoutInput         `json:"layout"`
+	Floor       FloorInput          `json:"floor"`
+	Building    BuildingInput       `json:"building"`
+	Site        SiteInput           `json:"site"`
+	Charges     ChargesInput        `json:"charges"`
+	Renovations RenovationsInput    `json:"renovations"`
+	Market      MarketInput         `json:"market"`
+	Documents   DocumentsInput      `json:"documents"`
 	Facts       []ValuationFact     `json:"facts,omitempty"`
 	ExtraFacts  []ValuationFact     `json:"extra_facts,omitempty"`
 	Conflicts   []ValuationConflict `json:"conflicts,omitempty"`
@@ -298,8 +298,8 @@ type ApartmentValuation struct {
 	Subject         ApartmentValuationSubject     `json:"subject"`
 	Price           ApartmentValuationPrice       `json:"price"`
 	Renovations     ApartmentValuationRenovations `json:"renovations"`
-	Input           ValuationInputs               `json:"input,omitempty"`
-	Brief           ValuationBrief                `json:"brief,omitempty"`
+	Input           ValuationInputs               `json:"input"`
+	Brief           ValuationBrief                `json:"brief"`
 	OfferAssessment ApartmentOfferAssessment      `json:"offer_assessment"`
 	Signals         []ApartmentValuationSignal    `json:"signals,omitempty"`
 	Explanation     string                        `json:"explanation"`
@@ -419,12 +419,12 @@ type ApartmentOfferAssessment struct {
 	Verdict                    string                         `json:"verdict"`
 	AskingPrice                *int64                         `json:"asking_price,omitempty"`
 	DebtFreePrice              *int64                         `json:"debt_free_price,omitempty"`
-	MarketValueRange           ApartmentValueRange            `json:"market_value_range,omitempty"`
-	RiskAdjustedValueRange     ApartmentValueRange            `json:"risk_adjusted_value_range,omitempty"`
-	RecommendedOfferRange      ApartmentValueRange            `json:"recommended_offer_range,omitempty"`
-	RenovationRiskReserve      ApartmentValueRange            `json:"renovation_risk_reserve,omitempty"`
-	RenovationRiskReservePerM2 ApartmentValueRange            `json:"renovation_risk_reserve_per_m2,omitempty"`
-	EstimatedOwnershipCost     ApartmentOwnershipCostEstimate `json:"estimated_ownership_cost,omitempty"`
+	MarketValueRange           ApartmentValueRange            `json:"market_value_range"`
+	RiskAdjustedValueRange     ApartmentValueRange            `json:"risk_adjusted_value_range"`
+	RecommendedOfferRange      ApartmentValueRange            `json:"recommended_offer_range"`
+	RenovationRiskReserve      ApartmentValueRange            `json:"renovation_risk_reserve"`
+	RenovationRiskReservePerM2 ApartmentValueRange            `json:"renovation_risk_reserve_per_m2"`
+	EstimatedOwnershipCost     ApartmentOwnershipCostEstimate `json:"estimated_ownership_cost"`
 	Confidence                 string                         `json:"confidence"`
 	MainReasons                []ApartmentOfferReason         `json:"main_reasons,omitempty"`
 	Missing                    []string                       `json:"missing,omitempty"`

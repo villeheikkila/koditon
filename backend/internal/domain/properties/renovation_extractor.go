@@ -92,7 +92,7 @@ func (s *Service) extractSourceListingRenovations(ctx context.Context, saleListi
 	if err != nil {
 		return RenovationExtractionResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[renovationExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
+	objectResult, err := fantasyobject.Generate[renovationExtractionObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: new(operation.MaxOutputTokens)})
 	if err != nil {
 		return RenovationExtractionResult{}, fmt.Errorf("extract renovations with fantasy: %w", err)
 	}

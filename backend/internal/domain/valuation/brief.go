@@ -2,6 +2,7 @@ package valuation
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -112,7 +113,7 @@ func briefExpensiveWindows(valuation *ApartmentValuation) []OwnershipCostWindow 
 	for key := range buckets {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i int, j int) bool { return keys[i] < keys[j] })
+	slices.Sort(keys)
 	windows := make([]OwnershipCostWindow, 0, len(keys))
 	for _, key := range keys {
 		current := buckets[key]
@@ -346,10 +347,8 @@ func appendUnique(items []string, item string) []string {
 	if item == "" {
 		return items
 	}
-	for _, current := range items {
-		if current == item {
-			return items
-		}
+	if slices.Contains(items, item) {
+		return items
 	}
 	return append(items, item)
 }

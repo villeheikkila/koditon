@@ -194,7 +194,7 @@ func propertyComparisonMarkdown(result PropertyComparisonResult) string {
 	b.WriteString(result.Summary)
 	for _, rank := range result.Ranking {
 		b.WriteString("\n- #")
-		b.WriteString(fmt.Sprintf("%d %s", rank.Rank, rank.ID))
+		fmt.Fprintf(&b, "%d %s", rank.Rank, rank.ID)
 		if len(rank.Reasons) > 0 {
 			b.WriteString(": ")
 			b.WriteString(strings.Join(rank.Reasons, "; "))
@@ -250,7 +250,7 @@ func propertyMarketContextMarkdown(result PropertyMarketContextResult) string {
 	}
 	if result.Market.MedianPricePerM2 != nil {
 		b.WriteString("\nMedian price/m2: ")
-		b.WriteString(fmt.Sprintf("%.0f", *result.Market.MedianPricePerM2))
+		fmt.Fprintf(&b, "%.0f", *result.Market.MedianPricePerM2)
 	}
 	if result.Market.OverUnderMarketHint != "" {
 		b.WriteString("\nSubject vs market: ")

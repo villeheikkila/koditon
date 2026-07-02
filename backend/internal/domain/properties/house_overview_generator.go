@@ -45,7 +45,7 @@ func (s *Service) GenerateSaleListingHouseOverview(ctx context.Context, input st
 	if err != nil {
 		return HouseOverviewGenerationResult{}, err
 	}
-	objectResult, err := fantasyobject.Generate[houseOverviewObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: ptrInt64(operation.MaxOutputTokens)})
+	objectResult, err := fantasyobject.Generate[houseOverviewObject](ctx, model, fantasy.ObjectCall{Prompt: prompt, SchemaName: operation.SchemaName, SchemaDescription: operation.SchemaDescription, Temperature: ptrFloat64(0), MaxOutputTokens: new(operation.MaxOutputTokens)})
 	if err != nil {
 		return HouseOverviewGenerationResult{}, fmt.Errorf("generate house overview with fantasy: %w", err)
 	}

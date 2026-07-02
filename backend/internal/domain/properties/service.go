@@ -226,7 +226,7 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 		Building:           firstNonEmpty(valueOrEmpty(row.BuildingDescriptionText), valueOrEmpty(row.BuildingOtherInfoText)),
 	}
 	if row.SaleListingSourceKind == "announcement" {
-		listing.Commercial.IsCompanyAnnouncement = ptrBool(true)
+		listing.Commercial.IsCompanyAnnouncement = new(true)
 	}
 	if err := s.enrichSaleListingMediaFromSource(ctx, &listing, saleListingID); err != nil {
 		return SaleListing{}, err
@@ -417,9 +417,9 @@ func renovationFromEvidence(category string, status string, year *int32, compone
 	var done *bool
 	switch status {
 	case "done":
-		done = ptrBool(true)
+		done = new(true)
 	case "planned":
-		done = ptrBool(false)
+		done = new(false)
 	}
 	renovation := buildingRenovation(category, done, year)
 	renovation.Component = component
@@ -686,7 +686,7 @@ LIMIT 1`, buildingID).Scan(&housingCompany, &businessID, &buildYear, &floorCount
 		return err
 	}
 	for _, row := range rows {
-		building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(row.Category, ptrBool(true), row.Year))
+		building.Details.Renovations = append(building.Details.Renovations, buildingRenovation(row.Category, new(true), row.Year))
 	}
 	building.Details.Renovations = compactRenovations(building.Details.Renovations)
 	return nil
@@ -1480,7 +1480,7 @@ ORDER BY event.category, COALESCE(event.year, event.start_year) NULLS LAST`, off
 		if err := rows.Scan(&category, &year); err != nil {
 			return err
 		}
-		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(category, ptrBool(true), year))
+		listing.Building.Renovations = append(listing.Building.Renovations, buildingRenovation(category, new(true), year))
 	}
 	if err := rows.Err(); err != nil {
 		return err

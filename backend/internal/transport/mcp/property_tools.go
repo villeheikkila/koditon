@@ -29,7 +29,7 @@ type propertyDetailInput struct {
 	City           string                 `json:"city,omitempty" jsonschema:"City hint when resolving text."`
 	Postal         string                 `json:"postal,omitempty" jsonschema:"Postal code hint when resolving text."`
 	MaxCandidates  *int32                 `json:"max_candidates,omitempty" jsonschema:"Candidate count when resolving text. Must be 25, 50, or 100."`
-	Include        propertyIncludeOptions `json:"include,omitempty" jsonschema:"Controls optional raw payload and evidence fields."`
+	Include        propertyIncludeOptions `json:"include" jsonschema:"Controls optional raw payload and evidence fields."`
 	IncludeRawJSON bool                   `json:"include_raw_json,omitempty" jsonschema:"Compatibility flag for including parsed raw source JSON."`
 }
 
@@ -452,7 +452,7 @@ func propertySummaryBadges(row listingAppRow, transactions []ComparableSale) []s
 func propertyReportsFromSections(sections []propertyReportSection) []PropertyReport {
 	out := make([]PropertyReport, 0, len(sections))
 	for _, section := range sections {
-		out = append(out, PropertyReport{Title: section.Title, Items: section.Items})
+		out = append(out, PropertyReport(section))
 	}
 	return out
 }

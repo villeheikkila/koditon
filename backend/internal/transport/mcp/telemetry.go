@@ -37,7 +37,7 @@ func traceToolHandler[In, Out any](tool *mcp.Tool, logger *slog.Logger, handler 
 				err = fmt.Errorf("panic: %v", recovered)
 				telemetry.RecordSpanError(span, err, "mcp tool panicked")
 				span.SetAttributes(attribute.String("mcp.tool.status", "panic"), attribute.Int64("mcp.tool.duration_ms", duration.Milliseconds()))
-				logger.ErrorContext(ctx, "mcp tool panicked", logging.Error(err), slog.String("mcp.tool.status", "panic"), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
+				logger.ErrorContext(ctx, "mcp tool panicked", logging.Error(err), slog.String("mcp_tool_status", "panic"), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 				span.End()
 				panic(recovered)
 			}
@@ -45,14 +45,14 @@ func traceToolHandler[In, Out any](tool *mcp.Tool, logger *slog.Logger, handler 
 			if err != nil {
 				status = "error"
 				telemetry.RecordSpanError(span, err, "mcp tool failed")
-				logger.ErrorContext(ctx, "mcp tool completed", logging.Error(err), slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
+				logger.ErrorContext(ctx, "mcp tool completed", logging.Error(err), slog.String("mcp_tool_status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 			} else if result != nil && result.IsError {
 				status = "tool_error"
 				span.SetStatus(codes.Error, "mcp tool returned an error result")
-				logger.WarnContext(ctx, "mcp tool completed", slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
+				logger.WarnContext(ctx, "mcp tool completed", slog.String("mcp_tool_status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeError))
 			} else {
 				span.SetStatus(codes.Ok, "")
-				logger.InfoContext(ctx, "mcp tool completed", slog.String("mcp.tool.status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeSuccess))
+				logger.InfoContext(ctx, "mcp tool completed", slog.String("mcp_tool_status", status), logging.DurationMS(duration), logging.Outcome(logging.OutcomeSuccess))
 			}
 			span.SetAttributes(attribute.String("mcp.tool.status", status), attribute.Int64("mcp.tool.duration_ms", duration.Milliseconds()))
 			span.End()

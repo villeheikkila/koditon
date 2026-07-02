@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -51,7 +50,7 @@ type InitResult struct {
 
 func Init(ctx context.Context, cfg Config, logger *slog.Logger) (InitResult, error) {
 	if !cfg.Enabled {
-		return InitResult{Shutdown: func(context.Context) error { return nil }, LogHandler: slog.NewTextHandler(io.Discard, nil)}, nil
+		return InitResult{Shutdown: func(context.Context) error { return nil }, LogHandler: slog.DiscardHandler}, nil
 	}
 	serviceName := strings.TrimSpace(cfg.ServiceName)
 	if serviceName == "" {

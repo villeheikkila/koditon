@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"maps"
+	"testing"
+)
 
 const testPEM = "-----BEGIN PRIVATE KEY-----\nAA==\n-----END PRIVATE KEY-----"
 
@@ -198,9 +201,7 @@ func validAPIEnv(overrides map[string]string) map[string]string {
 		"AUTH_APPLE_PRIVATE_KEY_ID": "KEYID",
 		"AUTH_APPLE_PRIVATE_KEY":    testPEM,
 	})
-	for key, value := range overrides {
-		values[key] = value
-	}
+	maps.Copy(values, overrides)
 	return values
 }
 
@@ -214,8 +215,6 @@ func baseEnv(overrides map[string]string) map[string]string {
 		"LOG_LEVEL":            "info",
 		"DATABASE_URL":         "postgres://postgres:postgres@localhost:5432/koditon?sslmode=disable",
 	}
-	for key, value := range overrides {
-		values[key] = value
-	}
+	maps.Copy(values, overrides)
 	return values
 }

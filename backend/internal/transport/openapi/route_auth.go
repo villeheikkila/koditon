@@ -480,10 +480,7 @@ func (a *API) webAuthTokenOutput(tokens *auth.OAuthTokenResponse) *authTokenOutp
 }
 
 func (a *API) webRefreshCookie(token string, expiresAt time.Time) http.Cookie {
-	maxAge := int(time.Until(expiresAt).Seconds())
-	if maxAge < 0 {
-		maxAge = 0
-	}
+	maxAge := max(int(time.Until(expiresAt).Seconds()), 0)
 	return http.Cookie{
 		Name:     a.webRefreshCookieName(),
 		Value:    token,
@@ -547,7 +544,7 @@ func (a *API) isAllowedWebAuthOrigin(origin string) bool {
 			return true
 		}
 	}
-	for _, candidate := range strings.Split(a.cfg.CORSAllowedOrigins, ",") {
+	for candidate := range strings.SplitSeq(a.cfg.CORSAllowedOrigins, ",") {
 		if sameOrigin(origin, candidate) {
 			return true
 		}

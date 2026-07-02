@@ -189,7 +189,7 @@ func (s *Service) BackfillAdDataHashes(ctx context.Context, limit int32) (source
 	if limit <= 0 {
 		limit = 1000
 	}
-	rows, err := s.queries.ListShortcutAdsMissingDataHash(ctx, ptr(int64(limit)))
+	rows, err := s.queries.ListShortcutAdsMissingDataHash(ctx, new(int64(limit)))
 	if err != nil {
 		return sourcejson.BackfillResult{}, fmt.Errorf("list shortcut ads missing data hash: %w", err)
 	}
