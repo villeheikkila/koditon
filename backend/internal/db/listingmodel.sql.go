@@ -11,8 +11,83 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteFrontdoorBuildingAnnouncementSourceListing = `-- name: DeleteFrontdoorBuildingAnnouncementSourceListing :exec
+DELETE FROM origin.source_listings
+WHERE provider = 'frontdoor'
+    AND source_kind = 'announcement'
+    AND raw_table = 'frontdoor_building_announcements'
+    AND raw_id = $1::text
+`
+
+func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *string) error {
+	_, err := q.db.Exec(ctx, deleteFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
+	return err
+}
+
 const reconcileSourceListingModel = `-- name: ReconcileSourceListingModel :one
-WITH source AS (
+WITH announcement_source AS (
+    SELECT
+        NULL::uuid AS frontdoor_ad_id,
+        fba.frontdoor_building_announcement_id,
+        lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2))) AS sale_listing_address_norm,
+        fb.frontdoor_building_apartment_count AS sale_listing_apartment_count,
+        fba.frontdoor_building_announcement_area AS sale_listing_area_value,
+        CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS sale_listing_asking_price,
+        COALESCE(fba.frontdoor_building_announcement_construction_finished_year, fb.frontdoor_building_build_year, fb.frontdoor_building_construction_end_year) AS sale_listing_build_year,
+        lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fb.frontdoor_building_postcode, COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area)))) AS sale_listing_building_match_key,
+        sl.canonical_source_id AS sale_listing_canonical_id,
+        COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS sale_listing_city,
+        lower(trim(COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area))) AS sale_listing_city_norm,
+        NULL::text AS sale_listing_condition,
+        NULL::bigint AS sale_listing_debt_free_price,
+        NULL::bigint AS sale_listing_debt_share_amount,
+        concat_ws(' ', fb.frontdoor_building_description, fb.frontdoor_building_other_info) AS sale_listing_description_text,
+        fb.frontdoor_building_has_elevator AS sale_listing_elevator,
+        fb.frontdoor_building_energy_certificate_code AS sale_listing_energy_class,
+        fb.frontdoor_building_energy_certificate_code AS sale_listing_energy_efficiency_label,
+        fba.frontdoor_building_announcement_first_seen_at AS sale_listing_first_seen_at,
+        NULL::integer AS sale_listing_floor_level,
+        COALESCE(fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_id::text) AS sale_listing_headline,
+        fb.frontdoor_building_business_id AS sale_listing_housing_company_business_id,
+        fb.frontdoor_building_company_name AS sale_listing_housing_company_name,
+        sl.source_listing_id AS sale_listing_id,
+        fba.frontdoor_building_announcement_last_seen_at AS sale_listing_last_seen_at,
+        fb.frontdoor_building_latitude AS sale_listing_latitude,
+        NULL::double precision AS sale_listing_living_area_value,
+        fb.frontdoor_building_longitude AS sale_listing_longitude,
+        sl.native_id AS sale_listing_native_id,
+        NULL::double precision AS sale_listing_plot_area_value,
+        NULL::boolean AS sale_listing_plot_owned,
+        fb.frontdoor_building_postcode AS sale_listing_postal,
+        fb.frontdoor_building_postcode AS sale_listing_postal_norm,
+        fba.frontdoor_building_announcement_price_per_square AS sale_listing_price_per_m2,
+        property_type.sale_listing_property_type_code AS sale_listing_property_type_code,
+        NULL::timestamptz AS sale_listing_published_at,
+        NULL::text AS sale_listing_room_category_code,
+        fba.frontdoor_building_announcement_room_structure AS sale_listing_room_layout,
+        NULL::integer AS sale_listing_rooms_count,
+        concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure, fb.frontdoor_building_company_name, fb.frontdoor_building_business_id) AS sale_listing_search_text,
+        NULL::boolean AS sale_listing_sauna,
+        sl.source_kind AS sale_listing_source_kind,
+        sl.provider AS sale_listing_source_provider,
+        concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2) AS sale_listing_street_address,
+        fb.frontdoor_building_floor_count AS sale_listing_total_floors,
+        sl.canonical_source_id AS sale_listing_unit_match_key,
+        sl.url AS sale_listing_url,
+        fba.frontdoor_building_announcement_new_building AS sale_listing_new_development,
+        NULL::boolean AS sale_listing_balcony,
+        NULL::bigint AS shortcut_ad_id
+    FROM origin.source_listings sl
+    JOIN origin.frontdoor_building_announcements fba ON sl.raw_table = 'frontdoor_building_announcements'
+        AND sl.raw_id = fba.frontdoor_building_announcement_id::text
+    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    LEFT JOIN origin.sale_listing_property_type_aliases property_type
+        ON property_type.sale_listing_property_type_alias = lower(trim(COALESCE(fba.frontdoor_building_announcement_property_subtype, fba.frontdoor_building_announcement_property_type)))
+    WHERE sl.source_listing_id = $1::uuid
+        AND sl.provider = 'frontdoor'
+        AND sl.source_kind = 'announcement'
+),
+staged_source AS (
     SELECT
         frontdoor_ad_id,
         frontdoor_building_announcement_id,
@@ -66,6 +141,114 @@ WITH source AS (
         shortcut_ad_id
     FROM public.property_source_offerings
     WHERE sale_listing_id = $1::uuid
+        AND NOT EXISTS (SELECT 1 FROM announcement_source)
+),
+source AS (
+    SELECT
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
+        sale_listing_address_norm,
+        sale_listing_apartment_count,
+        sale_listing_area_value,
+        sale_listing_asking_price,
+        sale_listing_build_year,
+        sale_listing_building_match_key,
+        sale_listing_canonical_id,
+        sale_listing_city,
+        sale_listing_city_norm,
+        sale_listing_condition,
+        sale_listing_debt_free_price,
+        sale_listing_debt_share_amount,
+        sale_listing_description_text,
+        sale_listing_elevator,
+        sale_listing_energy_class,
+        sale_listing_energy_efficiency_label,
+        sale_listing_first_seen_at,
+        sale_listing_floor_level,
+        sale_listing_headline,
+        sale_listing_housing_company_business_id,
+        sale_listing_housing_company_name,
+        sale_listing_id,
+        sale_listing_last_seen_at,
+        sale_listing_latitude,
+        sale_listing_living_area_value,
+        sale_listing_longitude,
+        sale_listing_native_id,
+        sale_listing_plot_area_value,
+        sale_listing_plot_owned,
+        sale_listing_postal,
+        sale_listing_postal_norm,
+        sale_listing_price_per_m2,
+        sale_listing_property_type_code,
+        sale_listing_published_at,
+        sale_listing_room_category_code,
+        sale_listing_room_layout,
+        sale_listing_rooms_count,
+        sale_listing_search_text,
+        sale_listing_sauna,
+        sale_listing_source_kind,
+        sale_listing_source_provider,
+        sale_listing_street_address,
+        sale_listing_total_floors,
+        sale_listing_unit_match_key,
+        sale_listing_url,
+        sale_listing_new_development,
+        sale_listing_balcony,
+        shortcut_ad_id
+    FROM announcement_source
+    UNION ALL
+    SELECT
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
+        sale_listing_address_norm,
+        sale_listing_apartment_count,
+        sale_listing_area_value,
+        sale_listing_asking_price,
+        sale_listing_build_year,
+        sale_listing_building_match_key,
+        sale_listing_canonical_id,
+        sale_listing_city,
+        sale_listing_city_norm,
+        sale_listing_condition,
+        sale_listing_debt_free_price,
+        sale_listing_debt_share_amount,
+        sale_listing_description_text,
+        sale_listing_elevator,
+        sale_listing_energy_class,
+        sale_listing_energy_efficiency_label,
+        sale_listing_first_seen_at,
+        sale_listing_floor_level,
+        sale_listing_headline,
+        sale_listing_housing_company_business_id,
+        sale_listing_housing_company_name,
+        sale_listing_id,
+        sale_listing_last_seen_at,
+        sale_listing_latitude,
+        sale_listing_living_area_value,
+        sale_listing_longitude,
+        sale_listing_native_id,
+        sale_listing_plot_area_value,
+        sale_listing_plot_owned,
+        sale_listing_postal,
+        sale_listing_postal_norm,
+        sale_listing_price_per_m2,
+        sale_listing_property_type_code,
+        sale_listing_published_at,
+        sale_listing_room_category_code,
+        sale_listing_room_layout,
+        sale_listing_rooms_count,
+        sale_listing_search_text,
+        sale_listing_sauna,
+        sale_listing_source_kind,
+        sale_listing_source_provider,
+        sale_listing_street_address,
+        sale_listing_total_floors,
+        sale_listing_unit_match_key,
+        sale_listing_url,
+        sale_listing_new_development,
+        sale_listing_balcony,
+        shortcut_ad_id
+    FROM staged_source
 ),
 frontdoor_evidence AS (
     INSERT INTO public.evidence_sources (
@@ -735,4 +918,66 @@ func (q *Queries) ReconcileSourceListingModel(ctx context.Context, dollar_1 uuid
 		&i.SearchDocuments,
 	)
 	return i, err
+}
+
+const upsertFrontdoorBuildingAnnouncementSourceListing = `-- name: UpsertFrontdoorBuildingAnnouncementSourceListing :one
+INSERT INTO origin.source_listings (
+    source_listing_id,
+    provider,
+    source_kind,
+    native_id,
+    canonical_source_id,
+    raw_table,
+    raw_id,
+    url,
+    payload_hash,
+    normalized_version,
+    normalized_at,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+SELECT
+    gen_random_uuid(),
+    'frontdoor',
+    'announcement',
+    fba.frontdoor_building_announcement_id::text,
+    'frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text,
+    'frontdoor_building_announcements',
+    fba.frontdoor_building_announcement_id::text,
+    fb.frontdoor_building_url,
+    NULL::text,
+    fba.frontdoor_building_announcement_data_normalized_version,
+    now(),
+    fba.frontdoor_building_announcement_first_seen_at,
+    fba.frontdoor_building_announcement_last_seen_at,
+    COALESCE(fba.frontdoor_building_announcement_first_seen_at, now()),
+    now()
+FROM origin.frontdoor_building_announcements fba
+JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+WHERE fba.frontdoor_building_announcement_id = $1
+    AND fba.frontdoor_building_announcement_rent_period IS NULL
+    AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
+ON CONFLICT (canonical_source_id) DO UPDATE SET
+    provider = EXCLUDED.provider,
+    source_kind = EXCLUDED.source_kind,
+    native_id = EXCLUDED.native_id,
+    raw_table = EXCLUDED.raw_table,
+    raw_id = EXCLUDED.raw_id,
+    url = EXCLUDED.url,
+    payload_hash = EXCLUDED.payload_hash,
+    normalized_version = EXCLUDED.normalized_version,
+    normalized_at = EXCLUDED.normalized_at,
+    first_seen_at = EXCLUDED.first_seen_at,
+    last_seen_at = EXCLUDED.last_seen_at,
+    updated_at = EXCLUDED.updated_at
+RETURNING source_listing_id
+`
+
+func (q *Queries) UpsertFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
+	var source_listing_id uuid.UUID
+	err := row.Scan(&source_listing_id)
+	return source_listing_id, err
 }

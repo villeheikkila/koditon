@@ -43,6 +43,10 @@ func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int6
 
 // RemoveFrontdoorBuildingAnnouncement removes the canonical listing projection for a rental Frontdoor announcement.
 func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) error {
+	announcementIDText := announcementID.String()
+	if err := s.queries.DeleteFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementIDText); err != nil {
+		return fmt.Errorf("delete frontdoor announcement source listing: %w", err)
+	}
 	if err := s.queries.DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx, &announcementID); err != nil {
 		return fmt.Errorf("delete frontdoor announcement listing model source: %w", err)
 	}
@@ -69,9 +73,9 @@ func (s *Service) ReconcileFrontdoorAd(ctx context.Context, frontdoorAdID uuid.U
 
 // ReconcileFrontdoorBuildingAnnouncement publishes one Frontdoor building announcement into the canonical listing graph.
 func (s *Service) ReconcileFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) (Result, error) {
-	sourceListingID, err := s.queries.CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx, &announcementID)
+	sourceListingID, err := s.queries.UpsertFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementID)
 	if err != nil {
-		return Result{}, fmt.Errorf("canonicalize frontdoor announcement listing model source: %w", err)
+		return Result{}, fmt.Errorf("upsert frontdoor announcement source listing: %w", err)
 	}
 	return s.reconcileSourceListing(ctx, sourceListingID)
 }
