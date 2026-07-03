@@ -384,6 +384,40 @@ type UnifiedEntityDetail struct {
 	Raw            RawPayload
 }
 
+type canonicalListingDetailRow struct {
+	Source               string
+	Kind                 string
+	NativeID             string
+	CanonicalID          string
+	URL                  *string
+	Headline             *string
+	Address              *string
+	City                 *string
+	Postal               *string
+	Latitude             *float64
+	Longitude            *float64
+	AskingPrice          *int64
+	DebtFreePrice        *int64
+	DebtShareAmount      *int64
+	AreaM2               *float64
+	RoomLayout           *string
+	PricePerM2           *float64
+	RoomsCount           *int32
+	FloorLevel           *int32
+	TotalFloors          *int32
+	BuildYear            *int32
+	PropertyTypeCode     *string
+	Condition            *string
+	EnergyClass          *string
+	EnergyLabel          *string
+	Elevator             *bool
+	Sauna                *bool
+	ListingType          string
+	ExternalURLAvailable bool
+	LastSeenAt           time.Time
+	RawPayload           []byte
+}
+
 type NormalizedDetailFields struct {
 	CanonicalID              string   `json:"canonical_id"`
 	Source                   string   `json:"source"`
@@ -611,6 +645,15 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 	if err != nil {
 		return UnifiedEntityDetail{}, err
 	}
+	if kind == "ad" || kind == "announcement" {
+		detail, err := s.listingDetailByCanonicalID(ctx, canonicalID, source, kind, nativeID)
+		if err == nil {
+			return detail, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return UnifiedEntityDetail{}, err
+		}
+	}
 	switch source {
 	case "shortcut":
 		switch kind {
@@ -712,6 +755,71 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 	default:
 		return UnifiedEntityDetail{}, fmt.Errorf("unsupported source: %s", source)
 	}
+}
+
+func (s *Service) listingDetailByCanonicalID(ctx context.Context, canonicalID string, source string, kind string, nativeID string) (UnifiedEntityDetail, error) {
+	var row canonicalListingDetailRow
+	err := s.db.QueryRow(ctx, `
+SELECT
+    doc.source,
+    doc.kind,
+    doc.native_id,
+    doc.canonical_id,
+    doc.url,
+    doc.headline,
+    doc.address,
+    doc.city,
+    doc.postal,
+    doc.latitude,
+    doc.longitude,
+    doc.asking_price,
+    doc.debt_free_price,
+    doc.debt_share_amount,
+    doc.area_m2,
+    doc.room_layout,
+    doc.price_per_m2,
+    doc.rooms_count,
+    doc.floor_level,
+    doc.total_floors,
+    doc.build_year,
+    doc.property_type_code,
+    doc.condition,
+    doc.energy_class,
+    doc.energy_efficiency_label,
+    doc.elevator,
+    doc.sauna,
+    doc.listing_type,
+    (doc.url IS NOT NULL AND doc.last_seen_at >= now() - interval '7 days') AS external_url_available,
+    COALESCE(doc.last_seen_at, doc.refreshed_at),
+    COALESCE(
+        CASE
+            WHEN evidence.shortcut_ad_id IS NOT NULL THEN sa.shortcut_ad_data
+            WHEN evidence.frontdoor_ad_id IS NOT NULL THEN fa.frontdoor_ad_data
+            WHEN evidence.frontdoor_building_announcement_id IS NOT NULL THEN to_jsonb(fba)
+            ELSE NULL
+        END,
+        '{}'::jsonb
+    ) AS raw_payload
+FROM public.listing_search_documents doc
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+WHERE doc.listing_status = 'active'
+    AND (doc.canonical_id = $1 OR (doc.source = $2 AND doc.kind = $3 AND doc.native_id = $4))
+ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
+LIMIT 1`, canonicalID, source, kind, nativeID).Scan(&row.Source, &row.Kind, &row.NativeID, &row.CanonicalID, &row.URL, &row.Headline, &row.Address, &row.City, &row.Postal, &row.Latitude, &row.Longitude, &row.AskingPrice, &row.DebtFreePrice, &row.DebtShareAmount, &row.AreaM2, &row.RoomLayout, &row.PricePerM2, &row.RoomsCount, &row.FloorLevel, &row.TotalFloors, &row.BuildYear, &row.PropertyTypeCode, &row.Condition, &row.EnergyClass, &row.EnergyLabel, &row.Elevator, &row.Sauna, &row.ListingType, &row.ExternalURLAvailable, &row.LastSeenAt, &row.RawPayload)
+	if err != nil {
+		return UnifiedEntityDetail{}, err
+	}
+	canonical := UnifiedCanonicalFields{CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, Headline: firstNonEmpty(valueOrEmpty(row.Headline), valueOrEmpty(row.Address), row.NativeID), Address: valueOrEmpty(row.Address), City: valueOrEmpty(row.City), Postal: valueOrEmpty(row.Postal), Latitude: row.Latitude, Longitude: row.Longitude, Price: row.AskingPrice, Area: row.AreaM2, RoomLayout: strings.TrimSpace(valueOrEmpty(row.RoomLayout)), URL: strings.TrimSpace(valueOrEmpty(row.URL)), ExternalURLAvailable: row.ExternalURLAvailable, LastSeenAt: row.LastSeenAt}
+	detail := UnifiedEntityDetail{Canonical: canonical}
+	energyClass := firstNonEmpty(valueOrEmpty(row.EnergyLabel), valueOrEmpty(row.EnergyClass))
+	detail.Normalized = NormalizedDetailFields{CanonicalID: row.CanonicalID, Source: row.Source, Kind: row.Kind, URL: canonical.URL, StreetAddress: canonical.Address, City: canonical.City, Postal: canonical.Postal, Latitude: row.Latitude, Longitude: row.Longitude, AskingPrice: row.AskingPrice, DebtFreePrice: row.DebtFreePrice, DebtShareAmount: row.DebtShareAmount, PricePerSquareMeter: row.PricePerM2, AreaM2: row.AreaM2, RoomLayout: canonical.RoomLayout, RoomsCount: row.RoomsCount, FloorLevel: row.FloorLevel, TotalFloors: row.TotalFloors, BuildYear: row.BuildYear, Condition: valueOrEmpty(row.Condition), EnergyClass: energyClass, Elevator: row.Elevator, Sauna: row.Sauna}
+	detail.SourceSpecific = []DetailField{{Label: "Listing Type", Value: row.ListingType}, {Label: "Property Type", Value: valueOrEmpty(row.PropertyTypeCode)}, {Label: "Condition", Value: valueOrEmpty(row.Condition)}, {Label: "Energy Class", Value: energyClass}}
+	detail.Raw = buildRawPayload(row.RawPayload)
+	detail = promoteCanonicalFields(detail, "Listing Type", "Property Type", "Condition", "Energy Class")
+	return cleanDetail(detail), nil
 }
 
 func CanonicalID(source, kind, nativeID string) string {
