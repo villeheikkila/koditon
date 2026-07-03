@@ -15,22 +15,24 @@ func transactionMatchCandidatesSQLForTest(t *testing.T) string {
 	return string(data)
 }
 
-func TestTransactionMatchCandidatesUseListingLocationFallbacks(t *testing.T) {
+func TestTransactionMatchCandidatesUseListingDocuments(t *testing.T) {
 	query := transactionMatchCandidatesSQLForTest(t)
 	for _, want := range []string{
-		"COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')",
-		"COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')",
+		"JOIN public.listing_search_documents doc ON doc.primary_source_listing_id = latest.sale_listing_id",
+		"doc.city AS listing_city",
+		"doc.postal AS listing_postal",
+		"doc.listing_status = 'active'",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("expected transaction match candidates SQL to include %q", want)
 		}
 	}
-	for _, rawOnly := range []string{
-		"COALESCE(sl.sale_listing_city, '')",
-		"COALESCE(sl.sale_listing_postal_norm, '')",
+	for _, sourceOnly := range []string{
+		"JOIN public.property_source_offerings sl",
+		"JOIN public.target_sources source_link",
 	} {
-		if strings.Contains(query, rawOnly) {
-			t.Fatalf("expected transaction match candidates SQL to avoid raw-only location expression %q", rawOnly)
+		if strings.Contains(query, sourceOnly) {
+			t.Fatalf("expected transaction match candidates SQL to avoid %q", sourceOnly)
 		}
 	}
 }
@@ -44,9 +46,8 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 		"'listing'::text",
 		"'source_listing'::text",
 		"FROM public.price_links pl",
-		"pl.price_link_id::text || ':' || sl.sale_listing_id::text",
-		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
-		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
+		"pl.price_link_id::text || ':' || doc.listing_id::text",
+		"JOIN public.listing_search_documents doc ON doc.property_offering_id = pl.target_id",
 		"pl.prices_transaction_id = sqlc.narg('transaction_id')::uuid",
 		"pl.target_type = 'source_listing'",
 	} {
@@ -62,11 +63,11 @@ func TestTransactionMatchCandidatesIncludeLinkedRowsForTransactionReview(t *test
 	}
 }
 
-func TestTransactionMatchCandidatesUseLiveShortcutAdAvailability(t *testing.T) {
+func TestTransactionMatchCandidatesUseProjectedAvailability(t *testing.T) {
 	query := transactionMatchCandidatesSQLForTest(t)
 	for _, want := range []string{
-		"sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad'",
-		"COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'",
+		"COALESCE(doc.url, '') <> '' AS external_url_available",
+		"doc.listing_status = 'active'",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("expected transaction match SQL to include %q", want)
