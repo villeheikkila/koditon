@@ -2420,7 +2420,7 @@ ALTER TABLE ONLY public.property_documents
     ADD CONSTRAINT property_documents_property_unit_id_fkey FOREIGN KEY (property_unit_id) REFERENCES public.property_units(property_unit_id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY public.property_houses
-    ADD CONSTRAINT property_houses_primary_sale_listing_id_fkey FOREIGN KEY (primary_sale_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE SET NULL;
+    ADD CONSTRAINT property_houses_primary_sale_listing_id_fkey FOREIGN KEY (primary_sale_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY public.property_offering_merge_decisions
     ADD CONSTRAINT property_offering_merge_decisi_source_property_offering_id_fkey FOREIGN KEY (source_property_offering_id) REFERENCES public.property_offerings(property_offering_id) ON DELETE CASCADE;
@@ -2429,7 +2429,7 @@ ALTER TABLE ONLY public.property_offering_merge_decisions
     ADD CONSTRAINT property_offering_merge_decisi_target_property_offering_id_fkey FOREIGN KEY (target_property_offering_id) REFERENCES public.property_offerings(property_offering_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.property_offerings
-    ADD CONSTRAINT property_offerings_primary_sale_listing_id_fkey FOREIGN KEY (primary_sale_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE SET NULL;
+    ADD CONSTRAINT property_offerings_primary_sale_listing_id_fkey FOREIGN KEY (primary_sale_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY public.property_offerings
     ADD CONSTRAINT property_offerings_property_house_id_fkey FOREIGN KEY (property_house_id) REFERENCES public.property_houses(property_house_id) ON DELETE CASCADE;
@@ -2459,7 +2459,7 @@ ALTER TABLE ONLY public.sale_listing_prices_transaction_match_candidates
     ADD CONSTRAINT sale_listing_prices_transaction_matc_prices_transaction_id_fkey FOREIGN KEY (prices_transaction_id) REFERENCES origin.prices_transactions(prices_transaction_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.sale_listing_prices_transaction_match_candidates
-    ADD CONSTRAINT sale_listing_prices_transaction_match_cand_sale_listing_id_fkey FOREIGN KEY (sale_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE CASCADE;
+    ADD CONSTRAINT sale_listing_prices_transaction_match_cand_sale_listing_id_fkey FOREIGN KEY (sale_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.property_source_offerings
     ADD CONSTRAINT sale_listings_frontdoor_ad_id_fkey FOREIGN KEY (frontdoor_ad_id) REFERENCES origin.frontdoor_ads(frontdoor_ad_id) ON DELETE SET NULL;
