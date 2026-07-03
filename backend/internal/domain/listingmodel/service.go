@@ -35,6 +35,10 @@ func NewService(logger *slog.Logger, pool *pgxpool.Pool) *Service {
 
 // RemoveShortcutAdListing removes the canonical listing projection for a non-listing Shortcut ad.
 func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int64) error {
+	shortcutAdIDText := fmt.Sprint(shortcutAdID)
+	if err := s.queries.DeleteShortcutAdSourceListing(ctx, &shortcutAdIDText); err != nil {
+		return fmt.Errorf("delete shortcut source listing: %w", err)
+	}
 	if err := s.queries.DeleteSaleListingForShortcutAd(ctx, &shortcutAdID); err != nil {
 		return fmt.Errorf("delete shortcut listing model source: %w", err)
 	}

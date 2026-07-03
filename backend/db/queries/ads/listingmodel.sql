@@ -59,6 +59,13 @@ WHERE provider = 'frontdoor'
     AND raw_table = 'frontdoor_building_announcements'
     AND raw_id = sqlc.arg(frontdoor_building_announcement_id)::text;
 
+-- name: DeleteShortcutAdSourceListing :exec
+DELETE FROM origin.source_listings
+WHERE provider = 'shortcut'
+    AND source_kind = 'ad'
+    AND raw_table = 'shortcut_ads'
+    AND raw_id = sqlc.arg(shortcut_ad_id)::text;
+
 -- name: ReconcileSourceListingModel :one
 WITH announcement_source AS (
     SELECT

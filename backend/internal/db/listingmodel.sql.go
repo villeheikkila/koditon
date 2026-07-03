@@ -24,6 +24,19 @@ func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.C
 	return err
 }
 
+const deleteShortcutAdSourceListing = `-- name: DeleteShortcutAdSourceListing :exec
+DELETE FROM origin.source_listings
+WHERE provider = 'shortcut'
+    AND source_kind = 'ad'
+    AND raw_table = 'shortcut_ads'
+    AND raw_id = $1::text
+`
+
+func (q *Queries) DeleteShortcutAdSourceListing(ctx context.Context, shortcutAdID *string) error {
+	_, err := q.db.Exec(ctx, deleteShortcutAdSourceListing, shortcutAdID)
+	return err
+}
+
 const reconcileSourceListingModel = `-- name: ReconcileSourceListingModel :one
 WITH announcement_source AS (
     SELECT
