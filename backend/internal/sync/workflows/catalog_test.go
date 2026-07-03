@@ -10,8 +10,8 @@ import (
 func TestAllDefinitionsCoverTargetWorkflowShape(t *testing.T) {
 	t.Parallel()
 	defs := AllDefinitions()
-	if len(defs) != 26 {
-		t.Fatalf("definition count = %d, want 26", len(defs))
+	if len(defs) != 23 {
+		t.Fatalf("definition count = %d, want 23", len(defs))
 	}
 	wantQueues := map[string]bool{
 		QueueFrontdoor:       false,

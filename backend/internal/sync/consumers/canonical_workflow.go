@@ -11,7 +11,6 @@ import (
 
 	"github.com/earendil-works/absurd/sdks/go/absurd"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
 	"koditon/internal/domain/properties"
@@ -22,9 +21,6 @@ import (
 var canonicalWorkflowKinds = []string{
 	TaskTypeCanonicalizeSourceAdsFanout,
 	TaskTypeCanonicalizeSourceAd,
-	TaskTypeCanonicalMatchSaleListingSourcesBackfill,
-	TaskTypeCanonicalMatchSaleListingSourcesFanout,
-	TaskTypeCanonicalMatchSaleListingSource,
 	TaskTypeCanonicalRebuildDimensionLayerBackfill,
 	TaskTypeCanonicalRebuildDimensionLayerListing,
 	TaskTypeCanonicalResolveDirtyDimensionTargets,
@@ -40,17 +36,6 @@ var canonicalLLMWorkflowKinds = []string{
 
 type canonicalFanoutResult struct {
 	Enqueued int `json:"enqueued"`
-}
-
-type canonicalMatchListingWorkflowResult struct {
-	SaleListingID string                    `json:"sale_listing_id"`
-	Status        string                    `json:"status"`
-	Run           *canonicalMatchRunSummary `json:"run,omitempty"`
-}
-
-type canonicalMatchLoadedListing struct {
-	Found bool                         `json:"found"`
-	Row   canonicalMatchSaleListingRow `json:"row"`
 }
 
 type dimensionLayerBackfillResult struct {
@@ -164,12 +149,6 @@ func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params json.RawM
 		result, err = c.runCanonicalizeSourceAdsFanoutWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalizeSourceAd:
 		result, err = c.runCanonicalizeSourceAdWorkflow(ctx, logger, params)
-	case TaskTypeCanonicalMatchSaleListingSourcesBackfill:
-		result, err = c.runCanonicalMatchBackfillWorkflow(ctx, logger, params)
-	case TaskTypeCanonicalMatchSaleListingSourcesFanout:
-		result, err = c.runCanonicalMatchFanoutWorkflow(ctx, logger, params)
-	case TaskTypeCanonicalMatchSaleListingSource:
-		result, err = c.runCanonicalMatchSaleListingSourceWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalRebuildDimensionLayerBackfill:
 		result, err = c.runDimensionLayerBackfillWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalRebuildDimensionLayerListing:
@@ -260,105 +239,6 @@ func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *
 		return canonicalizeSourceAdPayload{}, err
 	}
 	return payload, nil
-}
-
-func (c *Consumer) runCanonicalMatchBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalMatchRunSummary, error) {
-	payload, err := decodeCanonicalMatchBackfillWorkflowPayload(params)
-	if err != nil {
-		return canonicalMatchRunSummary{}, err
-	}
-	run, err := absurd.Step(ctx, "run-source-match-backfill", func(ctx context.Context) (canonicalMatchRunSummary, error) {
-		return c.runCanonicalSourceMatchBackfill(ctx, int(payload.ScoreThreshold), int(payload.CompetitorMargin))
-	})
-	if err != nil {
-		return canonicalMatchRunSummary{}, err
-	}
-	logger.InfoContext(ctx, "canonical sale listing source backfill matched", "run_id", run.RunID, "candidates", run.Candidates, "auto_linked", run.AutoLinked, "ambiguous", run.Ambiguous, "outcome", logging.OutcomeSuccess)
-	return run, nil
-}
-
-func (c *Consumer) runCanonicalMatchFanoutWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalFanoutResult, error) {
-	payload, err := decodeCanonicalMatchFanoutWorkflowPayload(params)
-	if err != nil {
-		return canonicalFanoutResult{}, err
-	}
-	return absurd.Step(ctx, "scan-and-spawn-listings", func(ctx context.Context) (canonicalFanoutResult, error) {
-		rows, err := c.queries.ListCanonicalMatchFanoutListings(ctx, &payload.Limit)
-		if err != nil {
-			return canonicalFanoutResult{}, fmt.Errorf("list sale listings for canonical source matching: %w", err)
-		}
-		enqueued := 0
-		for _, row := range rows {
-			if err := c.spawnCanonicalSourceMatchSaleListing(ctx, stringValue(row.SaleListingID), int32Value(row.AttemptCount)+1); err != nil {
-				return canonicalFanoutResult{}, err
-			}
-			enqueued++
-		}
-		logger.InfoContext(ctx, "canonical sale listing source match tasks spawned", "count", enqueued, "outcome", logging.OutcomeSuccess)
-		return canonicalFanoutResult{Enqueued: enqueued}, nil
-	})
-}
-
-func (c *Consumer) runCanonicalMatchSaleListingSourceWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalMatchListingWorkflowResult, error) {
-	payload, err := decodeCanonicalMatchSaleListingWorkflowPayload(params)
-	if err != nil {
-		return canonicalMatchListingWorkflowResult{}, err
-	}
-	loaded, err := absurd.Step(ctx, "load-listing", func(ctx context.Context) (canonicalMatchLoadedListing, error) {
-		row, err := c.loadCanonicalMatchSaleListing(ctx, payload.SaleListingID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return canonicalMatchLoadedListing{}, nil
-		}
-		return canonicalMatchLoadedListing{Found: true, Row: row}, err
-	})
-	if err != nil {
-		return canonicalMatchListingWorkflowResult{}, err
-	}
-	if !loaded.Found {
-		return canonicalMatchListingWorkflowResult{SaleListingID: payload.SaleListingID, Status: "not_found"}, nil
-	}
-	row := loaded.Row
-	if row.LinkMethod != nil && *row.LinkMethod == "manual" {
-		if err := c.updateCanonicalSourceMatchStateStep(ctx, "mark-manual-linked", row.ID, "manual_linked", nil, nil); err != nil {
-			return canonicalMatchListingWorkflowResult{}, err
-		}
-		if err := c.projectTypedHousingCompanyProfileForSaleListingStep(ctx, row.ID); err != nil {
-			return canonicalMatchListingWorkflowResult{}, err
-		}
-		return canonicalMatchListingWorkflowResult{SaleListingID: row.ID, Status: "manual_linked"}, nil
-	}
-	run, err := absurd.Step(ctx, "run-source-match", func(ctx context.Context) (canonicalMatchRunSummary, error) {
-		return c.runCanonicalSourceMatchForSaleListing(ctx, row.ID)
-	})
-	if err != nil {
-		return canonicalMatchListingWorkflowResult{}, err
-	}
-	if run.AutoLinked > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source auto-linked", "sale_listing_id", row.ID, "run_id", run.RunID, "outcome", logging.OutcomeSuccess)
-		if err := c.updateCanonicalSourceMatchStateStep(ctx, "mark-auto-linked", row.ID, "auto_linked", nil, &run.RunID); err != nil {
-			return canonicalMatchListingWorkflowResult{}, err
-		}
-		if err := c.projectTypedHousingCompanyProfileForSaleListingStep(ctx, row.ID); err != nil {
-			return canonicalMatchListingWorkflowResult{}, err
-		}
-		return canonicalMatchListingWorkflowResult{SaleListingID: row.ID, Status: "auto_linked", Run: &run}, nil
-	}
-	if run.Ambiguous > 0 {
-		logger.InfoContext(ctx, "canonical sale listing source needs review", "sale_listing_id", row.ID, "run_id", run.RunID, "candidates", run.Ambiguous)
-		if err := c.updateCanonicalSourceMatchStateStep(ctx, "mark-needs-review", row.ID, "needs_review", nil, &run.RunID); err != nil {
-			return canonicalMatchListingWorkflowResult{}, err
-		}
-		return canonicalMatchListingWorkflowResult{SaleListingID: row.ID, Status: "needs_review", Run: &run}, nil
-	}
-	next := time.Now().UTC().Add(7 * 24 * time.Hour)
-	status := "deferred"
-	if run.Candidates == 0 {
-		status = "noop"
-	}
-	if err := c.updateCanonicalSourceMatchStateStep(ctx, "mark-"+status, row.ID, status, &next, &run.RunID); err != nil {
-		return canonicalMatchListingWorkflowResult{}, err
-	}
-	return canonicalMatchListingWorkflowResult{SaleListingID: row.ID, Status: status, Run: &run}, nil
 }
 
 func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (dimensionLayerBackfillResult, error) {
@@ -573,22 +453,6 @@ func (c *Consumer) runCanonicalProjectManagerCertificateWorkflow(ctx context.Con
 	return result, nil
 }
 
-func decodeCanonicalMatchBackfillWorkflowPayload(raw json.RawMessage) (canonicalMatchBackfillPayload, error) {
-	payload := canonicalMatchBackfillPayload{ScoreThreshold: 95, CompetitorMargin: 10}
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return canonicalMatchBackfillPayload{}, fmt.Errorf("decode canonical source match backfill payload: %w", err)
-		}
-	}
-	if payload.ScoreThreshold <= 0 {
-		payload.ScoreThreshold = 95
-	}
-	if payload.CompetitorMargin < 0 {
-		payload.CompetitorMargin = 10
-	}
-	return payload, nil
-}
-
 func decodeCanonicalizeSourceAdsFanoutWorkflowPayload(raw json.RawMessage) (canonicalizeSourceAdsFanoutPayload, error) {
 	payload := canonicalizeSourceAdsFanoutPayload{Limit: 1000}
 	if len(raw) > 0 {
@@ -613,36 +477,6 @@ func decodeCanonicalizeSourceAdWorkflowPayload(raw json.RawMessage) (canonicaliz
 	payload.SourceID = strings.TrimSpace(payload.SourceID)
 	if payload.SourceTable == "" || payload.SourceID == "" {
 		return canonicalizeSourceAdPayload{}, fmt.Errorf("source_table and source_id are required")
-	}
-	return payload, nil
-}
-
-func decodeCanonicalMatchFanoutWorkflowPayload(raw json.RawMessage) (canonicalMatchFanoutPayload, error) {
-	payload := canonicalMatchFanoutPayload{Limit: 5000}
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return canonicalMatchFanoutPayload{}, fmt.Errorf("decode canonical source match fanout payload: %w", err)
-		}
-	}
-	if payload.Limit <= 0 || payload.Limit > 5000 {
-		payload.Limit = 5000
-	}
-	return payload, nil
-}
-
-func decodeCanonicalMatchSaleListingWorkflowPayload(raw json.RawMessage) (canonicalMatchSaleListingPayload, error) {
-	var payload canonicalMatchSaleListingPayload
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return canonicalMatchSaleListingPayload{}, fmt.Errorf("decode canonical sale listing source match payload: %w", err)
-		}
-	}
-	payload.SaleListingID = strings.TrimSpace(payload.SaleListingID)
-	if payload.SaleListingID == "" {
-		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id is required")
-	}
-	if _, err := uuid.Parse(payload.SaleListingID); err != nil {
-		return canonicalMatchSaleListingPayload{}, fmt.Errorf("sale_listing_id must be a uuid: %w", err)
 	}
 	return payload, nil
 }
@@ -747,18 +581,6 @@ func decodeManagerCertificateDocumentWorkflowPayload(raw json.RawMessage) (manag
 	return payload, nil
 }
 
-func (c *Consumer) spawnCanonicalSourceMatchSaleListing(ctx context.Context, saleListingID string, attempt int32) error {
-	payload, err := json.Marshal(canonicalMatchSaleListingPayload{SaleListingID: saleListingID, Attempt: attempt})
-	if err != nil {
-		return fmt.Errorf("marshal canonical sale listing source match payload: %w", err)
-	}
-	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypeCanonicalMatchSaleListingSource,
-		Params:   payload,
-	})
-	return err
-}
-
 func (c *Consumer) spawnCanonicalizeSourceAdsFanout(ctx context.Context, limit int32) error {
 	payload, err := json.Marshal(canonicalizeSourceAdsFanoutPayload{Limit: limit})
 	if err != nil {
@@ -767,20 +589,6 @@ func (c *Consumer) spawnCanonicalizeSourceAdsFanout(ctx context.Context, limit i
 	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
 		TaskName: TaskTypeCanonicalizeSourceAdsFanout,
 		Params:   payload,
-	})
-	return err
-}
-
-func (c *Consumer) updateCanonicalSourceMatchStateStep(ctx context.Context, stepName string, saleListingID, status string, nextAttemptAt *time.Time, runID *string) error {
-	_, err := absurd.Step(ctx, stepName, func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.updateCanonicalSourceMatchState(ctx, saleListingID, status, nextAttemptAt, runID)
-	})
-	return err
-}
-
-func (c *Consumer) projectTypedHousingCompanyProfileForSaleListingStep(ctx context.Context, saleListingID string) error {
-	_, err := absurd.Step(ctx, "project-typed-housing-company-profile", func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.projectTypedHousingCompanyProfileForSaleListing(ctx, saleListingID)
 	})
 	return err
 }

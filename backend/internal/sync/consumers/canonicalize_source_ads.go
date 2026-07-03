@@ -142,9 +142,6 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "source_listing_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty for frontdoor ad source offering: %w", err)
 	}
-	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1); err != nil {
-		return err
-	}
 	logger.InfoContext(ctx, "frontdoor ad canonicalized", "frontdoor_ad_id", sourceID, "sale_listing_id", saleListingID.String(), "outcome", logging.OutcomeSuccess)
 	return nil
 }
@@ -202,9 +199,6 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 	}
 	if _, err := c.queries.MarkListingDimensionTargetsDirty(ctx, db.MarkListingDimensionTargetsDirtyParams{SaleListingID: saleListingID, Reason: "source_listing_changed"}); err != nil {
 		return fmt.Errorf("mark dimension targets dirty for shortcut ad source offering: %w", err)
-	}
-	if err := c.enqueueCanonicalSourceMatchSaleListing(ctx, saleListingID.String(), 1); err != nil {
-		return err
 	}
 	logger.InfoContext(ctx, "shortcut ad canonicalized", "shortcut_ad_id", shortcutAdID, "sale_listing_id", saleListingID.String(), "outcome", logging.OutcomeSuccess)
 	return nil
