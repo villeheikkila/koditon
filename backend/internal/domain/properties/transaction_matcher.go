@@ -128,7 +128,14 @@ func (s *Service) loadTransactionMatchCandidateRows(ctx context.Context, targetL
 	}
 	out := make([]transactionMatchCandidateRaw, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, transactionMatchCandidateRaw{ListingID: row.SaleListingID, TransactionID: row.PricesTransactionID, ListingLayout: valueOrEmpty(row.ListingLayout), TransactionLayout: valueOrEmpty(row.TransactionLayout), ListingArea: row.SaleListingAreaValue, TransactionArea: row.PricesTransactionArea, ListingType: valueOrEmpty(row.ListingType), TransactionType: valueOrEmpty(row.TransactionType), ListingBuildYear: row.SaleListingBuildYear, TransactionYear: row.PricesTransactionBuildYear, ListingFloor: row.SaleListingFloorLevel, ListingTotalFloors: row.SaleListingTotalFloors, TransactionFloor: valueOrEmpty(row.TransactionFloor), ListingElevator: row.SaleListingElevator, TransactionElevator: row.PricesTransactionElevator, ListingCondition: valueOrEmpty(row.ListingCondition), TransactionCondition: valueOrEmpty(row.TransactionCondition), ListingPlotOwned: row.SaleListingPlotOwned, TransactionPlotOwned: row.PricesTransactionPlotOwned, ListingEnergy: valueOrEmpty(row.ListingEnergy), TransactionEnergy: valueOrEmpty(row.TransactionEnergy), ListingPrice: row.SaleListingAskingPrice, TransactionPrice: row.PricesTransactionPrice, ListingFirstSeenAt: row.SaleListingFirstSeenAt, ListingLastSeenAt: row.SaleListingLastSeenAt, ListingCreatedAt: row.SaleListingCreatedAt, ListingUpdatedAt: row.SaleListingUpdatedAt, TransactionCreatedAt: row.PricesTransactionCreatedAt})
+		if row.SaleListingID == nil {
+			continue
+		}
+		createdAt := time.Now().UTC()
+		if row.SaleListingCreatedAt != nil {
+			createdAt = *row.SaleListingCreatedAt
+		}
+		out = append(out, transactionMatchCandidateRaw{ListingID: *row.SaleListingID, TransactionID: row.PricesTransactionID, ListingLayout: valueOrEmpty(row.ListingLayout), TransactionLayout: valueOrEmpty(row.TransactionLayout), ListingArea: row.SaleListingAreaValue, TransactionArea: row.PricesTransactionArea, ListingType: valueOrEmpty(row.ListingType), TransactionType: valueOrEmpty(row.TransactionType), ListingBuildYear: row.SaleListingBuildYear, TransactionYear: row.PricesTransactionBuildYear, ListingFloor: row.SaleListingFloorLevel, ListingTotalFloors: row.SaleListingTotalFloors, TransactionFloor: valueOrEmpty(row.TransactionFloor), ListingElevator: row.SaleListingElevator, TransactionElevator: row.PricesTransactionElevator, ListingCondition: valueOrEmpty(row.ListingCondition), TransactionCondition: valueOrEmpty(row.TransactionCondition), ListingPlotOwned: row.SaleListingPlotOwned, TransactionPlotOwned: row.PricesTransactionPlotOwned, ListingEnergy: valueOrEmpty(row.ListingEnergy), TransactionEnergy: valueOrEmpty(row.TransactionEnergy), ListingPrice: row.SaleListingAskingPrice, TransactionPrice: row.PricesTransactionPrice, ListingFirstSeenAt: row.SaleListingFirstSeenAt, ListingLastSeenAt: row.SaleListingLastSeenAt, ListingCreatedAt: createdAt, ListingUpdatedAt: row.SaleListingUpdatedAt, TransactionCreatedAt: row.PricesTransactionCreatedAt})
 	}
 	return out, nil
 }
@@ -199,11 +206,8 @@ func (s *Service) applyTransactionMatchLinks(ctx context.Context, runID uuid.UUI
 		if err != nil {
 			return 0, 0, fmt.Errorf("link transaction match: %w", err)
 		}
-		if rowsAffected == 0 {
+		if rowsAffected == nil || *rowsAffected == 0 {
 			continue
-		}
-		if err := s.queries.SyncSourceListingTransactionMatchState(ctx, &candidate.ListingID); err != nil {
-			return 0, 0, fmt.Errorf("sync source listing transaction match state: %w", err)
 		}
 		autoLinked++
 		if err := s.queries.MarkTransactionMatchLinked(ctx, db.MarkTransactionMatchLinkedParams{RunID: &runID, ListingID: &candidate.ListingID, TransactionID: &candidate.TransactionID}); err != nil {
