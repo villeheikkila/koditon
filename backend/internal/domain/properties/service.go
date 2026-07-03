@@ -329,15 +329,13 @@ WITH target AS (
     SELECT
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
         pu.physical_building_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = $1
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = $1
+        AND doc.listing_status = 'active'
+    ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
     LIMIT 1
 )
 SELECT
@@ -1528,12 +1526,8 @@ LEFT JOIN LATERAL (
         c.sale_listing_prices_transaction_match_score,
         c.sale_listing_prices_transaction_match_confidence
     FROM public.sale_listing_prices_transaction_match_candidates c
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = pl.target_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = c.sale_listing_id
-        AND source_link.link_status <> 'rejected'
     WHERE c.prices_transaction_id = pl.prices_transaction_id
+        AND c.sale_listing_id = $2
     ORDER BY c.sale_listing_prices_transaction_match_created_at DESC
     LIMIT 1
 ) c ON true
@@ -1541,7 +1535,7 @@ WHERE pl.target_type = 'listing'
     AND pl.target_id = $1
     AND pl.link_status <> 'rejected'
 ORDER BY pl.link_score DESC, pl.updated_at DESC
-LIMIT 1`, offeringID).Scan(&transactionID, &transactionFirstSeenAt, &transactionUpdatedAt, &description, &transactionType, &category, &area, &price, &pricePerM2, &buildYear, &floor, &elevator, &condition, &plot, &plotOwned, &energyClass, &period, &city, &neighborhood, &postalCode, &matchStatus, &matchScore, &matchConfidence)
+LIMIT 1`, offeringID, saleListingID).Scan(&transactionID, &transactionFirstSeenAt, &transactionUpdatedAt, &description, &transactionType, &category, &area, &price, &pricePerM2, &buildYear, &floor, &elevator, &condition, &plot, &plotOwned, &energyClass, &period, &city, &neighborhood, &postalCode, &matchStatus, &matchScore, &matchConfidence)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
