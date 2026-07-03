@@ -100,6 +100,91 @@ WITH announcement_source AS (
         AND sl.provider = 'frontdoor'
         AND sl.source_kind = 'announcement'
 ),
+shortcut_source AS (
+    SELECT
+        NULL::uuid AS frontdoor_ad_id,
+        NULL::uuid AS frontdoor_building_announcement_id,
+        lower(trim(COALESCE(raw.street_address, sb.shortcut_building_address))) AS sale_listing_address_norm,
+        NULL::integer AS sale_listing_apartment_count,
+        raw.area AS sale_listing_area_value,
+        raw.price AS sale_listing_asking_price,
+        COALESCE(raw.build_year, sb.shortcut_building_construction_year) AS sale_listing_build_year,
+        lower(trim(concat_ws(' ', COALESCE(raw.street_address, sb.shortcut_building_address), raw.postal, raw.city))) AS sale_listing_building_match_key,
+        sl.canonical_source_id AS sale_listing_canonical_id,
+        raw.city AS sale_listing_city,
+        lower(trim(raw.city)) AS sale_listing_city_norm,
+        raw.condition AS sale_listing_condition,
+        raw.debt_free_price AS sale_listing_debt_free_price,
+        raw.debt_share_amount AS sale_listing_debt_share_amount,
+        raw.description_text AS sale_listing_description_text,
+        NULL::boolean AS sale_listing_elevator,
+        raw.energy_class AS sale_listing_energy_class,
+        raw.energy_class AS sale_listing_energy_efficiency_label,
+        sl.first_seen_at AS sale_listing_first_seen_at,
+        raw.floor_level AS sale_listing_floor_level,
+        COALESCE(raw.street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text) AS sale_listing_headline,
+        NULL::text AS sale_listing_housing_company_business_id,
+        sb.shortcut_building_housing_company AS sale_listing_housing_company_name,
+        sl.source_listing_id AS sale_listing_id,
+        sa.shortcut_ad_last_seen_at AS sale_listing_last_seen_at,
+        NULL::double precision AS sale_listing_latitude,
+        raw.living_area AS sale_listing_living_area_value,
+        NULL::double precision AS sale_listing_longitude,
+        sl.native_id AS sale_listing_native_id,
+        raw.plot_area AS sale_listing_plot_area_value,
+        NULL::boolean AS sale_listing_plot_owned,
+        raw.postal AS sale_listing_postal,
+        raw.postal AS sale_listing_postal_norm,
+        COALESCE(raw.price_per_m2, CASE WHEN raw.price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN raw.price::double precision / raw.area ELSE NULL END) AS sale_listing_price_per_m2,
+        NULL::text AS sale_listing_property_type_code,
+        (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS sale_listing_published_at,
+        NULL::text AS sale_listing_room_category_code,
+        sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS sale_listing_room_layout,
+        raw.rooms_count AS sale_listing_rooms_count,
+        trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS sale_listing_search_text,
+        raw.sauna AS sale_listing_sauna,
+        sl.source_kind AS sale_listing_source_kind,
+        sl.provider AS sale_listing_source_provider,
+        COALESCE(raw.street_address, sb.shortcut_building_address) AS sale_listing_street_address,
+        raw.total_floors AS sale_listing_total_floors,
+        sl.canonical_source_id AS sale_listing_unit_match_key,
+        sl.url AS sale_listing_url,
+        raw.new_development AS sale_listing_new_development,
+        raw.balcony AS sale_listing_balcony,
+        sa.shortcut_ad_id AS shortcut_ad_id
+    FROM origin.source_listings sl
+    JOIN origin.shortcut_ads sa ON sl.raw_table = 'shortcut_ads'
+        AND sl.raw_id = sa.shortcut_ad_id::text
+    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    CROSS JOIN LATERAL (
+        SELECT
+            COALESCE(CASE WHEN NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '') IS NOT NULL AND NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), '') IS NOT NULL THEN concat_ws(' ', NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,buildingLetter}'), '')) ELSE NULL END, NULLIF(trim(sa.shortcut_ad_data #>> '{address,formattedAddress}'), ''), NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '')) AS street_address,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '') AS city,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '') AS postal,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,priceSell}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,price}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,size}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS area,
+            (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS living_area,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,priceDebtFree}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,priceSell}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS debt_free_price,
+            (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,debtShare}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS debt_share_amount,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,pricePerSqm}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,pricePerSquareMeter}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price_per_m2,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,rooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{rooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS rooms_count,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,floor}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{floor}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS floor_level,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,totalFloors}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{buildingData,floors}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS total_floors,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{buildingData,year}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,constructionYear}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS build_year,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,condition}', sa.shortcut_ad_data #>> '{property,condition}')), '') AS condition,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,energyClass}', sa.shortcut_ad_data #>> '{property,energyClass}')), '') AS energy_class,
+            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{adData,description}', sa.shortcut_ad_data #>> '{description}', sa.shortcut_ad_data #>> '{text}')), '') AS description_text,
+            COALESCE(CASE WHEN sa.shortcut_ad_data #>> '{adData,sauna}' IS NULL THEN NULL WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,sauna}')) IN ('1', 'true', 'yes', 'on', 'kylla', 'kyllä', 'on') THEN true WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,sauna}')) IN ('0', 'false', 'no', 'off', 'ei') THEN false ELSE NULL END, CASE WHEN sa.shortcut_ad_data #>> '{adData,hasSauna}' IS NULL THEN NULL WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,hasSauna}')) IN ('1', 'true', 'yes', 'on', 'kylla', 'kyllä', 'on') THEN true WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,hasSauna}')) IN ('0', 'false', 'no', 'off', 'ei') THEN false ELSE NULL END) AS sauna,
+            CASE WHEN sa.shortcut_ad_data #>> '{adData,balcony}' IS NULL THEN NULL WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,balcony}')) IN ('1', 'true', 'yes', 'on', 'kylla', 'kyllä', 'on') THEN true WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,balcony}')) IN ('0', 'false', 'no', 'off', 'ei') THEN false ELSE NULL END AS balcony,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,plotArea}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{buildingData,plotArea}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS plot_area,
+            CASE WHEN sa.shortcut_ad_data #>> '{adData,newDevelopment}' IS NULL THEN NULL WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,newDevelopment}')) IN ('1', 'true', 'yes', 'on', 'kylla', 'kyllä', 'on') THEN true WHEN lower(trim(sa.shortcut_ad_data #>> '{adData,newDevelopment}')) IN ('0', 'false', 'no', 'off', 'ei') THEN false ELSE NULL END AS new_development
+    ) raw
+    WHERE sl.source_listing_id = $1::uuid
+        AND sl.provider = 'shortcut'
+        AND sl.source_kind = 'ad'
+        AND sa.shortcut_ad_type = 'listing'
+        AND sa.shortcut_ad_data IS NOT NULL
+),
 staged_source AS (
     SELECT
         frontdoor_ad_id,
@@ -155,6 +240,7 @@ staged_source AS (
     FROM public.property_source_offerings
     WHERE sale_listing_id = $1::uuid
         AND NOT EXISTS (SELECT 1 FROM announcement_source)
+        AND NOT EXISTS (SELECT 1 FROM shortcut_source)
 ),
 source AS (
     SELECT
@@ -209,6 +295,59 @@ source AS (
         sale_listing_balcony,
         shortcut_ad_id
     FROM announcement_source
+    UNION ALL
+    SELECT
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
+        sale_listing_address_norm,
+        sale_listing_apartment_count,
+        sale_listing_area_value,
+        sale_listing_asking_price,
+        sale_listing_build_year,
+        sale_listing_building_match_key,
+        sale_listing_canonical_id,
+        sale_listing_city,
+        sale_listing_city_norm,
+        sale_listing_condition,
+        sale_listing_debt_free_price,
+        sale_listing_debt_share_amount,
+        sale_listing_description_text,
+        sale_listing_elevator,
+        sale_listing_energy_class,
+        sale_listing_energy_efficiency_label,
+        sale_listing_first_seen_at,
+        sale_listing_floor_level,
+        sale_listing_headline,
+        sale_listing_housing_company_business_id,
+        sale_listing_housing_company_name,
+        sale_listing_id,
+        sale_listing_last_seen_at,
+        sale_listing_latitude,
+        sale_listing_living_area_value,
+        sale_listing_longitude,
+        sale_listing_native_id,
+        sale_listing_plot_area_value,
+        sale_listing_plot_owned,
+        sale_listing_postal,
+        sale_listing_postal_norm,
+        sale_listing_price_per_m2,
+        sale_listing_property_type_code,
+        sale_listing_published_at,
+        sale_listing_room_category_code,
+        sale_listing_room_layout,
+        sale_listing_rooms_count,
+        sale_listing_search_text,
+        sale_listing_sauna,
+        sale_listing_source_kind,
+        sale_listing_source_provider,
+        sale_listing_street_address,
+        sale_listing_total_floors,
+        sale_listing_unit_match_key,
+        sale_listing_url,
+        sale_listing_new_development,
+        sale_listing_balcony,
+        shortcut_ad_id
+    FROM shortcut_source
     UNION ALL
     SELECT
         frontdoor_ad_id,
@@ -990,6 +1129,67 @@ RETURNING source_listing_id
 
 func (q *Queries) UpsertFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, upsertFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
+	var source_listing_id uuid.UUID
+	err := row.Scan(&source_listing_id)
+	return source_listing_id, err
+}
+
+const upsertShortcutAdSourceListing = `-- name: UpsertShortcutAdSourceListing :one
+INSERT INTO origin.source_listings (
+    source_listing_id,
+    provider,
+    source_kind,
+    native_id,
+    canonical_source_id,
+    raw_table,
+    raw_id,
+    url,
+    payload_hash,
+    normalized_version,
+    normalized_at,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+SELECT
+    gen_random_uuid(),
+    'shortcut',
+    'ad',
+    sa.shortcut_ad_id::text,
+    'shortcut:ad:' || sa.shortcut_ad_id::text,
+    'shortcut_ads',
+    sa.shortcut_ad_id::text,
+    sa.shortcut_ad_url,
+    sa.shortcut_ad_data_hash,
+    sa.shortcut_ad_data_normalized_version,
+    now(),
+    sa.shortcut_ad_first_seen_at,
+    sa.shortcut_ad_last_seen_at,
+    COALESCE(sa.shortcut_ad_first_seen_at, now()),
+    now()
+FROM origin.shortcut_ads sa
+WHERE sa.shortcut_ad_id = $1
+    AND sa.shortcut_ad_type = 'listing'
+    AND sa.shortcut_ad_data IS NOT NULL
+ON CONFLICT (canonical_source_id) DO UPDATE SET
+    provider = EXCLUDED.provider,
+    source_kind = EXCLUDED.source_kind,
+    native_id = EXCLUDED.native_id,
+    raw_table = EXCLUDED.raw_table,
+    raw_id = EXCLUDED.raw_id,
+    url = EXCLUDED.url,
+    payload_hash = EXCLUDED.payload_hash,
+    normalized_version = EXCLUDED.normalized_version,
+    normalized_at = EXCLUDED.normalized_at,
+    first_seen_at = EXCLUDED.first_seen_at,
+    last_seen_at = EXCLUDED.last_seen_at,
+    updated_at = EXCLUDED.updated_at
+RETURNING source_listing_id
+`
+
+func (q *Queries) UpsertShortcutAdSourceListing(ctx context.Context, shortcutAdID *int64) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertShortcutAdSourceListing, shortcutAdID)
 	var source_listing_id uuid.UUID
 	err := row.Scan(&source_listing_id)
 	return source_listing_id, err

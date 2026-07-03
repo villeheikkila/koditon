@@ -59,9 +59,9 @@ func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, annou
 
 // ReconcileShortcutAd publishes one Shortcut ad into the canonical listing graph.
 func (s *Service) ReconcileShortcutAd(ctx context.Context, shortcutAdID int64) (Result, error) {
-	sourceListingID, err := s.queries.CanonicalizeShortcutAdSaleListing(ctx, &shortcutAdID)
+	sourceListingID, err := s.queries.UpsertShortcutAdSourceListing(ctx, &shortcutAdID)
 	if err != nil {
-		return Result{}, fmt.Errorf("canonicalize shortcut ad listing model source: %w", err)
+		return Result{}, fmt.Errorf("upsert shortcut ad source listing: %w", err)
 	}
 	return s.reconcileSourceListing(ctx, sourceListingID)
 }
