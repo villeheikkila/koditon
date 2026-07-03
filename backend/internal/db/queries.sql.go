@@ -6123,31 +6123,36 @@ INSERT INTO origin.source_listings (
     updated_at
 )
 SELECT
-    sl.sale_listing_id,
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
-    sl.sale_listing_native_id,
-    sl.sale_listing_canonical_id,
+    doc.primary_source_listing_id,
+    doc.source,
+    doc.kind,
+    doc.native_id,
+    doc.canonical_id,
     CASE
-        WHEN sl.shortcut_ad_id IS NOT NULL THEN 'shortcut_ads'
-        WHEN sl.frontdoor_ad_id IS NOT NULL THEN 'frontdoor_ads'
-        WHEN sl.frontdoor_building_announcement_id IS NOT NULL THEN 'frontdoor_building_announcements'
-        WHEN sl.prices_transaction_id IS NOT NULL THEN 'prices_transactions'
-        ELSE 'property_source_offerings'
+        WHEN evidence.shortcut_ad_id IS NOT NULL THEN 'shortcut_ads'
+        WHEN evidence.frontdoor_ad_id IS NOT NULL THEN 'frontdoor_ads'
+        WHEN evidence.frontdoor_building_announcement_id IS NOT NULL THEN 'frontdoor_building_announcements'
+        ELSE 'listing_search_documents'
     END,
-    COALESCE(sl.shortcut_ad_id::text, sl.frontdoor_ad_id::text, sl.frontdoor_building_announcement_id::text, sl.prices_transaction_id::text, sl.sale_listing_id::text),
-    sl.sale_listing_url,
+    COALESCE(evidence.shortcut_ad_id::text, evidence.frontdoor_ad_id::text, evidence.frontdoor_building_announcement_id::text, doc.primary_source_listing_id::text),
+    doc.url,
     COALESCE(sa.shortcut_ad_data_hash, fa.frontdoor_ad_data_hash),
-    GREATEST(COALESCE(sa.shortcut_ad_data_normalized_version, 0), COALESCE(fa.frontdoor_ad_data_normalized_version, 0)),
-    sl.sale_listing_updated_at,
-    sl.sale_listing_first_seen_at,
-    sl.sale_listing_last_seen_at,
-    sl.sale_listing_created_at,
-    sl.sale_listing_updated_at
-FROM public.property_source_offerings sl
-LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-WHERE sl.sale_listing_id = $1
+    GREATEST(COALESCE(sa.shortcut_ad_data_normalized_version, 0), COALESCE(fa.frontdoor_ad_data_normalized_version, 0), COALESCE(fba.frontdoor_building_announcement_data_normalized_version, 0)),
+    doc.refreshed_at,
+    doc.first_seen_at,
+    doc.last_seen_at,
+    doc.first_seen_at,
+    doc.refreshed_at
+FROM public.listing_search_documents doc
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+WHERE doc.primary_source_listing_id = $1
+    AND doc.primary_source_listing_id IS NOT NULL
+    AND doc.listing_status <> 'rejected'
+ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+LIMIT 1
 ON CONFLICT (canonical_source_id) DO UPDATE SET
     source_listing_id = EXCLUDED.source_listing_id,
     provider = EXCLUDED.provider,
