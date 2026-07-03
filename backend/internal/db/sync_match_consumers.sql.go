@@ -20,26 +20,18 @@ SET physical_building_latitude = coordinates.lat,
 FROM (
     SELECT DISTINCT ON (pu.physical_building_id)
         pu.physical_building_id,
-        COALESCE(fb.frontdoor_building_latitude, sb.shortcut_building_latitude, sl.sale_listing_latitude, postgis.ST_Y(hc.housing_company_geom)::double precision) AS lat,
-        COALESCE(fb.frontdoor_building_longitude, sb.shortcut_building_longitude, sl.sale_listing_longitude, postgis.ST_X(hc.housing_company_geom)::double precision) AS lng
+        COALESCE(doc.latitude, postgis.ST_Y(hc.housing_company_geom)::double precision) AS lat,
+        COALESCE(doc.longitude, postgis.ST_X(hc.housing_company_geom)::double precision) AS lng,
+        doc.last_seen_at
     FROM public.property_units pu
     LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
     LEFT JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    LEFT JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    LEFT JOIN public.listing_search_documents doc ON doc.property_offering_id = po.property_offering_id
+        AND doc.listing_status = 'active'
     WHERE pu.physical_building_id IS NOT NULL
     ORDER BY pu.physical_building_id,
-        (fb.frontdoor_building_latitude IS NOT NULL AND fb.frontdoor_building_longitude IS NOT NULL) DESC,
-        (sb.shortcut_building_latitude IS NOT NULL AND sb.shortcut_building_longitude IS NOT NULL) DESC,
-        (sl.sale_listing_latitude IS NOT NULL AND sl.sale_listing_longitude IS NOT NULL) DESC,
-        sl.sale_listing_last_seen_at DESC NULLS LAST
+        (doc.latitude IS NOT NULL AND doc.longitude IS NOT NULL) DESC,
+        doc.last_seen_at DESC NULLS LAST
 ) coordinates
 WHERE pb.physical_building_id = coordinates.physical_building_id
   AND coordinates.lat IS NOT NULL
