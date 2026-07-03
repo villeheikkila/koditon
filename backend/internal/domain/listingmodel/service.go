@@ -24,6 +24,7 @@ type Result struct {
 	EvidenceSourceID   uuid.UUID
 	PropertyOfferingID uuid.UUID
 	ListingID          uuid.UUID
+	SourceListingID    uuid.UUID
 	SearchDocuments    int32
 }
 
@@ -32,8 +33,55 @@ func NewService(logger *slog.Logger, pool *pgxpool.Pool) *Service {
 	return &Service{logger: logger.With("component", "listingmodel"), pool: pool, queries: db.New(pool)}
 }
 
+// RemoveShortcutAdListing removes the canonical listing projection for a non-listing Shortcut ad.
+func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int64) error {
+	if err := s.queries.DeleteSaleListingForShortcutAd(ctx, &shortcutAdID); err != nil {
+		return fmt.Errorf("delete shortcut listing model source: %w", err)
+	}
+	return nil
+}
+
+// RemoveFrontdoorBuildingAnnouncement removes the canonical listing projection for a rental Frontdoor announcement.
+func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) error {
+	if err := s.queries.DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx, &announcementID); err != nil {
+		return fmt.Errorf("delete frontdoor announcement listing model source: %w", err)
+	}
+	return nil
+}
+
+// ReconcileShortcutAd publishes one Shortcut ad into the canonical listing graph.
+func (s *Service) ReconcileShortcutAd(ctx context.Context, shortcutAdID int64) (Result, error) {
+	sourceListingID, err := s.queries.CanonicalizeShortcutAdSaleListing(ctx, &shortcutAdID)
+	if err != nil {
+		return Result{}, fmt.Errorf("canonicalize shortcut ad listing model source: %w", err)
+	}
+	return s.reconcileSourceListing(ctx, sourceListingID)
+}
+
+// ReconcileFrontdoorAd publishes one Frontdoor ad into the canonical listing graph.
+func (s *Service) ReconcileFrontdoorAd(ctx context.Context, frontdoorAdID uuid.UUID) (Result, error) {
+	sourceListingID, err := s.queries.CanonicalizeFrontdoorAdSaleListing(ctx, &frontdoorAdID)
+	if err != nil {
+		return Result{}, fmt.Errorf("canonicalize frontdoor ad listing model source: %w", err)
+	}
+	return s.reconcileSourceListing(ctx, sourceListingID)
+}
+
+// ReconcileFrontdoorBuildingAnnouncement publishes one Frontdoor building announcement into the canonical listing graph.
+func (s *Service) ReconcileFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) (Result, error) {
+	sourceListingID, err := s.queries.CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx, &announcementID)
+	if err != nil {
+		return Result{}, fmt.Errorf("canonicalize frontdoor announcement listing model source: %w", err)
+	}
+	return s.reconcileSourceListing(ctx, sourceListingID)
+}
+
 // ReconcileSourceOffering publishes one normalized source offering into the canonical listing graph.
 func (s *Service) ReconcileSourceOffering(ctx context.Context, sourceOfferingID uuid.UUID) (Result, error) {
+	return s.reconcileSourceListing(ctx, sourceOfferingID)
+}
+
+func (s *Service) reconcileSourceListing(ctx context.Context, sourceListingID uuid.UUID) (Result, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Result{}, fmt.Errorf("begin listing model reconciliation: %w", err)
@@ -43,20 +91,24 @@ func (s *Service) ReconcileSourceOffering(ctx context.Context, sourceOfferingID 
 			s.logger.DebugContext(ctx, "rollback listing model reconciliation", "error", rollbackErr)
 		}
 	}()
-	row, err := s.queries.WithTx(tx).ReconcileSourceOfferingListingModel(ctx, sourceOfferingID)
+	qtx := s.queries.WithTx(tx)
+	row, err := qtx.ReconcileSourceOfferingListingModel(ctx, sourceListingID)
 	if err != nil {
 		return Result{}, fmt.Errorf("reconcile source offering listing model: %w", err)
+	}
+	if err := qtx.SyncSourceListingFromPropertySourceOffering(ctx, &sourceListingID); err != nil {
+		return Result{}, fmt.Errorf("sync source listing from listing model: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("commit listing model reconciliation: %w", err)
 	}
-	result := Result{PropertyOfferingID: row.PropertyOfferingID, ListingID: row.ListingID}
+	result := Result{PropertyOfferingID: row.PropertyOfferingID, ListingID: row.ListingID, SourceListingID: sourceListingID}
 	if row.EvidenceSourceID != nil {
 		result.EvidenceSourceID = *row.EvidenceSourceID
 	}
 	if row.SearchDocuments != nil {
 		result.SearchDocuments = *row.SearchDocuments
 	}
-	s.logger.InfoContext(ctx, "source offering reconciled into listing model", "source_offering_id", sourceOfferingID.String(), "evidence_source_id", result.EvidenceSourceID.String(), "listing_id", result.ListingID.String(), "outcome", logging.OutcomeSuccess)
+	s.logger.InfoContext(ctx, "source listing reconciled into listing model", "source_listing_id", sourceListingID.String(), "evidence_source_id", result.EvidenceSourceID.String(), "listing_id", result.ListingID.String(), "outcome", logging.OutcomeSuccess)
 	return result, nil
 }

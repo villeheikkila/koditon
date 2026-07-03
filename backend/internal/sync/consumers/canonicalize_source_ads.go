@@ -46,26 +46,22 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 		}
 		return fmt.Errorf("load frontdoor building announcement for canonicalization: %w", err)
 	}
+	model := listingmodel.NewService(logger, c.pool)
 	if announcement.FrontdoorBuildingAnnouncementRentPeriod != nil || announcement.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
-		if err := c.queries.DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx, &announcementID); err != nil {
+		if err := model.RemoveFrontdoorBuildingAnnouncement(ctx, announcementID); err != nil {
 			return fmt.Errorf("delete rental frontdoor announcement source offering: %w", err)
 		}
 		version := currentSourceAdCanonicalizationVersion
 		return c.queries.MarkFrontdoorBuildingAnnouncementDataNormalized(ctx, db.MarkFrontdoorBuildingAnnouncementDataNormalizedParams{FrontdoorBuildingAnnouncementDataNormalizedVersion: &version, FrontdoorBuildingAnnouncementID: &announcementID})
 	}
-	saleListingID, err := c.queries.CanonicalizeFrontdoorBuildingAnnouncementSourceOffering(ctx, &announcementID)
+	result, err := model.ReconcileFrontdoorBuildingAnnouncement(ctx, announcementID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return fmt.Errorf("canonicalize frontdoor building announcement: %w", err)
+		return fmt.Errorf("reconcile frontdoor building announcement listing model: %w", err)
 	}
-	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
-		return err
-	}
-	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
-		return fmt.Errorf("sync source listing for frontdoor announcement: %w", err)
-	}
+	saleListingID := result.SourceListingID
 	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
 	}
@@ -98,19 +94,14 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	if len(ad.FrontdoorAdData) == 0 {
 		return nil
 	}
-	saleListingID, err := c.queries.CanonicalizeFrontdoorAdSaleListing(ctx, &frontdoorAdID)
+	result, err := listingmodel.NewService(logger, c.pool).ReconcileFrontdoorAd(ctx, frontdoorAdID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return fmt.Errorf("canonicalize frontdoor ad sale listing: %w", err)
+		return fmt.Errorf("reconcile frontdoor ad listing model: %w", err)
 	}
-	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
-		return err
-	}
-	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
-		return fmt.Errorf("sync source listing for frontdoor ad: %w", err)
-	}
+	saleListingID := result.SourceListingID
 	version := currentSourceAdCanonicalizationVersion
 	if err := c.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdDataNormalizedVersion: &version, FrontdoorAdExternalID: &ad.FrontdoorAdExternalID, FrontdoorAdDataHash: ad.FrontdoorAdDataHash}); err != nil {
 		return fmt.Errorf("mark frontdoor ad data normalized: %w", err)
@@ -138,25 +129,20 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 		return nil
 	}
 	if ad.ShortcutAdType != "listing" {
-		if err := c.queries.DeleteSaleListingForShortcutAd(ctx, &shortcutAdID); err != nil {
+		if err := listingmodel.NewService(logger, c.pool).RemoveShortcutAdListing(ctx, shortcutAdID); err != nil {
 			return fmt.Errorf("delete shortcut non-listing sale listing: %w", err)
 		}
 		version := currentSourceAdCanonicalizationVersion
 		return c.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdDataNormalizedVersion: &version, ShortcutAdID: &shortcutAdID, ShortcutAdDataHash: ad.ShortcutAdDataHash})
 	}
-	saleListingID, err := c.queries.CanonicalizeShortcutAdSaleListing(ctx, &shortcutAdID)
+	result, err := listingmodel.NewService(logger, c.pool).ReconcileShortcutAd(ctx, shortcutAdID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return fmt.Errorf("canonicalize shortcut ad sale listing: %w", err)
+		return fmt.Errorf("reconcile shortcut ad listing model: %w", err)
 	}
-	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
-		return err
-	}
-	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
-		return fmt.Errorf("sync source listing for shortcut ad: %w", err)
-	}
+	saleListingID := result.SourceListingID
 	version := currentSourceAdCanonicalizationVersion
 	if err := c.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdDataNormalizedVersion: &version, ShortcutAdID: &shortcutAdID, ShortcutAdDataHash: ad.ShortcutAdDataHash}); err != nil {
 		return fmt.Errorf("mark shortcut ad data normalized: %w", err)
