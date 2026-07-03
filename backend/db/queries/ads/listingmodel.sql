@@ -414,54 +414,6 @@ listing AS (
         updated_at = now()
     RETURNING listing_id
 ),
-retired_source_links AS (
-    UPDATE public.target_sources
-    SET link_status = 'superseded',
-        updated_at = now()
-    FROM source, offering
-    WHERE target_sources.target_type = 'listing'
-        AND target_sources.source_type = 'source_listing'
-        AND target_sources.source_id = source.sale_listing_id
-        AND target_sources.target_id <> offering.property_offering_id
-        AND target_sources.link_status <> 'rejected'
-    RETURNING target_source_id
-),
-target_link AS (
-    INSERT INTO public.target_sources (
-        target_type,
-        target_id,
-        source_type,
-        source_id,
-        link_status,
-        link_method,
-        link_score,
-        link_reasons,
-        first_seen_at,
-        last_seen_at
-    )
-    SELECT
-        'listing',
-        offering.property_offering_id,
-        'source_listing',
-        source.sale_listing_id,
-        'confirmed',
-        'sync_auto',
-        100,
-        jsonb_build_object('evidence_source_id', (SELECT evidence_source_id FROM evidence LIMIT 1), 'method', 'listingmodel_reconcile'),
-        source.sale_listing_first_seen_at,
-        source.sale_listing_last_seen_at
-    FROM source
-    JOIN offering ON true
-    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
-        link_status = EXCLUDED.link_status,
-        link_method = EXCLUDED.link_method,
-        link_score = GREATEST(public.target_sources.link_score, EXCLUDED.link_score),
-        link_reasons = public.target_sources.link_reasons || EXCLUDED.link_reasons,
-        first_seen_at = LEAST(COALESCE(public.target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, public.target_sources.first_seen_at)),
-        last_seen_at = GREATEST(COALESCE(public.target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, public.target_sources.last_seen_at)),
-        updated_at = now()
-    RETURNING target_source_id
-),
 listing_evidence AS (
     INSERT INTO public.entity_evidence (
         evidence_source_id,
@@ -525,14 +477,20 @@ house_evidence AS (
 source_summary AS (
     SELECT
         offering.property_offering_id,
-        array_agg(DISTINCT linked_source.sale_listing_source_provider ORDER BY linked_source.sale_listing_source_provider) AS source_providers,
-        array_agg(DISTINCT linked_source.sale_listing_source_kind ORDER BY linked_source.sale_listing_source_kind) AS source_kinds
+        array_agg(DISTINCT linked_evidence.provider ORDER BY linked_evidence.provider) FILTER (WHERE linked_evidence.provider IS NOT NULL) AS source_providers,
+        array_agg(DISTINCT CASE
+            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
+            ELSE linked_evidence.source_kind
+        END ORDER BY CASE
+            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
+            ELSE linked_evidence.source_kind
+        END) AS source_kinds
     FROM offering
-    JOIN public.target_sources linked ON linked.target_type = 'listing'
-        AND linked.target_id = offering.property_offering_id
-        AND linked.source_type = 'source_listing'
-        AND linked.link_status <> 'rejected'
-    JOIN public.property_source_offerings linked_source ON linked_source.sale_listing_id = linked.source_id
+    JOIN public.entity_evidence linked_entity ON linked_entity.listing_id = offering.property_offering_id
+        AND linked_entity.link_status <> 'rejected'
+    JOIN public.evidence_sources linked_evidence ON linked_evidence.evidence_source_id = linked_entity.evidence_source_id
     GROUP BY offering.property_offering_id
 ),
 search_document AS (
