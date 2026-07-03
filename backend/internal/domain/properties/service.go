@@ -473,7 +473,7 @@ func renovationEvidenceScore(row renovationDisplayEvidence, now time.Time) float
 	switch {
 	case row.EvidenceLevel == "manager_certificate":
 		base = 120
-	case row.SourceTable == "property_source_offerings":
+	case row.SourceTable == "property_source_offerings", row.SourceTable == "listing_search_documents":
 		base = 80
 	}
 	decay := 1.0

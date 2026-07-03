@@ -1044,12 +1044,11 @@ WITH targets AS (
     WHERE po.property_offering_id = sqlc.arg(property_offering_id)::uuid
         AND COALESCE(pu.housing_company_id, pb.housing_company_id) IS NOT NULL
     UNION
-    SELECT 'listing', source_link.source_id
-    FROM public.target_sources source_link
-    WHERE source_link.target_type = 'listing'
-        AND source_link.target_id = sqlc.arg(property_offering_id)::uuid
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    SELECT 'listing', doc.primary_source_listing_id
+    FROM public.listing_search_documents doc
+    WHERE doc.property_offering_id = sqlc.arg(property_offering_id)::uuid
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
 ), marked AS (
     INSERT INTO public.property_dimension_dirty_targets (
         target_type,
@@ -2056,46 +2055,61 @@ SELECT COALESCE((SELECT property_house_id FROM synced), '00000000-0000-0000-0000
 
 -- name: BackfillDetachedPropertyHouses :one
 WITH candidates AS (
-    SELECT sl.sale_listing_id, po.property_offering_id
-    FROM public.property_source_offerings sl
-    JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
-        AND source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
-    WHERE sl.sale_listing_property_type_code = 'detached_house'
+    SELECT
+        doc.primary_source_listing_id AS sale_listing_id,
+        doc.property_offering_id,
+        doc.source AS sale_listing_source_provider,
+        doc.kind AS sale_listing_source_kind,
+        doc.native_id AS sale_listing_native_id,
+        lower(trim(doc.address)) AS sale_listing_address_norm,
+        regexp_replace(COALESCE(doc.postal, ''), '[^0-9]+', '', 'g') AS sale_listing_postal_norm,
+        lower(trim(doc.city)) AS sale_listing_city_norm,
+        lower(trim(concat_ws(' ', doc.address, doc.postal, doc.city))) AS sale_listing_building_match_key,
+        doc.area_m2 AS sale_listing_area_value,
+        NULL::double precision AS sale_listing_living_area_value,
+        NULL::double precision AS sale_listing_plot_area_value,
+        doc.rooms_count AS sale_listing_rooms_count,
+        doc.latitude AS sale_listing_latitude,
+        doc.longitude AS sale_listing_longitude,
+        doc.build_year AS sale_listing_build_year,
+        doc.first_seen_at AS sale_listing_first_seen_at,
+        doc.last_seen_at AS sale_listing_last_seen_at,
+        COALESCE(
+            'detached_address:' || NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(concat_ws('|', regexp_replace(COALESCE(doc.postal, ''), '[^0-9]+', '', 'g'), lower(trim(doc.city)), lower(trim(concat_ws(' ', doc.address, doc.postal, doc.city))), doc.area_m2::text), ''))), '[^[:alnum:]åäö]+', '_', 'g')), ''),
+            'detached_source:' || doc.source || ':' || doc.kind || ':' || doc.native_id
+        ) AS house_key
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
+    WHERE doc.property_type_code = 'detached_house'
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
         AND po.property_house_id IS NULL
-    ORDER BY sl.sale_listing_updated_at DESC NULLS LAST, sl.sale_listing_id
+    ORDER BY doc.refreshed_at DESC NULLS LAST, doc.primary_source_listing_id
     LIMIT $1::int
 ),
 listing AS (
     SELECT
-        sl.sale_listing_id,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        sl.sale_listing_native_id,
-        sl.sale_listing_address_norm,
-        sl.sale_listing_postal_norm,
-        sl.sale_listing_city_norm,
-        sl.sale_listing_building_match_key,
-        sl.sale_listing_area_value,
-        sl.sale_listing_living_area_value,
-        sl.sale_listing_plot_area_value,
-        sl.sale_listing_rooms_count,
-        sl.sale_listing_latitude,
-        sl.sale_listing_longitude,
-        sl.sale_listing_build_year,
-        sl.sale_listing_first_seen_at,
-        sl.sale_listing_last_seen_at,
-        candidates.property_offering_id,
-        COALESCE(
-            'detached_address:' || NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(concat_ws('|', sl.sale_listing_postal_norm, sl.sale_listing_city_norm, sl.sale_listing_building_match_key, sl.sale_listing_area_value::text), ''))), '[^[:alnum:]åäö]+', '_', 'g')), ''),
-            'detached_source:' || sl.sale_listing_source_provider || ':' || sl.sale_listing_source_kind || ':' || sl.sale_listing_native_id
-        ) AS house_key
+        sale_listing_id,
+        property_offering_id,
+        sale_listing_source_provider,
+        sale_listing_source_kind,
+        sale_listing_native_id,
+        sale_listing_address_norm,
+        sale_listing_postal_norm,
+        sale_listing_city_norm,
+        sale_listing_building_match_key,
+        sale_listing_area_value,
+        sale_listing_living_area_value,
+        sale_listing_plot_area_value,
+        sale_listing_rooms_count,
+        sale_listing_latitude,
+        sale_listing_longitude,
+        sale_listing_build_year,
+        sale_listing_first_seen_at,
+        sale_listing_last_seen_at,
+        house_key
     FROM candidates
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = candidates.sale_listing_id
-),
-synced AS (
+), synced AS (
     INSERT INTO public.property_houses (
         property_house_identity_key,
         property_house_address_norm,
@@ -2154,43 +2168,7 @@ updated_offerings AS (
     FROM synced
     JOIN listing ON listing.sale_listing_id = synced.sale_listing_id
     WHERE property_offerings.property_offering_id = listing.property_offering_id
-    RETURNING listing.sale_listing_id, synced.property_house_id
-),
-target_sources AS (
-    INSERT INTO public.target_sources (
-        target_type,
-        target_id,
-        source_type,
-        source_id,
-        link_status,
-        link_method,
-        link_score,
-        link_reasons,
-        first_seen_at,
-        last_seen_at
-    )
-    SELECT
-        'house',
-        updated_offerings.property_house_id,
-        'source_listing',
-        listing.sale_listing_id,
-        'confirmed',
-        'backfill_auto',
-        100,
-        jsonb_build_object('source', 'detached_house_listing', 'identity_key', listing.house_key),
-        listing.sale_listing_first_seen_at,
-        listing.sale_listing_last_seen_at
-    FROM updated_offerings
-    JOIN listing ON listing.sale_listing_id = updated_offerings.sale_listing_id
-    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
-        link_status = EXCLUDED.link_status,
-        link_method = EXCLUDED.link_method,
-        link_score = EXCLUDED.link_score,
-        link_reasons = target_sources.link_reasons || EXCLUDED.link_reasons,
-        first_seen_at = LEAST(COALESCE(target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, target_sources.first_seen_at)),
-        last_seen_at = GREATEST(COALESCE(target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, target_sources.last_seen_at)),
-        updated_at = now()
-    RETURNING target_id
+    RETURNING listing.sale_listing_id, listing.property_offering_id, synced.property_house_id
 ),
 dirty AS (
     INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at)
@@ -2261,11 +2239,8 @@ synced_listings AS (
         po.property_offering_created_at,
         po.property_offering_updated_at
     FROM synced
-    JOIN public.target_sources source_link ON source_link.source_id = synced.sale_listing_id
-        AND source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    JOIN updated_offerings ON updated_offerings.sale_listing_id = synced.sale_listing_id
+    JOIN public.property_offerings po ON po.property_offering_id = updated_offerings.property_offering_id
     WHERE synced.property_house_id IS NOT NULL
     ON CONFLICT (listing_id) DO UPDATE SET
         listing_type = EXCLUDED.listing_type,
@@ -4000,13 +3975,12 @@ dirty_targets AS (
     FROM updated_unit
     JOIN public.property_offerings po ON po.property_unit_id = updated_unit.property_unit_id
     UNION
-    SELECT 'listing', source_link.source_id, $3::text
+    SELECT 'listing', doc.primary_source_listing_id, $3::text
     FROM updated_unit
     JOIN public.property_offerings po ON po.property_unit_id = updated_unit.property_unit_id
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = po.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
     UNION
     SELECT 'building', old_unit.physical_building_id, $3::text || '_old'
     FROM old_unit
@@ -4077,13 +4051,12 @@ dirty_targets AS (
     FROM updated_units
     JOIN public.property_offerings po ON po.property_unit_id = updated_units.property_unit_id
     UNION
-    SELECT 'listing', source_link.source_id, $3::text
+    SELECT 'listing', doc.primary_source_listing_id, $3::text
     FROM updated_units
     JOIN public.property_offerings po ON po.property_unit_id = updated_units.property_unit_id
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = po.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
 ),
 marked AS (
     INSERT INTO public.property_dimension_dirty_targets (target_type, target_id, dirty_reasons, dirty_at, resolved_at)
