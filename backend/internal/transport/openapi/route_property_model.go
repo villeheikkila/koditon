@@ -1545,39 +1545,34 @@ WITH target_offerings AS (
 ),
 ranked AS (
     SELECT
-        sl.sale_listing_id,
+        doc.listing_id AS sale_listing_id,
         target_offerings.property_offering_id,
         target_offerings.property_unit_id,
         target_offerings.physical_building_id,
         target_offerings.housing_company_id,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        COALESCE(sl.sale_listing_native_id, '') AS native_id,
-        COALESCE(sl.sale_listing_canonical_id, '') AS canonical_id,
-        COALESCE(source_link.link_status, '') AS link_status,
-        COALESCE(source_link.link_method, '') AS link_method,
-        COALESCE(source_link.link_score, 0)::int4 AS link_score,
-        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id, sl.sale_listing_id::text) AS title,
-        COALESCE(sl.sale_listing_url, '') AS url,
-        CASE
-            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-            ELSE false
-        END AS external_url_available,
-        COALESCE(sl.sale_listing_street_address, '') AS street_address,
-        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
-        COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
-        COALESCE(sl.sale_listing_room_layout, '') AS room_layout,
-        sl.sale_listing_area_value,
-        sl.sale_listing_asking_price,
-        sl.sale_listing_debt_free_price,
-        sl.sale_listing_price_per_m2,
-        sl.sale_listing_build_year,
-        sl.sale_listing_floor_level,
-        sl.sale_listing_first_seen_at,
-        sl.sale_listing_last_seen_at,
-        sl.sale_listing_published_at,
+        doc.source AS sale_listing_source_provider,
+        doc.kind AS sale_listing_source_kind,
+        COALESCE(doc.native_id, '') AS native_id,
+        COALESCE(doc.canonical_id, '') AS canonical_id,
+        'confirmed'::text AS link_status,
+        'listing_model'::text AS link_method,
+        100::int4 AS link_score,
+        COALESCE(doc.headline, doc.address, doc.native_id, doc.listing_id::text) AS title,
+        COALESCE(doc.url, '') AS url,
+        COALESCE(doc.url, '') <> '' AS external_url_available,
+        COALESCE(doc.address, '') AS street_address,
+        COALESCE(doc.city, '') AS city,
+        COALESCE(doc.postal, '') AS postal,
+        COALESCE(doc.room_layout, '') AS room_layout,
+        doc.area_m2 AS sale_listing_area_value,
+        doc.asking_price AS sale_listing_asking_price,
+        doc.debt_free_price AS sale_listing_debt_free_price,
+        doc.price_per_m2 AS sale_listing_price_per_m2,
+        doc.build_year AS sale_listing_build_year,
+        doc.floor_level AS sale_listing_floor_level,
+        doc.first_seen_at AS sale_listing_first_seen_at,
+        doc.last_seen_at AS sale_listing_last_seen_at,
+        doc.published_at AS sale_listing_published_at,
         price_match.transaction_id,
         COALESCE(price_match.match_scope, '') AS price_match_scope,
         COALESCE(price_match.match_status, '') AS price_match_status,
@@ -1600,13 +1595,8 @@ ranked AS (
         price_match.transaction_updated_at,
         COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json
     FROM target_offerings
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = target_offerings.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = target_offerings.property_offering_id
+        AND doc.listing_status = 'active'
     LEFT JOIN LATERAL (
         SELECT
             match_source.transaction_id,
@@ -1640,10 +1630,8 @@ ranked AS (
                 CASE WHEN pl.target_type = 'source_listing' THEN 0 ELSE 1 END AS priority
             FROM public.price_links pl
             WHERE pl.link_status <> 'rejected'
-                AND (
-                    (pl.target_type = 'source_listing' AND pl.target_id = sl.sale_listing_id)
-                    OR (pl.target_type = 'listing' AND pl.target_id = target_offerings.property_offering_id)
-                )
+                AND pl.target_type = 'listing'
+                AND pl.target_id = target_offerings.property_offering_id
         ) match_source
         JOIN origin.prices_transactions pt ON pt.prices_transaction_id = match_source.transaction_id
         ORDER BY match_source.priority, match_source.match_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
@@ -1660,8 +1648,8 @@ ranked AS (
             'text', COALESCE(observation.text, '')
         ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
         FROM public.target_observations observation
-        WHERE observation.source_type = 'source_listing'
-            AND observation.source_id = sl.sale_listing_id
+        WHERE observation.target_type = 'listing'
+            AND observation.target_id = target_offerings.property_offering_id
             AND observation.superseded_at IS NULL
     ) insight_rows ON true
 )
