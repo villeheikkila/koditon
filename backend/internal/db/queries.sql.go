@@ -52,12 +52,11 @@ dirty_targets AS (
     JOIN public.property_offerings po ON po.property_offering_id = old_document.property_offering_id
     WHERE po.property_house_id IS NOT NULL
     UNION
-    SELECT 'listing', source_link.source_id, $3::text || '_old'
+    SELECT 'listing', doc.primary_source_listing_id, $3::text || '_old'
     FROM old_document
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = old_document.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = old_document.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
     WHERE old_document.property_offering_id IS NOT NULL
     UNION
     SELECT 'offering', target_offering.property_offering_id, $3::text || '_new'
@@ -67,12 +66,11 @@ dirty_targets AS (
     FROM target_offering
     WHERE target_offering.property_unit_id IS NOT NULL
     UNION
-    SELECT 'listing', source_link.source_id, $3::text || '_new'
+    SELECT 'listing', doc.primary_source_listing_id, $3::text || '_new'
     FROM target_offering
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = target_offering.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = target_offering.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
     UNION
     SELECT 'building', old_document.physical_building_id, $3::text || '_old'
     FROM old_document
@@ -1890,118 +1888,6 @@ ON CONFLICT (unit_id) DO UPDATE SET
 func (q *Queries) EnsurePhysicalBuildingForSaleListing(ctx context.Context, saleListingID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, ensurePhysicalBuildingForSaleListing, saleListingID)
 	return err
-}
-
-const findCrossSourceAdMatches = `-- name: FindCrossSourceAdMatches :many
-SELECT
-    sa.shortcut_ad_id,
-    fa.frontdoor_ad_external_id,
-    ssl.sale_listing_unit_match_key AS address_key,
-    ssl.sale_listing_street_address AS shortcut_street,
-    fsl.sale_listing_street_address AS frontdoor_street,
-    ssl.sale_listing_postal AS shortcut_postal,
-    fsl.sale_listing_postal AS frontdoor_postal,
-    ssl.sale_listing_city AS shortcut_city,
-    fsl.sale_listing_city AS frontdoor_city,
-    ssl.sale_listing_asking_price AS shortcut_price,
-    fsl.sale_listing_asking_price AS frontdoor_price,
-    ssl.sale_listing_area_value AS shortcut_area,
-    fsl.sale_listing_area_value AS frontdoor_area
-FROM public.property_source_offerings ssl
-JOIN public.property_source_offerings fsl ON fsl.sale_listing_unit_match_key = ssl.sale_listing_unit_match_key
-JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = ssl.shortcut_ad_id
-JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = fsl.frontdoor_ad_id
-WHERE ssl.sale_listing_source_provider = 'shortcut'
-  AND fsl.sale_listing_source_provider = 'frontdoor'
-  AND ssl.sale_listing_source_kind = 'ad'
-  AND fsl.sale_listing_source_kind = 'ad'
-  AND ssl.sale_listing_unit_match_key IS NOT NULL
-  AND ssl.sale_listing_unit_match_key <> ''
-  AND ($1::text IS NULL OR trim($1::text) = '' OR lower(COALESCE(ssl.sale_listing_city, fsl.sale_listing_city, '')) LIKE ('%' || lower(trim($1::text)) || '%'))
-  AND (
-      $2::bigint IS NULL
-      OR (
-          ssl.sale_listing_asking_price IS NOT NULL
-          AND fsl.sale_listing_asking_price IS NOT NULL
-          AND abs(ssl.sale_listing_asking_price - fsl.sale_listing_asking_price) <= $2::bigint
-      )
-  )
-  AND (
-      $3::float8 IS NULL
-      OR (
-          ssl.sale_listing_area_value IS NOT NULL
-          AND fsl.sale_listing_area_value IS NOT NULL
-          AND abs(ssl.sale_listing_area_value - fsl.sale_listing_area_value) <= $3::float8
-      )
-  )
-ORDER BY
-    abs(COALESCE(ssl.sale_listing_asking_price, 0) - COALESCE(fsl.sale_listing_asking_price, 0)) ASC,
-    abs(COALESCE(ssl.sale_listing_area_value, 0) - COALESCE(fsl.sale_listing_area_value, 0)) ASC,
-    ssl.sale_listing_last_seen_at DESC,
-    fsl.sale_listing_last_seen_at DESC
-LIMIT $4::int
-`
-
-type FindCrossSourceAdMatchesParams struct {
-	City          *string  `json:"city"`
-	MaxPriceDelta *int64   `json:"max_price_delta"`
-	MaxAreaDelta  *float64 `json:"max_area_delta"`
-	LimitCount    *int32   `json:"limit_count"`
-}
-
-type FindCrossSourceAdMatchesRow struct {
-	ShortcutAdID          int64    `json:"shortcut_ad_id"`
-	FrontdoorAdExternalID string   `json:"frontdoor_ad_external_id"`
-	AddressKey            *string  `json:"address_key"`
-	ShortcutStreet        *string  `json:"shortcut_street"`
-	FrontdoorStreet       *string  `json:"frontdoor_street"`
-	ShortcutPostal        *string  `json:"shortcut_postal"`
-	FrontdoorPostal       *string  `json:"frontdoor_postal"`
-	ShortcutCity          *string  `json:"shortcut_city"`
-	FrontdoorCity         *string  `json:"frontdoor_city"`
-	ShortcutPrice         *int64   `json:"shortcut_price"`
-	FrontdoorPrice        *int64   `json:"frontdoor_price"`
-	ShortcutArea          *float64 `json:"shortcut_area"`
-	FrontdoorArea         *float64 `json:"frontdoor_area"`
-}
-
-func (q *Queries) FindCrossSourceAdMatches(ctx context.Context, arg FindCrossSourceAdMatchesParams) ([]FindCrossSourceAdMatchesRow, error) {
-	rows, err := q.db.Query(ctx, findCrossSourceAdMatches,
-		arg.City,
-		arg.MaxPriceDelta,
-		arg.MaxAreaDelta,
-		arg.LimitCount,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []FindCrossSourceAdMatchesRow{}
-	for rows.Next() {
-		var i FindCrossSourceAdMatchesRow
-		if err := rows.Scan(
-			&i.ShortcutAdID,
-			&i.FrontdoorAdExternalID,
-			&i.AddressKey,
-			&i.ShortcutStreet,
-			&i.FrontdoorStreet,
-			&i.ShortcutPostal,
-			&i.FrontdoorPostal,
-			&i.ShortcutCity,
-			&i.FrontdoorCity,
-			&i.ShortcutPrice,
-			&i.FrontdoorPrice,
-			&i.ShortcutArea,
-			&i.FrontdoorArea,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const finishPropertyDocumentExtractionRun = `-- name: FinishPropertyDocumentExtractionRun :exec

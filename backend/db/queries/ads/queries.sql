@@ -2364,12 +2364,11 @@ dirty_targets AS (
     JOIN public.property_offerings po ON po.property_offering_id = old_document.property_offering_id
     WHERE po.property_house_id IS NOT NULL
     UNION
-    SELECT 'listing', source_link.source_id, $3::text || '_old'
+    SELECT 'listing', doc.primary_source_listing_id, $3::text || '_old'
     FROM old_document
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = old_document.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = old_document.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
     WHERE old_document.property_offering_id IS NOT NULL
     UNION
     SELECT 'offering', target_offering.property_offering_id, $3::text || '_new'
@@ -2379,12 +2378,11 @@ dirty_targets AS (
     FROM target_offering
     WHERE target_offering.property_unit_id IS NOT NULL
     UNION
-    SELECT 'listing', source_link.source_id, $3::text || '_new'
+    SELECT 'listing', doc.primary_source_listing_id, $3::text || '_new'
     FROM target_offering
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = target_offering.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = target_offering.property_offering_id
+        AND doc.primary_source_listing_id IS NOT NULL
+        AND doc.listing_status <> 'rejected'
     UNION
     SELECT 'building', old_document.physical_building_id, $3::text || '_old'
     FROM old_document
@@ -3246,55 +3244,6 @@ WHERE doc.listing_status = 'active'
   AND ($11::text IS NULL OR trim($11::text) = '' OR doc.listing_type = $11::text)
   AND ($12::timestamptz IS NULL OR doc.published_at >= $12::timestamptz)
   AND ($13::timestamptz IS NULL OR doc.published_at <= $13::timestamptz);
-
--- name: FindCrossSourceAdMatches :many
-SELECT
-    sa.shortcut_ad_id,
-    fa.frontdoor_ad_external_id,
-    ssl.sale_listing_unit_match_key AS address_key,
-    ssl.sale_listing_street_address AS shortcut_street,
-    fsl.sale_listing_street_address AS frontdoor_street,
-    ssl.sale_listing_postal AS shortcut_postal,
-    fsl.sale_listing_postal AS frontdoor_postal,
-    ssl.sale_listing_city AS shortcut_city,
-    fsl.sale_listing_city AS frontdoor_city,
-    ssl.sale_listing_asking_price AS shortcut_price,
-    fsl.sale_listing_asking_price AS frontdoor_price,
-    ssl.sale_listing_area_value AS shortcut_area,
-    fsl.sale_listing_area_value AS frontdoor_area
-FROM public.property_source_offerings ssl
-JOIN public.property_source_offerings fsl ON fsl.sale_listing_unit_match_key = ssl.sale_listing_unit_match_key
-JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = ssl.shortcut_ad_id
-JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = fsl.frontdoor_ad_id
-WHERE ssl.sale_listing_source_provider = 'shortcut'
-  AND fsl.sale_listing_source_provider = 'frontdoor'
-  AND ssl.sale_listing_source_kind = 'ad'
-  AND fsl.sale_listing_source_kind = 'ad'
-  AND ssl.sale_listing_unit_match_key IS NOT NULL
-  AND ssl.sale_listing_unit_match_key <> ''
-  AND (sqlc.narg('city')::text IS NULL OR trim(sqlc.narg('city')::text) = '' OR lower(COALESCE(ssl.sale_listing_city, fsl.sale_listing_city, '')) LIKE ('%' || lower(trim(sqlc.narg('city')::text)) || '%'))
-  AND (
-      sqlc.narg('max_price_delta')::bigint IS NULL
-      OR (
-          ssl.sale_listing_asking_price IS NOT NULL
-          AND fsl.sale_listing_asking_price IS NOT NULL
-          AND abs(ssl.sale_listing_asking_price - fsl.sale_listing_asking_price) <= sqlc.narg('max_price_delta')::bigint
-      )
-  )
-  AND (
-      sqlc.narg('max_area_delta')::float8 IS NULL
-      OR (
-          ssl.sale_listing_area_value IS NOT NULL
-          AND fsl.sale_listing_area_value IS NOT NULL
-          AND abs(ssl.sale_listing_area_value - fsl.sale_listing_area_value) <= sqlc.narg('max_area_delta')::float8
-      )
-  )
-ORDER BY
-    abs(COALESCE(ssl.sale_listing_asking_price, 0) - COALESCE(fsl.sale_listing_asking_price, 0)) ASC,
-    abs(COALESCE(ssl.sale_listing_area_value, 0) - COALESCE(fsl.sale_listing_area_value, 0)) ASC,
-    ssl.sale_listing_last_seen_at DESC,
-    fsl.sale_listing_last_seen_at DESC
-LIMIT @limit_count::int;
 
 -- name: GetShortcutAdUnifiedDetail :one
 WITH sl AS (
