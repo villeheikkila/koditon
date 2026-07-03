@@ -2348,7 +2348,7 @@ ALTER TABLE ONLY public.listing_search_documents
     ADD CONSTRAINT listing_search_documents_property_offering_id_fkey FOREIGN KEY (property_offering_id) REFERENCES public.property_offerings(property_offering_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.listing_search_documents
-    ADD CONSTRAINT listing_search_documents_source_listing_id_fkey FOREIGN KEY (primary_source_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE SET NULL;
+    ADD CONSTRAINT listing_search_documents_source_listing_id_fkey FOREIGN KEY (primary_source_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY public.listing_price_match_states
     ADD CONSTRAINT listing_price_match_states_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;

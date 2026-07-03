@@ -146,6 +146,65 @@ evidence AS (
     UNION ALL
     SELECT evidence_source_id FROM announcement_evidence
 ),
+source_listing AS (
+    INSERT INTO origin.source_listings (
+        source_listing_id,
+        provider,
+        source_kind,
+        native_id,
+        canonical_source_id,
+        raw_table,
+        raw_id,
+        url,
+        payload_hash,
+        normalized_version,
+        normalized_at,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        source.sale_listing_id,
+        source.sale_listing_source_provider,
+        source.sale_listing_source_kind,
+        source.sale_listing_native_id,
+        source.sale_listing_canonical_id,
+        CASE
+            WHEN source.shortcut_ad_id IS NOT NULL THEN 'shortcut_ads'
+            WHEN source.frontdoor_ad_id IS NOT NULL THEN 'frontdoor_ads'
+            WHEN source.frontdoor_building_announcement_id IS NOT NULL THEN 'frontdoor_building_announcements'
+            ELSE 'listing_model'
+        END,
+        COALESCE(source.shortcut_ad_id::text, source.frontdoor_ad_id::text, source.frontdoor_building_announcement_id::text, source.sale_listing_id::text),
+        source.sale_listing_url,
+        COALESCE(sa.shortcut_ad_data_hash, fa.frontdoor_ad_data_hash),
+        GREATEST(COALESCE(sa.shortcut_ad_data_normalized_version, 0), COALESCE(fa.frontdoor_ad_data_normalized_version, 0), COALESCE(fba.frontdoor_building_announcement_data_normalized_version, 0)),
+        now(),
+        source.sale_listing_first_seen_at,
+        source.sale_listing_last_seen_at,
+        COALESCE(source.sale_listing_first_seen_at, now()),
+        now()
+    FROM source
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = source.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = source.frontdoor_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = source.frontdoor_building_announcement_id
+    ON CONFLICT (canonical_source_id) DO UPDATE SET
+        source_listing_id = EXCLUDED.source_listing_id,
+        provider = EXCLUDED.provider,
+        source_kind = EXCLUDED.source_kind,
+        native_id = EXCLUDED.native_id,
+        raw_table = EXCLUDED.raw_table,
+        raw_id = EXCLUDED.raw_id,
+        url = EXCLUDED.url,
+        payload_hash = EXCLUDED.payload_hash,
+        normalized_version = EXCLUDED.normalized_version,
+        normalized_at = EXCLUDED.normalized_at,
+        first_seen_at = EXCLUDED.first_seen_at,
+        last_seen_at = EXCLUDED.last_seen_at,
+        updated_at = EXCLUDED.updated_at
+    RETURNING source_listing_id
+),
 housing_company AS (
     INSERT INTO public.housing_companies (
         housing_company_identity_key,
@@ -395,13 +454,14 @@ listing AS (
         offering.property_offering_id,
         'sale',
         'active',
-        source.sale_listing_id,
+        source_listing.source_listing_id,
         offering.property_unit_id,
         offering.property_house_id,
         source.sale_listing_first_seen_at,
         source.sale_listing_last_seen_at,
         now()
     FROM source
+    JOIN source_listing ON true
     JOIN offering ON true
     ON CONFLICT (listing_id) DO UPDATE SET
         listing_type = EXCLUDED.listing_type,
@@ -543,7 +603,7 @@ search_document AS (
         listing.listing_id,
         offering.property_offering_id,
         evidence.evidence_source_id,
-        source.sale_listing_id,
+        source_listing.source_listing_id,
         source.sale_listing_source_provider,
         source.sale_listing_source_kind,
         source.sale_listing_native_id,
@@ -584,6 +644,7 @@ search_document AS (
         COALESCE(source_summary.source_kinds, ARRAY[source.sale_listing_source_kind]::text[]),
         now()
     FROM source
+    JOIN source_listing ON true
     JOIN evidence ON true
     JOIN offering ON true
     JOIN listing ON true

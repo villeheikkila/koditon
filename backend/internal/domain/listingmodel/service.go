@@ -96,9 +96,6 @@ func (s *Service) reconcileSourceListing(ctx context.Context, sourceListingID uu
 	if err != nil {
 		return Result{}, fmt.Errorf("reconcile source offering listing model: %w", err)
 	}
-	if err := qtx.SyncSourceListingFromPropertySourceOffering(ctx, &sourceListingID); err != nil {
-		return Result{}, fmt.Errorf("sync source listing from listing model: %w", err)
-	}
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("commit listing model reconciliation: %w", err)
 	}
