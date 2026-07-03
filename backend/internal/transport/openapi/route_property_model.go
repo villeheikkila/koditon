@@ -658,10 +658,13 @@ WITH building_markers AS (
     ) counts ON true
     LEFT JOIN LATERAL (
         SELECT count(*)::bigint AS source_count
-        FROM public.target_sources ts
-        WHERE ts.target_type = 'building'
-            AND ts.target_id = pb.physical_building_id
-            AND ts.link_status <> 'rejected'
+        FROM public.property_units source_unit
+        JOIN public.property_offerings source_offering ON source_offering.property_unit_id = source_unit.property_unit_id
+        JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+            AND source_doc.listing_status = 'active'
+        JOIN public.entity_evidence source_evidence ON source_evidence.listing_id = source_doc.listing_id
+            AND source_evidence.link_status <> 'rejected'
+        WHERE source_unit.physical_building_id = pb.physical_building_id
     ) source_counts ON true
     LEFT JOIN LATERAL (
         SELECT count(*)::bigint AS document_count
@@ -699,15 +702,15 @@ WITH building_markers AS (
             OR lower(concat_ws(' ', hc.housing_company_name, hc.housing_company_business_id, pb.physical_building_address_norm, pb.physical_building_city_norm, pb.physical_building_postal_norm, hc.housing_company_address_norm, hc.housing_company_city_norm, hc.housing_company_postal_norm)) LIKE ('%' || lower($6::text) || '%')
             OR EXISTS (
                 SELECT 1
-                FROM public.target_sources ts
-                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
-                    AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
-                    AND tsh.source_housing_company_id = ts.source_id
-                WHERE ts.target_type = 'building'
-                    AND ts.target_id = pb.physical_building_id
-                    AND ts.link_status <> 'rejected'
-                    AND lower(concat_ws(' ', ts.source_id::text, tsl.native_id, tsl.canonical_source_id, tsl.raw_id, tsl.url, tsh.native_id, tsh.raw_id, tsh.url)) LIKE ('%' || lower($6::text) || '%')
+                FROM public.property_units source_unit
+                JOIN public.property_offerings source_offering ON source_offering.property_unit_id = source_unit.property_unit_id
+                JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+                    AND source_doc.listing_status = 'active'
+                JOIN public.entity_evidence source_entity ON source_entity.listing_id = source_doc.listing_id
+                    AND source_entity.link_status <> 'rejected'
+                JOIN public.evidence_sources source_evidence ON source_evidence.evidence_source_id = source_entity.evidence_source_id
+                WHERE source_unit.physical_building_id = pb.physical_building_id
+                    AND lower(concat_ws(' ', source_doc.native_id, source_doc.canonical_id, source_doc.url, source_doc.search_text, source_evidence.external_id, source_evidence.url)) LIKE ('%' || lower($6::text) || '%')
             )
         )
 ),
@@ -740,10 +743,13 @@ company_markers AS (
     ) counts ON true
     LEFT JOIN LATERAL (
         SELECT count(*)::bigint AS source_count
-        FROM public.target_sources ts
-        WHERE ts.target_type = 'housing_company'
-            AND ts.target_id = hc.housing_company_id
-            AND ts.link_status <> 'rejected'
+        FROM public.property_units source_unit
+        JOIN public.property_offerings source_offering ON source_offering.property_unit_id = source_unit.property_unit_id
+        JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+            AND source_doc.listing_status = 'active'
+        JOIN public.entity_evidence source_evidence ON source_evidence.listing_id = source_doc.listing_id
+            AND source_evidence.link_status <> 'rejected'
+        WHERE source_unit.housing_company_id = hc.housing_company_id
     ) source_counts ON true
     LEFT JOIN LATERAL (
         SELECT count(*)::bigint AS document_count
@@ -783,15 +789,15 @@ company_markers AS (
             OR lower(concat_ws(' ', hc.housing_company_name, hc.housing_company_business_id, hc.housing_company_address_norm, hc.housing_company_city_norm, hc.housing_company_postal_norm)) LIKE ('%' || lower($6::text) || '%')
             OR EXISTS (
                 SELECT 1
-                FROM public.target_sources ts
-                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
-                    AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
-                    AND tsh.source_housing_company_id = ts.source_id
-                WHERE ts.target_type = 'housing_company'
-                    AND ts.target_id = hc.housing_company_id
-                    AND ts.link_status <> 'rejected'
-                    AND lower(concat_ws(' ', ts.source_id::text, tsl.native_id, tsl.canonical_source_id, tsl.raw_id, tsl.url, tsh.native_id, tsh.raw_id, tsh.url)) LIKE ('%' || lower($6::text) || '%')
+                FROM public.property_units source_unit
+                JOIN public.property_offerings source_offering ON source_offering.property_unit_id = source_unit.property_unit_id
+                JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+                    AND source_doc.listing_status = 'active'
+                JOIN public.entity_evidence source_entity ON source_entity.listing_id = source_doc.listing_id
+                    AND source_entity.link_status <> 'rejected'
+                JOIN public.evidence_sources source_evidence ON source_evidence.evidence_source_id = source_entity.evidence_source_id
+                WHERE source_unit.housing_company_id = hc.housing_company_id
+                    AND lower(concat_ws(' ', source_doc.native_id, source_doc.canonical_id, source_doc.url, source_doc.search_text, source_evidence.external_id, source_evidence.url)) LIKE ('%' || lower($6::text) || '%')
             )
         )
         AND NOT EXISTS (
@@ -829,10 +835,12 @@ house_markers AS (
     ) counts ON true
     LEFT JOIN LATERAL (
         SELECT count(*)::bigint AS source_count
-        FROM public.target_sources ts
-        WHERE ts.target_type = 'house'
-            AND ts.target_id = ph.property_house_id
-            AND ts.link_status <> 'rejected'
+        FROM public.property_offerings source_offering
+        JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+            AND source_doc.listing_status = 'active'
+        JOIN public.entity_evidence source_evidence ON source_evidence.listing_id = source_doc.listing_id
+            AND source_evidence.link_status <> 'rejected'
+        WHERE source_offering.property_house_id = ph.property_house_id
     ) source_counts ON true
     LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object(
@@ -864,15 +872,14 @@ house_markers AS (
             OR lower(concat_ws(' ', ph.property_house_address_norm, ph.property_house_city_norm, ph.property_house_postal_norm)) LIKE ('%' || lower($6::text) || '%')
             OR EXISTS (
                 SELECT 1
-                FROM public.target_sources ts
-                LEFT JOIN origin.source_listings tsl ON ts.source_type = 'source_listing'
-                    AND tsl.source_listing_id = ts.source_id
-                LEFT JOIN origin.source_housing_companies tsh ON ts.source_type = 'source_housing_company'
-                    AND tsh.source_housing_company_id = ts.source_id
-                WHERE ts.target_type = 'house'
-                    AND ts.target_id = ph.property_house_id
-                    AND ts.link_status <> 'rejected'
-                    AND lower(concat_ws(' ', ts.source_id::text, tsl.native_id, tsl.canonical_source_id, tsl.raw_id, tsl.url, tsh.native_id, tsh.raw_id, tsh.url)) LIKE ('%' || lower($6::text) || '%')
+                FROM public.property_offerings source_offering
+                JOIN public.listing_search_documents source_doc ON source_doc.property_offering_id = source_offering.property_offering_id
+                    AND source_doc.listing_status = 'active'
+                JOIN public.entity_evidence source_entity ON source_entity.listing_id = source_doc.listing_id
+                    AND source_entity.link_status <> 'rejected'
+                JOIN public.evidence_sources source_evidence ON source_evidence.evidence_source_id = source_entity.evidence_source_id
+                WHERE source_offering.property_house_id = ph.property_house_id
+                    AND lower(concat_ws(' ', source_doc.native_id, source_doc.canonical_id, source_doc.url, source_doc.search_text, source_evidence.external_id, source_evidence.url)) LIKE ('%' || lower($6::text) || '%')
             )
         )
 ),
