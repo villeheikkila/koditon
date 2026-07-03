@@ -2281,51 +2281,102 @@ FROM synced
 WHERE property_house_id IS NOT NULL;
 
 -- name: GetPropertySourceOfferingDescriptionTexts :one
+WITH source_doc AS (
+    SELECT
+        doc.listing_status,
+        doc.refreshed_at,
+        fa.frontdoor_ad_data,
+        sa.shortcut_ad_data,
+        fba.frontdoor_building_announcement_room_structure,
+        fb.frontdoor_building_description,
+        fb.frontdoor_building_other_info
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE doc.primary_source_listing_id = sqlc.arg('sale_listing_id')::uuid
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
 SELECT
-    sale_listing_description_text AS description_text,
-    COALESCE(sale_listing_building_description_text, sale_listing_building_other_info_text, '') AS building_text,
-    sale_listing_additional_info_text AS additional_info_text
-FROM public.property_source_offerings
-WHERE sale_listing_id = @sale_listing_id
-LIMIT 1;
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
+    COALESCE(NULLIF(trim(COALESCE(frontdoor_building_description, frontdoor_building_other_info)), ''), '') AS building_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}', frontdoor_building_announcement_room_structure)), '') AS additional_info_text
+FROM source_doc;
 
 -- name: GetPropertySourceOfferingValuationExtractionTexts :one
+WITH source_doc AS (
+    SELECT
+        doc.listing_status,
+        doc.refreshed_at,
+        doc.room_layout,
+        doc.rooms_count,
+        doc.area_m2,
+        doc.floor_level,
+        doc.total_floors,
+        doc.condition,
+        doc.sauna,
+        doc.balcony,
+        fa.frontdoor_ad_data,
+        sa.shortcut_ad_data,
+        fba.frontdoor_building_announcement_area,
+        fba.frontdoor_building_announcement_room_structure,
+        fb.frontdoor_building_floor_count,
+        fb.frontdoor_building_build_year,
+        fb.frontdoor_building_construction_end_year,
+        fb.frontdoor_building_heating,
+        fb.frontdoor_building_heating_fuel,
+        fb.frontdoor_building_outer_roof_type,
+        fb.frontdoor_building_outer_roof_material,
+        fb.frontdoor_building_car_storage_description,
+        fb.frontdoor_building_description,
+        fb.frontdoor_building_other_info
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE doc.primary_source_listing_id = sqlc.arg('sale_listing_id')::uuid
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
 SELECT
-    sale_listing_room_layout AS room_layout,
-    sale_listing_rooms_count,
-    sale_listing_bedrooms_count,
-    sale_listing_area_value,
-    sale_listing_living_area_value,
-    sale_listing_total_area_value,
-    sale_listing_other_area_value,
-    sale_listing_floor_level,
-    sale_listing_total_floors,
-    sale_listing_floor_text AS floor_text,
-    sale_listing_condition AS condition,
-    sale_listing_sauna,
-    sale_listing_balcony,
-    sale_listing_parking_text AS parking_text,
-    sale_listing_description_text AS description_text,
-    sale_listing_additional_info_text AS additional_info_text,
-    sale_listing_kitchen_description_text AS kitchen_description_text,
-    sale_listing_bathroom_description_text AS bathroom_description_text,
-    sale_listing_storage_description_text AS storage_description_text,
-    sale_listing_floor_materials_description_text AS floor_materials_description_text,
-    sale_listing_wall_materials_description_text AS wall_materials_description_text,
-    sale_listing_balcony_description_text AS balcony_description_text,
-    sale_listing_sauna_description_text AS sauna_description_text,
-    sale_listing_views_description_text AS views_description_text,
-    sale_listing_building_material AS building_material,
-    sale_listing_heating_system AS heating_system,
-    sale_listing_roof_type AS roof_type,
-    sale_listing_roof_material AS roof_material,
-    sale_listing_car_storage_text AS car_storage_text,
-    sale_listing_building_description_text AS building_description_text,
-    sale_listing_building_other_info_text AS building_other_info_text,
-    sale_listing_charges_text AS charges_text
-FROM public.property_source_offerings
-WHERE sale_listing_id = @sale_listing_id
-LIMIT 1;
+    COALESCE(room_layout, frontdoor_building_announcement_room_structure) AS room_layout,
+    rooms_count AS sale_listing_rooms_count,
+    COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bedroomCount}', shortcut_ad_data #>> '{adData,bedrooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), NULL::integer) AS sale_listing_bedrooms_count,
+    COALESCE(area_m2, frontdoor_building_announcement_area) AS sale_listing_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,livingArea}', shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_living_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,totalArea}', shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_total_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,otherArea}', shortcut_ad_data #>> '{adData,sizeOther}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_other_area_value,
+    floor_level AS sale_listing_floor_level,
+    COALESCE(total_floors, frontdoor_building_floor_count) AS sale_listing_total_floors,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,floorLevel}', shortcut_ad_data #>> '{adData,floor}', floor_level::text)), '') AS floor_text,
+    condition,
+    sauna AS sale_listing_sauna,
+    balcony AS sale_listing_balcony,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,carParkingInformation}', shortcut_ad_data #>> '{adData,parkingSpaceInfo}', shortcut_ad_data #>> '{adData,carStorageInfo}')), '') AS parking_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}')), '') AS additional_info_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,kitchenDescription}', frontdoor_ad_data #>> '{property,kitchenDescription}', shortcut_ad_data #>> '{adData,kitchenApplianceInfo}')), '') AS kitchen_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bathroomDescription}', frontdoor_ad_data #>> '{property,bathroomDescription}', shortcut_ad_data #>> '{adData,bathroomApplianceInfo}')), '') AS bathroom_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,storageSpacesDescription}', frontdoor_ad_data #>> '{residenceDetailsDTO,storageSpacesDescription}', shortcut_ad_data #>> '{adData,storageInfo}', shortcut_ad_data #>> '{adData,commonAreaInfo}')), '') AS storage_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,floorMaterialDescription}', frontdoor_ad_data #>> '{property,floorMaterialDescription}', shortcut_ad_data #>> '{adData,floorMaterialInfo}')), '') AS floor_materials_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,wallMaterialDescription}', frontdoor_ad_data #>> '{property,wallMaterialDescription}', shortcut_ad_data #>> '{adData,wallMaterialInfo}')), '') AS wall_materials_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,balconyDescription}', frontdoor_ad_data #>> '{property,balconyDescription}', shortcut_ad_data #>> '{adData,balconyInfo}')), '') AS balcony_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,saunaDescription}', shortcut_ad_data #>> '{adData,saunaInfo}')), '') AS sauna_description_text,
+    NULLIF(trim(frontdoor_ad_data #>> '{residenceDetailsDTO,viewsDescription}'), '') AS views_description_text,
+    NULL::text AS building_material,
+    NULLIF(trim(concat_ws(', ', frontdoor_building_heating, array_to_string(frontdoor_building_heating_fuel, ', '))), '') AS heating_system,
+    frontdoor_building_outer_roof_type AS roof_type,
+    frontdoor_building_outer_roof_material AS roof_material,
+    frontdoor_building_car_storage_description AS car_storage_text,
+    frontdoor_building_description AS building_description_text,
+    frontdoor_building_other_info AS building_other_info_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', shortcut_ad_data #>> '{priceData,chargesText}', shortcut_ad_data #>> '{priceData,additionalInfo}', shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text
+FROM source_doc;
 
 -- name: ListPropertySourceOfferingInsights :many
 SELECT

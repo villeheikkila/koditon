@@ -60,7 +60,7 @@ func (s *Service) extractSourceListingDescriptionInsights(ctx context.Context, s
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return DescriptionExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetPropertySourceOfferingDescriptionTexts(ctx, &saleListingID)
+	row, err := s.queries.GetPropertySourceOfferingDescriptionTexts(ctx, saleListingID)
 	if err != nil {
 		return DescriptionExtractionResult{}, mapNotFound(err)
 	}

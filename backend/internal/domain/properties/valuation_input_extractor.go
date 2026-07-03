@@ -55,7 +55,7 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return ValuationInputExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetPropertySourceOfferingValuationExtractionTexts(ctx, &saleListingID)
+	row, err := s.queries.GetPropertySourceOfferingValuationExtractionTexts(ctx, saleListingID)
 	if err != nil {
 		return ValuationInputExtractionResult{}, mapNotFound(err)
 	}
