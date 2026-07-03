@@ -1022,14 +1022,15 @@ SELECT
     pu.housing_company_id,
     ph.property_house_id,
     COALESCE(hc.housing_company_name, ''),
-    COALESCE(primary_listing.sale_listing_street_address, hc.housing_company_address_norm, ph.property_house_address_norm, ''),
-    COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, ''),
-    COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')
+    COALESCE(primary_listing.address, hc.housing_company_address_norm, ph.property_house_address_norm, ''),
+    COALESCE(primary_listing.city, hc.housing_company_city_norm, ph.property_house_city_norm, ''),
+    COALESCE(primary_listing.postal, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')
 FROM public.property_offerings po
 LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
 LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+LEFT JOIN public.listing_search_documents primary_listing ON primary_listing.property_offering_id = po.property_offering_id
+    AND primary_listing.listing_status = 'active'
 WHERE po.property_offering_id = $1`, id).Scan(&offeringID, &headline, &askingPrice, &debtFreePrice, &lastSeenAt, &unitID, &roomLayout, &areaM2, &housingCompanyID, &houseID, &companyName, &address, &city, &postal)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -1367,62 +1368,28 @@ func (a *API) appendTargetSourceLinks(ctx context.Context, overview *TargetOverv
 
 func (a *API) appendOfferingSourceLinks(ctx context.Context, overview *TargetOverview, offeringID uuid.UUID) error {
 	rows, err := a.pool.Query(ctx, `
-WITH linked_listings AS (
-    SELECT sl.*
-    FROM public.target_sources source_link
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.target_id = $1
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-),
-source_links AS (
+WITH source_links AS (
     SELECT
         'Listing'::text AS label,
-        sl.sale_listing_source_provider AS provider,
-        sl.sale_listing_source_kind AS kind,
-        sl.sale_listing_native_id AS source_id,
-        sl.sale_listing_canonical_id AS canonical_id,
-        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
-        COALESCE(sl.sale_listing_url, '') AS url,
+        evidence.provider,
         CASE
-            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-            ELSE false
-        END AS external_url_available,
-        sl.sale_listing_last_seen_at AS last_seen_at
-    FROM linked_listings sl
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    UNION ALL
-    SELECT DISTINCT
-        'Building page'::text AS label,
-        'shortcut'::text AS provider,
-        'building'::text AS kind,
-        sb.shortcut_building_external_id::text AS source_id,
-        ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
-        COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
-        sb.shortcut_building_url AS url,
-        COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
-        COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
-    FROM linked_listings sl
-    JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    UNION ALL
-    SELECT DISTINCT
-        'Building page'::text AS label,
-        'frontdoor'::text AS provider,
-        'building'::text AS kind,
-        fb.frontdoor_building_id::text AS source_id,
-        ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
-        COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
-        fb.frontdoor_building_url AS url,
-        COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
-        fb.frontdoor_building_last_seen_at AS last_seen_at
-    FROM linked_listings sl
-    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+            WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+            WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+            WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+            ELSE evidence.source_kind
+        END AS kind,
+        evidence.external_id AS source_id,
+        doc.canonical_id,
+        COALESCE(doc.headline, doc.address, evidence.external_id, doc.canonical_id) AS title,
+        COALESCE(evidence.url, doc.url, '') AS url,
+        COALESCE(evidence.url, doc.url, '') <> '' AND doc.listing_status = 'active' AS external_url_available,
+        COALESCE(evidence.observed_at, doc.last_seen_at) AS last_seen_at
+    FROM public.listing_search_documents doc
+    JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+        AND entity_evidence.link_status <> 'rejected'
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
+    WHERE doc.property_offering_id = $1
+        AND doc.listing_status = 'active'
 )
 SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
@@ -1443,64 +1410,30 @@ ORDER BY label, provider, last_seen_at DESC NULLS LAST, title`, offeringID)
 
 func (a *API) appendHousingCompanySourceLinks(ctx context.Context, overview *TargetOverview, housingCompanyID uuid.UUID) error {
 	rows, err := a.pool.Query(ctx, `
-WITH linked_listings AS (
-    SELECT DISTINCT sl.*
-    FROM public.property_units pu
-    JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE pu.housing_company_id = $1
-),
-source_links AS (
+WITH source_links AS (
     SELECT
         'Listing'::text AS label,
-        sl.sale_listing_source_provider AS provider,
-        sl.sale_listing_source_kind AS kind,
-        sl.sale_listing_native_id AS source_id,
-        sl.sale_listing_canonical_id AS canonical_id,
-        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS title,
-        COALESCE(sl.sale_listing_url, '') AS url,
+        evidence.provider,
         CASE
-            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-            ELSE false
-        END AS external_url_available,
-        sl.sale_listing_last_seen_at AS last_seen_at
-    FROM linked_listings sl
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    UNION ALL
-    SELECT DISTINCT
-        'Building page'::text AS label,
-        'shortcut'::text AS provider,
-        'building'::text AS kind,
-        sb.shortcut_building_external_id::text AS source_id,
-        ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id,
-        COALESCE(sb.shortcut_building_housing_company, sb.shortcut_building_address, sb.shortcut_building_external_id::text) AS title,
-        sb.shortcut_building_url AS url,
-        COALESCE(sb.shortcut_building_page_not_found, false) = false AS external_url_available,
-        COALESCE(sb.shortcut_building_updated_at, sb.shortcut_building_processed_at) AS last_seen_at
-    FROM linked_listings sl
-    JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-    JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    UNION ALL
-    SELECT DISTINCT
-        'Building page'::text AS label,
-        'frontdoor'::text AS provider,
-        'building'::text AS kind,
-        fb.frontdoor_building_id::text AS source_id,
-        ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id,
-        COALESCE(fb.frontdoor_building_company_name, concat_ws(' ', fb.frontdoor_building_street_address, fb.frontdoor_building_house_number), fb.frontdoor_building_id::text) AS title,
-        fb.frontdoor_building_url AS url,
-        COALESCE(fba.frontdoor_building_announcement_published, false) AS external_url_available,
-        fb.frontdoor_building_last_seen_at AS last_seen_at
-    FROM linked_listings sl
-    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+            WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+            WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+            WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+            ELSE evidence.source_kind
+        END AS kind,
+        evidence.external_id AS source_id,
+        doc.canonical_id,
+        COALESCE(doc.headline, doc.address, evidence.external_id, doc.canonical_id) AS title,
+        COALESCE(evidence.url, doc.url, '') AS url,
+        COALESCE(evidence.url, doc.url, '') <> '' AND doc.listing_status = 'active' AS external_url_available,
+        COALESCE(evidence.observed_at, doc.last_seen_at) AS last_seen_at
+    FROM public.property_units unit
+    JOIN public.property_offerings offering ON offering.property_unit_id = unit.property_unit_id
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = offering.property_offering_id
+        AND doc.listing_status = 'active'
+    JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+        AND entity_evidence.link_status <> 'rejected'
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
+    WHERE unit.housing_company_id = $1
 )
 SELECT label, provider, kind, COALESCE(source_id, ''), COALESCE(canonical_id, ''), COALESCE(title, ''), COALESCE(url, ''), external_url_available, last_seen_at
 FROM source_links
@@ -1540,35 +1473,38 @@ func (a *API) listTargetSources(ctx context.Context, target CanonicalTargetRef) 
 		return nil, err
 	}
 	rows, err := a.pool.Query(ctx, `
+WITH target_documents AS (
+    SELECT doc.*
+    FROM public.listing_search_documents doc
+    LEFT JOIN public.property_offerings offering ON offering.property_offering_id = doc.property_offering_id
+    LEFT JOIN public.property_units unit ON unit.property_unit_id = offering.property_unit_id
+    WHERE doc.listing_status = 'active'
+        AND (
+            ($1::text = 'offering' AND doc.property_offering_id = $2)
+            OR ($1::text = 'listing' AND doc.listing_id = $2)
+            OR ($1::text = 'unit' AND offering.property_unit_id = $2)
+            OR ($1::text = 'building' AND unit.physical_building_id = $2)
+            OR ($1::text = 'housing_company' AND unit.housing_company_id = $2)
+            OR ($1::text = 'house' AND offering.property_house_id = $2)
+        )
+)
 SELECT
-    COALESCE(src.provider, shc.provider, ts.source_type),
-    COALESCE(src.source_kind, shc.source_kind, ts.source_type),
-    COALESCE(src.raw_table, shc.raw_table, ts.source_type),
-    COALESCE(ts.source_id::text, ''),
-    COALESCE(src.raw_id, shc.raw_id, ts.source_id::text),
-    COALESCE(src.canonical_source_id, ''),
-    COALESCE(src.native_id, shc.native_id, ''),
-    COALESCE(src.url, shc.url, ''),
-    CASE
-        WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-        ELSE false
-    END AS external_url_available,
-    ts.link_status,
-    ts.last_seen_at
-FROM public.target_sources ts
-LEFT JOIN origin.source_listings src ON ts.source_type = 'source_listing'
-    AND src.source_listing_id = ts.source_id
-LEFT JOIN origin.source_housing_companies shc ON ts.source_type = 'source_housing_company'
-    AND shc.source_housing_company_id = ts.source_id
-LEFT JOIN public.property_source_offerings sl ON sl.sale_listing_id = src.source_listing_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-WHERE ts.target_type = CASE WHEN $1::text = 'offering' THEN 'listing' ELSE $1::text END
-    AND ts.target_id = $2
-    AND ts.link_status <> 'rejected'
-ORDER BY COALESCE(src.source_kind, shc.source_kind, ts.source_type), COALESCE(src.provider, shc.provider, ts.source_type), ts.last_seen_at DESC NULLS LAST, COALESCE(src.raw_id, shc.raw_id, ts.source_id::text)
+    evidence.provider,
+    evidence.source_kind,
+    'evidence_sources'::text,
+    evidence.evidence_source_id::text,
+    COALESCE(evidence.external_id, evidence.evidence_source_id::text),
+    doc.canonical_id,
+    COALESCE(evidence.external_id, doc.native_id, ''),
+    COALESCE(evidence.url, doc.url, ''),
+    COALESCE(evidence.url, doc.url, '') <> '' AS external_url_available,
+    entity_evidence.link_status,
+    COALESCE(evidence.observed_at, doc.last_seen_at)
+FROM target_documents doc
+JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+    AND entity_evidence.link_status <> 'rejected'
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
+ORDER BY evidence.source_kind, evidence.provider, COALESCE(evidence.observed_at, doc.last_seen_at) DESC NULLS LAST, evidence.external_id
 LIMIT 500`, target.Type, targetID)
 	if err != nil {
 		return nil, err
@@ -2009,7 +1945,7 @@ SELECT
     pu.physical_building_id,
     pu.housing_company_id,
     COALESCE(po.property_offering_headline, pu.property_unit_room_layout, pu.property_unit_address_norm, ph.property_house_address_norm, po.property_offering_id::text),
-    COALESCE(pu.property_unit_room_layout, primary_listing.sale_listing_room_layout, ''),
+    COALESCE(pu.property_unit_room_layout, primary_listing.room_layout, ''),
     COALESCE(pu.property_unit_area_value, ph.property_house_area_value),
     po.property_offering_asking_price,
     po.property_offering_last_seen_at,
@@ -2023,17 +1959,17 @@ SELECT
 FROM public.property_offerings po
 LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
-LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+LEFT JOIN public.listing_search_documents primary_listing ON primary_listing.property_offering_id = po.property_offering_id
+    AND primary_listing.listing_status = 'active'
 LEFT JOIN LATERAL (
     SELECT
-        count(DISTINCT source_link.source_id)::int4 AS source_count,
-        string_agg(DISTINCT sl.sale_listing_source_provider, ',' ORDER BY sl.sale_listing_source_provider) AS sources
-    FROM public.target_sources source_link
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+        cardinality(doc.source_providers)::int4 AS source_count,
+        array_to_string(doc.source_providers, ',') AS sources
+    FROM public.listing_search_documents doc
+    WHERE doc.property_offering_id = po.property_offering_id
+        AND doc.listing_status = 'active'
+    ORDER BY doc.last_seen_at DESC NULLS LAST
+    LIMIT 1
 ) source_stats ON true
 LEFT JOIN LATERAL (
     SELECT

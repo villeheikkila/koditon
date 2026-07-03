@@ -1012,6 +1012,107 @@ CREATE TABLE public.property_documents (
     CONSTRAINT property_documents_size_bytes_check CHECK (((property_document_size_bytes > 0) AND (property_document_size_bytes <= 26214400)))
 );
 
+CREATE TABLE public.evidence_sources (
+    evidence_source_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_kind text NOT NULL,
+    provider text,
+    external_id text,
+    url text,
+    payload_hash text,
+    observed_at timestamp with time zone,
+    frontdoor_ad_id uuid,
+    shortcut_ad_id bigint,
+    frontdoor_building_announcement_id uuid,
+    property_document_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT evidence_sources_kind_check CHECK ((source_kind = ANY (ARRAY['frontdoor_ad'::text, 'shortcut_ad'::text, 'frontdoor_building_announcement'::text, 'manager_certificate'::text, 'manual'::text, 'legacy_import'::text]))),
+    CONSTRAINT evidence_sources_one_source_check CHECK ((num_nonnulls(frontdoor_ad_id, shortcut_ad_id, frontdoor_building_announcement_id, property_document_id) = 1)),
+    CONSTRAINT evidence_sources_kind_matches_source_check CHECK ((((source_kind = 'frontdoor_ad'::text) AND (frontdoor_ad_id IS NOT NULL)) OR ((source_kind = 'shortcut_ad'::text) AND (shortcut_ad_id IS NOT NULL)) OR ((source_kind = 'frontdoor_building_announcement'::text) AND (frontdoor_building_announcement_id IS NOT NULL)) OR ((source_kind = 'manager_certificate'::text) AND (property_document_id IS NOT NULL))))
+);
+
+CREATE TABLE public.evidence_facts (
+    evidence_fact_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    evidence_source_id uuid NOT NULL,
+    subject_type text NOT NULL,
+    field_name text NOT NULL,
+    value jsonb NOT NULL,
+    confidence double precision DEFAULT 1 NOT NULL,
+    extracted_at timestamp with time zone DEFAULT now() NOT NULL,
+    superseded_at timestamp with time zone,
+    CONSTRAINT evidence_facts_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
+    CONSTRAINT evidence_facts_subject_type_check CHECK ((subject_type = ANY (ARRAY['listing'::text, 'offering'::text, 'unit'::text, 'house'::text, 'building'::text, 'housing_company'::text, 'address'::text])))
+);
+
+CREATE TABLE public.entity_evidence (
+    entity_evidence_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    evidence_source_id uuid NOT NULL,
+    listing_id uuid,
+    property_offering_id uuid,
+    property_unit_id uuid,
+    property_house_id uuid,
+    physical_building_id uuid,
+    housing_company_id uuid,
+    link_status text NOT NULL,
+    link_method text NOT NULL,
+    confidence double precision DEFAULT 1 NOT NULL,
+    reasons jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT entity_evidence_confidence_check CHECK (((confidence >= (0)::double precision) AND (confidence <= (1)::double precision))),
+    CONSTRAINT entity_evidence_link_method_check CHECK ((link_method = ANY (ARRAY['sync_auto'::text, 'source_match_auto'::text, 'document_match_auto'::text, 'manual'::text, 'legacy_import'::text]))),
+    CONSTRAINT entity_evidence_link_status_check CHECK ((link_status = ANY (ARRAY['confirmed'::text, 'candidate'::text, 'rejected'::text, 'superseded'::text]))),
+    CONSTRAINT entity_evidence_one_entity_check CHECK ((num_nonnulls(listing_id, property_offering_id, property_unit_id, property_house_id, physical_building_id, housing_company_id) = 1))
+);
+
+CREATE TABLE public.listing_search_documents (
+    listing_id uuid NOT NULL,
+    property_offering_id uuid NOT NULL,
+    primary_evidence_source_id uuid NOT NULL,
+    primary_source_listing_id uuid,
+    source text NOT NULL,
+    kind text NOT NULL,
+    native_id text NOT NULL,
+    canonical_id text NOT NULL,
+    url text,
+    headline text,
+    address text,
+    city text,
+    postal text,
+    latitude double precision,
+    longitude double precision,
+    asking_price bigint,
+    debt_free_price bigint,
+    debt_share_amount bigint,
+    area_m2 double precision,
+    room_layout text,
+    price_per_m2 double precision,
+    rooms_count integer,
+    floor_level integer,
+    total_floors integer,
+    build_year integer,
+    property_type_code text,
+    condition text,
+    energy_class text,
+    energy_efficiency_label text,
+    elevator boolean,
+    sauna boolean,
+    balcony boolean,
+    plot_owned boolean,
+    new_development boolean,
+    listing_type text NOT NULL,
+    listing_status text NOT NULL,
+    published_at timestamp with time zone,
+    first_seen_at timestamp with time zone,
+    last_seen_at timestamp with time zone,
+    search_text text NOT NULL,
+    source_providers text[] DEFAULT '{}'::text[] NOT NULL,
+    source_kinds text[] DEFAULT '{}'::text[] NOT NULL,
+    refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT listing_search_documents_listing_type_check CHECK ((listing_type = ANY (ARRAY['sale'::text, 'rental'::text]))),
+    CONSTRAINT listing_search_documents_status_check CHECK ((listing_status = ANY (ARRAY['active'::text, 'stale'::text, 'removed'::text, 'rejected'::text, 'ambiguous'::text])))
+);
+
 CREATE TABLE public.property_houses (
     property_house_id uuid DEFAULT gen_random_uuid() NOT NULL,
     property_house_identity_key text NOT NULL,
@@ -1590,6 +1691,15 @@ ALTER TABLE ONLY public.dimension_profiles
 ALTER TABLE ONLY public.dimension_values
     ADD CONSTRAINT dimension_values_pkey PRIMARY KEY (target_type, target_id, dimension_key);
 
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_pkey PRIMARY KEY (entity_evidence_id);
+
+ALTER TABLE ONLY public.evidence_facts
+    ADD CONSTRAINT evidence_facts_pkey PRIMARY KEY (evidence_fact_id);
+
+ALTER TABLE ONLY public.evidence_sources
+    ADD CONSTRAINT evidence_sources_pkey PRIMARY KEY (evidence_source_id);
+
 ALTER TABLE ONLY public.houses
     ADD CONSTRAINT houses_pkey PRIMARY KEY (house_id);
 
@@ -1598,6 +1708,9 @@ ALTER TABLE ONLY public.housing_company_merge_decisions
 
 ALTER TABLE ONLY public.listings
     ADD CONSTRAINT listings_pkey PRIMARY KEY (listing_id);
+
+ALTER TABLE ONLY public.listing_search_documents
+    ADD CONSTRAINT listing_search_documents_pkey PRIMARY KEY (listing_id);
 
 ALTER TABLE ONLY public.physical_buildings
     ADD CONSTRAINT physical_buildings_physical_building_identity_key_key UNIQUE (physical_building_identity_key);
@@ -1881,6 +1994,30 @@ CREATE INDEX idx_dimension_values_dimension ON public.dimension_values USING btr
 
 CREATE INDEX idx_dimension_values_selected_claim ON public.dimension_values USING btree (selected_claim_id);
 
+CREATE INDEX idx_entity_evidence_evidence ON public.entity_evidence USING btree (evidence_source_id, link_status);
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_building ON public.entity_evidence USING btree (evidence_source_id, physical_building_id) WHERE ((physical_building_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_company ON public.entity_evidence USING btree (evidence_source_id, housing_company_id) WHERE ((housing_company_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_house ON public.entity_evidence USING btree (evidence_source_id, property_house_id) WHERE ((property_house_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_listing ON public.entity_evidence USING btree (evidence_source_id, listing_id) WHERE ((listing_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_offering ON public.entity_evidence USING btree (evidence_source_id, property_offering_id) WHERE ((property_offering_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE UNIQUE INDEX idx_entity_evidence_unique_unit ON public.entity_evidence USING btree (evidence_source_id, property_unit_id) WHERE ((property_unit_id IS NOT NULL) AND (link_status <> 'rejected'::text));
+
+CREATE INDEX idx_evidence_facts_evidence ON public.evidence_facts USING btree (evidence_source_id, subject_type, field_name) WHERE (superseded_at IS NULL);
+
+CREATE UNIQUE INDEX idx_evidence_sources_frontdoor_ad ON public.evidence_sources USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
+
+CREATE UNIQUE INDEX idx_evidence_sources_frontdoor_building_announcement ON public.evidence_sources USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
+
+CREATE UNIQUE INDEX idx_evidence_sources_property_document ON public.evidence_sources USING btree (property_document_id) WHERE (property_document_id IS NOT NULL);
+
+CREATE UNIQUE INDEX idx_evidence_sources_shortcut_ad ON public.evidence_sources USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
+
 CREATE INDEX idx_houses_address ON public.houses USING btree (postal_norm, city_norm, address_norm);
 
 CREATE INDEX idx_houses_lat_lng ON public.houses USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
@@ -1904,6 +2041,22 @@ CREATE INDEX idx_listings_last_seen ON public.listings USING btree (last_seen_at
 CREATE INDEX idx_listings_primary_source_listing ON public.listings USING btree (primary_source_listing_id);
 
 CREATE INDEX idx_listings_unit ON public.listings USING btree (unit_id) WHERE (unit_id IS NOT NULL);
+
+CREATE INDEX idx_listing_search_documents_area ON public.listing_search_documents USING btree (area_m2);
+
+CREATE INDEX idx_listing_search_documents_city ON public.listing_search_documents USING btree (city);
+
+CREATE INDEX idx_listing_search_documents_last_seen ON public.listing_search_documents USING btree (last_seen_at DESC);
+
+CREATE INDEX idx_listing_search_documents_map_filters ON public.listing_search_documents USING btree (property_type_code, elevator, sauna, balcony, plot_owned, new_development);
+
+CREATE INDEX idx_listing_search_documents_postal ON public.listing_search_documents USING btree (postal);
+
+CREATE INDEX idx_listing_search_documents_price ON public.listing_search_documents USING btree (asking_price);
+
+CREATE INDEX idx_listing_search_documents_search_trgm ON public.listing_search_documents USING gin (lower(search_text) extensions.gin_trgm_ops);
+
+CREATE INDEX idx_listing_search_documents_source ON public.listing_search_documents USING btree (source, kind);
 
 CREATE INDEX idx_physical_buildings_housing_company ON public.physical_buildings USING btree (housing_company_id);
 
@@ -2126,6 +2279,54 @@ ALTER TABLE ONLY auth.user_roles
 
 ALTER TABLE ONLY origin.frontdoor_building_announcements
     ADD CONSTRAINT frontdoor_building_announceme_frontdoor_building_announcem_fkey FOREIGN KEY (frontdoor_building_id) REFERENCES origin.frontdoor_buildings(frontdoor_building_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_evidence_source_id_fkey FOREIGN KEY (evidence_source_id) REFERENCES public.evidence_sources(evidence_source_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_housing_company_id_fkey FOREIGN KEY (housing_company_id) REFERENCES public.housing_companies(housing_company_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_physical_building_id_fkey FOREIGN KEY (physical_building_id) REFERENCES public.physical_buildings(physical_building_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_property_house_id_fkey FOREIGN KEY (property_house_id) REFERENCES public.property_houses(property_house_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_property_offering_id_fkey FOREIGN KEY (property_offering_id) REFERENCES public.property_offerings(property_offering_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.entity_evidence
+    ADD CONSTRAINT entity_evidence_property_unit_id_fkey FOREIGN KEY (property_unit_id) REFERENCES public.property_units(property_unit_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.evidence_facts
+    ADD CONSTRAINT evidence_facts_evidence_source_id_fkey FOREIGN KEY (evidence_source_id) REFERENCES public.evidence_sources(evidence_source_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.evidence_sources
+    ADD CONSTRAINT evidence_sources_frontdoor_ad_id_fkey FOREIGN KEY (frontdoor_ad_id) REFERENCES origin.frontdoor_ads(frontdoor_ad_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.evidence_sources
+    ADD CONSTRAINT evidence_sources_frontdoor_building_announcement_id_fkey FOREIGN KEY (frontdoor_building_announcement_id) REFERENCES origin.frontdoor_building_announcements(frontdoor_building_announcement_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.evidence_sources
+    ADD CONSTRAINT evidence_sources_property_document_id_fkey FOREIGN KEY (property_document_id) REFERENCES public.property_documents(property_document_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.evidence_sources
+    ADD CONSTRAINT evidence_sources_shortcut_ad_id_fkey FOREIGN KEY (shortcut_ad_id) REFERENCES origin.shortcut_ads(shortcut_ad_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.listing_search_documents
+    ADD CONSTRAINT listing_search_documents_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.listing_search_documents
+    ADD CONSTRAINT listing_search_documents_primary_evidence_source_id_fkey FOREIGN KEY (primary_evidence_source_id) REFERENCES public.evidence_sources(evidence_source_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.listing_search_documents
+    ADD CONSTRAINT listing_search_documents_property_offering_id_fkey FOREIGN KEY (property_offering_id) REFERENCES public.property_offerings(property_offering_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.listing_search_documents
+    ADD CONSTRAINT listing_search_documents_source_listing_id_fkey FOREIGN KEY (primary_source_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY origin.postal_postal_codes
     ADD CONSTRAINT postal_postal_codes_postal_postal_codes_ad_area_id_fkey FOREIGN KEY (postal_ad_area_id) REFERENCES origin.postal_ad_areas(postal_ad_area_id);
@@ -5590,4 +5791,3 @@ INSERT INTO public.property_dimension_source_priorities VALUES ('risk.maintenanc
 INSERT INTO public.property_dimension_source_priorities VALUES ('risk.repair_backlog_risk', 'property_documents', 'finances.repair_backlog_risk', 88, 0.86);
 INSERT INTO public.property_dimension_source_priorities VALUES ('risk.administrative_legal_risk', 'property_documents', 'risks.administrative_legal_risk', 92, 0.9);
 INSERT INTO public.property_dimension_source_priorities VALUES ('risk.restrictions', 'property_documents', 'risks.restrictions', 92, 0.9);
-

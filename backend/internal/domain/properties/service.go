@@ -809,18 +809,17 @@ JOIN public.housing_companies pb ON pb.housing_company_id = pu.housing_company_i
 JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
 LEFT JOIN LATERAL (
     SELECT
-        max(NULLIF(sl.sale_listing_headline, '')) AS headline,
-        min(sl.sale_listing_asking_price) FILTER (WHERE sl.sale_listing_asking_price IS NOT NULL) AS asking_price,
-        min(sl.sale_listing_price_per_m2) FILTER (WHERE sl.sale_listing_price_per_m2 IS NOT NULL) AS price_per_m2,
-        max(sl.sale_listing_last_seen_at) AS last_seen_at,
-        array_agg(DISTINCT sl.sale_listing_source_provider ORDER BY sl.sale_listing_source_provider) AS providers,
-        array_agg(DISTINCT sl.sale_listing_source_kind ORDER BY sl.sale_listing_source_kind) AS kinds
-    FROM public.target_sources source_link
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+        max(NULLIF(doc.headline, '')) AS headline,
+        min(doc.asking_price) FILTER (WHERE doc.asking_price IS NOT NULL) AS asking_price,
+        min(doc.price_per_m2) FILTER (WHERE doc.price_per_m2 IS NOT NULL) AS price_per_m2,
+        max(doc.last_seen_at) AS last_seen_at,
+        array_agg(DISTINCT provider ORDER BY provider) AS providers,
+        array_agg(DISTINCT kind ORDER BY kind) AS kinds
+    FROM public.listing_search_documents doc
+    LEFT JOIN LATERAL unnest(doc.source_providers) provider ON true
+    LEFT JOIN LATERAL unnest(doc.source_kinds) kind ON true
+    WHERE doc.property_offering_id = po.property_offering_id
+        AND doc.listing_status = 'active'
 ) source_summary ON true
 LEFT JOIN LATERAL (
     SELECT
@@ -894,10 +893,10 @@ func (s *Service) saleOfferingSource(ctx context.Context, offeringID uuid.UUID) 
 	err := s.db.QueryRow(ctx, `
 SELECT
     po.property_offering_id::text,
-    pb.housing_company_id::text,
+    COALESCE(pb.housing_company_id::text, '')::text,
     pu.property_unit_id::text,
-    selected.sale_listing_id,
-    count(DISTINCT source_count.target_source_id)::int4,
+    selected.primary_source_listing_id,
+    COALESCE(selected.source_count, 0)::int4,
     count(DISTINCT merges.source_property_offering_id)::int4,
     COALESCE(array_agg(DISTINCT merges.source_property_offering_id::text) FILTER (WHERE merges.source_property_offering_id IS NOT NULL), ARRAY[]::text[])
 FROM public.property_offerings po
@@ -905,35 +904,22 @@ JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
 JOIN public.housing_companies pb ON pb.housing_company_id = pu.housing_company_id
 JOIN LATERAL (
     SELECT
-        sl.sale_listing_id
-    FROM public.target_sources linked
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = linked.source_id
-    WHERE linked.target_type = 'listing'
-        AND linked.target_id = po.property_offering_id
-        AND linked.source_type = 'source_listing'
-        AND linked.link_status <> 'rejected'
+        doc.primary_source_listing_id,
+        cardinality(doc.source_providers)::int4 AS source_count
+    FROM public.listing_search_documents doc
+    WHERE doc.property_offering_id = po.property_offering_id
+        AND doc.listing_status = 'active'
     ORDER BY
-        CASE WHEN sl.sale_listing_source_kind = 'ad' THEN 0 ELSE 1 END,
-        CASE WHEN sl.sale_listing_asking_price IS NOT NULL THEN 0 ELSE 1 END,
-        CASE WHEN NULLIF(sl.sale_listing_description_text, '') IS NOT NULL THEN 0 ELSE 1 END,
-        CASE
-            WHEN sl.frontdoor_ad_id IS NOT NULL THEN 0
-            WHEN sl.shortcut_ad_id IS NOT NULL THEN 1
-            ELSE 2
-        END,
-        sl.sale_listing_last_seen_at DESC NULLS LAST,
-        linked.link_score DESC,
-        sl.sale_listing_created_at DESC
+        CASE WHEN doc.kind = 'ad' THEN 0 ELSE 1 END,
+        CASE WHEN doc.asking_price IS NOT NULL THEN 0 ELSE 1 END,
+        doc.last_seen_at DESC NULLS LAST,
+        doc.refreshed_at DESC
     LIMIT 1
 ) selected ON true
-LEFT JOIN public.target_sources source_count ON source_count.target_type = 'listing'
-    AND source_count.target_id = po.property_offering_id
-    AND source_count.source_type = 'source_listing'
-    AND source_count.link_status <> 'rejected'
 LEFT JOIN public.property_offering_merge_decisions merges ON merges.target_property_offering_id = po.property_offering_id
     AND merges.property_offering_merge_decision_status = 'accepted'
 WHERE po.property_offering_id = $1
-GROUP BY po.property_offering_id, pb.housing_company_id, pu.property_unit_id, selected.sale_listing_id
+GROUP BY po.property_offering_id, pb.housing_company_id, pu.property_unit_id, selected.primary_source_listing_id, selected.source_count
 LIMIT 1`, offeringID).Scan(&offering.OfferingID, &offering.HousingCompanyID, &offering.UnitID, &sourceListingID, &offering.SourceCount, &offering.MergeDecisionCount, &offering.MergedFrom)
 	if err != nil {
 		return CanonicalOffering{}, uuid.UUID{}, mapNotFound(err)
@@ -944,24 +930,29 @@ LIMIT 1`, offeringID).Scan(&offering.OfferingID, &offering.HousingCompanyID, &of
 func (s *Service) saleOfferingSourceRecords(ctx context.Context, offeringID uuid.UUID) ([]OfferingSourceRecord, error) {
 	rows, err := s.db.Query(ctx, `
 SELECT
-    sl.sale_listing_id::text,
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
-    ''::text,
-    COALESCE(sl.sale_listing_url, ''),
-    COALESCE(sl.sale_listing_headline, ''),
-    sl.sale_listing_first_seen_at,
-    sl.sale_listing_last_seen_at,
-    source_link.link_status,
-    source_link.link_method,
-    source_link.link_score::int4
-FROM public.target_sources source_link
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-WHERE source_link.target_type = 'listing'
-    AND source_link.target_id = $1
-    AND source_link.source_type = 'source_listing'
-    AND source_link.link_status <> 'rejected'
-ORDER BY sl.sale_listing_last_seen_at DESC NULLS LAST, sl.sale_listing_created_at DESC`, offeringID)
+    evidence.evidence_source_id::text,
+    evidence.provider,
+    CASE
+        WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+        WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+        WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+        ELSE evidence.source_kind
+    END,
+    COALESCE(evidence.external_id, ''),
+    COALESCE(evidence.url, doc.url, ''),
+    COALESCE(doc.headline, ''),
+    doc.first_seen_at,
+    COALESCE(evidence.observed_at, doc.last_seen_at),
+    entity_evidence.link_status,
+    entity_evidence.link_method,
+    (entity_evidence.confidence * 100)::int4
+FROM public.listing_search_documents doc
+JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+    AND entity_evidence.link_status <> 'rejected'
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
+WHERE doc.property_offering_id = $1
+    AND doc.listing_status = 'active'
+ORDER BY COALESCE(evidence.observed_at, doc.last_seen_at) DESC NULLS LAST, evidence.provider, evidence.external_id`, offeringID)
 	if err != nil {
 		return nil, err
 	}

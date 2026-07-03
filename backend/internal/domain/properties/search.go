@@ -10,15 +10,7 @@ import (
 
 func (s *Service) searchListings(ctx context.Context, params SearchParams, listingType string) ([]listingSearchRow, error) {
 	if listingType == "rental" {
-		rows, err := s.queries.SearchRentalListings(ctx, rentalSearchParams(params))
-		if err != nil {
-			return nil, fmt.Errorf("search rental listings: %w", err)
-		}
-		out := make([]listingSearchRow, 0, len(rows))
-		for _, row := range rows {
-			out = append(out, listingSearchRowFromRental(row))
-		}
-		return out, nil
+		return []listingSearchRow{}, nil
 	}
 	rows, err := s.queries.SearchSaleListings(ctx, saleSearchParams(params))
 	if err != nil {
@@ -33,11 +25,7 @@ func (s *Service) searchListings(ctx context.Context, params SearchParams, listi
 
 func (s *Service) countListings(ctx context.Context, params SearchParams, listingType string) (int64, error) {
 	if listingType == "rental" {
-		count, err := s.queries.CountRentalListings(ctx, rentalCountParams(params))
-		if err != nil {
-			return 0, fmt.Errorf("count rental listings: %w", err)
-		}
-		return int64Value(count), nil
+		return 0, nil
 	}
 	count, err := s.queries.CountSaleListings(ctx, saleCountParams(params))
 	if err != nil {
@@ -56,15 +44,6 @@ func saleCountParams(params SearchParams) db.CountSaleListingsParams {
 	return db.CountSaleListingsParams{Source: &params.Source, QueryText: emptyToNil(params.Query), City: emptyToNil(params.City), Postal: emptyToNil(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore, MinPricePerM2: params.MinPricePerM2, MaxPricePerM2: params.MaxPricePerM2, Rooms: params.Rooms, Floor: params.Floor, MinBuildYear: params.MinBuildYear, MaxBuildYear: params.MaxBuildYear, Condition: emptyToNil(params.Condition), EnergyClass: emptyToNil(params.EnergyClass), Kind: &params.Kind}
 }
 
-func rentalSearchParams(params SearchParams) db.SearchRentalListingsParams {
-	offset := (params.Page - 1) * params.PageSize
-	return db.SearchRentalListingsParams{Source: &params.Source, QueryText: emptyToNil(params.Query), City: emptyToNil(params.City), Postal: emptyToNil(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore, SortMode: &params.Sort, OffsetCount: offset, LimitCount: params.PageSize}
-}
-
-func rentalCountParams(params SearchParams) db.CountRentalListingsParams {
-	return db.CountRentalListingsParams{Source: &params.Source, QueryText: emptyToNil(params.Query), City: emptyToNil(params.City), Postal: emptyToNil(params.Postal), MinPrice: params.MinPrice, MaxPrice: params.MaxPrice, MinArea: params.MinArea, MaxArea: params.MaxArea, PublishedAfter: params.PublishedAfter, PublishedBefore: params.PublishedBefore}
-}
-
 func listingSearchRowFromSale(row db.SearchSaleListingsRow) listingSearchRow {
 	return listingSearchRow{Source: row.Source, Kind: row.Kind, NativeID: row.NativeID, CanonicalID: row.CanonicalID, PublicID: valueOrEmpty(row.PublicID), URL: valueOrEmpty(row.Url), Headline: valueOrEmpty(row.Headline), Address: valueOrEmpty(row.Address), City: valueOrEmpty(row.City), Postal: valueOrEmpty(row.Postal), Price: row.Price, Area: row.Area, RoomLayout: valueOrEmpty(row.RoomLayout), PricePerM2: row.PricePerM2, DebtFreePrice: row.DebtFreePrice, DebtShareAmount: row.DebtShareAmount, RoomsCount: row.RoomsCount, FloorLevel: row.FloorLevel, TotalFloors: row.TotalFloors, BuildYear: row.BuildYear, Condition: row.Condition, EnergyClass: row.EnergyClass, EnergyEfficiencyLabel: row.EnergyEfficiencyLabel, LastSeenAt: row.LastSeenAt, PublishedAt: row.PublishedAt, BuildingKeyAddress: valueOrEmpty(row.BuildingKeyAddress), SourceProviders: row.SourceProviders}
 }
@@ -81,164 +60,105 @@ func (s *Service) SaleListingMap(ctx context.Context, bounds MapBounds) (SaleLis
 		limit = 500
 	}
 	rows, err := s.db.Query(ctx, `
-WITH visible_base AS (
+WITH visible AS (
     SELECT
-        pb.housing_company_id,
-        postgis.ST_SnapToGrid(pb.housing_company_geom, 0.000001) AS marker_geom,
-        postgis.ST_AsEWKT(postgis.ST_SnapToGrid(pb.housing_company_geom, 0.000001)) AS marker_key,
-        pb.housing_company_address_norm,
-        pb.housing_company_city_norm,
-        pb.housing_company_postal_norm,
-        COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) AS housing_company_build_year,
-        po.property_offering_id,
-        po.property_offering_headline,
-        po.property_offering_asking_price,
-        po.property_offering_price_per_m2,
-        COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) AS property_unit_area_value,
-        COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), pu.property_unit_room_layout, sl.sale_listing_room_layout) AS property_unit_room_layout,
-        COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::integer, pu.property_unit_rooms_count, sl.sale_listing_rooms_count) AS property_unit_rooms_count,
-        COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition) AS property_unit_condition,
-        COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class) AS building_energy_class,
-        po.property_offering_last_seen_at,
-        sl.sale_listing_street_address,
-        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm) AS sale_listing_city,
-        COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm) AS sale_listing_postal,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        row_number() OVER (
-            PARTITION BY po.property_offering_id
-            ORDER BY
-                CASE
-                    WHEN sl.frontdoor_ad_id IS NOT NULL THEN 0
-                    WHEN sl.shortcut_ad_id IS NOT NULL THEN 1
-                    ELSE 2
-                END,
-                sl.sale_listing_last_seen_at DESC NULLS LAST,
-                sl.sale_listing_created_at DESC
-        ) AS source_rank
-    FROM public.housing_companies pb
-    JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
-    JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
-        AND unit_profile.target_id = pu.property_unit_id
-    LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
-        AND building_profile.target_id = pu.physical_building_id
-    LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
-        AND housing_profile.target_id = pb.housing_company_id
-    WHERE pb.housing_company_geom IS NOT NULL
-        AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
-        AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
-        AND ($8::text IS NULL OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text, sl.sale_listing_street_address, pb.housing_company_address_norm, pb.housing_company_name)) LIKE ('%' || lower(trim($8::text)) || '%'))
-        AND (
-            $9::text IS NULL
-            OR lower(COALESCE(pb.housing_company_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%')
-            OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($9::text)) || '%')
-        )
-        AND ($10::text IS NULL OR NULLIF(regexp_replace(trim(COALESCE(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, pb.housing_company_postal_norm, ''), '')), '[^0-9]+', '', 'g'), '') = NULLIF(regexp_replace(trim(COALESCE($10::text, '')), '[^0-9]+', '', 'g'), ''))
-        AND ($11::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) >= $11::bigint)
-        AND ($12::bigint IS NULL OR COALESCE(po.property_offering_asking_price, sl.sale_listing_asking_price) <= $12::bigint)
-        AND ($13::double precision IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) >= $13::double precision)
-        AND ($14::double precision IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::double precision, pu.property_unit_area_value, sl.sale_listing_area_value) <= $14::double precision)
-        AND ($15::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) >= $15::double precision)
-        AND ($16::double precision IS NULL OR COALESCE(po.property_offering_price_per_m2, sl.sale_listing_price_per_m2) <= $16::double precision)
-        AND ($17::integer IS NULL OR COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::integer, pu.property_unit_rooms_count, sl.sale_listing_rooms_count) = $17::integer)
-        AND ($18::integer IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) >= $18::integer)
-        AND ($19::integer IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::integer, (housing_profile.dimensions #>> '{housing_company,build_year}')::integer, pb.housing_company_build_year, sl.sale_listing_build_year) <= $19::integer)
-        AND ($20::text IS NULL OR sl.sale_listing_property_type_code = (SELECT a.sale_listing_property_type_code FROM public.sale_listing_property_type_aliases a WHERE a.sale_listing_property_type_alias = NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE($20::text, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') LIMIT 1) OR lower(COALESCE(sl.sale_listing_property_type_raw, '')) LIKE ('%' || lower(trim($20::text)) || '%'))
-        AND ($21::text IS NULL OR (SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition), ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input) = (SELECT CASE normalized_input.alias_key WHEN 'good' THEN 'good' WHEN 'hyvä' THEN 'good' WHEN 'hyva' THEN 'good' WHEN 'satisfactory' THEN 'satisfactory' WHEN 'tyyd' THEN 'satisfactory' WHEN 'tyydyttävä' THEN 'satisfactory' WHEN 'tyydyttava' THEN 'satisfactory' WHEN 'tolerable' THEN 'poor' WHEN 'poor' THEN 'poor' WHEN 'bad' THEN 'poor' WHEN 'huono' THEN 'poor' WHEN 'välttävä' THEN 'poor' WHEN 'valttava' THEN 'poor' WHEN 'unclassified' THEN 'unknown' WHEN 'not_known' THEN 'unknown' WHEN 'not_shown' THEN 'unknown' ELSE NULL END FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE($21::text, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input) OR lower(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
-        AND ($22::text IS NULL OR (SELECT COALESCE(mapped.energy_efficiency_match_code, CASE WHEN derived.class_code IS NULL THEN NULL WHEN COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year) IS NULL THEN derived.class_code ELSE derived.class_code || COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year)::text END) FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE(COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class), ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input LEFT JOIN LATERAL (SELECT a.energy_efficiency_class_code, a.energy_efficiency_standard_year, a.energy_efficiency_status, a.energy_efficiency_match_code FROM origin.energy_efficiency_aliases a WHERE a.energy_efficiency_alias = normalized_input.alias_key LIMIT 1) mapped ON true CROSS JOIN LATERAL (SELECT regexp_match(normalized_input.alias_key, '^e([0-9]{2})_([a-h])$') AS provider_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_?((?:19|20|21)[0-9]{2})($|_)') AS label_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_energialuokkaan_((?:19|20|21)[0-9]{2})($|_)') AS energy_label_year_parts, regexp_match(normalized_input.alias_key, '(^|_)energialuokka_([a-h])($|_)') AS energy_label_class_parts, regexp_match(normalized_input.alias_key, '^([a-h])_energiatodistus') AS leading_certificate_parts, regexp_match(normalized_input.alias_key, '^([a-h])$') AS class_only_parts) matches CROSS JOIN LATERAL (SELECT CASE WHEN matches.provider_parts IS NOT NULL THEN upper(matches.provider_parts[2]) WHEN matches.label_parts IS NOT NULL THEN upper(matches.label_parts[2]) WHEN matches.energy_label_year_parts IS NOT NULL THEN upper(matches.energy_label_year_parts[2]) WHEN matches.energy_label_class_parts IS NOT NULL THEN upper(matches.energy_label_class_parts[2]) WHEN matches.leading_certificate_parts IS NOT NULL THEN upper(matches.leading_certificate_parts[1]) WHEN matches.class_only_parts IS NOT NULL THEN upper(matches.class_only_parts[1]) ELSE NULL END AS class_code, CASE WHEN matches.provider_parts IS NULL THEN NULL WHEN matches.provider_parts[1]::integer < 50 THEN 2000 + matches.provider_parts[1]::integer ELSE 1900 + matches.provider_parts[1]::integer END AS provider_year, CASE WHEN matches.label_parts IS NOT NULL THEN matches.label_parts[3]::integer ELSE NULL END AS label_year, CASE WHEN matches.energy_label_year_parts IS NOT NULL THEN matches.energy_label_year_parts[3]::integer ELSE NULL END AS energy_label_year) derived) = (SELECT COALESCE(mapped.energy_efficiency_match_code, CASE WHEN derived.class_code IS NULL THEN NULL WHEN COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year) IS NULL THEN derived.class_code ELSE derived.class_code || COALESCE(derived.provider_year, derived.label_year, derived.energy_label_year)::text END) FROM (SELECT NULLIF(trim(BOTH '_' FROM regexp_replace(lower(trim(COALESCE($22::text, ''))), '[^[:alnum:]åäö]+', '_', 'g')), '') AS alias_key) normalized_input LEFT JOIN LATERAL (SELECT a.energy_efficiency_class_code, a.energy_efficiency_standard_year, a.energy_efficiency_status, a.energy_efficiency_match_code FROM origin.energy_efficiency_aliases a WHERE a.energy_efficiency_alias = normalized_input.alias_key LIMIT 1) mapped ON true CROSS JOIN LATERAL (SELECT regexp_match(normalized_input.alias_key, '^e([0-9]{2})_([a-h])$') AS provider_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_?((?:19|20|21)[0-9]{2})($|_)') AS label_parts, regexp_match(normalized_input.alias_key, '(^|_)([a-h])_energialuokkaan_((?:19|20|21)[0-9]{2})($|_)') AS energy_label_year_parts, regexp_match(normalized_input.alias_key, '(^|_)energialuokka_([a-h])($|_)') AS energy_label_class_parts, regexp_match(normalized_input.alias_key, '^([a-h])_energiatodistus') AS leading_certificate_parts, regexp_match(normalized_input.alias_key, '^([a-h])$') AS class_only_parts) matches CROSS JOIN LATERAL (SELECT CASE WHEN matches.provider_parts IS NOT NULL THEN upper(matches.provider_parts[2]) WHEN matches.label_parts IS NOT NULL THEN upper(matches.label_parts[2]) WHEN matches.energy_label_year_parts IS NOT NULL THEN upper(matches.energy_label_year_parts[2]) WHEN matches.energy_label_class_parts IS NOT NULL THEN upper(matches.energy_label_class_parts[2]) WHEN matches.leading_certificate_parts IS NOT NULL THEN upper(matches.leading_certificate_parts[1]) WHEN matches.class_only_parts IS NOT NULL THEN upper(matches.class_only_parts[1]) ELSE NULL END AS class_code, CASE WHEN matches.provider_parts IS NULL THEN NULL WHEN matches.provider_parts[1]::integer < 50 THEN 2000 + matches.provider_parts[1]::integer ELSE 1900 + matches.provider_parts[1]::integer END AS provider_year, CASE WHEN matches.label_parts IS NOT NULL THEN matches.label_parts[3]::integer ELSE NULL END AS label_year, CASE WHEN matches.energy_label_year_parts IS NOT NULL THEN matches.energy_label_year_parts[3]::integer ELSE NULL END AS energy_label_year) derived) OR lower(concat_ws(' ', COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class), sl.sale_listing_energy_efficiency_label)) LIKE ('%' || lower(trim($22::text)) || '%'))
-        AND ($23::boolean IS NULL OR sl.sale_listing_elevator IS NOT DISTINCT FROM $23::boolean)
-        AND ($24::boolean IS NULL OR sl.sale_listing_sauna IS NOT DISTINCT FROM $24::boolean)
-        AND ($25::boolean IS NULL OR sl.sale_listing_balcony IS NOT DISTINCT FROM $25::boolean)
-        AND ($26::boolean IS NULL OR sl.sale_listing_plot_owned IS NOT DISTINCT FROM $26::boolean)
-        AND ($27::boolean IS NULL OR sl.sale_listing_new_development IS NOT DISTINCT FROM $27::boolean)
+        doc.*,
+        postgis.ST_SnapToGrid(postgis.ST_SetSRID(postgis.ST_MakePoint(doc.longitude, doc.latitude), 4326), 0.000001) AS marker_geom,
+        postgis.ST_AsEWKT(postgis.ST_SnapToGrid(postgis.ST_SetSRID(postgis.ST_MakePoint(doc.longitude, doc.latitude), 4326), 0.000001)) AS marker_key
+    FROM public.listing_search_documents doc
+    WHERE doc.listing_status = 'active'
+        AND doc.latitude IS NOT NULL
+        AND doc.longitude IS NOT NULL
+        AND ($1 = 'all' OR doc.source_providers @> ARRAY[$1::text])
+        AND ($2 = 'all' OR doc.source_kinds @> ARRAY[$2::text])
+        AND ($8::text IS NULL OR lower(doc.search_text) LIKE ('%' || lower(trim($8::text)) || '%'))
+        AND ($9::text IS NULL OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($9::text)) || '%'))
+        AND ($10::text IS NULL OR NULLIF(regexp_replace(trim(COALESCE(doc.postal, '')), '[^0-9]+', '', 'g'), '') = NULLIF(regexp_replace(trim(COALESCE($10::text, '')), '[^0-9]+', '', 'g'), ''))
+        AND ($11::bigint IS NULL OR doc.asking_price >= $11::bigint)
+        AND ($12::bigint IS NULL OR doc.asking_price <= $12::bigint)
+        AND ($13::double precision IS NULL OR doc.area_m2 >= $13::double precision)
+        AND ($14::double precision IS NULL OR doc.area_m2 <= $14::double precision)
+        AND ($15::double precision IS NULL OR doc.price_per_m2 >= $15::double precision)
+        AND ($16::double precision IS NULL OR doc.price_per_m2 <= $16::double precision)
+        AND ($17::integer IS NULL OR doc.rooms_count = $17::integer)
+        AND ($18::integer IS NULL OR doc.build_year >= $18::integer)
+        AND ($19::integer IS NULL OR doc.build_year <= $19::integer)
+        AND ($20::text IS NULL OR doc.property_type_code = $20::text)
+        AND ($21::text IS NULL OR lower(COALESCE(doc.condition, '')) LIKE ('%' || lower(trim($21::text)) || '%'))
+        AND ($22::text IS NULL OR lower(COALESCE(doc.energy_class, '')) LIKE ('%' || lower(trim($22::text)) || '%'))
+        AND ($23::boolean IS NULL OR doc.elevator IS NOT DISTINCT FROM $23::boolean)
+        AND ($24::boolean IS NULL OR doc.sauna IS NOT DISTINCT FROM $24::boolean)
+        AND ($25::boolean IS NULL OR doc.balcony IS NOT DISTINCT FROM $25::boolean)
+        AND ($26::boolean IS NULL OR doc.plot_owned IS NOT DISTINCT FROM $26::boolean)
+        AND ($27::boolean IS NULL OR doc.new_development IS NOT DISTINCT FROM $27::boolean)
         AND (
             $28::boolean IS NULL
             OR EXISTS (
                 SELECT 1
                 FROM public.price_links pl
                 WHERE pl.target_type = 'listing'
-                    AND pl.target_id = po.property_offering_id
+                    AND pl.target_id = doc.property_offering_id
                     AND pl.link_status <> 'rejected'
             ) IS NOT DISTINCT FROM $28::boolean
         )
         AND (
             $3::double precision IS NULL
             OR postgis.ST_Intersects(
-                pb.housing_company_geom,
+                postgis.ST_SetSRID(postgis.ST_MakePoint(doc.longitude, doc.latitude), 4326),
                 postgis.ST_MakeEnvelope($4::double precision, $3::double precision, $6::double precision, $5::double precision, 4326)
             )
         )
-),
-visible AS (
-    SELECT *
-    FROM visible_base
-    WHERE source_rank = 1
-),
-source_summary AS (
-    SELECT
-        property_offering_id,
-        array_agg(DISTINCT sale_listing_source_provider ORDER BY sale_listing_source_provider) AS offering_providers,
-        array_agg(DISTINCT sale_listing_source_kind ORDER BY sale_listing_source_kind) AS offering_kinds
-    FROM visible_base
-    GROUP BY property_offering_id
 ),
 grouped AS (
     SELECT
         marker_geom,
         marker_key,
         count(DISTINCT property_offering_id)::bigint AS offering_count,
-        count(DISTINCT housing_company_id)::bigint AS housing_company_count,
-        min(housing_company_address_norm) AS address,
-        min(housing_company_city_norm) AS city,
-        min(housing_company_postal_norm) AS postal,
-        min(property_offering_asking_price) AS min_price,
-        max(property_offering_asking_price) AS max_price,
-        min(property_unit_area_value) AS min_area,
-        max(property_unit_area_value) AS max_area,
-        max(property_offering_last_seen_at) AS last_seen_at,
-        array_agg(DISTINCT sale_listing_source_provider ORDER BY sale_listing_source_provider) AS providers,
-        array_agg(DISTINCT sale_listing_source_kind ORDER BY sale_listing_source_kind) AS kinds,
-        (array_agg(DISTINCT property_offering_id::text))[1:8] AS listing_ids,
-        min(housing_company_id::text) AS housing_company_id
+        0::bigint AS housing_company_count,
+        min(address) AS address,
+        min(city) AS city,
+        min(postal) AS postal,
+        min(asking_price) AS min_price,
+        max(asking_price) AS max_price,
+        min(area_m2) AS min_area,
+        max(area_m2) AS max_area,
+        max(last_seen_at) AS last_seen_at,
+        array_agg(DISTINCT source ORDER BY source) AS providers,
+        array_agg(DISTINCT kind ORDER BY kind) AS kinds,
+        (array_agg(DISTINCT listing_id::text))[1:8] AS listing_ids,
+        NULL::text AS housing_company_id
     FROM visible
     GROUP BY marker_geom, marker_key
 ),
 listing_cards AS (
     SELECT
         marker_key,
-        jsonb_agg(listing ORDER BY property_offering_last_seen_at DESC NULLS LAST, property_offering_asking_price ASC NULLS LAST) AS listings
+        jsonb_agg(listing ORDER BY last_seen_at DESC NULLS LAST, asking_price ASC NULLS LAST) AS listings
     FROM (
         SELECT
             visible.marker_key,
-            visible.property_offering_last_seen_at,
-            visible.property_offering_asking_price,
+            visible.last_seen_at,
+            visible.asking_price,
             jsonb_build_object(
-                'id', visible.property_offering_id::text,
-                'headline', visible.property_offering_headline,
-                'address', COALESCE(NULLIF(visible.sale_listing_street_address, ''), visible.housing_company_address_norm),
-                'city', COALESCE(NULLIF(visible.sale_listing_city, ''), visible.housing_company_city_norm),
-                'postal', COALESCE(NULLIF(visible.sale_listing_postal, ''), visible.housing_company_postal_norm),
-                'layout', visible.property_unit_room_layout,
-                'area_m2', visible.property_unit_area_value,
-                'price', visible.property_offering_asking_price,
-                'price_per_m2', visible.property_offering_price_per_m2,
-                'build_year', visible.housing_company_build_year,
-                'last_seen_at', visible.property_offering_last_seen_at,
-                'providers', COALESCE(source_summary.offering_providers, ARRAY[]::text[]),
-                'kinds', COALESCE(source_summary.offering_kinds, ARRAY[]::text[])
+                'id', visible.listing_id::text,
+                'headline', visible.headline,
+                'address', visible.address,
+                'city', visible.city,
+                'postal', visible.postal,
+                'layout', visible.room_layout,
+                'area_m2', visible.area_m2,
+                'price', visible.asking_price,
+                'price_per_m2', visible.price_per_m2,
+                'build_year', visible.build_year,
+                'last_seen_at', visible.last_seen_at,
+                'providers', visible.source_providers,
+                'kinds', visible.source_kinds
             ) AS listing,
             row_number() OVER (
                 PARTITION BY visible.marker_key
-                ORDER BY visible.property_offering_last_seen_at DESC NULLS LAST, visible.property_offering_asking_price ASC NULLS LAST
+                ORDER BY visible.last_seen_at DESC NULLS LAST, visible.asking_price ASC NULLS LAST
             ) AS listing_rank
         FROM visible
-        LEFT JOIN source_summary ON source_summary.property_offering_id = visible.property_offering_id
     ) ranked
     WHERE listing_rank <= 24
     GROUP BY marker_key
@@ -293,20 +213,15 @@ func (s *Service) SaleListingMapFilterOptions(ctx context.Context, sourceValue s
 	rows, err := s.db.Query(ctx, `
 WITH source_rows AS (
     SELECT
-        NULLIF(trim(pb.housing_company_city_norm), '') AS city_norm,
-        NULLIF(regexp_replace(trim(COALESCE(pb.housing_company_postal_norm, '')), '[^0-9]+', '', 'g'), '') AS postal,
-        pb.housing_company_geom AS geom
-    FROM public.housing_companies pb
-    JOIN public.property_units pu ON pu.housing_company_id = pb.housing_company_id
-    JOIN public.property_offerings po ON po.property_unit_id = pu.property_unit_id
-    JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-        AND source_link.target_id = po.property_offering_id
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    WHERE pb.housing_company_geom IS NOT NULL
-        AND ($1 = 'all' OR sl.sale_listing_source_provider = $1)
-        AND ($2 = 'all' OR sl.sale_listing_source_kind = $2)
+        NULLIF(trim(doc.city), '') AS city_norm,
+        NULLIF(regexp_replace(trim(COALESCE(doc.postal, '')), '[^0-9]+', '', 'g'), '') AS postal,
+        postgis.ST_SetSRID(postgis.ST_MakePoint(doc.longitude, doc.latitude), 4326) AS geom
+    FROM public.listing_search_documents doc
+    WHERE doc.listing_status = 'active'
+        AND doc.latitude IS NOT NULL
+        AND doc.longitude IS NOT NULL
+        AND ($1 = 'all' OR doc.source_providers @> ARRAY[$1::text])
+        AND ($2 = 'all' OR doc.source_kinds @> ARRAY[$2::text])
 ),
 city_rows AS (
     SELECT

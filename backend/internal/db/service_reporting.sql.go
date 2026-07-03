@@ -14,38 +14,25 @@ import (
 )
 
 const countGroupedOfferings = `-- name: CountGroupedOfferings :one
-WITH source_rows AS (
-    SELECT
-        source_link.target_id AS property_offering_id,
-        sl.sale_listing_id
-    FROM public.target_sources source_link
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
-    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
-    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    WHERE source_link.target_type = 'listing'
-      AND source_link.source_type = 'source_listing'
-      AND source_link.link_status <> 'rejected'
-      AND ($1::text = 'all' OR sl.sale_listing_source_provider = $1::text)
-      AND ($2::text = 'all' OR sl.sale_listing_source_kind = $2::text)
-      AND ($3::text IS NULL OR lower(concat_ws(' ', po.property_offering_headline, sl.sale_listing_search_text, sl.sale_listing_canonical_id, sl.sale_listing_native_id, hc.housing_company_name, pu.property_unit_address_norm, ph.property_house_address_norm)) LIKE ('%' || lower(trim($3::text)) || '%'))
-      AND ($4::text IS NULL OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
-      AND ($5::text IS NULL OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
-      AND ($6::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) >= $6::bigint)
-      AND ($7::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) <= $7::bigint)
-      AND ($8::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) >= $8::float8)
-      AND ($9::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) <= $9::float8)
-      AND ($10::timestamptz IS NULL OR sl.sale_listing_published_at >= $10::timestamptz)
-      AND ($11::timestamptz IS NULL OR sl.sale_listing_published_at <= $11::timestamptz)
-)
-SELECT count(DISTINCT property_offering_id)::bigint
-FROM source_rows
+SELECT count(DISTINCT doc.property_offering_id)::bigint
+FROM public.listing_search_documents doc
+WHERE doc.listing_status = 'active'
+  AND ($1::text = 'all' OR doc.source_providers @> ARRAY[$1::text])
+  AND ($2::text = 'all' OR doc.source_kinds @> ARRAY[$2::text])
+  AND ($3::text IS NULL OR lower(doc.search_text) LIKE ('%' || lower(trim($3::text)) || '%'))
+  AND ($4::text IS NULL OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+  AND ($5::text IS NULL OR lower(COALESCE(doc.postal, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
+  AND ($6::bigint IS NULL OR doc.asking_price >= $6::bigint)
+  AND ($7::bigint IS NULL OR doc.asking_price <= $7::bigint)
+  AND ($8::float8 IS NULL OR doc.area_m2 >= $8::float8)
+  AND ($9::float8 IS NULL OR doc.area_m2 <= $9::float8)
+  AND ($10::timestamptz IS NULL OR doc.published_at >= $10::timestamptz)
+  AND ($11::timestamptz IS NULL OR doc.published_at <= $11::timestamptz)
 `
 
 type CountGroupedOfferingsParams struct {
-	Source          string     `json:"source"`
-	Kind            string     `json:"kind"`
+	Source          *string    `json:"source"`
+	Kind            *string    `json:"kind"`
 	QueryText       *string    `json:"query_text"`
 	City            *string    `json:"city"`
 	Postal          *string    `json:"postal"`
@@ -1270,62 +1257,34 @@ func (q *Queries) LookupPostalCity(ctx context.Context, postal *string) (LookupP
 }
 
 const searchGroupedOfferings = `-- name: SearchGroupedOfferings :many
-WITH source_rows AS (
+WITH offering_rows AS (
     SELECT
-        source_link.target_id AS property_offering_id,
-        sl.sale_listing_id,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        sl.sale_listing_last_seen_at
-    FROM public.target_sources source_link
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
-    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
-    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    WHERE source_link.target_type = 'listing'
-      AND source_link.source_type = 'source_listing'
-      AND source_link.link_status <> 'rejected'
-      AND ($4::text = 'all' OR sl.sale_listing_source_provider = $4::text)
-      AND ($5::text = 'all' OR sl.sale_listing_source_kind = $5::text)
-      AND ($6::text IS NULL OR lower(concat_ws(' ', po.property_offering_headline, sl.sale_listing_search_text, sl.sale_listing_canonical_id, sl.sale_listing_native_id, hc.housing_company_name, pu.property_unit_address_norm, ph.property_house_address_norm)) LIKE ('%' || lower(trim($6::text)) || '%'))
-      AND ($7::text IS NULL OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
-      AND ($8::text IS NULL OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '')) LIKE ('%' || lower(trim($8::text)) || '%'))
-      AND ($9::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) >= $9::bigint)
-      AND ($10::bigint IS NULL OR COALESCE(sl.sale_listing_asking_price, po.property_offering_asking_price) <= $10::bigint)
-      AND ($11::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) >= $11::float8)
-      AND ($12::float8 IS NULL OR COALESCE(sl.sale_listing_area_value, pu.property_unit_area_value, ph.property_house_area_value) <= $12::float8)
-      AND ($13::timestamptz IS NULL OR sl.sale_listing_published_at >= $13::timestamptz)
-      AND ($14::timestamptz IS NULL OR sl.sale_listing_published_at <= $14::timestamptz)
-), offering_matches AS (
-    SELECT
-        property_offering_id,
-        count(DISTINCT sale_listing_id)::int4 AS source_count,
-        string_agg(DISTINCT sale_listing_source_provider, ',' ORDER BY sale_listing_source_provider) AS sources,
-        max(sale_listing_last_seen_at) AS source_last_seen_at
-    FROM source_rows
-    GROUP BY property_offering_id
-), offering_rows AS (
-    SELECT
-        po.property_offering_id,
-        COALESCE(hc.housing_company_id::text, '')::text AS housing_company_id,
-        hc.housing_company_name AS housing_company_name,
-        COALESCE(po.property_offering_headline, primary_listing.sale_listing_headline, primary_listing.sale_listing_street_address, pu.property_unit_room_layout, pu.property_unit_address_norm, ph.property_house_address_norm, po.property_offering_id::text) AS headline,
-        COALESCE(primary_listing.sale_listing_street_address, pu.property_unit_address_norm, hc.housing_company_address_norm, ph.property_house_address_norm, '') AS address,
-        COALESCE(primary_listing.sale_listing_city, primary_listing.sale_listing_city_norm, hc.housing_company_city_norm, ph.property_house_city_norm, '') AS city,
-        COALESCE(primary_listing.sale_listing_postal, primary_listing.sale_listing_postal_norm, hc.housing_company_postal_norm, ph.property_house_postal_norm, '') AS postal,
-        po.property_offering_asking_price AS price,
-        COALESCE(pu.property_unit_area_value, ph.property_house_area_value) AS area,
-        COALESCE(pu.property_unit_room_layout, primary_listing.sale_listing_room_layout, '') AS room_layout,
-        COALESCE(po.property_offering_last_seen_at, offering_matches.source_last_seen_at) AS last_seen_at,
-        offering_matches.source_count,
-        offering_matches.sources AS sources
-    FROM offering_matches
-    JOIN public.property_offerings po ON po.property_offering_id = offering_matches.property_offering_id
-    LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    LEFT JOIN public.property_houses ph ON ph.property_house_id = po.property_house_id
-    LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    LEFT JOIN public.property_source_offerings primary_listing ON primary_listing.sale_listing_id = po.primary_sale_listing_id
+        doc.property_offering_id,
+        ''::text AS housing_company_id,
+        NULL::text AS housing_company_name,
+        doc.headline,
+        doc.address,
+        doc.city,
+        doc.postal,
+        doc.asking_price AS price,
+        doc.area_m2 AS area,
+        doc.room_layout,
+        doc.last_seen_at,
+        cardinality(doc.source_providers)::int4 AS source_count,
+        array_to_string(doc.source_providers, ',') AS sources
+    FROM public.listing_search_documents doc
+    WHERE doc.listing_status = 'active'
+      AND ($4::text = 'all' OR doc.source_providers @> ARRAY[$4::text])
+      AND ($5::text = 'all' OR doc.source_kinds @> ARRAY[$5::text])
+      AND ($6::text IS NULL OR lower(doc.search_text) LIKE ('%' || lower(trim($6::text)) || '%'))
+      AND ($7::text IS NULL OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($7::text)) || '%'))
+      AND ($8::text IS NULL OR lower(COALESCE(doc.postal, '')) LIKE ('%' || lower(trim($8::text)) || '%'))
+      AND ($9::bigint IS NULL OR doc.asking_price >= $9::bigint)
+      AND ($10::bigint IS NULL OR doc.asking_price <= $10::bigint)
+      AND ($11::float8 IS NULL OR doc.area_m2 >= $11::float8)
+      AND ($12::float8 IS NULL OR doc.area_m2 <= $12::float8)
+      AND ($13::timestamptz IS NULL OR doc.published_at >= $13::timestamptz)
+      AND ($14::timestamptz IS NULL OR doc.published_at <= $14::timestamptz)
 )
 SELECT
     row.property_offering_id::text,
@@ -1352,22 +1311,19 @@ SELECT
 FROM offering_rows row
 LEFT JOIN LATERAL (
     SELECT
-        pt.prices_transaction_id AS transaction_id,
+        price_link.prices_transaction_id AS transaction_id,
         price_link.target_type AS match_scope,
         price_link.link_status AS match_status,
         price_link.link_method AS match_method,
         price_link.link_score::int4 AS match_score,
-        pt.prices_transaction_price AS price_eur
+        NULL::bigint AS price_eur
     FROM public.price_links price_link
-    JOIN origin.prices_transactions pt ON pt.prices_transaction_id = price_link.prices_transaction_id
     WHERE price_link.link_status <> 'rejected'
         AND (
-            (price_link.target_type = 'source_listing' AND EXISTS (
-                SELECT 1 FROM source_rows sr WHERE sr.property_offering_id = row.property_offering_id AND sr.sale_listing_id = price_link.target_id
-            ))
-            OR (price_link.target_type = 'listing' AND price_link.target_id = row.property_offering_id)
+            price_link.target_type = 'listing'
+            AND price_link.target_id = row.property_offering_id
         )
-    ORDER BY CASE WHEN price_link.target_type = 'source_listing' THEN 0 ELSE 1 END, price_link.link_score DESC NULLS LAST, pt.prices_transaction_updated_at DESC
+    ORDER BY CASE WHEN price_link.target_type = 'source_listing' THEN 0 ELSE 1 END, price_link.link_score DESC NULLS LAST, price_link.updated_at DESC
     LIMIT 1
 ) price_match ON true
 LEFT JOIN LATERAL (

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -433,51 +434,67 @@ func NewService(dbtx db.DBTX) *Service {
 func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, error) {
 	normalized := normalizeSearchParams(params)
 	offset := (normalized.Page - 1) * normalized.PageSize
-	source := stringPtr(normalized.Source)
-	kind := stringPtr(normalized.Kind)
-	grouping := stringPtr(normalized.Grouping)
-	sort := stringPtr(normalized.Sort)
-	listingTypeFilter := emptyToNil(normalized.ListingType)
-	if normalized.ListingType == "all" {
-		listingTypeFilter = nil
+	minPrice, maxPrice := int64(0), int64(9223372036854775807)
+	minArea, maxArea := float64(0), math.MaxFloat64
+	if normalized.MinPrice != nil {
+		minPrice = *normalized.MinPrice
 	}
-	publishedAfter := normalized.PublishedAfter
-	publishedBefore := normalized.PublishedBefore
+	if normalized.MaxPrice != nil {
+		maxPrice = *normalized.MaxPrice
+	}
+	if normalized.MinArea != nil {
+		minArea = *normalized.MinArea
+	}
+	if normalized.MaxArea != nil {
+		maxArea = *normalized.MaxArea
+	}
+	listingType := strings.TrimSpace(normalized.ListingType)
+	if listingType == "all" {
+		listingType = ""
+	}
+	publishedAfter := time.Time{}
+	publishedBefore := time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	if normalized.PublishedAfter != nil {
+		publishedAfter = *normalized.PublishedAfter
+	}
+	if normalized.PublishedBefore != nil {
+		publishedBefore = *normalized.PublishedBefore
+	}
 	count, err := s.queries.CountUnifiedEntities(ctx, db.CountUnifiedEntitiesParams{
-		SourceFilter:      source,
-		KindFilter:        kind,
-		QueryText:         emptyToNil(normalized.Query),
-		CityFilter:        emptyToNil(normalized.City),
-		PostalFilter:      emptyToNil(normalized.Postal),
-		MinPrice:          normalized.MinPrice,
-		MaxPrice:          normalized.MaxPrice,
-		MinArea:           normalized.MinArea,
-		MaxArea:           normalized.MaxArea,
-		ListingTypeFilter: listingTypeFilter,
-		GroupingFilter:    grouping,
-		PublishedAfter:    publishedAfter,
-		PublishedBefore:   publishedBefore,
+		Column1:  &normalized.Source,
+		Column2:  &normalized.Kind,
+		Column3:  &normalized.Grouping,
+		Column4:  stringPtr(strings.TrimSpace(normalized.Query)),
+		Column5:  stringPtr(strings.TrimSpace(normalized.City)),
+		Column6:  stringPtr(strings.TrimSpace(normalized.Postal)),
+		Column7:  &minPrice,
+		Column8:  &maxPrice,
+		Column9:  &minArea,
+		Column10: &maxArea,
+		Column11: &listingType,
+		Column12: &publishedAfter,
+		Column13: &publishedBefore,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("count unified entities: %w", err)
 	}
 	rows, err := s.queries.SearchUnifiedEntities(ctx, db.SearchUnifiedEntitiesParams{
-		SortMode:          sort,
-		OffsetCount:       offset,
-		LimitCount:        normalized.PageSize,
-		SourceFilter:      source,
-		KindFilter:        kind,
-		QueryText:         emptyToNil(normalized.Query),
-		CityFilter:        emptyToNil(normalized.City),
-		PostalFilter:      emptyToNil(normalized.Postal),
-		MinPrice:          normalized.MinPrice,
-		MaxPrice:          normalized.MaxPrice,
-		MinArea:           normalized.MinArea,
-		MaxArea:           normalized.MaxArea,
-		ListingTypeFilter: listingTypeFilter,
-		GroupingFilter:    grouping,
-		PublishedAfter:    publishedAfter,
-		PublishedBefore:   publishedBefore,
+		Column1:  normalized.Source,
+		Column2:  normalized.Kind,
+		Column3:  normalized.Grouping,
+		Column4:  strings.TrimSpace(normalized.Query),
+		Column5:  strings.TrimSpace(normalized.City),
+		Column6:  strings.TrimSpace(normalized.Postal),
+		Column7:  minPrice,
+		Column8:  maxPrice,
+		Column9:  minArea,
+		Column10: maxArea,
+		Column11: listingType,
+		Column12: publishedAfter,
+		Column13: publishedBefore,
+		Column14: normalized.Sort,
+		Column15: normalized.PageSize,
+		Column16: offset,
 	})
 	if err != nil {
 		return ReportPage{}, fmt.Errorf("search unified entities: %w", err)
@@ -524,12 +541,14 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (ReportPage, 
 func (s *Service) SearchGroupedOfferings(ctx context.Context, params SearchParams) (GroupedOfferingSearchPage, error) {
 	normalized := normalizeSearchParams(params)
 	offset := (normalized.Page - 1) * normalized.PageSize
-	filter := db.CountGroupedOfferingsParams{Source: normalizeSource(normalized.Source), Kind: normalizeKind(normalized.Kind), QueryText: emptyToNil(normalized.Query), City: emptyToNil(normalized.City), Postal: emptyToNil(normalized.Postal), MinPrice: normalized.MinPrice, MaxPrice: normalized.MaxPrice, MinArea: normalized.MinArea, MaxArea: normalized.MaxArea, PublishedAfter: normalized.PublishedAfter, PublishedBefore: normalized.PublishedBefore}
+	source := normalizeSource(normalized.Source)
+	kind := normalizeKind(normalized.Kind)
+	filter := db.CountGroupedOfferingsParams{Source: &source, Kind: &kind, QueryText: emptyToNil(normalized.Query), City: emptyToNil(normalized.City), Postal: emptyToNil(normalized.Postal), MinPrice: normalized.MinPrice, MaxPrice: normalized.MaxPrice, MinArea: normalized.MinArea, MaxArea: normalized.MaxArea, PublishedAfter: normalized.PublishedAfter, PublishedBefore: normalized.PublishedBefore}
 	total, err := s.queries.CountGroupedOfferings(ctx, filter)
 	if err != nil {
 		return GroupedOfferingSearchPage{}, fmt.Errorf("count grouped offerings: %w", err)
 	}
-	rows, err := s.queries.SearchGroupedOfferings(ctx, db.SearchGroupedOfferingsParams{SortMode: normalized.Sort, OffsetCount: offset, LimitCount: normalized.PageSize, Source: filter.Source, Kind: filter.Kind, QueryText: filter.QueryText, City: filter.City, Postal: filter.Postal, MinPrice: filter.MinPrice, MaxPrice: filter.MaxPrice, MinArea: filter.MinArea, MaxArea: filter.MaxArea, PublishedAfter: filter.PublishedAfter, PublishedBefore: filter.PublishedBefore})
+	rows, err := s.queries.SearchGroupedOfferings(ctx, db.SearchGroupedOfferingsParams{SortMode: normalized.Sort, OffsetCount: offset, LimitCount: normalized.PageSize, Source: source, Kind: kind, QueryText: filter.QueryText, City: filter.City, Postal: filter.Postal, MinPrice: filter.MinPrice, MaxPrice: filter.MaxPrice, MinArea: filter.MinArea, MaxArea: filter.MaxArea, PublishedAfter: filter.PublishedAfter, PublishedBefore: filter.PublishedBefore})
 	if err != nil {
 		return GroupedOfferingSearchPage{}, fmt.Errorf("search grouped offerings: %w", err)
 	}

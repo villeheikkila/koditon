@@ -10,19 +10,22 @@ func TestSaleListingSearchUsesNormalizedLocationFallbacks(t *testing.T) {
 	sql := readPropertySearchSQL(t)
 	for _, queryName := range []string{"SearchSaleListings", "CountSaleListings"} {
 		query := namedSQLSection(t, sql, queryName)
-		if strings.Contains(query, "lower(COALESCE(sl.sale_listing_city, ''))") {
-			t.Fatal("expected city filters to fall back to normalized city")
-		}
-		if strings.Contains(query, "lower(COALESCE(sl.sale_listing_postal, ''))") {
-			t.Fatal("expected postal filters to fall back to normalized postal")
+		for _, want := range []string{
+			"FROM public.listing_search_documents doc",
+			"lower(COALESCE(doc.city, ''))",
+			"lower(COALESCE(doc.postal, ''))",
+		} {
+			if !strings.Contains(query, want) {
+				t.Fatalf("expected %s to include %q", queryName, want)
+			}
 		}
 	}
 	searchQuery := namedSQLSection(t, sql, "SearchSaleListings")
-	if !strings.Contains(searchQuery, "COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '')") {
-		t.Fatal("expected search rows to expose normalized city fallback")
+	if !strings.Contains(searchQuery, "doc.city") {
+		t.Fatal("expected search rows to expose projected city")
 	}
-	if !strings.Contains(searchQuery, "COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '')") {
-		t.Fatal("expected search rows to expose normalized postal fallback")
+	if !strings.Contains(searchQuery, "doc.postal") {
+		t.Fatal("expected search rows to expose projected postal")
 	}
 }
 
@@ -35,6 +38,16 @@ func TestPropertySearchSQLAvoidsRawOnlyListingLocation(t *testing.T) {
 	} {
 		if strings.Contains(text, rawOnly) {
 			t.Fatalf("expected property search SQL to avoid raw-only location expression %q", rawOnly)
+		}
+	}
+}
+
+func TestRentalSearchDoesNotReadOriginTables(t *testing.T) {
+	sql := readPropertySearchSQL(t)
+	for _, queryName := range []string{"SearchRentalListings", "CountRentalListings", "ListRentalCanonicalIDs", "ListBuildingCanonicalIDs"} {
+		query := namedSQLSection(t, sql, queryName)
+		if strings.Contains(query, "origin.") {
+			t.Fatalf("expected %s to avoid origin tables", queryName)
 		}
 	}
 }

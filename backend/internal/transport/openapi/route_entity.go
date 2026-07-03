@@ -9,7 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/domain/ads"
 )
@@ -231,58 +230,54 @@ type entityGroupingOutput struct {
 
 func (a *API) entityGrouping(ctx context.Context, canonicalID string) (entityGroupingOutput, error) {
 	var listingID uuid.UUID
-	var offeringID *uuid.UUID
+	var offeringID uuid.UUID
+	var primarySourceListingID *uuid.UUID
 	err := a.pool.QueryRow(ctx, `
-SELECT sl.sale_listing_id, source_link.target_id
-FROM public.property_source_offerings sl
-LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
-    AND source_link.target_type = 'listing'
-    AND source_link.source_type = 'source_listing'
-    AND source_link.link_status <> 'rejected'
-WHERE sl.sale_listing_canonical_id = $1
-ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC NULLS LAST
-LIMIT 1`, canonicalID).Scan(&listingID, &offeringID)
+SELECT listing_id, property_offering_id, primary_source_listing_id
+FROM public.listing_search_documents
+WHERE canonical_id = $1
+    OR listing_id::text = $1
+    OR property_offering_id::text = $1
+ORDER BY last_seen_at DESC NULLS LAST, refreshed_at DESC
+LIMIT 1`, canonicalID).Scan(&listingID, &offeringID, &primarySourceListingID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return entityGroupingOutput{}, nil
-		}
-		return entityGroupingOutput{}, err
+		return entityGroupingOutput{}, nil
 	}
-	out := entityGroupingOutput{ListingID: listingID.String()}
-	meta, err := a.entityListingMetadata(ctx, listingID, offeringID)
+	out := entityGroupingOutput{ListingID: listingID.String(), OfferingID: offeringID.String()}
+	metaListingID := listingID
+	if primarySourceListingID != nil {
+		metaListingID = *primarySourceListingID
+	}
+	meta, err := a.entityListingMetadata(ctx, metaListingID, &offeringID)
 	if err != nil {
 		return entityGroupingOutput{}, err
 	}
 	out.PriceMatch = meta.PriceMatch
 	out.Insights = meta.Insights
-	if offeringID == nil {
-		return out, nil
-	}
-	out.OfferingID = offeringID.String()
 	rows, err := a.pool.Query(ctx, `
 SELECT
-    sl.sale_listing_id::text,
-    sl.sale_listing_canonical_id,
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
-    sl.sale_listing_native_id,
-    COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id, ''),
-    COALESCE(sl.sale_listing_street_address, ''),
-    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, ''),
-    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, ''),
-    sl.sale_listing_asking_price,
-    sl.sale_listing_area_value,
-    COALESCE(sl.sale_listing_url, ''),
-    CASE
-        WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-        WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-        ELSE false
+    COALESCE(doc.primary_source_listing_id::text, doc.listing_id::text),
+    doc.canonical_id,
+    COALESCE(evidence.provider, doc.source),
+    CASE evidence.source_kind
+        WHEN 'frontdoor_building_announcement' THEN 'announcement'
+        WHEN 'frontdoor_ad' THEN 'ad'
+        WHEN 'shortcut_ad' THEN 'ad'
+        ELSE doc.kind
     END,
-    sl.sale_listing_last_seen_at,
-    COALESCE(source_link.link_status, ''),
-    COALESCE(source_link.link_method, ''),
-    source_link.link_score::int4,
+    COALESCE(evidence.external_id, doc.native_id),
+    COALESCE(doc.headline, ''),
+    COALESCE(doc.address, ''),
+    COALESCE(doc.city, ''),
+    COALESCE(doc.postal, ''),
+    doc.asking_price,
+    doc.area_m2,
+    COALESCE(evidence.url, doc.url, ''),
+    (COALESCE(evidence.url, doc.url) IS NOT NULL AND doc.last_seen_at >= now() - interval '7 days'),
+    doc.last_seen_at,
+    entity_evidence.link_status,
+    entity_evidence.link_method,
+    (entity_evidence.confidence * 100)::int4,
     price_match.transaction_id,
     COALESCE(price_match.match_scope, ''),
     COALESCE(price_match.match_status, ''),
@@ -294,10 +289,10 @@ SELECT
     COALESCE(price_match.category, ''),
     price_match.updated_at,
     COALESCE(insight_rows.insights_json, '[]'::jsonb)
-FROM public.target_sources source_link
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+FROM public.listing_search_documents doc
+JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+    AND entity_evidence.link_status <> 'rejected'
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
 LEFT JOIN LATERAL (
     SELECT
         pt.prices_transaction_id AS transaction_id,
@@ -321,8 +316,8 @@ LEFT JOIN LATERAL (
         FROM public.price_links pl
         WHERE pl.link_status <> 'rejected'
             AND (
-                (pl.target_type = 'source_listing' AND pl.target_id = sl.sale_listing_id)
-                OR (pl.target_type = 'listing' AND pl.target_id = source_link.target_id)
+                (doc.primary_source_listing_id IS NOT NULL AND pl.target_type = 'source_listing' AND pl.target_id = doc.primary_source_listing_id)
+                OR (pl.target_type = 'listing' AND pl.target_id = doc.property_offering_id)
             )
     ) match_source
     JOIN origin.prices_transactions pt ON pt.prices_transaction_id = match_source.prices_transaction_id
@@ -341,14 +336,11 @@ LEFT JOIN LATERAL (
     ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
     FROM public.target_observations observation
     WHERE observation.source_type = 'source_listing'
-        AND observation.source_id = sl.sale_listing_id
+        AND observation.source_id = doc.primary_source_listing_id
         AND observation.superseded_at IS NULL
 ) insight_rows ON true
-WHERE source_link.target_type = 'listing'
-    AND source_link.target_id = $1
-    AND source_link.source_type = 'source_listing'
-    AND source_link.link_status <> 'rejected'
-ORDER BY sl.sale_listing_last_seen_at DESC NULLS LAST, sl.sale_listing_source_provider, sl.sale_listing_native_id`, *offeringID)
+WHERE doc.listing_id = $1
+ORDER BY doc.last_seen_at DESC NULLS LAST, evidence.provider, evidence.external_id`, listingID)
 	if err != nil {
 		return entityGroupingOutput{}, err
 	}

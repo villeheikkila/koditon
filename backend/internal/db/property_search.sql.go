@@ -11,126 +11,46 @@ import (
 )
 
 const countRentalListings = `-- name: CountRentalListings :one
-WITH unified AS (
-    SELECT 'shortcut'::text AS source, raw.city, raw.postal, raw.price, raw.area, (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at, trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable
-    FROM origin.shortcut_ads sa
-    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    CROSS JOIN LATERAL (
-        SELECT
-            COALESCE(CASE WHEN NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '') IS NOT NULL AND NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), '') IS NOT NULL THEN concat_ws(' ', NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,buildingLetter}'), '')) ELSE NULL END, NULLIF(trim(sa.shortcut_ad_data #>> '{address,formattedAddress}'), ''), NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '')) AS street_address,
-            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '') AS city,
-            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '') AS postal,
-            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,priceSell}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,price}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerDay}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price,
-            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,size}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeMin}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS area
-    ) raw
-    WHERE sa.shortcut_ad_type = 'rental'
-    UNION ALL
-    SELECT 'frontdoor'::text AS source, COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city, fb.frontdoor_building_postcode AS postal, CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS price, fba.frontdoor_building_announcement_area AS area, NULL::timestamptz AS published_at, concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable
-    FROM origin.frontdoor_building_announcements fba
-    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
-)
 SELECT count(*)::bigint
-FROM unified u
-WHERE ($1 = 'all' OR u.source = $1)
-  AND ($2::text IS NULL OR trim($2::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim($2::text)) || '%'))
-  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(u.city, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
-  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(u.postal, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
-  AND ($5::bigint IS NULL OR u.price >= $5::bigint)
-  AND ($6::bigint IS NULL OR u.price <= $6::bigint)
-  AND ($7::float8 IS NULL OR u.area >= $7::float8)
-  AND ($8::float8 IS NULL OR u.area <= $8::float8)
-  AND ($9::timestamptz IS NULL OR u.published_at >= $9::timestamptz)
-  AND ($10::timestamptz IS NULL OR u.published_at <= $10::timestamptz)
+WHERE false
+  AND ($1 = 'all' OR $1 <> '')
 `
 
-type CountRentalListingsParams struct {
-	Source          *string    `json:"source"`
-	QueryText       *string    `json:"query_text"`
-	City            *string    `json:"city"`
-	Postal          *string    `json:"postal"`
-	MinPrice        *int64     `json:"min_price"`
-	MaxPrice        *int64     `json:"max_price"`
-	MinArea         *float64   `json:"min_area"`
-	MaxArea         *float64   `json:"max_area"`
-	PublishedAfter  *time.Time `json:"published_after"`
-	PublishedBefore *time.Time `json:"published_before"`
-}
-
-func (q *Queries) CountRentalListings(ctx context.Context, arg CountRentalListingsParams) (*int64, error) {
-	row := q.db.QueryRow(ctx, countRentalListings,
-		arg.Source,
-		arg.QueryText,
-		arg.City,
-		arg.Postal,
-		arg.MinPrice,
-		arg.MaxPrice,
-		arg.MinArea,
-		arg.MaxArea,
-		arg.PublishedAfter,
-		arg.PublishedBefore,
-	)
-	var count *int64
-	err := row.Scan(&count)
-	return count, err
+func (q *Queries) CountRentalListings(ctx context.Context, source *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countRentalListings, source)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const countSaleListings = `-- name: CountSaleListings :one
 SELECT count(*)::bigint
-FROM public.listings l
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = l.primary_source_listing_id
-JOIN public.property_units pu ON pu.property_unit_id = l.unit_id
-LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
-    AND unit_profile.target_id = pu.property_unit_id
-LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
-    AND building_profile.target_id = pu.physical_building_id
-LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
-    AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-WHERE EXISTS (
-    SELECT 1
-    FROM public.target_sources active_link
-    WHERE active_link.target_type = 'listing'
-        AND active_link.target_id = l.listing_id
-        AND active_link.source_type = 'source_listing'
-        AND active_link.link_status <> 'rejected'
-)
-  AND (
-    $1 = 'all'
-    OR EXISTS (
-        SELECT 1
-        FROM public.target_sources source_link
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
-        WHERE source_link.target_type = 'listing'
-            AND source_link.target_id = l.listing_id
-            AND source_link.source_type = 'source_listing'
-            AND source_link.link_status <> 'rejected'
-            AND source_sl.sale_listing_source_provider = $1
-    )
-  )
-  AND ($2::text IS NULL OR trim($2::text) = '' OR lower(concat_ws(' ', sl.sale_listing_search_text, sl.sale_listing_description_text)) LIKE ('%' || lower(trim($2::text)) || '%'))
-  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
-  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
-  AND ($5::bigint IS NULL OR sl.sale_listing_asking_price >= $5::bigint)
-  AND ($6::bigint IS NULL OR sl.sale_listing_asking_price <= $6::bigint)
-  AND ($7::float8 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, sl.sale_listing_area_value) >= $7::float8)
-  AND ($8::float8 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, sl.sale_listing_area_value) <= $8::float8)
-  AND ($9::timestamptz IS NULL OR sl.sale_listing_published_at >= $9::timestamptz)
-  AND ($10::timestamptz IS NULL OR sl.sale_listing_published_at <= $10::timestamptz)
-  AND ($11::float8 IS NULL OR sl.sale_listing_price_per_m2 >= $11::float8)
-  AND ($12::float8 IS NULL OR sl.sale_listing_price_per_m2 <= $12::float8)
-  AND ($13::int4 IS NULL OR COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, sl.sale_listing_rooms_count) = $13::int4)
-  AND ($14::int4 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, sl.sale_listing_floor_level) = $14::int4)
-  AND ($15::int4 IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, sl.sale_listing_build_year) >= $15::int4)
-  AND ($16::int4 IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, sl.sale_listing_build_year) <= $16::int4)
-  AND ($17::text IS NULL OR trim($17::text) = '' OR lower(COALESCE(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), sl.sale_listing_condition), '')) LIKE ('%' || lower(trim($17::text)) || '%'))
-  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), sl.sale_listing_energy_class), '')) LIKE ('%' || lower(trim($18::text)) || '%'))
-  AND ($19 = 'all' OR sl.sale_listing_source_kind = $19)
+FROM public.listing_search_documents doc
+WHERE doc.listing_status = 'active'
+  AND ($1 = 'all' OR doc.source_providers @> ARRAY[$1::text])
+  AND ($2 = 'all' OR doc.source_kinds @> ARRAY[$2::text])
+  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(doc.search_text) LIKE ('%' || lower(trim($3::text)) || '%'))
+  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+  AND ($5::text IS NULL OR trim($5::text) = '' OR lower(COALESCE(doc.postal, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
+  AND ($6::bigint IS NULL OR doc.asking_price >= $6::bigint)
+  AND ($7::bigint IS NULL OR doc.asking_price <= $7::bigint)
+  AND ($8::float8 IS NULL OR doc.area_m2 >= $8::float8)
+  AND ($9::float8 IS NULL OR doc.area_m2 <= $9::float8)
+  AND ($10::timestamptz IS NULL OR doc.published_at >= $10::timestamptz)
+  AND ($11::timestamptz IS NULL OR doc.published_at <= $11::timestamptz)
+  AND ($12::float8 IS NULL OR doc.price_per_m2 >= $12::float8)
+  AND ($13::float8 IS NULL OR doc.price_per_m2 <= $13::float8)
+  AND ($14::int4 IS NULL OR doc.rooms_count = $14::int4)
+  AND ($15::int4 IS NULL OR doc.floor_level = $15::int4)
+  AND ($16::int4 IS NULL OR doc.build_year >= $16::int4)
+  AND ($17::int4 IS NULL OR doc.build_year <= $17::int4)
+  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(doc.condition, '')) LIKE ('%' || lower(trim($18::text)) || '%'))
+  AND ($19::text IS NULL OR trim($19::text) = '' OR lower(COALESCE(doc.energy_class, '')) LIKE ('%' || lower(trim($19::text)) || '%'))
 `
 
 type CountSaleListingsParams struct {
 	Source          *string    `json:"source"`
+	Kind            *string    `json:"kind"`
 	QueryText       *string    `json:"query_text"`
 	City            *string    `json:"city"`
 	Postal          *string    `json:"postal"`
@@ -148,12 +68,12 @@ type CountSaleListingsParams struct {
 	MaxBuildYear    *int32     `json:"max_build_year"`
 	Condition       *string    `json:"condition"`
 	EnergyClass     *string    `json:"energy_class"`
-	Kind            *string    `json:"kind"`
 }
 
 func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsParams) (*int64, error) {
 	row := q.db.QueryRow(ctx, countSaleListings,
 		arg.Source,
+		arg.Kind,
 		arg.QueryText,
 		arg.City,
 		arg.Postal,
@@ -171,7 +91,6 @@ func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsPa
 		arg.MaxBuildYear,
 		arg.Condition,
 		arg.EnergyClass,
-		arg.Kind,
 	)
 	var count *int64
 	err := row.Scan(&count)
@@ -179,11 +98,8 @@ func (q *Queries) CountSaleListings(ctx context.Context, arg CountSaleListingsPa
 }
 
 const listBuildingCanonicalIDs = `-- name: ListBuildingCanonicalIDs :many
-SELECT ('shortcut:building:' || sb.shortcut_building_id::text) AS canonical_id
-FROM origin.shortcut_buildings sb
-UNION ALL
-SELECT ('frontdoor:building:' || fb.frontdoor_building_id::text) AS canonical_id
-FROM origin.frontdoor_buildings fb
+SELECT physical_building_id::text AS canonical_id
+FROM public.physical_buildings
 `
 
 func (q *Queries) ListBuildingCanonicalIDs(ctx context.Context) ([]*string, error) {
@@ -207,24 +123,19 @@ func (q *Queries) ListBuildingCanonicalIDs(ctx context.Context) ([]*string, erro
 }
 
 const listRentalCanonicalIDs = `-- name: ListRentalCanonicalIDs :many
-SELECT ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id
-FROM origin.shortcut_ads sa
-WHERE sa.shortcut_ad_type = 'rental'
-UNION ALL
-SELECT ('frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text) AS canonical_id
-FROM origin.frontdoor_building_announcements fba
-WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
+SELECT ''::text AS canonical_id
+WHERE false
 `
 
-func (q *Queries) ListRentalCanonicalIDs(ctx context.Context) ([]*string, error) {
+func (q *Queries) ListRentalCanonicalIDs(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, listRentalCanonicalIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []*string{}
+	items := []string{}
 	for rows.Next() {
-		var canonical_id *string
+		var canonical_id string
 		if err := rows.Scan(&canonical_id); err != nil {
 			return nil, err
 		}
@@ -237,39 +148,20 @@ func (q *Queries) ListRentalCanonicalIDs(ctx context.Context) ([]*string, error)
 }
 
 const searchRentalListings = `-- name: SearchRentalListings :many
-WITH unified AS (
-    SELECT 'shortcut'::text AS source, 'ad'::text AS kind, sa.shortcut_ad_id::text AS native_id, ('shortcut:ad:' || sa.shortcut_ad_id::text) AS canonical_id, sa.shortcut_ad_url AS url, COALESCE(raw.street_address, sb.shortcut_building_address, sa.shortcut_ad_id::text) AS headline, COALESCE(raw.street_address, sb.shortcut_building_address) AS address, raw.city, raw.postal, raw.price, raw.area, sa.shortcut_ad_data #>> '{adData,roomConfiguration}' AS room_layout, sa.shortcut_ad_last_seen_at AS last_seen_at, (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS published_at, trim(concat_ws(' ', sa.shortcut_ad_id::text, sa.shortcut_ad_url, raw.street_address, raw.city, raw.postal, sa.shortcut_ad_data #>> '{adData,roomConfiguration}', sb.shortcut_building_address, sb.shortcut_building_housing_company)) AS searchable
-    FROM origin.shortcut_ads sa
-    LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-    CROSS JOIN LATERAL (
-        SELECT
-            COALESCE(CASE WHEN NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '') IS NOT NULL AND NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), '') IS NOT NULL THEN concat_ws(' ', NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,buildingLetter}'), '')) ELSE NULL END, NULLIF(trim(sa.shortcut_ad_data #>> '{address,formattedAddress}'), ''), NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '')) AS street_address,
-            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,city,name}', sa.shortcut_ad_data #>> '{address,city}')), '') AS city,
-            NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,zipCode,value}', sa.shortcut_ad_data #>> '{address,zipCode,name}', sa.shortcut_ad_data #>> '{address,zipCode}')), '') AS postal,
-            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,priceSell}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,price}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerMonth}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerWeek}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{priceData,rentPerDay}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price,
-            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,size}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,sizeMin}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,buildingOverrideTotalSize}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(sa.shortcut_ad_data #>> '{adData,buildingOverrideSizeMin}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS area
-    ) raw
-    WHERE sa.shortcut_ad_type = 'rental'
-    UNION ALL
-    SELECT 'frontdoor'::text AS source, 'announcement'::text AS kind, fba.frontdoor_building_announcement_id::text AS native_id, ('frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text) AS canonical_id, fb.frontdoor_building_url AS url, COALESCE(fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_id::text) AS headline, concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2) AS address, COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS city, fb.frontdoor_building_postcode AS postal, CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS price, fba.frontdoor_building_announcement_area AS area, fba.frontdoor_building_announcement_room_structure AS room_layout, fba.frontdoor_building_announcement_last_seen_at AS last_seen_at, NULL::timestamptz AS published_at, concat_ws(' ', fba.frontdoor_building_announcement_id::text, fba.frontdoor_building_announcement_external_id::text, fba.frontdoor_building_announcement_friendly_id, fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fba.frontdoor_building_announcement_location, fb.frontdoor_building_postcode, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area, fb.frontdoor_building_url, fba.frontdoor_building_announcement_room_structure) AS searchable
-    FROM origin.frontdoor_building_announcements fba
-    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE fba.frontdoor_building_announcement_rent_period IS NOT NULL OR fba.frontdoor_building_announcement_rental_unique_no IS NOT NULL
-)
 SELECT
-    source,
-    kind,
-    native_id,
-    canonical_id,
-    ('r_' || substr(md5(canonical_id), 1, 16)) AS public_id,
-    url,
-    headline,
-    address,
-    city,
-    postal,
-    price,
-    area,
-    room_layout,
+    ''::text AS source,
+    ''::text AS kind,
+    ''::text AS native_id,
+    ''::text AS canonical_id,
+    ''::text AS public_id,
+    NULL::text AS url,
+    NULL::text AS headline,
+    NULL::text AS address,
+    NULL::text AS city,
+    NULL::text AS postal,
+    NULL::bigint AS price,
+    NULL::float8 AS area,
+    NULL::text AS room_layout,
     NULL::float8 AS price_per_m2,
     NULL::bigint AS debt_free_price,
     NULL::bigint AS debt_share_amount,
@@ -280,53 +172,30 @@ SELECT
     NULL::text AS condition,
     NULL::text AS energy_class,
     NULL::text AS energy_efficiency_label,
-    last_seen_at::text AS last_seen_at,
-    published_at::text AS published_at,
-    address AS building_key_address,
-    ARRAY[source]::text[] AS source_providers
-FROM unified u
-WHERE ($1 = 'all' OR u.source = $1)
-  AND ($2::text IS NULL OR trim($2::text) = '' OR lower(u.searchable) LIKE ('%' || lower(trim($2::text)) || '%'))
-  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(u.city, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
-  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(u.postal, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
-  AND ($5::bigint IS NULL OR u.price >= $5::bigint)
-  AND ($6::bigint IS NULL OR u.price <= $6::bigint)
-  AND ($7::float8 IS NULL OR u.area >= $7::float8)
-  AND ($8::float8 IS NULL OR u.area <= $8::float8)
-  AND ($9::timestamptz IS NULL OR u.published_at >= $9::timestamptz)
-  AND ($10::timestamptz IS NULL OR u.published_at <= $10::timestamptz)
-ORDER BY
-    CASE WHEN $11 = 'price_asc' THEN price END ASC NULLS LAST,
-    CASE WHEN $11 = 'price_desc' THEN price END DESC NULLS LAST,
-    CASE WHEN $11 = 'area_asc' THEN area END ASC NULLS LAST,
-    CASE WHEN $11 = 'area_desc' THEN area END DESC NULLS LAST,
-    CASE WHEN $11 = 'seen_desc' THEN last_seen_at END DESC NULLS LAST,
-    last_seen_at DESC
-LIMIT $13::int OFFSET $12::int
+    NULL::text AS last_seen_at,
+    NULL::text AS published_at,
+    NULL::text AS building_key_address,
+    ARRAY[]::text[] AS source_providers
+WHERE false
+  AND ($1 = 'all' OR $1 <> '')
+  AND ($2 <> '')
+  AND ($3::int >= 0)
+  AND ($4::int >= 0)
 `
 
 type SearchRentalListingsParams struct {
-	Source          *string    `json:"source"`
-	QueryText       *string    `json:"query_text"`
-	City            *string    `json:"city"`
-	Postal          *string    `json:"postal"`
-	MinPrice        *int64     `json:"min_price"`
-	MaxPrice        *int64     `json:"max_price"`
-	MinArea         *float64   `json:"min_area"`
-	MaxArea         *float64   `json:"max_area"`
-	PublishedAfter  *time.Time `json:"published_after"`
-	PublishedBefore *time.Time `json:"published_before"`
-	SortMode        *string    `json:"sort_mode"`
-	OffsetCount     int32      `json:"offset_count"`
-	LimitCount      int32      `json:"limit_count"`
+	Source      *string `json:"source"`
+	SortMode    *string `json:"sort_mode"`
+	LimitCount  int32   `json:"limit_count"`
+	OffsetCount int32   `json:"offset_count"`
 }
 
 type SearchRentalListingsRow struct {
-	Source                *string  `json:"source"`
-	Kind                  *string  `json:"kind"`
-	NativeID              *string  `json:"native_id"`
-	CanonicalID           *string  `json:"canonical_id"`
-	PublicID              *string  `json:"public_id"`
+	Source                string   `json:"source"`
+	Kind                  string   `json:"kind"`
+	NativeID              string   `json:"native_id"`
+	CanonicalID           string   `json:"canonical_id"`
+	PublicID              string   `json:"public_id"`
 	Url                   *string  `json:"url"`
 	Headline              *string  `json:"headline"`
 	Address               *string  `json:"address"`
@@ -354,18 +223,9 @@ type SearchRentalListingsRow struct {
 func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalListingsParams) ([]SearchRentalListingsRow, error) {
 	rows, err := q.db.Query(ctx, searchRentalListings,
 		arg.Source,
-		arg.QueryText,
-		arg.City,
-		arg.Postal,
-		arg.MinPrice,
-		arg.MaxPrice,
-		arg.MinArea,
-		arg.MaxArea,
-		arg.PublishedAfter,
-		arg.PublishedBefore,
 		arg.SortMode,
-		arg.OffsetCount,
 		arg.LimitCount,
+		arg.OffsetCount,
 	)
 	if err != nil {
 		return nil, err
@@ -415,110 +275,70 @@ func (q *Queries) SearchRentalListings(ctx context.Context, arg SearchRentalList
 
 const searchSaleListings = `-- name: SearchSaleListings :many
 SELECT
-    pso.sale_listing_source_provider AS source,
-    pso.sale_listing_source_kind AS kind,
-    pso.sale_listing_native_id AS native_id,
-    pso.sale_listing_canonical_id AS canonical_id,
-    l.listing_id::text AS public_id,
-    pso.sale_listing_url AS url,
-    pso.sale_listing_headline AS headline,
-    pso.sale_listing_street_address AS address,
-    COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '') AS city,
-    COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '') AS postal,
-    pso.sale_listing_asking_price AS price,
-    COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) AS area,
-    COALESCE(NULLIF(unit_profile.dimensions #>> '{layout,room_layout}', ''), pso.sale_listing_room_layout, '') AS room_layout,
-    pso.sale_listing_price_per_m2 AS price_per_m2,
-    pso.sale_listing_debt_free_price AS debt_free_price,
-    pso.sale_listing_debt_share_amount AS debt_share_amount,
-    COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, pso.sale_listing_rooms_count) AS rooms_count,
-    COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, pso.sale_listing_floor_level) AS floor_level,
-    COALESCE((unit_profile.dimensions #>> '{unit,total_floors}')::int4, (building_profile.dimensions #>> '{building,floor_count}')::int4, pso.sale_listing_total_floors) AS total_floors,
-    COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year) AS build_year,
-    COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), pso.sale_listing_condition) AS condition,
-    COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), pso.sale_listing_energy_class) AS energy_class,
-    pso.sale_listing_energy_efficiency_label AS energy_efficiency_label,
-    pso.sale_listing_last_seen_at::text AS last_seen_at,
-    pso.sale_listing_published_at::text AS published_at,
-    pso.sale_listing_street_address AS building_key_address,
-    source_badges.source_providers
-FROM public.listings l
-JOIN public.property_source_offerings pso ON pso.sale_listing_id = l.primary_source_listing_id
-JOIN public.property_units pu ON pu.property_unit_id = l.unit_id
-LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-LEFT JOIN public.housing_companies hc ON hc.housing_company_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-LEFT JOIN public.dimension_profiles unit_profile ON unit_profile.target_type = 'unit'
-    AND unit_profile.target_id = pu.property_unit_id
-LEFT JOIN public.dimension_profiles building_profile ON building_profile.target_type = 'building'
-    AND building_profile.target_id = pu.physical_building_id
-LEFT JOIN public.dimension_profiles housing_profile ON housing_profile.target_type = 'housing_company'
-    AND housing_profile.target_id = COALESCE(pu.housing_company_id, pb.housing_company_id)
-JOIN LATERAL (
-    SELECT array_agg(provider ORDER BY provider)::text[] AS source_providers
-    FROM (
-        SELECT DISTINCT source_sl.sale_listing_source_provider AS provider
-        FROM public.target_sources source_link
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
-        WHERE source_link.target_type = 'listing'
-            AND source_link.target_id = l.listing_id
-            AND source_link.source_type = 'source_listing'
-            AND source_link.link_status <> 'rejected'
-    ) providers
-) source_badges ON true
-WHERE EXISTS (
-    SELECT 1
-    FROM public.target_sources active_link
-    WHERE active_link.target_type = 'listing'
-        AND active_link.target_id = l.listing_id
-        AND active_link.source_type = 'source_listing'
-        AND active_link.link_status <> 'rejected'
-)
-  AND (
-    $1 = 'all'
-    OR EXISTS (
-        SELECT 1
-        FROM public.target_sources source_link
-        JOIN public.property_source_offerings source_sl ON source_sl.sale_listing_id = source_link.source_id
-        WHERE source_link.target_type = 'listing'
-            AND source_link.target_id = l.listing_id
-            AND source_link.source_type = 'source_listing'
-            AND source_link.link_status <> 'rejected'
-            AND source_sl.sale_listing_source_provider = $1
-    )
-  )
-  AND ($2::text IS NULL OR trim($2::text) = '' OR lower(concat_ws(' ', pso.sale_listing_search_text, pso.sale_listing_description_text)) LIKE ('%' || lower(trim($2::text)) || '%'))
-  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(COALESCE(pso.sale_listing_city, pso.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($3::text)) || '%'))
-  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(pso.sale_listing_postal, pso.sale_listing_postal_norm, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
-  AND ($5::bigint IS NULL OR pso.sale_listing_asking_price >= $5::bigint)
-  AND ($6::bigint IS NULL OR pso.sale_listing_asking_price <= $6::bigint)
-  AND ($7::float8 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) >= $7::float8)
-  AND ($8::float8 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) <= $8::float8)
-  AND ($9::timestamptz IS NULL OR pso.sale_listing_published_at >= $9::timestamptz)
-  AND ($10::timestamptz IS NULL OR pso.sale_listing_published_at <= $10::timestamptz)
-  AND ($11::float8 IS NULL OR pso.sale_listing_price_per_m2 >= $11::float8)
-  AND ($12::float8 IS NULL OR pso.sale_listing_price_per_m2 <= $12::float8)
-  AND ($13::int4 IS NULL OR COALESCE((unit_profile.dimensions #>> '{layout,room_count}')::int4, pso.sale_listing_rooms_count) = $13::int4)
-  AND ($14::int4 IS NULL OR COALESCE((unit_profile.dimensions #>> '{unit,floor_level}')::int4, pso.sale_listing_floor_level) = $14::int4)
-  AND ($15::int4 IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year) >= $15::int4)
-  AND ($16::int4 IS NULL OR COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year) <= $16::int4)
-  AND ($17::text IS NULL OR trim($17::text) = '' OR lower(COALESCE(COALESCE(NULLIF(unit_profile.dimensions #>> '{condition,unit_condition}', ''), pso.sale_listing_condition), '')) LIKE ('%' || lower(trim($17::text)) || '%'))
-  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(COALESCE(NULLIF(building_profile.dimensions #>> '{building,energy_class}', ''), NULLIF(housing_profile.dimensions #>> '{housing_company,energy_class}', ''), pso.sale_listing_energy_class), '')) LIKE ('%' || lower(trim($18::text)) || '%'))
-  AND ($19 = 'all' OR pso.sale_listing_source_kind = $19)
+    doc.source,
+    doc.kind,
+    doc.native_id,
+    doc.canonical_id,
+    doc.listing_id::text AS public_id,
+    doc.url,
+    doc.headline,
+    doc.address,
+    doc.city,
+    doc.postal,
+    doc.asking_price AS price,
+    doc.area_m2 AS area,
+    doc.room_layout,
+    doc.price_per_m2,
+    doc.debt_free_price,
+    doc.debt_share_amount,
+    doc.rooms_count,
+    doc.floor_level,
+    doc.total_floors,
+    doc.build_year,
+    doc.condition,
+    doc.energy_class,
+    doc.energy_efficiency_label,
+    doc.last_seen_at::text AS last_seen_at,
+    doc.published_at::text AS published_at,
+    doc.address AS building_key_address,
+    doc.source_providers
+FROM public.listing_search_documents doc
+WHERE doc.listing_status = 'active'
+  AND ($1 = 'all' OR doc.source_providers @> ARRAY[$1::text])
+  AND ($2 = 'all' OR doc.source_kinds @> ARRAY[$2::text])
+  AND ($3::text IS NULL OR trim($3::text) = '' OR lower(doc.search_text) LIKE ('%' || lower(trim($3::text)) || '%'))
+  AND ($4::text IS NULL OR trim($4::text) = '' OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($4::text)) || '%'))
+  AND ($5::text IS NULL OR trim($5::text) = '' OR lower(COALESCE(doc.postal, '')) LIKE ('%' || lower(trim($5::text)) || '%'))
+  AND ($6::bigint IS NULL OR doc.asking_price >= $6::bigint)
+  AND ($7::bigint IS NULL OR doc.asking_price <= $7::bigint)
+  AND ($8::float8 IS NULL OR doc.area_m2 >= $8::float8)
+  AND ($9::float8 IS NULL OR doc.area_m2 <= $9::float8)
+  AND ($10::timestamptz IS NULL OR doc.published_at >= $10::timestamptz)
+  AND ($11::timestamptz IS NULL OR doc.published_at <= $11::timestamptz)
+  AND ($12::float8 IS NULL OR doc.price_per_m2 >= $12::float8)
+  AND ($13::float8 IS NULL OR doc.price_per_m2 <= $13::float8)
+  AND ($14::int4 IS NULL OR doc.rooms_count = $14::int4)
+  AND ($15::int4 IS NULL OR doc.floor_level = $15::int4)
+  AND ($16::int4 IS NULL OR doc.build_year >= $16::int4)
+  AND ($17::int4 IS NULL OR doc.build_year <= $17::int4)
+  AND ($18::text IS NULL OR trim($18::text) = '' OR lower(COALESCE(doc.condition, '')) LIKE ('%' || lower(trim($18::text)) || '%'))
+  AND ($19::text IS NULL OR trim($19::text) = '' OR lower(COALESCE(doc.energy_class, '')) LIKE ('%' || lower(trim($19::text)) || '%'))
 ORDER BY
-    CASE WHEN $20 = 'price_asc' THEN pso.sale_listing_asking_price END ASC NULLS LAST,
-    CASE WHEN $20 = 'price_desc' THEN pso.sale_listing_asking_price END DESC NULLS LAST,
-    CASE WHEN $20 = 'area_asc' THEN COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) END ASC NULLS LAST,
-    CASE WHEN $20 = 'area_desc' THEN COALESCE((unit_profile.dimensions #>> '{unit,area_m2}')::float8, pso.sale_listing_area_value) END DESC NULLS LAST,
-    CASE WHEN $20 = 'price_m2_asc' THEN pso.sale_listing_price_per_m2 END ASC NULLS LAST,
-    CASE WHEN $20 = 'price_m2_desc' THEN pso.sale_listing_price_per_m2 END DESC NULLS LAST,
-    CASE WHEN $20 = 'build_year_desc' THEN COALESCE((building_profile.dimensions #>> '{building,build_year}')::int4, (housing_profile.dimensions #>> '{housing_company,build_year}')::int4, hc.housing_company_build_year, pso.sale_listing_build_year) END DESC NULLS LAST,
-    CASE WHEN $20 = 'seen_desc' THEN pso.sale_listing_last_seen_at END DESC NULLS LAST,
-    pso.sale_listing_last_seen_at DESC
+    CASE WHEN $20 = 'price_asc' THEN doc.asking_price END ASC NULLS LAST,
+    CASE WHEN $20 = 'price_desc' THEN doc.asking_price END DESC NULLS LAST,
+    CASE WHEN $20 = 'area_asc' THEN doc.area_m2 END ASC NULLS LAST,
+    CASE WHEN $20 = 'area_desc' THEN doc.area_m2 END DESC NULLS LAST,
+    CASE WHEN $20 = 'price_m2_asc' THEN doc.price_per_m2 END ASC NULLS LAST,
+    CASE WHEN $20 = 'price_m2_desc' THEN doc.price_per_m2 END DESC NULLS LAST,
+    CASE WHEN $20 = 'build_year_desc' THEN doc.build_year END DESC NULLS LAST,
+    CASE WHEN $20 = 'seen_desc' THEN doc.last_seen_at END DESC NULLS LAST,
+    doc.last_seen_at DESC
 LIMIT $22::int OFFSET $21::int
 `
 
 type SearchSaleListingsParams struct {
 	Source          *string    `json:"source"`
+	Kind            *string    `json:"kind"`
 	QueryText       *string    `json:"query_text"`
 	City            *string    `json:"city"`
 	Postal          *string    `json:"postal"`
@@ -536,7 +356,6 @@ type SearchSaleListingsParams struct {
 	MaxBuildYear    *int32     `json:"max_build_year"`
 	Condition       *string    `json:"condition"`
 	EnergyClass     *string    `json:"energy_class"`
-	Kind            *string    `json:"kind"`
 	SortMode        *string    `json:"sort_mode"`
 	OffsetCount     *int32     `json:"offset_count"`
 	LimitCount      *int32     `json:"limit_count"`
@@ -549,7 +368,7 @@ type SearchSaleListingsRow struct {
 	CanonicalID           string   `json:"canonical_id"`
 	PublicID              *string  `json:"public_id"`
 	Url                   *string  `json:"url"`
-	Headline              string   `json:"headline"`
+	Headline              *string  `json:"headline"`
 	Address               *string  `json:"address"`
 	City                  *string  `json:"city"`
 	Postal                *string  `json:"postal"`
@@ -575,6 +394,7 @@ type SearchSaleListingsRow struct {
 func (q *Queries) SearchSaleListings(ctx context.Context, arg SearchSaleListingsParams) ([]SearchSaleListingsRow, error) {
 	rows, err := q.db.Query(ctx, searchSaleListings,
 		arg.Source,
+		arg.Kind,
 		arg.QueryText,
 		arg.City,
 		arg.Postal,
@@ -592,7 +412,6 @@ func (q *Queries) SearchSaleListings(ctx context.Context, arg SearchSaleListings
 		arg.MaxBuildYear,
 		arg.Condition,
 		arg.EnergyClass,
-		arg.Kind,
 		arg.SortMode,
 		arg.OffsetCount,
 		arg.LimitCount,

@@ -495,6 +495,60 @@ func serviceReportingSQLForTest(t *testing.T) string {
 	return string(data)
 }
 
+func adsQueriesSQLForTest(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("../../../db/queries/ads/queries.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func namedSQLSection(t *testing.T, sql string, name string) string {
+	t.Helper()
+	startMarker := "-- name: " + name + " "
+	start := strings.Index(sql, startMarker)
+	if start < 0 {
+		t.Fatalf("missing query %s", name)
+	}
+	rest := sql[start+len(startMarker):]
+	next := strings.Index(rest, "\n-- name: ")
+	if next < 0 {
+		return rest
+	}
+	return rest[:next]
+}
+
+func TestUnifiedSearchUsesListingSearchDocuments(t *testing.T) {
+	sql := adsQueriesSQLForTest(t)
+	for _, queryName := range []string{"SearchUnifiedEntities", "CountUnifiedEntities"} {
+		section := namedSQLSection(t, sql, queryName)
+		for _, want := range []string{
+			"public.listing_search_documents",
+			"doc.listing_status = 'active'",
+			"doc.source_providers",
+			"doc.search_text",
+		} {
+			if !strings.Contains(section, want) {
+				t.Fatalf("expected %s SQL to include %q", queryName, want)
+			}
+		}
+		if strings.Contains(section, "origin.") {
+			t.Fatalf("expected %s SQL to avoid origin tables", queryName)
+		}
+	}
+}
+
+func TestGroupedOfferingSearchDoesNotReadOriginTables(t *testing.T) {
+	sql := serviceReportingSQLForTest(t)
+	for _, queryName := range []string{"SearchGroupedOfferings", "CountGroupedOfferings"} {
+		section := namedSQLSection(t, sql, queryName)
+		if strings.Contains(section, "origin.") {
+			t.Fatalf("expected %s SQL to avoid origin tables", queryName)
+		}
+	}
+}
+
 func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
 	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{

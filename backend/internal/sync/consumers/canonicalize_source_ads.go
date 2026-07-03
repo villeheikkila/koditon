@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"koditon/internal/db"
+	"koditon/internal/domain/listingmodel"
 	"koditon/internal/domain/properties"
 	"koditon/internal/platform/logging"
 	"koditon/internal/sync/workflows"
@@ -61,6 +62,9 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 	}
 	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("sync source listing for frontdoor announcement: %w", err)
+	}
+	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
+		return err
 	}
 	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
@@ -115,6 +119,9 @@ func (c *Consumer) canonicalizeFrontdoorAd(ctx context.Context, logger *slog.Log
 	}
 	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("sync source listing for frontdoor ad: %w", err)
+	}
+	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
+		return err
 	}
 	version := currentSourceAdCanonicalizationVersion
 	if err := c.queries.MarkFrontdoorAdDataNormalized(ctx, db.MarkFrontdoorAdDataNormalizedParams{FrontdoorAdDataNormalizedVersion: &version, FrontdoorAdExternalID: &ad.FrontdoorAdExternalID, FrontdoorAdDataHash: ad.FrontdoorAdDataHash}); err != nil {
@@ -173,6 +180,9 @@ func (c *Consumer) canonicalizeShortcutAd(ctx context.Context, logger *slog.Logg
 	}
 	if err := c.queries.SyncSourceListingFromPropertySourceOffering(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("sync source listing for shortcut ad: %w", err)
+	}
+	if _, err := listingmodel.NewService(logger, c.pool).ReconcileSourceOffering(ctx, saleListingID); err != nil {
+		return err
 	}
 	version := currentSourceAdCanonicalizationVersion
 	if err := c.queries.MarkShortcutAdDataNormalized(ctx, db.MarkShortcutAdDataNormalizedParams{ShortcutAdDataNormalizedVersion: &version, ShortcutAdID: &shortcutAdID, ShortcutAdDataHash: ad.ShortcutAdDataHash}); err != nil {

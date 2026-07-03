@@ -783,4 +783,81 @@ ON CONFLICT (provider, source_kind, native_id) DO UPDATE SET
   last_seen_at = GREATEST(origin.source_listings.last_seen_at, EXCLUDED.last_seen_at),
   updated_at = EXCLUDED.updated_at;
 
+INSERT INTO public.evidence_sources (
+  source_kind,
+  provider,
+  external_id,
+  url,
+  payload_hash,
+  observed_at,
+  shortcut_ad_id
+)
+SELECT
+  'shortcut_ad',
+  'shortcut',
+  shortcut_ad_id::text,
+  shortcut_ad_url,
+  shortcut_ad_data_hash,
+  shortcut_ad_last_seen_at,
+  shortcut_ad_id
+FROM origin.shortcut_ads
+WHERE shortcut_ad_type = 'listing'
+ON CONFLICT (shortcut_ad_id) WHERE shortcut_ad_id IS NOT NULL DO UPDATE SET
+  external_id = EXCLUDED.external_id,
+  url = EXCLUDED.url,
+  payload_hash = EXCLUDED.payload_hash,
+  observed_at = EXCLUDED.observed_at,
+  updated_at = now();
+
+INSERT INTO public.evidence_sources (
+  source_kind,
+  provider,
+  external_id,
+  url,
+  payload_hash,
+  observed_at,
+  frontdoor_ad_id
+)
+SELECT
+  'frontdoor_ad',
+  'frontdoor',
+  frontdoor_ad_external_id,
+  frontdoor_ad_url,
+  frontdoor_ad_data_hash,
+  frontdoor_ad_last_seen_at,
+  frontdoor_ad_id
+FROM origin.frontdoor_ads
+WHERE frontdoor_ad_data IS NOT NULL
+ON CONFLICT (frontdoor_ad_id) WHERE frontdoor_ad_id IS NOT NULL DO UPDATE SET
+  external_id = EXCLUDED.external_id,
+  url = EXCLUDED.url,
+  payload_hash = EXCLUDED.payload_hash,
+  observed_at = EXCLUDED.observed_at,
+  updated_at = now();
+
+INSERT INTO public.evidence_sources (
+  source_kind,
+  provider,
+  external_id,
+  url,
+  payload_hash,
+  observed_at,
+  frontdoor_building_announcement_id
+)
+SELECT
+  'frontdoor_building_announcement',
+  'frontdoor',
+  frontdoor_building_announcement_id::text,
+  NULL,
+  NULL,
+  frontdoor_building_announcement_last_seen_at,
+  frontdoor_building_announcement_id
+FROM origin.frontdoor_building_announcements
+WHERE frontdoor_building_announcement_rent_period IS NULL
+  AND frontdoor_building_announcement_rental_unique_no IS NULL
+ON CONFLICT (frontdoor_building_announcement_id) WHERE frontdoor_building_announcement_id IS NOT NULL DO UPDATE SET
+  external_id = EXCLUDED.external_id,
+  observed_at = EXCLUDED.observed_at,
+  updated_at = now();
+
 COMMIT;
