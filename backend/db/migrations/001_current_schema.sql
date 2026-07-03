@@ -898,6 +898,21 @@ CREATE TABLE public.price_links (
     CONSTRAINT price_links_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'source_listing'::text, 'source_building_announcement'::text, 'building'::text, 'housing_company'::text])))
 );
 
+CREATE TABLE public.listing_price_match_states (
+    source_listing_id uuid NOT NULL,
+    listing_id uuid NOT NULL,
+    match_status text,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone,
+    last_attempted_at timestamp with time zone,
+    run_id uuid,
+    expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT listing_price_match_states_attempt_count_check CHECK ((attempt_count >= 0)),
+    CONSTRAINT listing_price_match_states_status_check CHECK ((match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'noop'::text, 'auto_linked'::text, 'needs_review'::text, 'expired'::text])))
+);
+
 CREATE TABLE public.property_dimension_catalog (
     dimension_key text NOT NULL,
     target_type text NOT NULL,
@@ -1712,6 +1727,9 @@ ALTER TABLE ONLY public.listings
 ALTER TABLE ONLY public.listing_search_documents
     ADD CONSTRAINT listing_search_documents_pkey PRIMARY KEY (listing_id);
 
+ALTER TABLE ONLY public.listing_price_match_states
+    ADD CONSTRAINT listing_price_match_states_pkey PRIMARY KEY (source_listing_id);
+
 ALTER TABLE ONLY public.physical_buildings
     ADD CONSTRAINT physical_buildings_physical_building_identity_key_key UNIQUE (physical_building_identity_key);
 
@@ -2066,6 +2084,10 @@ CREATE INDEX idx_price_links_target ON public.price_links USING btree (target_ty
 
 CREATE INDEX idx_price_links_transaction ON public.price_links USING btree (prices_transaction_id, link_status);
 
+CREATE INDEX idx_listing_price_match_states_listing ON public.listing_price_match_states USING btree (listing_id);
+
+CREATE INDEX idx_listing_price_match_states_queue ON public.listing_price_match_states USING btree (next_attempt_at, updated_at) WHERE (COALESCE(match_status, 'pending'::text) = ANY (ARRAY['pending'::text, 'deferred'::text, 'noop'::text]));
+
 CREATE INDEX idx_property_dimension_dirty_targets_queue ON public.property_dimension_dirty_targets USING btree (dirty_at) WHERE ((resolved_at IS NULL) OR (resolved_at < dirty_at));
 
 CREATE INDEX idx_property_dimension_projection_runs_source ON public.property_dimension_projection_runs USING btree (projection_type, source_table, source_id, projection_version, started_at DESC);
@@ -2327,6 +2349,9 @@ ALTER TABLE ONLY public.listing_search_documents
 
 ALTER TABLE ONLY public.listing_search_documents
     ADD CONSTRAINT listing_search_documents_source_listing_id_fkey FOREIGN KEY (primary_source_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.listing_price_match_states
+    ADD CONSTRAINT listing_price_match_states_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY origin.postal_postal_codes
     ADD CONSTRAINT postal_postal_codes_postal_postal_codes_ad_area_id_fkey FOREIGN KEY (postal_ad_area_id) REFERENCES origin.postal_ad_areas(postal_ad_area_id);

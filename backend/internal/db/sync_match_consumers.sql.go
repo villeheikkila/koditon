@@ -185,16 +185,27 @@ func (q *Queries) ListDirtyDimensionTargets(ctx context.Context, limitCount *int
 }
 
 const listPricesMatchFanoutListings = `-- name: ListPricesMatchFanoutListings :many
-SELECT sale_listing_id::text AS sale_listing_id, COALESCE(sale_listing_prices_match_attempt_count, 0)::int4 AS attempt_count
-FROM public.property_source_offerings
-WHERE sale_listing_source_kind = 'ad'
-    AND prices_transaction_id IS NULL
-    AND sale_listing_last_seen_at IS NOT NULL
-    AND sale_listing_last_seen_at <= now() - interval '7 days'
-    AND sale_listing_last_seen_at >= now() - interval '4 months'
-    AND COALESCE(sale_listing_prices_match_status, 'pending') IN ('pending', 'deferred', 'noop')
-    AND COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days') <= now()
-ORDER BY COALESCE(sale_listing_prices_match_next_attempt_at, sale_listing_last_seen_at + interval '7 days'), sale_listing_last_seen_at
+SELECT doc.primary_source_listing_id::text AS sale_listing_id, COALESCE(state.attempt_count, 0)::int4 AS attempt_count
+FROM public.listing_search_documents doc
+LEFT JOIN public.listing_price_match_states state ON state.source_listing_id = doc.primary_source_listing_id
+WHERE doc.kind = 'ad'
+    AND doc.listing_status = 'active'
+    AND doc.primary_source_listing_id IS NOT NULL
+    AND doc.last_seen_at IS NOT NULL
+    AND doc.last_seen_at <= now() - interval '7 days'
+    AND doc.last_seen_at >= now() - interval '4 months'
+    AND COALESCE(state.match_status, 'pending') IN ('pending', 'deferred', 'noop')
+    AND COALESCE(state.next_attempt_at, doc.last_seen_at + interval '7 days') <= now()
+    AND NOT EXISTS (
+        SELECT 1
+        FROM public.price_links pl
+        WHERE pl.link_status <> 'rejected'
+            AND (
+                (pl.target_type = 'source_listing' AND pl.target_id = doc.primary_source_listing_id)
+                OR (pl.target_type = 'listing' AND pl.target_id = doc.property_offering_id)
+            )
+    )
+ORDER BY COALESCE(state.next_attempt_at, doc.last_seen_at + interval '7 days'), doc.last_seen_at
 LIMIT $1::int4
 `
 
@@ -225,14 +236,30 @@ func (q *Queries) ListPricesMatchFanoutListings(ctx context.Context, limitCount 
 
 const loadPricesMatchSaleListing = `-- name: LoadPricesMatchSaleListing :one
 SELECT
-    sale_listing_id::text AS id,
-    sale_listing_last_seen_at,
-    COALESCE(prices_transaction_id::text, '')::text AS transaction_id,
-    sale_listing_prices_match_status,
-    sale_listing_prices_match_attempt_count,
-    sale_listing_prices_match_expires_at
-FROM public.property_source_offerings
-WHERE sale_listing_id = $1::uuid
+    doc.primary_source_listing_id::text AS id,
+    doc.last_seen_at AS sale_listing_last_seen_at,
+    COALESCE(price_link.prices_transaction_id::text, '')::text AS transaction_id,
+    state.match_status AS sale_listing_prices_match_status,
+    COALESCE(state.attempt_count, 0)::int4 AS sale_listing_prices_match_attempt_count,
+    state.expires_at AS sale_listing_prices_match_expires_at
+FROM public.listing_search_documents doc
+LEFT JOIN public.listing_price_match_states state ON state.source_listing_id = doc.primary_source_listing_id
+LEFT JOIN LATERAL (
+    SELECT pl.prices_transaction_id
+    FROM public.price_links pl
+    WHERE pl.link_status <> 'rejected'
+        AND (
+            (pl.target_type = 'source_listing' AND pl.target_id = doc.primary_source_listing_id)
+            OR (pl.target_type = 'listing' AND pl.target_id = doc.property_offering_id)
+        )
+    ORDER BY pl.link_score DESC, pl.updated_at DESC
+    LIMIT 1
+) price_link ON true
+WHERE doc.primary_source_listing_id = $1::uuid
+    AND doc.listing_status = 'active'
+    AND doc.kind = 'ad'
+ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
+LIMIT 1
 `
 
 type LoadPricesMatchSaleListingRow struct {
@@ -240,7 +267,7 @@ type LoadPricesMatchSaleListingRow struct {
 	SaleListingLastSeenAt              *time.Time `json:"sale_listing_last_seen_at"`
 	TransactionID                      *string    `json:"transaction_id"`
 	SaleListingPricesMatchStatus       *string    `json:"sale_listing_prices_match_status"`
-	SaleListingPricesMatchAttemptCount int32      `json:"sale_listing_prices_match_attempt_count"`
+	SaleListingPricesMatchAttemptCount *int32     `json:"sale_listing_prices_match_attempt_count"`
 	SaleListingPricesMatchExpiresAt    *time.Time `json:"sale_listing_prices_match_expires_at"`
 }
 
@@ -283,24 +310,48 @@ func (q *Queries) MarkDimensionTargetQueued(ctx context.Context, arg MarkDimensi
 }
 
 const updatePricesMatchState = `-- name: UpdatePricesMatchState :exec
-WITH updated_source AS (
-    UPDATE public.property_source_offerings
-    SET
-        sale_listing_prices_match_status = $1::text,
-        sale_listing_prices_match_next_attempt_at = $2::timestamptz,
-        sale_listing_prices_match_last_attempted_at = now(),
-        sale_listing_prices_match_attempt_count = sale_listing_prices_match_attempt_count + 1,
-        sale_listing_prices_match_run_id = COALESCE($3::uuid, sale_listing_prices_match_run_id),
-        sale_listing_prices_match_expires_at = COALESCE($4::timestamptz, sale_listing_prices_match_expires_at),
-        sale_listing_updated_at = now()
-    WHERE sale_listing_id = $5::uuid
-    RETURNING sale_listing_id, sale_listing_updated_at
+WITH source_doc AS (
+    SELECT doc.primary_source_listing_id, doc.listing_id
+    FROM public.listing_search_documents doc
+    WHERE doc.primary_source_listing_id = $5::uuid
+        AND doc.listing_status = 'active'
+        AND doc.kind = 'ad'
+    ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
+    LIMIT 1
 )
-UPDATE origin.source_listings src
-SET normalized_at = updated_source.sale_listing_updated_at,
-    updated_at = updated_source.sale_listing_updated_at
-FROM updated_source
-WHERE src.source_listing_id = updated_source.sale_listing_id
+INSERT INTO public.listing_price_match_states (
+    source_listing_id,
+    listing_id,
+    match_status,
+    next_attempt_at,
+    last_attempted_at,
+    attempt_count,
+    run_id,
+    expires_at,
+    created_at,
+    updated_at
+)
+SELECT
+    source_doc.primary_source_listing_id,
+    source_doc.listing_id,
+    $1::text,
+    $2::timestamptz,
+    now(),
+    1,
+    $3::uuid,
+    $4::timestamptz,
+    now(),
+    now()
+FROM source_doc
+ON CONFLICT (source_listing_id) DO UPDATE SET
+    listing_id = EXCLUDED.listing_id,
+    match_status = EXCLUDED.match_status,
+    next_attempt_at = EXCLUDED.next_attempt_at,
+    last_attempted_at = EXCLUDED.last_attempted_at,
+    attempt_count = public.listing_price_match_states.attempt_count + 1,
+    run_id = COALESCE(EXCLUDED.run_id, public.listing_price_match_states.run_id),
+    expires_at = COALESCE(EXCLUDED.expires_at, public.listing_price_match_states.expires_at),
+    updated_at = now()
 `
 
 type UpdatePricesMatchStateParams struct {
