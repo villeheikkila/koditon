@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 
 	client "koditon/internal/clients/shortcut"
+	"koditon/internal/platform/httpratelimit"
 )
 
 func TestLiveShortcutAdPayloadV1Validates(t *testing.T) {
@@ -29,7 +30,7 @@ func TestLiveShortcutAdPayloadV1Validates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse SHORTCUT_LIVE_AD_ID: %v", err)
 	}
-	c := client.NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, os.Getenv("SHORTCUT_SITEMAP_BASE_URL"))
+	c := client.NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, os.Getenv("SHORTCUT_SITEMAP_BASE_URL"), httpratelimit.Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	raw, err := c.GetAdByID(ctx, int(adID))
@@ -96,7 +97,7 @@ func liveShortcutClient(t *testing.T) *client.Client {
 	if baseURL == "" || adBaseURL == "" || userAgent == "" || sitemapBaseURL == "" {
 		t.Skip("set SHORTCUT_BASE_URL, SHORTCUT_AD_BASE_URL, SHORTCUT_USER_AGENT, and SHORTCUT_SITEMAP_BASE_URL")
 	}
-	return client.NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, sitemapBaseURL)
+	return client.NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, sitemapBaseURL, httpratelimit.Config{})
 }
 
 func liveSampleLimit() int {

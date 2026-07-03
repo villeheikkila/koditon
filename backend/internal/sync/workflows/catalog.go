@@ -63,6 +63,7 @@ var definitions = []Definition{
 	{Name: "prices_match_sale_listing", Queue: QueuePrices, DefaultMaxAttempts: 3, DefaultCancellation: &absurd.CancellationPolicy{MaxDuration: 15552000}},
 	{Name: "canonicalize_source_ads_fanout", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "canonicalize_source_ad", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
+	{Name: "canonical_link_frontdoor_announcements", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "canonical_rebuild_dimension_layer_backfill", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "canonical_rebuild_dimension_layer_listing", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},
 	{Name: "canonical_resolve_dirty_dimension_targets", Queue: QueueCanonicalDB, DefaultMaxAttempts: 3},

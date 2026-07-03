@@ -79,12 +79,14 @@ func New(logger *slog.Logger, cfg config.Config, pool *pgxpool.Pool, authService
 		cfg.Shortcut.AdBaseURL,
 		cfg.Shortcut.UserAgent,
 		cfg.Shortcut.SitemapBase,
+		cfg.Shortcut.RateLimit,
 	)
 	frontdoorClient := frontdoorclient.New(
 		cfg.Frontdoor.BaseURL,
 		cfg.Frontdoor.UserAgent,
 		cfg.Frontdoor.Cookie,
 		cfg.Frontdoor.SitemapBase,
+		cfg.Frontdoor.RateLimit,
 	)
 	return &API{
 		logger:            logger.With("component", "api"),

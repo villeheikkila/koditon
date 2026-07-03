@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"koditon/internal/platform/httpratelimit"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
@@ -98,16 +100,20 @@ type rawConfig struct {
 	AuthAppleWebServiceID   string `env:"AUTH_APPLE_WEB_SERVICE_ID" envDefault:""`
 	AuthAppleWebRedirectURI string `env:"AUTH_APPLE_WEB_REDIRECT_URI" envDefault:""`
 
-	ShortcutBaseURL     string `env:"SHORTCUT_BASE_URL" envDefault:""`
-	ShortcutDocsBaseURL string `env:"SHORTCUT_DOCS_BASE_URL" envDefault:""`
-	ShortcutAdBaseURL   string `env:"SHORTCUT_AD_BASE_URL" envDefault:""`
-	ShortcutUserAgent   string `env:"SHORTCUT_USER_AGENT" envDefault:""`
-	ShortcutSitemapBase string `env:"SHORTCUT_SITEMAP_BASE_URL" envDefault:""`
+	ShortcutBaseURL        string  `env:"SHORTCUT_BASE_URL" envDefault:""`
+	ShortcutDocsBaseURL    string  `env:"SHORTCUT_DOCS_BASE_URL" envDefault:""`
+	ShortcutAdBaseURL      string  `env:"SHORTCUT_AD_BASE_URL" envDefault:""`
+	ShortcutUserAgent      string  `env:"SHORTCUT_USER_AGENT" envDefault:""`
+	ShortcutSitemapBase    string  `env:"SHORTCUT_SITEMAP_BASE_URL" envDefault:""`
+	ShortcutRateLimitRPS   float64 `env:"SHORTCUT_RATE_LIMIT_RPS" envDefault:"2"`
+	ShortcutRateLimitBurst int     `env:"SHORTCUT_RATE_LIMIT_BURST" envDefault:"1"`
 
-	FrontdoorBaseURL     string `env:"FRONTDOOR_BASE_URL" envDefault:""`
-	FrontdoorUserAgent   string `env:"FRONTDOOR_USER_AGENT" envDefault:""`
-	FrontdoorCookie      string `env:"FRONTDOOR_COOKIE" envDefault:""`
-	FrontdoorSitemapBase string `env:"FRONTDOOR_SITEMAP_BASE_URL" envDefault:""`
+	FrontdoorBaseURL        string  `env:"FRONTDOOR_BASE_URL" envDefault:""`
+	FrontdoorUserAgent      string  `env:"FRONTDOOR_USER_AGENT" envDefault:""`
+	FrontdoorCookie         string  `env:"FRONTDOOR_COOKIE" envDefault:""`
+	FrontdoorSitemapBase    string  `env:"FRONTDOOR_SITEMAP_BASE_URL" envDefault:""`
+	FrontdoorRateLimitRPS   float64 `env:"FRONTDOOR_RATE_LIMIT_RPS" envDefault:"2"`
+	FrontdoorRateLimitBurst int     `env:"FRONTDOOR_RATE_LIMIT_BURST" envDefault:"1"`
 
 	OpenRouterAPIKey              string `env:"OPENROUTER_API_KEY" envDefault:""`
 	OpenAIAPIKey                  string `env:"OPENAI_API_KEY" envDefault:""`
@@ -184,12 +190,20 @@ func (r rawConfig) toConfig() Config {
 			AdBaseURL:   r.ShortcutAdBaseURL,
 			UserAgent:   r.ShortcutUserAgent,
 			SitemapBase: r.ShortcutSitemapBase,
+			RateLimit: httpratelimit.Config{
+				RequestsPerSecond: r.ShortcutRateLimitRPS,
+				Burst:             r.ShortcutRateLimitBurst,
+			},
 		},
 		Frontdoor: FrontdoorConfig{
 			BaseURL:     r.FrontdoorBaseURL,
 			UserAgent:   r.FrontdoorUserAgent,
 			Cookie:      r.FrontdoorCookie,
 			SitemapBase: r.FrontdoorSitemapBase,
+			RateLimit: httpratelimit.Config{
+				RequestsPerSecond: r.FrontdoorRateLimitRPS,
+				Burst:             r.FrontdoorRateLimitBurst,
+			},
 		},
 		OpenRouter: OpenRouterConfig{
 			APIKey: r.OpenRouterAPIKey,
@@ -410,6 +424,7 @@ type ShortcutConfig struct {
 	AdBaseURL   string
 	UserAgent   string
 	SitemapBase string
+	RateLimit   httpratelimit.Config
 }
 
 type FrontdoorConfig struct {
@@ -417,6 +432,7 @@ type FrontdoorConfig struct {
 	UserAgent   string
 	Cookie      string
 	SitemapBase string
+	RateLimit   httpratelimit.Config
 }
 
 type OpenRouterConfig struct {
@@ -494,6 +510,8 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL must be debug, info, warn, warning, or error"))
 	}
 	validateURL(&errs, "DATABASE_URL", c.DatabaseURL, "postgres", "postgresql")
+	validateRateLimit(&errs, "SHORTCUT", c.Shortcut.RateLimit)
+	validateRateLimit(&errs, "FRONTDOOR", c.Frontdoor.RateLimit)
 	c.validateTelemetry(&errs)
 	if c.Mode.API {
 		c.validateAPI(&errs)
@@ -530,6 +548,15 @@ func (c Config) validateTelemetry(errs *[]error) {
 		if err != nil || ratio < 0 || ratio > 1 {
 			*errs = append(*errs, fmt.Errorf("OTEL_TRACES_SAMPLER_ARG must be a number between 0 and 1"))
 		}
+	}
+}
+
+func validateRateLimit(errs *[]error, prefix string, cfg httpratelimit.Config) {
+	if cfg.RequestsPerSecond < 0 {
+		*errs = append(*errs, fmt.Errorf("%s_RATE_LIMIT_RPS must not be negative", prefix))
+	}
+	if cfg.Burst < 0 {
+		*errs = append(*errs, fmt.Errorf("%s_RATE_LIMIT_BURST must not be negative", prefix))
 	}
 }
 

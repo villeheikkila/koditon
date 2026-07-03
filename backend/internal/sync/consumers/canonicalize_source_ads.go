@@ -20,13 +20,19 @@ import (
 )
 
 const (
-	TaskTypeCanonicalizeSourceAdsFanout    = "canonicalize_source_ads_fanout"
-	TaskTypeCanonicalizeSourceAd           = "canonicalize_source_ad"
-	currentSourceAdCanonicalizationVersion = int32(2)
+	TaskTypeCanonicalizeSourceAdsFanout         = "canonicalize_source_ads_fanout"
+	TaskTypeCanonicalizeSourceAd                = "canonicalize_source_ad"
+	TaskTypeCanonicalLinkFrontdoorAnnouncements = "canonical_link_frontdoor_announcements"
+	currentSourceAdCanonicalizationVersion      = int32(2)
 )
 
 type canonicalizeSourceAdsFanoutPayload struct {
 	Limit int32 `json:"limit,omitempty"`
+}
+
+type canonicalLinkFrontdoorAnnouncementsPayload struct {
+	Limit       int32 `json:"limit,omitempty"`
+	MinAgeHours int32 `json:"min_age_hours,omitempty"`
 }
 
 type canonicalizeSourceAdPayload struct {

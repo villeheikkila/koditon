@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"koditon/internal/platform/httpratelimit"
 	"koditon/internal/platform/logging"
 	"koditon/internal/platform/sitemap"
 	"koditon/internal/platform/telemetry"
@@ -78,7 +79,7 @@ type Client struct {
 	sitemapBaseURL string
 }
 
-func New(baseURL, userAgent, cookie, sitemapBaseURL string) *Client {
+func New(baseURL, userAgent, cookie, sitemapBaseURL string, rateLimit httpratelimit.Config) *Client {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -93,7 +94,7 @@ func New(baseURL, userAgent, cookie, sitemapBaseURL string) *Client {
 	}
 	httpClient := &http.Client{
 		Timeout:   defaultRequestTimeout,
-		Transport: telemetry.HTTPTransport(transport),
+		Transport: httpratelimit.Transport("frontdoor", telemetry.HTTPTransport(transport), rateLimit),
 	}
 	return &Client{
 		httpClient:     httpClient,

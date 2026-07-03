@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -192,8 +193,11 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			return frontdoorEntityResult{}, err
 		}
 		if _, err := absurd.Step(ctx, "canonicalize-source-announcements", func(ctx context.Context) (frontdoorFanoutResult, error) {
-			buildingID, err := uuid.Parse(params.SourceID)
+			buildingID, err := c.resolveSyncedFrontdoorBuildingID(ctx, params.SourceID)
 			if err != nil {
+				return frontdoorFanoutResult{}, err
+			}
+			if buildingID == uuid.Nil {
 				return frontdoorFanoutResult{}, nil
 			}
 			announcements, err := c.queries.ListFrontdoorBuildingAnnouncements(ctx, &buildingID)
@@ -217,6 +221,21 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 	entityID := params.SourceType + ":" + params.SourceID
 	logger.InfoContext(ctx, "frontdoor entity workflow completed", "source_type", params.SourceType, "source_id", params.SourceID, "outcome", logging.OutcomeSuccess)
 	return frontdoorEntityResult{EntityID: entityID, Type: params.SourceType}, nil
+}
+
+func (c *Consumer) resolveSyncedFrontdoorBuildingID(ctx context.Context, sourceID string) (uuid.UUID, error) {
+	if buildingID, err := uuid.Parse(sourceID); err == nil {
+		return buildingID, nil
+	}
+	housingCompanyID, err := strconv.ParseInt(sourceID, 10, 64)
+	if err != nil {
+		return uuid.Nil, nil
+	}
+	building, err := c.queries.GetFrontdoorBuildingByHousingCompanyID(ctx, &housingCompanyID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("load synced frontdoor building by housing company id %d: %w", housingCompanyID, err)
+	}
+	return building.FrontdoorBuildingID, nil
 }
 
 func (c *Consumer) spawnFrontdoorSync(ctx context.Context, entityID string) error {

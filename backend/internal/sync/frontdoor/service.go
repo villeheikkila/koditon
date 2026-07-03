@@ -10,6 +10,7 @@ import (
 
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
+	"koditon/internal/platform/httpratelimit"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
 	"koditon/internal/sync/sourcejson"
 )
@@ -27,12 +28,14 @@ func NewService(
 	userAgent string,
 	cookie string,
 	sitemapBase string,
+	rateLimit httpratelimit.Config,
 ) *Service {
 	frontdoorClient := client.New(
 		baseURL,
 		userAgent,
 		cookie,
 		sitemapBase,
+		rateLimit,
 	)
 	return &Service{
 		client:  frontdoorClient,

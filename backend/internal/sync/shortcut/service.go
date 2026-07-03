@@ -10,6 +10,7 @@ import (
 
 	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
+	"koditon/internal/platform/httpratelimit"
 	"koditon/internal/platform/logging"
 	shortcutpayload "koditon/internal/providers/shortcut"
 	"koditon/internal/sync/sourcejson"
@@ -32,6 +33,7 @@ func NewService(
 	adBaseURL string,
 	userAgent string,
 	sitemapBase string,
+	rateLimit httpratelimit.Config,
 ) *Service {
 	queries := db.New(dbtx)
 	tokenLoad := func(ctx context.Context) (*client.Tokens, error) {
@@ -67,6 +69,7 @@ func NewService(
 		adBaseURL,
 		userAgent,
 		sitemapBase,
+		rateLimit,
 	)
 	return &Service{
 		client:  shortcutClient,

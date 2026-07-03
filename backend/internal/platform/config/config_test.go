@@ -74,6 +74,31 @@ func TestFromEnvMapDatabasePoolDefaults(t *testing.T) {
 	}
 }
 
+func TestFromEnvMapProviderRateLimitDefaults(t *testing.T) {
+	t.Parallel()
+	cfg, err := FromEnvMap(validAPIEnv(map[string]string{}))
+	if err != nil {
+		t.Fatalf("FromEnvMap returned error: %v", err)
+	}
+	if cfg.Shortcut.RateLimit.RequestsPerSecond != 2 || cfg.Shortcut.RateLimit.Burst != 1 {
+		t.Fatalf("Shortcut.RateLimit = %#v, want 2 rps burst 1", cfg.Shortcut.RateLimit)
+	}
+	if cfg.Frontdoor.RateLimit.RequestsPerSecond != 2 || cfg.Frontdoor.RateLimit.Burst != 1 {
+		t.Fatalf("Frontdoor.RateLimit = %#v, want 2 rps burst 1", cfg.Frontdoor.RateLimit)
+	}
+}
+
+func TestFromEnvMapRejectsInvalidProviderRateLimit(t *testing.T) {
+	t.Parallel()
+	_, err := FromEnvMap(validAPIEnv(map[string]string{
+		"SHORTCUT_RATE_LIMIT_RPS":    "-1",
+		"FRONTDOOR_RATE_LIMIT_BURST": "-1",
+	}))
+	if err == nil {
+		t.Fatal("expected invalid provider rate limit to fail")
+	}
+}
+
 func TestFromEnvMapRejectsInvalidDatabasePoolConfig(t *testing.T) {
 	t.Parallel()
 	_, err := FromEnvMap(baseEnv(map[string]string{

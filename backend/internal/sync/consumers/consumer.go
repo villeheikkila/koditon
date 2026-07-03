@@ -17,6 +17,7 @@ import (
 	"koditon/internal/sync/frontdoor"
 	"koditon/internal/sync/postal"
 	"koditon/internal/sync/shortcut"
+	"koditon/internal/sync/workflows"
 )
 
 type Consumer struct {
@@ -200,10 +201,31 @@ func (c *Consumer) runMaintenance(ctx context.Context, cfg Config) {
 }
 
 func (c *Consumer) runMaintenanceOnce(ctx context.Context, logger *slog.Logger, cfg Config) {
-	if err := c.enqueueDirtyDimensionTargetFanout(ctx); err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-			return
-		}
-		logger.WarnContext(ctx, "dirty dimension target fanout enqueue failed", "error", err, "outcome", logging.OutcomeError)
+	now := time.Now().UTC()
+	hourlySlot := now.Truncate(time.Hour)
+	dailySlot := now.Truncate(24 * time.Hour)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.frontdoorWorkflowClient, TaskTypeFrontdoorSitemapSync, nil, "frontdoor-sitemap-daily", dailySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.frontdoorWorkflowClient, TaskTypeFrontdoorBuildingsSitemapSync, nil, "frontdoor-buildings-sitemap-daily", dailySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.shortcutAPIWorkflowClient, TaskTypeShortcutSitemapSync, nil, "shortcut-sitemap-daily", dailySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.shortcutAPIWorkflowClient, TaskTypeShortcutBuildingsSitemapSync, nil, "shortcut-buildings-sitemap-daily", dailySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.canonicalWorkflowClient, TaskTypeCanonicalizeSourceAdsFanout, canonicalizeSourceAdsFanoutPayload{Limit: 1000}, "canonicalize-source-ads-hourly", hourlySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.canonicalWorkflowClient, TaskTypeCanonicalResolveDirtyDimensionTargets, dirtyDimensionTargetsPayload{Limit: 1000}, "dirty-dimension-targets-hourly", hourlySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.canonicalWorkflowClient, TaskTypeCanonicalLinkFrontdoorAnnouncements, canonicalLinkFrontdoorAnnouncementsPayload{Limit: 1000, MinAgeHours: 24}, "frontdoor-announcement-links-hourly", hourlySlot)
+	c.enqueueMaintenanceWorkflow(ctx, logger, c.pricesWorkflowClient, TaskTypePricesMatchSaleListingsFanout, pricesMatchFanoutPayload{Limit: 5000}, "prices-match-daily", dailySlot)
+}
+
+func (c *Consumer) enqueueMaintenanceWorkflow(ctx context.Context, logger *slog.Logger, app *absurd.Client, taskName string, params any, scheduleName string, slot time.Time) {
+	if app == nil {
+		return
 	}
+	raw, err := workflows.MarshalParams(params)
+	if err != nil {
+		logger.WarnContext(ctx, "maintenance workflow params failed", "task_name", taskName, "error", err, "outcome", logging.OutcomeError)
+		return
+	}
+	_, err = workflows.Spawn(ctx, app, workflows.SpawnTaskRequest{TaskName: taskName, Params: raw, IdempotencyKey: workflows.CronSlotIdempotencyKey(taskName, scheduleName, slot)})
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+		return
+	}
+	logger.WarnContext(ctx, "maintenance workflow enqueue failed", "task_name", taskName, "schedule_name", scheduleName, "error", err, "outcome", logging.OutcomeError)
 }

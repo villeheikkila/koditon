@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"koditon/internal/platform/httpratelimit"
 	"koditon/internal/platform/telemetry"
 
 	"golang.org/x/sync/singleflight"
@@ -73,7 +74,7 @@ type Client struct {
 	sitemapBaseURL     string
 }
 
-func NewClient(logger *slog.Logger, tokenLoad TokenLoader, tokenStore TokenStore, baseURL, docsBaseURL, adBaseURL, userAgent, sitemapBaseURL string) *Client {
+func NewClient(logger *slog.Logger, tokenLoad TokenLoader, tokenStore TokenStore, baseURL, docsBaseURL, adBaseURL, userAgent, sitemapBaseURL string, rateLimit httpratelimit.Config) *Client {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -94,7 +95,7 @@ func NewClient(logger *slog.Logger, tokenLoad TokenLoader, tokenStore TokenStore
 		}).DialContext,
 	}
 	httpClient := &http.Client{
-		Transport: telemetry.HTTPTransport(transport),
+		Transport: httpratelimit.Transport("shortcut", telemetry.HTTPTransport(transport), rateLimit),
 	}
 	return &Client{
 		httpClient:         httpClient,

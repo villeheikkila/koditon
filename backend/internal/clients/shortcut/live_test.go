@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"koditon/internal/platform/httpratelimit"
+
 	"github.com/joho/godotenv"
 )
 
@@ -27,7 +29,7 @@ func TestLiveAdPayloadDecodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse SHORTCUT_LIVE_AD_ID: %v", err)
 	}
-	c := NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, os.Getenv("SHORTCUT_SITEMAP_BASE_URL"))
+	c := NewClient(slog.Default(), nil, nil, baseURL, os.Getenv("SHORTCUT_DOCS_BASE_URL"), adBaseURL, userAgent, os.Getenv("SHORTCUT_SITEMAP_BASE_URL"), httpratelimit.Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	raw, err := c.GetAdByID(ctx, adID)

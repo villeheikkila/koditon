@@ -21,6 +21,7 @@ import (
 var canonicalWorkflowKinds = []string{
 	TaskTypeCanonicalizeSourceAdsFanout,
 	TaskTypeCanonicalizeSourceAd,
+	TaskTypeCanonicalLinkFrontdoorAnnouncements,
 	TaskTypeCanonicalRebuildDimensionLayerBackfill,
 	TaskTypeCanonicalRebuildDimensionLayerListing,
 	TaskTypeCanonicalResolveDirtyDimensionTargets,
@@ -149,6 +150,8 @@ func (c *Consumer) handleCanonicalWorkflow(ctx context.Context, params json.RawM
 		result, err = c.runCanonicalizeSourceAdsFanoutWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalizeSourceAd:
 		result, err = c.runCanonicalizeSourceAdWorkflow(ctx, logger, params)
+	case TaskTypeCanonicalLinkFrontdoorAnnouncements:
+		result, err = c.runCanonicalLinkFrontdoorAnnouncementsWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalRebuildDimensionLayerBackfill:
 		result, err = c.runDimensionLayerBackfillWorkflow(ctx, logger, params)
 	case TaskTypeCanonicalRebuildDimensionLayerListing:
@@ -239,6 +242,38 @@ func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *
 		return canonicalizeSourceAdPayload{}, err
 	}
 	return payload, nil
+}
+
+func (c *Consumer) runCanonicalLinkFrontdoorAnnouncementsWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (canonicalFanoutResult, error) {
+	payload, err := decodeCanonicalLinkFrontdoorAnnouncementsWorkflowPayload(params)
+	if err != nil {
+		return canonicalFanoutResult{}, err
+	}
+	result, err := absurd.Step(ctx, "link-announcements", func(ctx context.Context) (canonicalFanoutResult, error) {
+		rows, err := c.queries.LinkFrontdoorAnnouncementsToRemovedAds(ctx, db.LinkFrontdoorAnnouncementsToRemovedAdsParams{LimitCount: payload.Limit, MinAgeHours: payload.MinAgeHours})
+		if err != nil {
+			return canonicalFanoutResult{}, fmt.Errorf("link frontdoor announcements to removed ads: %w", err)
+		}
+		return canonicalFanoutResult{Enqueued: int(rows)}, nil
+	})
+	if err != nil {
+		return canonicalFanoutResult{}, err
+	}
+	if result.Enqueued >= int(payload.Limit) {
+		if err := absurd.SleepFor(ctx, "pause-before-next-link-batch", 30*time.Second); err != nil {
+			return canonicalFanoutResult{}, err
+		}
+		if _, err := absurd.Step(ctx, "spawn-next-link-batch", func(ctx context.Context) (canonicalFanoutResult, error) {
+			if err := c.spawnCanonicalLinkFrontdoorAnnouncements(ctx, payload.Limit, payload.MinAgeHours, fmt.Sprintf("batch:%d", time.Now().UTC().UnixNano())); err != nil {
+				return canonicalFanoutResult{}, err
+			}
+			return canonicalFanoutResult{Enqueued: 1}, nil
+		}); err != nil {
+			return canonicalFanoutResult{}, err
+		}
+	}
+	logger.InfoContext(ctx, "frontdoor announcement links created", "count", result.Enqueued, "next_batch_scheduled", result.Enqueued >= int(payload.Limit), "outcome", logging.OutcomeSuccess)
+	return result, nil
 }
 
 func (c *Consumer) runDimensionLayerBackfillWorkflow(ctx context.Context, logger *slog.Logger, params json.RawMessage) (dimensionLayerBackfillResult, error) {
@@ -581,14 +616,47 @@ func decodeManagerCertificateDocumentWorkflowPayload(raw json.RawMessage) (manag
 	return payload, nil
 }
 
+func decodeCanonicalLinkFrontdoorAnnouncementsWorkflowPayload(raw json.RawMessage) (canonicalLinkFrontdoorAnnouncementsPayload, error) {
+	payload := canonicalLinkFrontdoorAnnouncementsPayload{Limit: 1000, MinAgeHours: 24}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return canonicalLinkFrontdoorAnnouncementsPayload{}, fmt.Errorf("decode frontdoor announcement link payload: %w", err)
+		}
+	}
+	if payload.Limit <= 0 || payload.Limit > 5000 {
+		payload.Limit = 1000
+	}
+	if payload.MinAgeHours <= 0 {
+		payload.MinAgeHours = 24
+	}
+	return payload, nil
+}
+
 func (c *Consumer) spawnCanonicalizeSourceAdsFanout(ctx context.Context, limit int32) error {
 	payload, err := json.Marshal(canonicalizeSourceAdsFanoutPayload{Limit: limit})
 	if err != nil {
 		return fmt.Errorf("marshal canonicalize source ads fanout payload: %w", err)
 	}
 	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypeCanonicalizeSourceAdsFanout,
-		Params:   payload,
+		TaskName:       TaskTypeCanonicalizeSourceAdsFanout,
+		Params:         payload,
+		IdempotencyKey: fmt.Sprintf("%s:batch:%d", workflows.IdempotencyKey(TaskTypeCanonicalizeSourceAdsFanout, payload), time.Now().UTC().UnixNano()),
 	})
+	return err
+}
+
+func (c *Consumer) spawnCanonicalLinkFrontdoorAnnouncements(ctx context.Context, limit int32, minAgeHours int32, idempotencySuffix string) error {
+	payload, err := json.Marshal(canonicalLinkFrontdoorAnnouncementsPayload{Limit: limit, MinAgeHours: minAgeHours})
+	if err != nil {
+		return fmt.Errorf("marshal frontdoor announcement link payload: %w", err)
+	}
+	req := workflows.SpawnTaskRequest{
+		TaskName: TaskTypeCanonicalLinkFrontdoorAnnouncements,
+		Params:   payload,
+	}
+	if strings.TrimSpace(idempotencySuffix) != "" {
+		req.IdempotencyKey = fmt.Sprintf("%s:%s", workflows.IdempotencyKey(TaskTypeCanonicalLinkFrontdoorAnnouncements, payload), strings.TrimSpace(idempotencySuffix))
+	}
+	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, req)
 	return err
 }

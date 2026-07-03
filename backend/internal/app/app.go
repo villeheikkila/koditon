@@ -176,6 +176,7 @@ func run(
 			cfg.Shortcut.AdBaseURL,
 			cfg.Shortcut.UserAgent,
 			cfg.Shortcut.SitemapBase,
+			cfg.Shortcut.RateLimit,
 		)
 		frontdoorService := frontdoor.NewService(
 			pool,
@@ -184,6 +185,7 @@ func run(
 			cfg.Frontdoor.UserAgent,
 			cfg.Frontdoor.Cookie,
 			cfg.Frontdoor.SitemapBase,
+			cfg.Frontdoor.RateLimit,
 		)
 		postalService := postal.NewService(pool)
 		propertiesService := properties.NewService(pool, properties.WithOpenRouterRenovationExtractor(cfg.OpenRouter.APIKey, ""), properties.WithOpenAIManagerCertificateExtractor(cfg.OpenAI.APIKey, cfg.OpenAI.ManagerCertificateModel))
