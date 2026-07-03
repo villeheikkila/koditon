@@ -16,16 +16,25 @@ UNION ALL SELECT 'housing_company'::text, housing_company_id FROM linked WHERE h
 
 -- name: GetSaleListingSourceMediaData :one
 SELECT
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
+    evidence.provider AS sale_listing_source_provider,
+    CASE
+        WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+        WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+        WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+        ELSE evidence.source_kind
+    END AS sale_listing_source_kind,
     COALESCE(sa.shortcut_ad_data, '{}'::jsonb) AS shortcut_ad_data,
     COALESCE(fa.frontdoor_ad_data, '{}'::jsonb) AS frontdoor_ad_data,
     fba.frontdoor_building_announcement_main_image_uri AS frontdoor_building_announcement_main_image_uri
-FROM public.property_source_offerings sl
-LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-WHERE sl.sale_listing_id = $1;
+FROM public.listing_search_documents doc
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+WHERE doc.primary_source_listing_id = $1
+    AND doc.listing_status = 'active'
+ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
+LIMIT 1;
 
 -- name: ListSaleListingFallbackRenovations :many
 SELECT

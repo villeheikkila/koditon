@@ -311,12 +311,14 @@ func (s *Service) enrichSaleListingMediaFromSource(ctx context.Context, listing 
 		return err
 	}
 	var media Media
+	provider := valueOrEmpty(row.SaleListingSourceProvider)
+	kind := valueOrEmpty(row.SaleListingSourceKind)
 	switch {
-	case row.SaleListingSourceProvider == "shortcut" && len(row.ShortcutAdData) > 2:
+	case provider == "shortcut" && len(row.ShortcutAdData) > 2:
 		media = shortcutMedia(parseShortcutRaw(row.ShortcutAdData))
-	case row.SaleListingSourceProvider == "frontdoor" && row.SaleListingSourceKind == "ad" && len(row.FrontdoorAdData) > 2:
+	case provider == "frontdoor" && kind == "ad" && len(row.FrontdoorAdData) > 2:
 		media = frontdoorMedia(parseFrontdoorRaw(row.FrontdoorAdData))
-	case row.SaleListingSourceProvider == "frontdoor" && row.SaleListingSourceKind == "announcement":
+	case provider == "frontdoor" && kind == "announcement":
 		media = frontdoorAnnouncementMedia(valueOrEmpty(row.FrontdoorBuildingAnnouncementMainImageUri))
 	}
 	mergeMedia(&listing.Media, media)
@@ -929,7 +931,11 @@ func (s *Service) saleOfferingSourceRecords(ctx context.Context, offeringID uuid
 	rows, err := s.db.Query(ctx, `
 SELECT
     evidence.evidence_source_id::text,
-    evidence.provider,
+    CASE
+        WHEN evidence.source_kind IN ('frontdoor_ad', 'frontdoor_building_announcement') THEN 'frontdoor'
+        WHEN evidence.source_kind = 'shortcut_ad' THEN 'shortcut'
+        ELSE evidence.source_kind
+    END,
     CASE
         WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
         WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
@@ -1349,29 +1355,38 @@ func (s *Service) SaleOfferingSourceRawPayload(ctx context.Context, offeringIDIn
 	var out OfferingSourceRawPayload
 	err = s.db.QueryRow(ctx, `
 SELECT
-    sl.sale_listing_id::text,
-    sl.sale_listing_source_provider,
-    sl.sale_listing_source_kind,
-    sl.sale_listing_native_id,
+    evidence.evidence_source_id::text,
+    CASE
+        WHEN evidence.source_kind IN ('frontdoor_ad', 'frontdoor_building_announcement') THEN 'frontdoor'
+        WHEN evidence.source_kind = 'shortcut_ad' THEN 'shortcut'
+        ELSE evidence.source_kind
+    END,
+    CASE
+        WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+        WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+        WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+        ELSE evidence.source_kind
+    END,
+    COALESCE(evidence.external_id, doc.native_id),
     COALESCE(
         CASE
-            WHEN sl.shortcut_ad_id IS NOT NULL THEN sa.shortcut_ad_data
-            WHEN sl.frontdoor_ad_id IS NOT NULL THEN fa.frontdoor_ad_data
-            WHEN sl.frontdoor_building_announcement_id IS NOT NULL THEN to_jsonb(fba)
+            WHEN evidence.shortcut_ad_id IS NOT NULL THEN sa.shortcut_ad_data
+            WHEN evidence.frontdoor_ad_id IS NOT NULL THEN fa.frontdoor_ad_data
+            WHEN evidence.frontdoor_building_announcement_id IS NOT NULL THEN to_jsonb(fba)
             ELSE NULL
         END,
         '{}'::jsonb
     ) AS payload
-FROM public.target_sources source_link
-JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
-LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
-WHERE source_link.target_type = 'listing'
-    AND source_link.target_id = $1
-    AND source_link.source_type = 'source_listing'
-    AND source_link.source_id = $2
-    AND source_link.link_status <> 'rejected'
+FROM public.listing_search_documents doc
+JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+    AND entity_evidence.evidence_source_id = $2
+    AND entity_evidence.link_status <> 'rejected'
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+WHERE doc.property_offering_id = $1
+    AND doc.listing_status = 'active'
 LIMIT 1`, offeringID, sourceID).Scan(&out.ID, &out.Provider, &out.Kind, &out.NativeID, &out.Payload)
 	if err != nil {
 		return OfferingSourceRawPayload{}, mapNotFound(err)
