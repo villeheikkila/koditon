@@ -1083,7 +1083,7 @@ SELECT jsonb_build_object('deprecated', false)::jsonb AS payload;
 WITH deleted AS (
     DELETE FROM public.dimension_claims
     WHERE claim_scope = 'source'
-        AND source_table = 'property_source_offerings'
+        AND source_table IN ('property_source_offerings', 'listing_search_documents')
         AND source_id = @sale_listing_id::uuid
         AND projection_version = 'listing-provider-v1'
 ),
@@ -1099,7 +1099,7 @@ run AS (
     VALUES (
         'source_claims',
         'listing-provider-v1',
-        'property_source_offerings',
+        'listing_search_documents',
         @sale_listing_id::uuid,
         'succeeded',
         now()
@@ -1130,57 +1130,58 @@ inserted AS (
         'listing-provider-v1',
         'source',
         'listing',
-        sl.sale_listing_id,
+        doc.primary_source_listing_id,
         v.dimension_key,
         v.value,
         v.value_kind,
         c.unit,
-        'property_source_offerings',
-        sl.sale_listing_id,
+        'listing_search_documents',
+        doc.primary_source_listing_id,
         v.source_field,
-        COALESCE(sl.sale_listing_last_seen_at, sl.sale_listing_updated_at, sl.sale_listing_created_at, now()),
+        COALESCE(doc.last_seen_at, doc.refreshed_at, doc.first_seen_at, now()),
         v.confidence,
         COALESCE(sp.default_reliability, v.source_reliability),
-        jsonb_build_object('provider', sl.sale_listing_source_provider, 'source_kind', sl.sale_listing_source_kind)
-    FROM public.property_source_offerings sl
+        jsonb_build_object('provider', doc.source, 'source_kind', doc.kind, 'evidence_source_id', doc.primary_evidence_source_id)
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     CROSS JOIN run
     CROSS JOIN LATERAL (
         VALUES
-            ('sale_listing_area_value','unit.area_m2','number',to_jsonb(sl.sale_listing_area_value),0.95,0.75),
-            ('sale_listing_living_area_value','unit.living_area_m2','number',to_jsonb(sl.sale_listing_living_area_value),0.95,0.75),
-            ('sale_listing_total_area_value','unit.total_area_m2','number',to_jsonb(sl.sale_listing_total_area_value),0.9,0.75),
-            ('sale_listing_other_area_value','unit.other_area_m2','number',to_jsonb(sl.sale_listing_other_area_value),0.9,0.75),
-            ('sale_listing_room_layout','layout.room_layout','string',to_jsonb(NULLIF(sl.sale_listing_room_layout, '')),0.9,0.7),
-            ('sale_listing_rooms_count','layout.room_count','number',to_jsonb(sl.sale_listing_rooms_count),0.95,0.75),
-            ('sale_listing_bedrooms_count','layout.bedroom_count','number',to_jsonb(sl.sale_listing_bedrooms_count),0.85,0.7),
-            ('sale_listing_floor_level','unit.floor_level','number',to_jsonb(sl.sale_listing_floor_level),0.9,0.7),
-            ('sale_listing_total_floors','building.floor_count','number',to_jsonb(sl.sale_listing_total_floors),0.85,0.65),
-            ('sale_listing_condition','condition.unit_condition','string',to_jsonb(NULLIF(sl.sale_listing_condition, '')),0.75,0.6),
-            ('sale_listing_sauna','features.sauna','boolean',to_jsonb(sl.sale_listing_sauna),0.9,0.75),
-            ('sale_listing_balcony','features.balcony','boolean',to_jsonb(sl.sale_listing_balcony),0.9,0.75),
-            ('sale_listing_parking_text','features.parking_type','string',to_jsonb(NULLIF(sl.sale_listing_parking_text, '')),0.65,0.55),
-            ('sale_listing_maintenance_charge_monthly','charges.maintenance_monthly_eur','number',to_jsonb(sl.sale_listing_maintenance_charge_monthly),0.9,0.7),
-            ('sale_listing_total_charge_monthly','charges.total_monthly_eur','number',to_jsonb(sl.sale_listing_total_charge_monthly),0.9,0.7),
-            ('sale_listing_water_charge','charges.water_monthly_eur','number',to_jsonb(sl.sale_listing_water_charge),0.8,0.6),
-            ('sale_listing_debt_share_amount','charges.debt_share_eur','number',to_jsonb(sl.sale_listing_debt_share_amount),0.9,0.7),
-            ('sale_listing_build_year','building.build_year','number',to_jsonb(sl.sale_listing_build_year),0.85,0.65),
-            ('sale_listing_elevator','building.elevator','boolean',to_jsonb(sl.sale_listing_elevator),0.8,0.65),
-            ('sale_listing_heating_system','building.heating_method','string',to_jsonb(NULLIF(sl.sale_listing_heating_system, '')),0.75,0.6),
-            ('sale_listing_energy_efficiency_label','building.energy_class','string',to_jsonb(NULLIF(sl.sale_listing_energy_efficiency_label, '')),0.75,0.6),
-            ('sale_listing_building_material','building.material','string',to_jsonb(NULLIF(sl.sale_listing_building_material, '')),0.75,0.6),
-            ('sale_listing_roof_type','building.roof_type','string',to_jsonb(NULLIF(sl.sale_listing_roof_type, '')),0.75,0.6),
-            ('sale_listing_roof_material','building.roof_material','string',to_jsonb(NULLIF(sl.sale_listing_roof_material, '')),0.75,0.6),
-            ('sale_listing_apartment_count','housing_company.apartment_count','number',to_jsonb(sl.sale_listing_apartment_count),0.75,0.6),
-            ('sale_listing_housing_company_name','housing_company.name','string',to_jsonb(NULLIF(sl.sale_listing_housing_company_name, '')),0.8,0.6),
-            ('sale_listing_housing_company_business_id','housing_company.business_id','string',to_jsonb(NULLIF(sl.sale_listing_housing_company_business_id, '')),0.9,0.65),
-            ('sale_listing_plot_type_code','site.plot_ownership_type','string',to_jsonb(NULLIF(sl.sale_listing_plot_type_code, '')),0.75,0.6)
+            ('area_m2','unit.area_m2','number',to_jsonb(doc.area_m2),0.95,0.75),
+            ('living_area_m2','unit.living_area_m2','number',to_jsonb((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,livingArea}', sa.shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)),0.95,0.75),
+            ('total_area_m2','unit.total_area_m2','number',to_jsonb((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,totalArea}', sa.shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)),0.9,0.75),
+            ('other_area_m2','unit.other_area_m2','number',to_jsonb((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,otherArea}', sa.shortcut_ad_data #>> '{adData,sizeOther}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)),0.9,0.75),
+            ('room_layout','layout.room_layout','string',to_jsonb(NULLIF(doc.room_layout, '')),0.9,0.7),
+            ('rooms_count','layout.room_count','number',to_jsonb(doc.rooms_count),0.95,0.75),
+            ('bedrooms_count','layout.bedroom_count','number',to_jsonb((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,bedroomCount}', sa.shortcut_ad_data #>> '{adData,bedrooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)),0.85,0.7),
+            ('floor_level','unit.floor_level','number',to_jsonb(doc.floor_level),0.9,0.7),
+            ('total_floors','building.floor_count','number',to_jsonb(COALESCE(doc.total_floors, fb.frontdoor_building_floor_count)),0.85,0.65),
+            ('condition','condition.unit_condition','string',to_jsonb(NULLIF(doc.condition, '')),0.75,0.6),
+            ('sauna','features.sauna','boolean',to_jsonb(doc.sauna),0.9,0.75),
+            ('balcony','features.balcony','boolean',to_jsonb(doc.balcony),0.9,0.75),
+            ('parking_text','features.parking_type','string',to_jsonb(NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,carParkingInformation}', sa.shortcut_ad_data #>> '{adData,parkingSpaceInfo}', sa.shortcut_ad_data #>> '{adData,carStorageInfo}', fb.frontdoor_building_car_storage_description)), '')),0.65,0.55),
+            ('debt_share_amount','charges.debt_share_eur','number',to_jsonb(doc.debt_share_amount),0.9,0.7),
+            ('build_year','building.build_year','number',to_jsonb(COALESCE(doc.build_year, fb.frontdoor_building_build_year, fb.frontdoor_building_construction_end_year)),0.85,0.65),
+            ('elevator','building.elevator','boolean',to_jsonb(doc.elevator),0.8,0.65),
+            ('heating_system','building.heating_method','string',to_jsonb(NULLIF(trim(concat_ws(', ', fb.frontdoor_building_heating, array_to_string(fb.frontdoor_building_heating_fuel, ', '))), '')),0.75,0.6),
+            ('energy_efficiency_label','building.energy_class','string',to_jsonb(NULLIF(COALESCE(doc.energy_efficiency_label, doc.energy_class), '')),0.75,0.6),
+            ('roof_type','building.roof_type','string',to_jsonb(NULLIF(fb.frontdoor_building_outer_roof_type, '')),0.75,0.6),
+            ('roof_material','building.roof_material','string',to_jsonb(NULLIF(fb.frontdoor_building_outer_roof_material, '')),0.75,0.6),
+            ('apartment_count','housing_company.apartment_count','number',to_jsonb(fb.frontdoor_building_apartment_count),0.75,0.6),
+            ('housing_company_name','housing_company.name','string',to_jsonb(NULLIF(fb.frontdoor_building_company_name, '')),0.8,0.6),
+            ('housing_company_business_id','housing_company.business_id','string',to_jsonb(NULLIF(fb.frontdoor_building_business_id, '')),0.9,0.65),
+            ('plot_owned','site.plot_ownership_type','string',to_jsonb(CASE WHEN doc.plot_owned IS TRUE THEN 'owned' WHEN doc.plot_owned IS FALSE THEN 'leased' ELSE NULL END),0.75,0.6)
     ) AS v(source_field, dimension_key, value_kind, value, confidence, source_reliability)
     JOIN public.property_dimension_catalog c ON c.dimension_key = v.dimension_key
     LEFT JOIN public.property_dimension_source_priorities sp
         ON sp.dimension_key = v.dimension_key
-        AND sp.source_table = 'property_source_offerings'
+        AND sp.source_table = 'listing_search_documents'
         AND sp.source_field = v.source_field
-    WHERE sl.sale_listing_id = @sale_listing_id::uuid
+    WHERE doc.primary_source_listing_id = @sale_listing_id::uuid
         AND v.value IS NOT NULL
     RETURNING 1
 ),
@@ -1225,18 +1226,16 @@ run AS (
 ),
 linked_listings AS (
     SELECT DISTINCT
-        source_link.source_id AS sale_listing_id,
+        doc.primary_source_listing_id AS sale_listing_id,
         po.property_offering_id,
         pu.property_unit_id,
         pu.physical_building_id,
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
+    WHERE doc.listing_status <> 'rejected'
         AND (SELECT target_id FROM args) = CASE (SELECT target_type FROM args)
             WHEN 'offering' THEN po.property_offering_id
             WHEN 'unit' THEN pu.property_unit_id
@@ -1332,7 +1331,7 @@ scored AS (
             WHEN c.claim_scope = 'manual' THEN 1::double precision
             WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
             WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-            WHEN p.strategy = 'latest_reliable' AND c.source_table = 'property_source_offerings' THEN 1.05::double precision
+            WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
             ELSE 1::double precision
         END AS authority_factor,
         CASE
@@ -1348,7 +1347,7 @@ scored AS (
                 CASE
                     WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
                     WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-                    WHEN p.strategy = 'latest_reliable' AND c.source_table = 'property_source_offerings' THEN 1.05::double precision
+                    WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
                     ELSE 1::double precision
                 END
         END AS score
@@ -1583,15 +1582,13 @@ WITH linked AS (
         pu.property_unit_id,
         pu.physical_building_id,
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = @sale_listing_id::uuid
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = @sale_listing_id::uuid
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
     LIMIT 1
 ),
 target_candidates AS (
@@ -1614,7 +1611,7 @@ target_candidates AS (
     FROM public.dimension_claims c
     JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
     WHERE c.claim_scope IN ('source','manual')
-        AND c.source_table = 'property_source_offerings'
+        AND c.source_table IN ('listing_search_documents', 'property_source_offerings')
         AND c.source_id = @sale_listing_id::uuid
         AND c.target_type = catalog.target_type
 )
@@ -1629,15 +1626,13 @@ WITH linked AS (
         pu.property_unit_id,
         pu.physical_building_id,
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = @sale_listing_id::uuid
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = @sale_listing_id::uuid
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
     LIMIT 1
 ),
 targets AS (
@@ -1702,15 +1697,13 @@ WITH linked AS (
         po.property_house_id,
         pu.physical_building_id,
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = @sale_listing_id::uuid
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = @sale_listing_id::uuid
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
     LIMIT 1
 ), targets AS (
     SELECT 'listing'::text AS target_type, @sale_listing_id::uuid AS target_id
@@ -1748,38 +1741,43 @@ SELECT count(*)::integer AS count FROM marked;
 -- name: EnsurePhysicalBuildingForSaleListing :exec
 WITH linked AS (
     SELECT
-        source_link.source_id AS sale_listing_id,
+        doc.primary_source_listing_id AS sale_listing_id,
+        doc.property_offering_id,
+        doc.address,
+        doc.postal,
+        doc.city,
+        doc.build_year,
+        doc.total_floors,
+        doc.elevator,
+        doc.latitude,
+        doc.longitude,
         pu.property_unit_id,
         pu.housing_company_id,
         hc.housing_company_identity_key
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = @sale_listing_id::uuid
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = @sale_listing_id::uuid
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
     LIMIT 1
 ),
 listing AS (
     SELECT
-        sl.sale_listing_address_norm,
-        sl.sale_listing_postal_norm,
-        sl.sale_listing_city_norm,
-        sl.sale_listing_build_year,
-        sl.sale_listing_total_floors,
-        sl.sale_listing_apartment_count,
-        sl.sale_listing_elevator,
-        sl.sale_listing_latitude,
-        sl.sale_listing_longitude,
+        lower(trim(linked.address)) AS sale_listing_address_norm,
+        regexp_replace(COALESCE(linked.postal, ''), '[^0-9]+', '', 'g') AS sale_listing_postal_norm,
+        lower(trim(linked.city)) AS sale_listing_city_norm,
+        linked.build_year AS sale_listing_build_year,
+        linked.total_floors AS sale_listing_total_floors,
+        NULL::integer AS sale_listing_apartment_count,
+        linked.elevator AS sale_listing_elevator,
+        linked.latitude AS sale_listing_latitude,
+        linked.longitude AS sale_listing_longitude,
         linked.housing_company_id,
         linked.property_unit_id,
         linked.housing_company_identity_key
-    FROM public.property_source_offerings sl
-    JOIN linked ON linked.sale_listing_id = sl.sale_listing_id
-    WHERE sl.sale_listing_id = @sale_listing_id::uuid
+    FROM linked
 ),
 inserted AS (
     INSERT INTO public.physical_buildings (
