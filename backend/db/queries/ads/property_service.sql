@@ -38,20 +38,20 @@ LIMIT 1;
 
 -- name: ListSaleListingFallbackRenovations :many
 SELECT
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component AS property_source_offering_renovation_component,
-    property_source_offering_renovation_scope AS property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage AS property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility AS property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text AS property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence,
-    property_source_offering_renovation_source_field
-FROM public.property_source_offering_renovations
-WHERE sale_listing_id = $1
-ORDER BY property_source_offering_renovation_category, property_source_offering_renovation_year NULLS LAST;
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component AS source_listing_renovation_component,
+    source_listing_renovation_scope AS source_listing_renovation_scope,
+    source_listing_renovation_stage AS source_listing_renovation_stage,
+    source_listing_renovation_responsibility AS source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text AS source_listing_renovation_text,
+    source_listing_renovation_confidence,
+    source_listing_renovation_source_field
+FROM public.source_listing_renovations
+WHERE source_listing_id = $1
+ORDER BY source_listing_renovation_category, source_listing_renovation_year NULLS LAST;
 
 -- name: ListHousingCompanyRenovationEvents :many
 SELECT

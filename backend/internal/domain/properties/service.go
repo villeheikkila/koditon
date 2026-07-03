@@ -128,7 +128,7 @@ func (s *Service) SaleListingByID(ctx context.Context, input string, shortcutBas
 }
 
 func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.UUID) (SaleListing, error) {
-	row, err := s.queries.GetPropertySourceOfferingDetail(ctx, &saleListingID)
+	row, err := s.queries.GetSourceListingDetail(ctx, &saleListingID)
 	if err != nil {
 		return SaleListing{}, mapNotFound(err)
 	}
@@ -253,12 +253,12 @@ func (s *Service) saleListingBySourceID(ctx context.Context, saleListingID uuid.
 }
 
 func (s *Service) enrichSaleListingInsights(ctx context.Context, listing *SaleListing, saleListingID uuid.UUID) error {
-	rows, err := s.queries.ListPropertySourceOfferingInsights(ctx, &saleListingID)
+	rows, err := s.queries.ListSourceListingInsights(ctx, &saleListingID)
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.PropertySourceOfferingInsightKey, Value: valueOrEmpty(row.PropertySourceOfferingInsightValue), Direction: row.PropertySourceOfferingInsightDirection, Severity: row.PropertySourceOfferingInsightSeverity, Confidence: float64(ptrInt32Value(row.PropertySourceOfferingInsightConfidence)) / 100, Source: valueOrEmpty(row.PropertySourceOfferingInsightSourceField), Explanation: valueOrEmpty(row.PropertySourceOfferingInsightText)})
+		listing.Insights.Items = append(listing.Insights.Items, Insight{Key: row.SourceListingInsightKey, Value: valueOrEmpty(row.SourceListingInsightValue), Direction: row.SourceListingInsightDirection, Severity: row.SourceListingInsightSeverity, Confidence: float64(ptrInt32Value(row.SourceListingInsightConfidence)) / 100, Source: valueOrEmpty(row.SourceListingInsightSourceField), Explanation: valueOrEmpty(row.SourceListingInsightText)})
 	}
 	return nil
 }
@@ -407,7 +407,7 @@ func (s *Service) enrichSaleListingRenovationsFromFallbackRows(ctx context.Conte
 		return err
 	}
 	for _, row := range rows {
-		listing.Building.Renovations = append(listing.Building.Renovations, renovationFromEvidence(row.PropertySourceOfferingRenovationCategory, row.PropertySourceOfferingRenovationStatus, row.PropertySourceOfferingRenovationYear, valueOrEmpty(row.PropertySourceOfferingRenovationComponent), valueOrEmpty(row.PropertySourceOfferingRenovationScope), valueOrEmpty(row.PropertySourceOfferingRenovationStage), valueOrEmpty(row.PropertySourceOfferingRenovationResponsibility), row.PropertySourceOfferingRenovationCostEstimateEur, valueOrEmpty(row.PropertySourceOfferingRenovationText), &row.PropertySourceOfferingRenovationConfidence, row.PropertySourceOfferingRenovationSourceField))
+		listing.Building.Renovations = append(listing.Building.Renovations, renovationFromEvidence(row.SourceListingRenovationCategory, row.SourceListingRenovationStatus, row.SourceListingRenovationYear, valueOrEmpty(row.SourceListingRenovationComponent), valueOrEmpty(row.SourceListingRenovationScope), valueOrEmpty(row.SourceListingRenovationStage), valueOrEmpty(row.SourceListingRenovationResponsibility), row.SourceListingRenovationCostEstimateEur, valueOrEmpty(row.SourceListingRenovationText), &row.SourceListingRenovationConfidence, row.SourceListingRenovationSourceField))
 	}
 	listing.Building.Renovations = compactRenovations(listing.Building.Renovations)
 	return nil
@@ -473,7 +473,7 @@ func renovationEvidenceScore(row renovationDisplayEvidence, now time.Time) float
 	switch {
 	case row.EvidenceLevel == "manager_certificate":
 		base = 120
-	case row.SourceTable == "property_source_offerings", row.SourceTable == "listing_search_documents":
+	case row.SourceTable == "listing_search_documents":
 		base = 80
 	}
 	decay := 1.0

@@ -55,7 +55,7 @@ func (s *Service) extractSourceListingValuationInputs(ctx context.Context, saleL
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return ValuationInputExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetPropertySourceOfferingValuationExtractionTexts(ctx, saleListingID)
+	row, err := s.queries.GetSourceListingValuationExtractionTexts(ctx, saleListingID)
 	if err != nil {
 		return ValuationInputExtractionResult{}, mapNotFound(err)
 	}
@@ -122,7 +122,7 @@ func (s *Service) replaceLLMPropertyClaims(ctx context.Context, saleListingID uu
 	return nil
 }
 
-func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExtractionTextsRow) (fantasy.Prompt, error) {
+func valuationInputExtractionPrompt(row db.GetSourceListingValuationExtractionTextsRow) (fantasy.Prompt, error) {
 	return propertyLLMPrompt("valuation_input_extraction", map[string]string{
 		"room_layout":                      valueOrEmpty(row.RoomLayout),
 		"rooms_count":                      int32PromptValue(row.SaleListingRoomsCount),
@@ -159,7 +159,7 @@ func valuationInputExtractionPrompt(row db.GetPropertySourceOfferingValuationExt
 	})
 }
 
-func valuationInputPromptHasContent(row db.GetPropertySourceOfferingValuationExtractionTextsRow) bool {
+func valuationInputPromptHasContent(row db.GetSourceListingValuationExtractionTextsRow) bool {
 	return firstNonEmpty(valueOrEmpty(row.RoomLayout), valueOrEmpty(row.FloorText), valueOrEmpty(row.Condition), valueOrEmpty(row.ParkingText), valueOrEmpty(row.DescriptionText), valueOrEmpty(row.AdditionalInfoText), valueOrEmpty(row.KitchenDescriptionText), valueOrEmpty(row.BathroomDescriptionText), valueOrEmpty(row.StorageDescriptionText), valueOrEmpty(row.FloorMaterialsDescriptionText), valueOrEmpty(row.WallMaterialsDescriptionText), valueOrEmpty(row.BalconyDescriptionText), valueOrEmpty(row.SaunaDescriptionText), valueOrEmpty(row.ViewsDescriptionText), valueOrEmpty(row.BuildingMaterial), valueOrEmpty(row.HeatingSystem), valueOrEmpty(row.RoofType), valueOrEmpty(row.RoofMaterial), valueOrEmpty(row.CarStorageText), valueOrEmpty(row.BuildingDescriptionText), valueOrEmpty(row.BuildingOtherInfoText), valueOrEmpty(row.ChargesText)) != "" || row.SaleListingRoomsCount != nil || row.SaleListingAreaValue != nil || row.SaleListingFloorLevel != nil || row.SaleListingSauna != nil || row.SaleListingBalcony != nil
 }
 

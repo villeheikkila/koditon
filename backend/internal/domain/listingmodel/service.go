@@ -39,9 +39,6 @@ func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int6
 	if err := s.queries.DeleteShortcutAdSourceListing(ctx, &shortcutAdIDText); err != nil {
 		return fmt.Errorf("delete shortcut source listing: %w", err)
 	}
-	if err := s.queries.DeleteSaleListingForShortcutAd(ctx, &shortcutAdID); err != nil {
-		return fmt.Errorf("delete shortcut listing model source: %w", err)
-	}
 	return nil
 }
 
@@ -50,9 +47,6 @@ func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, annou
 	announcementIDText := announcementID.String()
 	if err := s.queries.DeleteFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementIDText); err != nil {
 		return fmt.Errorf("delete frontdoor announcement source listing: %w", err)
-	}
-	if err := s.queries.DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx, &announcementID); err != nil {
-		return fmt.Errorf("delete frontdoor announcement listing model source: %w", err)
 	}
 	return nil
 }

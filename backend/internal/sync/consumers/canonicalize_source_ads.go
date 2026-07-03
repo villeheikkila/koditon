@@ -62,7 +62,7 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 		return fmt.Errorf("reconcile frontdoor building announcement listing model: %w", err)
 	}
 	saleListingID := result.SourceListingID
-	if err := c.queries.RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx, &saleListingID); err != nil {
+	if err := c.queries.RefreshSourceListingRenovationsFromFrontdoorBuilding(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("refresh frontdoor announcement renovations: %w", err)
 	}
 	if err := properties.ProjectListingRenovationEvents(ctx, c.pool, saleListingID); err != nil {

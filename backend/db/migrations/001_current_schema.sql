@@ -1216,144 +1216,23 @@ CREATE TABLE public.property_renovation_events (
     CONSTRAINT property_renovation_events_target_type_check CHECK ((target_type = ANY (ARRAY['listing'::text, 'document'::text, 'offering'::text, 'unit'::text, 'building'::text, 'housing_company'::text, 'house'::text])))
 );
 
-CREATE TABLE public.property_source_offering_renovations (
-    property_source_offering_renovation_id uuid DEFAULT gen_random_uuid() CONSTRAINT property_source_offering_re_property_source_offering_r_not_null NOT NULL,
-    sale_listing_id uuid NOT NULL,
-    property_source_offering_renovation_source_field text CONSTRAINT property_source_offering_r_property_source_offering_r_not_null1 NOT NULL,
-    property_source_offering_renovation_category text CONSTRAINT property_source_offering_r_property_source_offering_r_not_null2 NOT NULL,
-    property_source_offering_renovation_status text CONSTRAINT property_source_offering_r_property_source_offering_r_not_null3 NOT NULL,
-    property_source_offering_renovation_year integer,
-    property_source_offering_renovation_text text,
-    property_source_offering_renovation_confidence integer DEFAULT 100 CONSTRAINT property_source_offering_r_property_source_offering_r_not_null4 NOT NULL,
-    property_source_offering_renovation_created_at timestamp with time zone DEFAULT now() CONSTRAINT property_source_offering_r_property_source_offering_r_not_null5 NOT NULL,
-    property_source_offering_renovation_updated_at timestamp with time zone DEFAULT now() CONSTRAINT property_source_offering_r_property_source_offering_r_not_null6 NOT NULL,
-    property_source_offering_renovation_component text,
-    property_source_offering_renovation_scope text,
-    property_source_offering_renovation_stage text,
-    property_source_offering_renovation_responsibility text,
-    property_source_offering_renovation_cost_estimate_eur bigint,
-    CONSTRAINT property_source_offering_renovation_status_check CHECK ((property_source_offering_renovation_status = ANY (ARRAY['done'::text, 'planned'::text, 'unknown'::text])))
-);
-
-CREATE TABLE public.property_source_offerings (
-    sale_listing_id uuid DEFAULT gen_random_uuid() CONSTRAINT sale_listings_sale_listing_id_not_null NOT NULL,
-    shortcut_ad_id bigint,
-    frontdoor_ad_id uuid,
-    frontdoor_building_announcement_id uuid,
-    prices_transaction_id uuid,
-    sale_listing_source_provider text CONSTRAINT sale_listings_sale_listing_source_provider_not_null NOT NULL,
-    sale_listing_source_kind text CONSTRAINT sale_listings_sale_listing_source_kind_not_null NOT NULL,
-    sale_listing_native_id text CONSTRAINT sale_listings_sale_listing_native_id_not_null NOT NULL,
-    sale_listing_canonical_id text CONSTRAINT sale_listings_sale_listing_canonical_id_not_null NOT NULL,
-    sale_listing_url text,
-    sale_listing_headline text CONSTRAINT sale_listings_sale_listing_headline_not_null NOT NULL,
-    sale_listing_street_address text,
-    sale_listing_city text,
-    sale_listing_postal text,
-    sale_listing_asking_price bigint,
-    sale_listing_area_value double precision,
-    sale_listing_room_layout text,
-    sale_listing_last_seen_at timestamp with time zone,
-    sale_listing_published_at timestamp with time zone,
-    sale_listing_search_text text,
-    sale_listing_created_at timestamp with time zone DEFAULT now() CONSTRAINT sale_listings_sale_listing_created_at_not_null NOT NULL,
-    sale_listing_updated_at timestamp with time zone DEFAULT now() CONSTRAINT sale_listings_sale_listing_updated_at_not_null NOT NULL,
-    sale_listing_street_name text,
-    sale_listing_street_number text,
-    sale_listing_building_letter text,
-    sale_listing_apartment text,
-    sale_listing_street_name_norm text,
-    sale_listing_street_number_norm text,
-    sale_listing_building_letter_norm text,
-    sale_listing_city_norm text,
-    sale_listing_postal_norm text,
-    sale_listing_address_norm text,
-    sale_listing_address_components jsonb,
-    sale_listing_building_match_key text,
-    sale_listing_street_match_key text,
-    sale_listing_unit_match_key text,
-    sale_listing_price_per_m2 double precision,
-    sale_listing_debt_free_price bigint,
-    sale_listing_debt_share_amount bigint,
-    sale_listing_rooms_count integer,
-    sale_listing_floor_level integer,
-    sale_listing_total_floors integer,
-    sale_listing_build_year integer,
-    sale_listing_condition text,
-    sale_listing_energy_class text,
-    sale_listing_description_text text,
-    sale_listing_property_type_raw text,
-    sale_listing_property_type_code text,
-    sale_listing_room_category_code text,
-    sale_listing_floor_text text,
-    sale_listing_elevator boolean,
-    sale_listing_plot_type_raw text,
-    sale_listing_plot_type_code text,
-    sale_listing_energy_efficiency_label text,
-    sale_listing_energy_efficiency_class_code text,
-    sale_listing_energy_efficiency_standard_year integer,
-    sale_listing_energy_efficiency_status text,
-    sale_listing_energy_efficiency_match_code text,
-    sale_listing_first_seen_at timestamp with time zone,
-    sale_listing_prices_match_status text,
-    sale_listing_prices_match_next_attempt_at timestamp with time zone,
-    sale_listing_prices_match_last_attempted_at timestamp with time zone,
-    sale_listing_prices_match_attempt_count integer DEFAULT 0 CONSTRAINT sale_listings_sale_listing_prices_match_attempt_count_not_null NOT NULL,
-    sale_listing_prices_match_expires_at timestamp with time zone,
-    sale_listing_prices_match_run_id uuid,
-    sale_listing_plot_owned boolean,
-    sale_listing_source_match_status text,
-    sale_listing_source_match_next_attempt_at timestamp with time zone,
-    sale_listing_source_match_last_attempted_at timestamp with time zone,
-    sale_listing_source_match_attempt_count integer DEFAULT 0 CONSTRAINT sale_listings_sale_listing_source_match_attempt_count_not_null NOT NULL,
-    sale_listing_availability_text text,
-    sale_listing_renovations_done_text text,
-    sale_listing_renovations_planned_text text,
-    sale_listing_additional_info_text text,
-    sale_listing_charges_text text,
-    sale_listing_maintenance_charge_monthly double precision,
-    sale_listing_total_charge_monthly double precision,
-    sale_listing_water_charge double precision,
-    sale_listing_housing_company_name text,
-    sale_listing_housing_company_business_id text,
-    sale_listing_building_material text,
-    sale_listing_heating_system text,
-    sale_listing_roof_type text,
-    sale_listing_roof_material text,
-    sale_listing_apartment_count integer,
-    sale_listing_car_storage_text text,
-    sale_listing_building_description_text text,
-    sale_listing_building_other_info_text text,
-    sale_listing_latitude double precision,
-    sale_listing_longitude double precision,
-    sale_listing_living_area_value double precision,
-    sale_listing_total_area_value double precision,
-    sale_listing_other_area_value double precision,
-    sale_listing_bedrooms_count integer,
-    sale_listing_sauna boolean,
-    sale_listing_balcony boolean,
-    sale_listing_parking_text text,
-    sale_listing_kitchen_description_text text,
-    sale_listing_bathroom_description_text text,
-    sale_listing_storage_description_text text,
-    sale_listing_floor_materials_description_text text,
-    sale_listing_wall_materials_description_text text,
-    sale_listing_balcony_description_text text,
-    sale_listing_sauna_description_text text,
-    sale_listing_views_description_text text,
-    sale_listing_appliances text[],
-    sale_listing_features text[],
-    sale_listing_plot_area_value double precision,
-    sale_listing_services_text text,
-    sale_listing_transport_text text,
-    sale_listing_previous_asking_price bigint,
-    sale_listing_previous_debt_free_price bigint,
-    sale_listing_new_development boolean,
-    CONSTRAINT sale_listings_has_source_check CHECK (((shortcut_ad_id IS NOT NULL) OR (frontdoor_ad_id IS NOT NULL) OR (frontdoor_building_announcement_id IS NOT NULL))),
-    CONSTRAINT sale_listings_prices_match_status_check CHECK (((sale_listing_prices_match_status IS NULL) OR (sale_listing_prices_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'expired'::text, 'noop'::text])))),
-    CONSTRAINT sale_listings_source_kind_check CHECK ((sale_listing_source_kind = ANY (ARRAY['ad'::text, 'announcement'::text]))),
-    CONSTRAINT sale_listings_source_match_status_check CHECK (((sale_listing_source_match_status IS NULL) OR (sale_listing_source_match_status = ANY (ARRAY['pending'::text, 'deferred'::text, 'auto_linked'::text, 'needs_review'::text, 'manual_linked'::text, 'rejected'::text, 'noop'::text])))),
-    CONSTRAINT sale_listings_source_provider_check CHECK ((sale_listing_source_provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text])))
+CREATE TABLE public.source_listing_renovations (
+    source_listing_renovation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_listing_id uuid NOT NULL,
+    source_listing_renovation_source_field text NOT NULL,
+    source_listing_renovation_category text NOT NULL,
+    source_listing_renovation_status text NOT NULL,
+    source_listing_renovation_year integer,
+    source_listing_renovation_text text,
+    source_listing_renovation_confidence integer DEFAULT 100 NOT NULL,
+    source_listing_renovation_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_listing_renovation_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_listing_renovation_component text,
+    source_listing_renovation_scope text,
+    source_listing_renovation_stage text,
+    source_listing_renovation_responsibility text,
+    source_listing_renovation_cost_estimate_eur bigint,
+    CONSTRAINT source_listing_renovation_status_check CHECK ((source_listing_renovation_status = ANY (ARRAY['done'::text, 'planned'::text, 'unknown'::text])))
 );
 
 CREATE TABLE public.property_units (
@@ -1784,8 +1663,8 @@ ALTER TABLE ONLY public.property_offerings
 ALTER TABLE ONLY public.property_renovation_events
     ADD CONSTRAINT property_renovation_events_pkey PRIMARY KEY (property_renovation_event_id);
 
-ALTER TABLE ONLY public.property_source_offering_renovations
-    ADD CONSTRAINT property_source_offering_renovations_pkey PRIMARY KEY (property_source_offering_renovation_id);
+ALTER TABLE ONLY public.source_listing_renovations
+    ADD CONSTRAINT source_listing_renovations_pkey PRIMARY KEY (source_listing_renovation_id);
 
 ALTER TABLE ONLY public.property_units
     ADD CONSTRAINT property_units_pkey PRIMARY KEY (property_unit_id);
@@ -1801,12 +1680,6 @@ ALTER TABLE ONLY public.sale_listing_prices_transaction_match_candidates
 
 ALTER TABLE ONLY public.sale_listing_prices_transaction_match_runs
     ADD CONSTRAINT sale_listing_prices_transaction_match_runs_pkey PRIMARY KEY (sale_listing_prices_transaction_match_run_id);
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_canonical_id_key UNIQUE (sale_listing_canonical_id);
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_pkey PRIMARY KEY (sale_listing_id);
 
 ALTER TABLE ONLY public.target_observations
     ADD CONSTRAINT target_observations_pkey PRIMARY KEY (target_observation_id);
@@ -2134,11 +2007,9 @@ CREATE INDEX idx_property_renovation_events_target_observed ON public.property_r
 
 CREATE UNIQUE INDEX idx_property_renovation_events_unique_source ON public.property_renovation_events USING btree (event_scope, target_type, target_id, source_table, source_id, COALESCE(source_field, ''::text), category, status, COALESCE(stage, ''::text), COALESCE(scope, ''::text), COALESCE(year, '-1'::integer), COALESCE(start_year, '-1'::integer), COALESCE(end_year, '-1'::integer), md5(COALESCE(summary, ''::text)), projection_version);
 
-CREATE INDEX idx_property_source_offering_renovations_listing ON public.property_source_offering_renovations USING btree (sale_listing_id);
+CREATE INDEX idx_source_listing_renovations_listing ON public.source_listing_renovations USING btree (source_listing_id);
 
-CREATE UNIQUE INDEX idx_property_source_offering_renovations_unique ON public.property_source_offering_renovations USING btree (sale_listing_id, property_source_offering_renovation_source_field, property_source_offering_renovation_category, property_source_offering_renovation_status, COALESCE(property_source_offering_renovation_year, 0), COALESCE(property_source_offering_renovation_component, ''::text), COALESCE(property_source_offering_renovation_stage, ''::text));
-
-CREATE INDEX idx_property_source_offerings_street_name_number_ascii ON public.property_source_offerings USING btree (translate(sale_listing_street_name_norm, 'åäö'::text, 'aao'::text), sale_listing_street_number_norm, sale_listing_last_seen_at DESC);
+CREATE UNIQUE INDEX idx_source_listing_renovations_unique ON public.source_listing_renovations USING btree (source_listing_id, source_listing_renovation_source_field, source_listing_renovation_category, source_listing_renovation_status, COALESCE(source_listing_renovation_year, 0), COALESCE(source_listing_renovation_component, ''::text), COALESCE(source_listing_renovation_stage, ''::text));
 
 CREATE INDEX idx_property_units_housing_company ON public.property_units USING btree (housing_company_id);
 
@@ -2149,58 +2020,6 @@ CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_listing_sc ON 
 CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_run_status ON public.sale_listing_prices_transaction_match_candidates USING btree (sale_listing_prices_transaction_match_run_id, sale_listing_prices_transaction_match_status);
 
 CREATE INDEX idx_sale_listing_prices_transaction_match_candidates_transactio ON public.sale_listing_prices_transaction_match_candidates USING btree (prices_transaction_id, sale_listing_prices_transaction_match_score DESC);
-
-CREATE INDEX idx_sale_listings_area ON public.property_source_offerings USING btree (sale_listing_area_value);
-
-CREATE INDEX idx_sale_listings_build_year ON public.property_source_offerings USING btree (sale_listing_build_year);
-
-CREATE INDEX idx_sale_listings_building_match_key ON public.property_source_offerings USING btree (sale_listing_building_match_key);
-
-CREATE INDEX idx_sale_listings_city ON public.property_source_offerings USING btree (sale_listing_city);
-
-CREATE INDEX idx_sale_listings_elevator ON public.property_source_offerings USING btree (sale_listing_elevator);
-
-CREATE INDEX idx_sale_listings_energy_efficiency_class_year ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_class_code, sale_listing_energy_efficiency_standard_year);
-
-CREATE INDEX idx_sale_listings_energy_efficiency_match_code ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_match_code);
-
-CREATE INDEX idx_sale_listings_energy_efficiency_status ON public.property_source_offerings USING btree (sale_listing_energy_efficiency_status);
-
-CREATE INDEX idx_sale_listings_first_seen ON public.property_source_offerings USING btree (sale_listing_first_seen_at);
-
-CREATE INDEX idx_sale_listings_floor_level ON public.property_source_offerings USING btree (sale_listing_floor_level);
-
-CREATE INDEX idx_sale_listings_last_seen ON public.property_source_offerings USING btree (sale_listing_last_seen_at DESC);
-
-CREATE INDEX idx_sale_listings_plot_owned ON public.property_source_offerings USING btree (sale_listing_plot_owned);
-
-CREATE INDEX idx_sale_listings_plot_type_code ON public.property_source_offerings USING btree (sale_listing_plot_type_code);
-
-CREATE INDEX idx_sale_listings_postal ON public.property_source_offerings USING btree (sale_listing_postal);
-
-CREATE INDEX idx_sale_listings_price ON public.property_source_offerings USING btree (sale_listing_asking_price);
-
-CREATE INDEX idx_sale_listings_price_per_m2 ON public.property_source_offerings USING btree (sale_listing_price_per_m2);
-
-CREATE INDEX idx_sale_listings_prices_match_last_seen ON public.property_source_offerings USING btree (sale_listing_last_seen_at) WHERE ((prices_transaction_id IS NULL) AND (sale_listing_source_kind = 'ad'::text));
-
-CREATE INDEX idx_sale_listings_prices_match_queue ON public.property_source_offerings USING btree (sale_listing_prices_match_status, sale_listing_prices_match_next_attempt_at) WHERE (prices_transaction_id IS NULL);
-
-CREATE INDEX idx_sale_listings_property_type_code ON public.property_source_offerings USING btree (sale_listing_property_type_code);
-
-CREATE INDEX idx_sale_listings_room_category_code ON public.property_source_offerings USING btree (sale_listing_room_category_code);
-
-CREATE INDEX idx_sale_listings_rooms_count ON public.property_source_offerings USING btree (sale_listing_rooms_count);
-
-CREATE INDEX idx_sale_listings_search_trgm ON public.property_source_offerings USING gin (lower(sale_listing_search_text) extensions.gin_trgm_ops);
-
-CREATE INDEX idx_sale_listings_source ON public.property_source_offerings USING btree (sale_listing_source_provider, sale_listing_source_kind);
-
-CREATE INDEX idx_sale_listings_source_match_queue ON public.property_source_offerings USING btree (sale_listing_source_match_status, sale_listing_source_match_next_attempt_at) WHERE (sale_listing_source_kind = 'ad'::text);
-
-CREATE INDEX idx_sale_listings_street_match_key ON public.property_source_offerings USING btree (sale_listing_street_match_key);
-
-CREATE INDEX idx_sale_listings_unit_match_key ON public.property_source_offerings USING btree (sale_listing_unit_match_key);
 
 CREATE INDEX idx_target_observations_source ON public.target_observations USING btree (source_type, source_id) WHERE (superseded_at IS NULL);
 
@@ -2213,14 +2032,6 @@ CREATE INDEX idx_units_physical_building ON public.units USING btree (physical_b
 CREATE UNIQUE INDEX price_links_one_confirmed_listing_per_transaction ON public.price_links USING btree (prices_transaction_id) WHERE ((target_type = 'listing'::text) AND (link_status = 'confirmed'::text));
 
 CREATE UNIQUE INDEX price_links_unique_target_transaction ON public.price_links USING btree (target_type, target_id, prices_transaction_id);
-
-CREATE UNIQUE INDEX sale_listings_frontdoor_ad_id_key ON public.property_source_offerings USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
-
-CREATE UNIQUE INDEX sale_listings_frontdoor_building_announcement_id_key ON public.property_source_offerings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
-
-CREATE UNIQUE INDEX sale_listings_prices_transaction_id_key ON public.property_source_offerings USING btree (prices_transaction_id) WHERE (prices_transaction_id IS NOT NULL);
-
-CREATE UNIQUE INDEX sale_listings_shortcut_ad_id_key ON public.property_source_offerings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
 
 CREATE UNIQUE INDEX target_observations_active_unique ON public.target_observations USING btree (target_type, target_id, observation_key, source_type, source_id) WHERE (superseded_at IS NULL);
 
@@ -2443,8 +2254,8 @@ ALTER TABLE ONLY public.property_renovation_events
 ALTER TABLE ONLY public.property_renovation_events
     ADD CONSTRAINT property_renovation_events_source_event_id_fkey FOREIGN KEY (source_event_id) REFERENCES public.property_renovation_events(property_renovation_event_id);
 
-ALTER TABLE ONLY public.property_source_offering_renovations
-    ADD CONSTRAINT property_source_offering_renovations_sale_listing_id_fkey FOREIGN KEY (sale_listing_id) REFERENCES public.property_source_offerings(sale_listing_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.source_listing_renovations
+    ADD CONSTRAINT source_listing_renovations_source_listing_id_fkey FOREIGN KEY (source_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.property_units
     ADD CONSTRAINT property_units_physical_building_id_fkey FOREIGN KEY (physical_building_id) REFERENCES public.physical_buildings(physical_building_id) ON DELETE SET NULL;
@@ -2460,21 +2271,6 @@ ALTER TABLE ONLY public.sale_listing_prices_transaction_match_candidates
 
 ALTER TABLE ONLY public.sale_listing_prices_transaction_match_candidates
     ADD CONSTRAINT sale_listing_prices_transaction_match_cand_sale_listing_id_fkey FOREIGN KEY (sale_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_frontdoor_ad_id_fkey FOREIGN KEY (frontdoor_ad_id) REFERENCES origin.frontdoor_ads(frontdoor_ad_id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_frontdoor_building_announcement_id_fkey FOREIGN KEY (frontdoor_building_announcement_id) REFERENCES origin.frontdoor_building_announcements(frontdoor_building_announcement_id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_prices_transaction_id_fkey FOREIGN KEY (prices_transaction_id) REFERENCES origin.prices_transactions(prices_transaction_id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_sale_listing_prices_match_run_id_fkey FOREIGN KEY (sale_listing_prices_match_run_id) REFERENCES public.sale_listing_prices_transaction_match_runs(sale_listing_prices_transaction_match_run_id) ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.property_source_offerings
-    ADD CONSTRAINT sale_listings_shortcut_ad_id_fkey FOREIGN KEY (shortcut_ad_id) REFERENCES origin.shortcut_ads(shortcut_ad_id) ON DELETE SET NULL;
 
 
 -- Absurd durable workflow schema. Keep backend/db/vendor/absurd.sql in sync with this block.

@@ -132,34 +132,34 @@ func (q *Queries) ListHousingCompanyRenovationEvents(ctx context.Context, dollar
 
 const listSaleListingFallbackRenovations = `-- name: ListSaleListingFallbackRenovations :many
 SELECT
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component AS property_source_offering_renovation_component,
-    property_source_offering_renovation_scope AS property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage AS property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility AS property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text AS property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence,
-    property_source_offering_renovation_source_field
-FROM public.property_source_offering_renovations
-WHERE sale_listing_id = $1
-ORDER BY property_source_offering_renovation_category, property_source_offering_renovation_year NULLS LAST
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component AS source_listing_renovation_component,
+    source_listing_renovation_scope AS source_listing_renovation_scope,
+    source_listing_renovation_stage AS source_listing_renovation_stage,
+    source_listing_renovation_responsibility AS source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text AS source_listing_renovation_text,
+    source_listing_renovation_confidence,
+    source_listing_renovation_source_field
+FROM public.source_listing_renovations
+WHERE source_listing_id = $1
+ORDER BY source_listing_renovation_category, source_listing_renovation_year NULLS LAST
 `
 
 type ListSaleListingFallbackRenovationsRow struct {
-	PropertySourceOfferingRenovationCategory        string  `json:"property_source_offering_renovation_category"`
-	PropertySourceOfferingRenovationStatus          string  `json:"property_source_offering_renovation_status"`
-	PropertySourceOfferingRenovationYear            *int32  `json:"property_source_offering_renovation_year"`
-	PropertySourceOfferingRenovationComponent       *string `json:"property_source_offering_renovation_component"`
-	PropertySourceOfferingRenovationScope           *string `json:"property_source_offering_renovation_scope"`
-	PropertySourceOfferingRenovationStage           *string `json:"property_source_offering_renovation_stage"`
-	PropertySourceOfferingRenovationResponsibility  *string `json:"property_source_offering_renovation_responsibility"`
-	PropertySourceOfferingRenovationCostEstimateEur *int64  `json:"property_source_offering_renovation_cost_estimate_eur"`
-	PropertySourceOfferingRenovationText            *string `json:"property_source_offering_renovation_text"`
-	PropertySourceOfferingRenovationConfidence      int32   `json:"property_source_offering_renovation_confidence"`
-	PropertySourceOfferingRenovationSourceField     string  `json:"property_source_offering_renovation_source_field"`
+	SourceListingRenovationCategory        string  `json:"source_listing_renovation_category"`
+	SourceListingRenovationStatus          string  `json:"source_listing_renovation_status"`
+	SourceListingRenovationYear            *int32  `json:"source_listing_renovation_year"`
+	SourceListingRenovationComponent       *string `json:"source_listing_renovation_component"`
+	SourceListingRenovationScope           *string `json:"source_listing_renovation_scope"`
+	SourceListingRenovationStage           *string `json:"source_listing_renovation_stage"`
+	SourceListingRenovationResponsibility  *string `json:"source_listing_renovation_responsibility"`
+	SourceListingRenovationCostEstimateEur *int64  `json:"source_listing_renovation_cost_estimate_eur"`
+	SourceListingRenovationText            *string `json:"source_listing_renovation_text"`
+	SourceListingRenovationConfidence      int32   `json:"source_listing_renovation_confidence"`
+	SourceListingRenovationSourceField     string  `json:"source_listing_renovation_source_field"`
 }
 
 func (q *Queries) ListSaleListingFallbackRenovations(ctx context.Context, dollar_1 *uuid.UUID) ([]ListSaleListingFallbackRenovationsRow, error) {
@@ -172,17 +172,17 @@ func (q *Queries) ListSaleListingFallbackRenovations(ctx context.Context, dollar
 	for rows.Next() {
 		var i ListSaleListingFallbackRenovationsRow
 		if err := rows.Scan(
-			&i.PropertySourceOfferingRenovationCategory,
-			&i.PropertySourceOfferingRenovationStatus,
-			&i.PropertySourceOfferingRenovationYear,
-			&i.PropertySourceOfferingRenovationComponent,
-			&i.PropertySourceOfferingRenovationScope,
-			&i.PropertySourceOfferingRenovationStage,
-			&i.PropertySourceOfferingRenovationResponsibility,
-			&i.PropertySourceOfferingRenovationCostEstimateEur,
-			&i.PropertySourceOfferingRenovationText,
-			&i.PropertySourceOfferingRenovationConfidence,
-			&i.PropertySourceOfferingRenovationSourceField,
+			&i.SourceListingRenovationCategory,
+			&i.SourceListingRenovationStatus,
+			&i.SourceListingRenovationYear,
+			&i.SourceListingRenovationComponent,
+			&i.SourceListingRenovationScope,
+			&i.SourceListingRenovationStage,
+			&i.SourceListingRenovationResponsibility,
+			&i.SourceListingRenovationCostEstimateEur,
+			&i.SourceListingRenovationText,
+			&i.SourceListingRenovationConfidence,
+			&i.SourceListingRenovationSourceField,
 		); err != nil {
 			return nil, err
 		}

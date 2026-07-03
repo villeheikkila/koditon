@@ -1,24 +1,4 @@
--- name: DeleteSaleListingForShortcutAd :exec
-WITH deleted AS (
-    DELETE FROM public.property_source_offerings
-    WHERE shortcut_ad_id = sqlc.arg(shortcut_ad_id)
-    RETURNING sale_listing_id
-)
-DELETE FROM origin.source_listings sl
-USING deleted
-WHERE sl.source_listing_id = deleted.sale_listing_id;
-
--- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
-WITH deleted AS (
-    DELETE FROM public.property_source_offerings
-    WHERE frontdoor_building_announcement_id = sqlc.arg(frontdoor_building_announcement_id)
-    RETURNING sale_listing_id
-)
-DELETE FROM origin.source_listings sl
-USING deleted
-WHERE sl.source_listing_id = deleted.sale_listing_id;
-
--- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
+-- name: RefreshSourceListingRenovationsFromFrontdoorBuilding :exec
 WITH listing AS (
     SELECT
         doc.primary_source_listing_id AS sale_listing_id,
@@ -46,22 +26,22 @@ WITH listing AS (
     LIMIT 1
 ),
 deleted AS (
-    DELETE FROM public.property_source_offering_renovations
-    WHERE sale_listing_id = @sale_listing_id
+    DELETE FROM public.source_listing_renovations
+    WHERE source_listing_id = @sale_listing_id
 )
-INSERT INTO public.property_source_offering_renovations (
-    sale_listing_id,
-    property_source_offering_renovation_source_field,
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component,
-    property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence
+INSERT INTO public.source_listing_renovations (
+    source_listing_id,
+    source_listing_renovation_source_field,
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component,
+    source_listing_renovation_scope,
+    source_listing_renovation_stage,
+    source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text,
+    source_listing_renovation_confidence
 )
 SELECT
     listing.sale_listing_id,
@@ -107,25 +87,25 @@ SELECT
     COALESCE(NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,renovationsPlannedDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', shortcut_ad_data #>> '{property,renovationsPlannedDescription}', shortcut_ad_data #>> '{adData,renovationFutureInfo}', shortcut_ad_data #>> '{buildingData,renovationFutureInfo}')), ''), '')::text AS planned_text
 FROM source_doc;
 
--- name: DeleteLLMPropertySourceOfferingRenovations :exec
-DELETE FROM public.property_source_offering_renovations
-WHERE sale_listing_id = @sale_listing_id
-    AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text');
+-- name: DeleteLLMSourceListingRenovations :exec
+DELETE FROM public.source_listing_renovations
+WHERE source_listing_id = @sale_listing_id
+    AND source_listing_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text');
 
--- name: InsertLLMPropertySourceOfferingRenovation :exec
-INSERT INTO public.property_source_offering_renovations (
-    sale_listing_id,
-    property_source_offering_renovation_source_field,
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component,
-    property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence
+-- name: InsertLLMSourceListingRenovation :exec
+INSERT INTO public.source_listing_renovations (
+    source_listing_id,
+    source_listing_renovation_source_field,
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component,
+    source_listing_renovation_scope,
+    source_listing_renovation_stage,
+    source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text,
+    source_listing_renovation_confidence
 ) VALUES (
     @sale_listing_id,
     sqlc.arg(source_field),
@@ -163,7 +143,7 @@ WITH run AS (
 deleted AS (
     DELETE FROM public.property_renovation_events
     WHERE event_scope = 'source'
-        AND source_table IN ('property_source_offerings', 'listing_search_documents')
+        AND source_table = 'listing_search_documents'
         AND source_id = @sale_listing_id
         AND projection_version = sqlc.arg(projection_version)
 ),
@@ -218,25 +198,25 @@ inserted AS (
         COALESCE(linked.housing_company_id, linked.physical_building_id),
         'listing_search_documents',
         linked.sale_listing_id,
-        renovation.property_source_offering_renovation_source_field,
-        renovation.property_source_offering_renovation_category,
-        NULLIF(renovation.property_source_offering_renovation_component, ''),
-        renovation.property_source_offering_renovation_status,
-        NULLIF(renovation.property_source_offering_renovation_stage, ''),
-        NULLIF(renovation.property_source_offering_renovation_scope, ''),
-        NULLIF(renovation.property_source_offering_renovation_responsibility, ''),
-        renovation.property_source_offering_renovation_year,
+        renovation.source_listing_renovation_source_field,
+        renovation.source_listing_renovation_category,
+        NULLIF(renovation.source_listing_renovation_component, ''),
+        renovation.source_listing_renovation_status,
+        NULLIF(renovation.source_listing_renovation_stage, ''),
+        NULLIF(renovation.source_listing_renovation_scope, ''),
+        NULLIF(renovation.source_listing_renovation_responsibility, ''),
+        renovation.source_listing_renovation_year,
         NULL,
         NULL,
-        renovation.property_source_offering_renovation_cost_estimate_eur,
-        NULLIF(renovation.property_source_offering_renovation_text, ''),
-        jsonb_build_object('evidence_level', CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
-        GREATEST(0, LEAST(1, COALESCE(renovation.property_source_offering_renovation_confidence, 50)::double precision / 100)),
-        CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
+        renovation.source_listing_renovation_cost_estimate_eur,
+        NULLIF(renovation.source_listing_renovation_text, ''),
+        jsonb_build_object('evidence_level', CASE WHEN renovation.source_listing_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
+        GREATEST(0, LEAST(1, COALESCE(renovation.source_listing_renovation_confidence, 50)::double precision / 100)),
+        CASE WHEN renovation.source_listing_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
         COALESCE(linked.last_seen_at, linked.refreshed_at, linked.first_seen_at, now())
     FROM run
     JOIN linked ON COALESCE(linked.housing_company_id, linked.physical_building_id) IS NOT NULL
-    JOIN public.property_source_offering_renovations renovation ON renovation.sale_listing_id = linked.sale_listing_id
+    JOIN public.source_listing_renovations renovation ON renovation.source_listing_id = linked.sale_listing_id
     ON CONFLICT (
         event_scope,
         target_type,
@@ -439,7 +419,7 @@ SELECT jsonb_build_object('deprecated', false)::jsonb AS payload;
 WITH deleted AS (
     DELETE FROM public.dimension_claims
     WHERE claim_scope = 'source'
-        AND source_table IN ('property_source_offerings', 'listing_search_documents')
+        AND source_table = 'listing_search_documents'
         AND source_id = @sale_listing_id::uuid
         AND projection_version = 'listing-provider-v1'
 ),
@@ -687,7 +667,7 @@ scored AS (
             WHEN c.claim_scope = 'manual' THEN 1::double precision
             WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
             WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-            WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
+            WHEN p.strategy = 'latest_reliable' AND c.source_table = 'listing_search_documents' THEN 1.05::double precision
             ELSE 1::double precision
         END AS authority_factor,
         CASE
@@ -703,7 +683,7 @@ scored AS (
                 CASE
                     WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
                     WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-                    WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
+                    WHEN p.strategy = 'latest_reliable' AND c.source_table = 'listing_search_documents' THEN 1.05::double precision
                     ELSE 1::double precision
                 END
         END AS score
@@ -967,7 +947,7 @@ target_candidates AS (
     FROM public.dimension_claims c
     JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
     WHERE c.claim_scope IN ('source','manual')
-        AND c.source_table IN ('listing_search_documents', 'property_source_offerings')
+        AND c.source_table = 'listing_search_documents'
         AND c.source_id = @sale_listing_id::uuid
         AND c.target_type = catalog.target_type
 )
@@ -1428,7 +1408,7 @@ SELECT count(*)::integer
 FROM synced
 WHERE property_house_id IS NOT NULL;
 
--- name: GetPropertySourceOfferingDescriptionTexts :one
+-- name: GetSourceListingDescriptionTexts :one
 WITH source_doc AS (
     SELECT
         doc.listing_status,
@@ -1454,7 +1434,7 @@ SELECT
     NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}', frontdoor_building_announcement_room_structure)), '') AS additional_info_text
 FROM source_doc;
 
--- name: GetPropertySourceOfferingValuationExtractionTexts :one
+-- name: GetSourceListingValuationExtractionTexts :one
 WITH source_doc AS (
     SELECT
         doc.listing_status,
@@ -1526,15 +1506,15 @@ SELECT
     NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', shortcut_ad_data #>> '{priceData,chargesText}', shortcut_ad_data #>> '{priceData,additionalInfo}', shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text
 FROM source_doc;
 
--- name: ListPropertySourceOfferingInsights :many
+-- name: ListSourceListingInsights :many
 SELECT
-    observation.observation_key AS property_source_offering_insight_key,
-    COALESCE(observation.value #>> '{}', '')::text AS property_source_offering_insight_value,
-    observation.direction AS property_source_offering_insight_direction,
-    observation.severity AS property_source_offering_insight_severity,
-    round(observation.confidence * 100)::integer AS property_source_offering_insight_confidence,
-    COALESCE(observation.evidence ->> 'source_field', '')::text AS property_source_offering_insight_source_field,
-    observation.text AS property_source_offering_insight_text
+    observation.observation_key AS source_listing_insight_key,
+    COALESCE(observation.value #>> '{}', '')::text AS source_listing_insight_value,
+    observation.direction AS source_listing_insight_direction,
+    observation.severity AS source_listing_insight_severity,
+    round(observation.confidence * 100)::integer AS source_listing_insight_confidence,
+    COALESCE(observation.evidence ->> 'source_field', '')::text AS source_listing_insight_source_field,
+    observation.text AS source_listing_insight_text
 FROM public.target_observations observation
 WHERE observation.source_type = 'source_listing'
     AND observation.source_id = @sale_listing_id
@@ -2253,7 +2233,7 @@ ON CONFLICT (
     extraction_prompt_version = EXCLUDED.extraction_prompt_version,
     updated_at = now();
 
--- name: DeleteLLMPropertySourceOfferingInsights :exec
+-- name: DeleteLLMSourceListingInsights :exec
 UPDATE public.target_observations
 SET superseded_at = now()
 WHERE source_type = 'source_listing'
@@ -2272,7 +2252,7 @@ WHERE claims.target_type = CASE sqlc.arg(entity_type)::text
     AND claims.target_id = sqlc.arg(entity_id)
     AND claims.extraction_model IS NOT NULL;
 
--- name: InsertPropertySourceOfferingInsight :exec
+-- name: InsertSourceListingInsight :exec
 INSERT INTO public.target_observations (
     target_type,
     target_id,
@@ -2909,7 +2889,7 @@ FROM origin.frontdoor_buildings fb
 WHERE fb.frontdoor_building_id = sqlc.arg(building_id)
 LIMIT 1;
 
--- name: GetPropertySourceOfferingDetail :one
+-- name: GetSourceListingDetail :one
 SELECT
     COALESCE(doc.primary_source_listing_id, doc.listing_id) AS sale_listing_id,
     doc.source AS sale_listing_source_provider,

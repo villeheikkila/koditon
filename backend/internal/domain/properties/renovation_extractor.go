@@ -129,12 +129,12 @@ func (s *Service) replaceLLMRenovationRows(ctx context.Context, saleListingID uu
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
-	if err := queries.DeleteLLMPropertySourceOfferingRenovations(ctx, &saleListingID); err != nil {
+	if err := queries.DeleteLLMSourceListingRenovations(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("delete previous llm renovation rows: %w", err)
 	}
 	for _, item := range items {
 		sourceField := llmRenovationSourceField(item.SourceField)
-		if err := queries.InsertLLMPropertySourceOfferingRenovation(ctx, db.InsertLLMPropertySourceOfferingRenovationParams{SaleListingID: &saleListingID, SourceField: &sourceField, Category: &item.Category, Status: &item.Status, Year: item.Year, Component: &item.Component, Scope: &item.Scope, Stage: &item.Stage, Responsibility: &item.Responsibility, CostEstimateEur: item.CostEstimateEUR, Summary: &item.Text, Confidence: &item.Confidence}); err != nil {
+		if err := queries.InsertLLMSourceListingRenovation(ctx, db.InsertLLMSourceListingRenovationParams{SaleListingID: &saleListingID, SourceField: &sourceField, Category: &item.Category, Status: &item.Status, Year: item.Year, Component: &item.Component, Scope: &item.Scope, Stage: &item.Stage, Responsibility: &item.Responsibility, CostEstimateEur: item.CostEstimateEUR, Summary: &item.Text, Confidence: &item.Confidence}); err != nil {
 			return fmt.Errorf("insert llm renovation row: %w", err)
 		}
 	}

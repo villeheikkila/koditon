@@ -856,7 +856,7 @@ func (q *Queries) DeleteLLMPropertyClaimsForEntity(ctx context.Context, arg Dele
 	return err
 }
 
-const deleteLLMPropertySourceOfferingInsights = `-- name: DeleteLLMPropertySourceOfferingInsights :exec
+const deleteLLMSourceListingInsights = `-- name: DeleteLLMSourceListingInsights :exec
 UPDATE public.target_observations
 SET superseded_at = now()
 WHERE source_type = 'source_listing'
@@ -865,19 +865,19 @@ WHERE source_type = 'source_listing'
     AND evidence ->> 'source_field' LIKE 'llm_%'
 `
 
-func (q *Queries) DeleteLLMPropertySourceOfferingInsights(ctx context.Context, saleListingID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingInsights, saleListingID)
+func (q *Queries) DeleteLLMSourceListingInsights(ctx context.Context, saleListingID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteLLMSourceListingInsights, saleListingID)
 	return err
 }
 
-const deleteLLMPropertySourceOfferingRenovations = `-- name: DeleteLLMPropertySourceOfferingRenovations :exec
-DELETE FROM public.property_source_offering_renovations
-WHERE sale_listing_id = $1
-    AND property_source_offering_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text')
+const deleteLLMSourceListingRenovations = `-- name: DeleteLLMSourceListingRenovations :exec
+DELETE FROM public.source_listing_renovations
+WHERE source_listing_id = $1
+    AND source_listing_renovation_source_field IN ('llm_renovations_done_text', 'llm_renovations_planned_text')
 `
 
-func (q *Queries) DeleteLLMPropertySourceOfferingRenovations(ctx context.Context, saleListingID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteLLMPropertySourceOfferingRenovations, saleListingID)
+func (q *Queries) DeleteLLMSourceListingRenovations(ctx context.Context, saleListingID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteLLMSourceListingRenovations, saleListingID)
 	return err
 }
 
@@ -898,38 +898,6 @@ type DeleteManagerCertificateRenovationEventsParams struct {
 
 func (q *Queries) DeleteManagerCertificateRenovationEvents(ctx context.Context, arg DeleteManagerCertificateRenovationEventsParams) error {
 	_, err := q.db.Exec(ctx, deleteManagerCertificateRenovationEvents, arg.HousingCompanyID, arg.PropertyDocumentID)
-	return err
-}
-
-const deletePropertySourceOfferingForFrontdoorBuildingAnnouncement = `-- name: DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement :exec
-WITH deleted AS (
-    DELETE FROM public.property_source_offerings
-    WHERE frontdoor_building_announcement_id = $1
-    RETURNING sale_listing_id
-)
-DELETE FROM origin.source_listings sl
-USING deleted
-WHERE sl.source_listing_id = deleted.sale_listing_id
-`
-
-func (q *Queries) DeletePropertySourceOfferingForFrontdoorBuildingAnnouncement(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deletePropertySourceOfferingForFrontdoorBuildingAnnouncement, frontdoorBuildingAnnouncementID)
-	return err
-}
-
-const deleteSaleListingForShortcutAd = `-- name: DeleteSaleListingForShortcutAd :exec
-WITH deleted AS (
-    DELETE FROM public.property_source_offerings
-    WHERE shortcut_ad_id = $1
-    RETURNING sale_listing_id
-)
-DELETE FROM origin.source_listings sl
-USING deleted
-WHERE sl.source_listing_id = deleted.sale_listing_id
-`
-
-func (q *Queries) DeleteSaleListingForShortcutAd(ctx context.Context, shortcutAdID *int64) error {
-	_, err := q.db.Exec(ctx, deleteSaleListingForShortcutAd, shortcutAdID)
 	return err
 }
 
@@ -1903,436 +1871,6 @@ func (q *Queries) GetPropertyDocumentSummary(ctx context.Context, propertyDocume
 	return i, err
 }
 
-const getPropertySourceOfferingDescriptionTexts = `-- name: GetPropertySourceOfferingDescriptionTexts :one
-WITH source_doc AS (
-    SELECT
-        doc.listing_status,
-        doc.refreshed_at,
-        fa.frontdoor_ad_data,
-        sa.shortcut_ad_data,
-        fba.frontdoor_building_announcement_room_structure,
-        fb.frontdoor_building_description,
-        fb.frontdoor_building_other_info
-    FROM public.listing_search_documents doc
-    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
-    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
-    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE doc.primary_source_listing_id = $1::uuid
-    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
-    LIMIT 1
-)
-SELECT
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
-    COALESCE(NULLIF(trim(COALESCE(frontdoor_building_description, frontdoor_building_other_info)), ''), '') AS building_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}', frontdoor_building_announcement_room_structure)), '') AS additional_info_text
-FROM source_doc
-`
-
-type GetPropertySourceOfferingDescriptionTextsRow struct {
-	DescriptionText    *string `json:"description_text"`
-	BuildingText       *string `json:"building_text"`
-	AdditionalInfoText *string `json:"additional_info_text"`
-}
-
-func (q *Queries) GetPropertySourceOfferingDescriptionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingDescriptionTextsRow, error) {
-	row := q.db.QueryRow(ctx, getPropertySourceOfferingDescriptionTexts, saleListingID)
-	var i GetPropertySourceOfferingDescriptionTextsRow
-	err := row.Scan(&i.DescriptionText, &i.BuildingText, &i.AdditionalInfoText)
-	return i, err
-}
-
-const getPropertySourceOfferingDetail = `-- name: GetPropertySourceOfferingDetail :one
-SELECT
-    COALESCE(doc.primary_source_listing_id, doc.listing_id) AS sale_listing_id,
-    doc.source AS sale_listing_source_provider,
-    doc.kind AS sale_listing_source_kind,
-    doc.url,
-    doc.headline,
-    doc.address AS street_address,
-    doc.city,
-    doc.postal,
-    doc.latitude AS sale_listing_latitude,
-    doc.longitude AS sale_listing_longitude,
-    doc.room_layout,
-    doc.rooms_count AS sale_listing_rooms_count,
-    doc.area_m2 AS sale_listing_area_value,
-    doc.floor_level AS sale_listing_floor_level,
-    doc.property_type_code AS property_type_raw,
-    doc.condition,
-    doc.elevator AS sale_listing_elevator,
-    doc.energy_class,
-    doc.energy_efficiency_label,
-    NULL::text AS plot_type_raw,
-    doc.property_type_code AS plot_type_code,
-    doc.plot_owned AS sale_listing_plot_owned,
-    doc.asking_price AS sale_listing_asking_price,
-    doc.debt_free_price AS sale_listing_debt_free_price,
-    doc.debt_share_amount AS sale_listing_debt_share_amount,
-    doc.price_per_m2 AS sale_listing_price_per_m2,
-    doc.first_seen_at AS sale_listing_first_seen_at,
-    doc.last_seen_at AS sale_listing_last_seen_at,
-    doc.published_at AS sale_listing_published_at,
-    doc.build_year AS sale_listing_build_year,
-    doc.total_floors AS sale_listing_total_floors,
-    NULL::integer AS sale_listing_apartment_count,
-    NULL::double precision AS sale_listing_living_area_value,
-    NULL::double precision AS sale_listing_total_area_value,
-    NULL::double precision AS sale_listing_other_area_value,
-    NULL::integer AS sale_listing_bedrooms_count,
-    doc.sauna AS sale_listing_sauna,
-    doc.balcony AS sale_listing_balcony,
-    NULL::text AS parking_text,
-    NULL::text AS kitchen_description_text,
-    NULL::text AS bathroom_description_text,
-    NULL::text AS storage_description_text,
-    NULL::text AS floor_materials_description_text,
-    NULL::text AS wall_materials_description_text,
-    NULL::text AS balcony_description_text,
-    NULL::text AS sauna_description_text,
-    NULL::text AS views_description_text,
-    ARRAY[]::text[] AS appliances,
-    ARRAY[]::text[] AS features,
-    NULL::double precision AS sale_listing_plot_area_value,
-    NULL::text AS services_text,
-    NULL::text AS transport_text,
-    NULL::bigint AS sale_listing_previous_asking_price,
-    NULL::bigint AS sale_listing_previous_debt_free_price,
-    doc.new_development AS sale_listing_new_development,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{basicDetails,description}', sa.shortcut_ad_data #>> '{adData,description}', sa.shortcut_ad_data #>> '{description}', sa.shortcut_ad_data #>> '{text}')), '') AS description_text,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,freeingDescription}', sa.shortcut_ad_data #>> '{adData,availabilityDescription}', sa.shortcut_ad_data #>> '{availabilityDescription}', sa.shortcut_ad_data #>> '{adData,availableFrom}')), '') AS availability_text,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), '') AS renovations_done_text,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), '') AS renovations_planned_text,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,additionalInfo}', sa.shortcut_ad_data #>> '{adData,additionalInfo}', sa.shortcut_ad_data #>> '{moreInformationAvailableFrom}', sa.shortcut_ad_data #>> '{property,otherInfo}')), '') AS additional_info_text,
-    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', fa.frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', sa.shortcut_ad_data #>> '{priceData,chargesText}', sa.shortcut_ad_data #>> '{priceData,additionalInfo}', sa.shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', sa.shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text,
-    NULL::double precision AS sale_listing_maintenance_charge_monthly,
-    NULL::double precision AS sale_listing_total_charge_monthly,
-    NULL::double precision AS sale_listing_water_charge,
-    NULL::text AS housing_company_name,
-    NULL::text AS housing_company_business_id,
-    NULL::text AS building_material,
-    NULL::text AS heating_system,
-    NULL::text AS roof_type,
-    NULL::text AS roof_material,
-    NULL::text AS car_storage_text,
-    NULL::text AS building_description_text,
-    NULL::text AS building_other_info_text
-FROM public.listing_search_documents doc
-JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
-LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
-WHERE doc.primary_source_listing_id = $1
-    AND doc.listing_status = 'active'
-    AND doc.kind IN ('ad', 'announcement')
-LIMIT 1
-`
-
-type GetPropertySourceOfferingDetailRow struct {
-	SaleListingID                       *uuid.UUID `json:"sale_listing_id"`
-	SaleListingSourceProvider           string     `json:"sale_listing_source_provider"`
-	SaleListingSourceKind               string     `json:"sale_listing_source_kind"`
-	Url                                 *string    `json:"url"`
-	Headline                            *string    `json:"headline"`
-	StreetAddress                       *string    `json:"street_address"`
-	City                                *string    `json:"city"`
-	Postal                              *string    `json:"postal"`
-	SaleListingLatitude                 *float64   `json:"sale_listing_latitude"`
-	SaleListingLongitude                *float64   `json:"sale_listing_longitude"`
-	RoomLayout                          *string    `json:"room_layout"`
-	SaleListingRoomsCount               *int32     `json:"sale_listing_rooms_count"`
-	SaleListingAreaValue                *float64   `json:"sale_listing_area_value"`
-	SaleListingFloorLevel               *int32     `json:"sale_listing_floor_level"`
-	PropertyTypeRaw                     *string    `json:"property_type_raw"`
-	Condition                           *string    `json:"condition"`
-	SaleListingElevator                 *bool      `json:"sale_listing_elevator"`
-	EnergyClass                         *string    `json:"energy_class"`
-	EnergyEfficiencyLabel               *string    `json:"energy_efficiency_label"`
-	PlotTypeRaw                         *string    `json:"plot_type_raw"`
-	PlotTypeCode                        *string    `json:"plot_type_code"`
-	SaleListingPlotOwned                *bool      `json:"sale_listing_plot_owned"`
-	SaleListingAskingPrice              *int64     `json:"sale_listing_asking_price"`
-	SaleListingDebtFreePrice            *int64     `json:"sale_listing_debt_free_price"`
-	SaleListingDebtShareAmount          *int64     `json:"sale_listing_debt_share_amount"`
-	SaleListingPricePerM2               *float64   `json:"sale_listing_price_per_m2"`
-	SaleListingFirstSeenAt              *time.Time `json:"sale_listing_first_seen_at"`
-	SaleListingLastSeenAt               *time.Time `json:"sale_listing_last_seen_at"`
-	SaleListingPublishedAt              *time.Time `json:"sale_listing_published_at"`
-	SaleListingBuildYear                *int32     `json:"sale_listing_build_year"`
-	SaleListingTotalFloors              *int32     `json:"sale_listing_total_floors"`
-	SaleListingApartmentCount           *int32     `json:"sale_listing_apartment_count"`
-	SaleListingLivingAreaValue          *float64   `json:"sale_listing_living_area_value"`
-	SaleListingTotalAreaValue           *float64   `json:"sale_listing_total_area_value"`
-	SaleListingOtherAreaValue           *float64   `json:"sale_listing_other_area_value"`
-	SaleListingBedroomsCount            *int32     `json:"sale_listing_bedrooms_count"`
-	SaleListingSauna                    *bool      `json:"sale_listing_sauna"`
-	SaleListingBalcony                  *bool      `json:"sale_listing_balcony"`
-	ParkingText                         *string    `json:"parking_text"`
-	KitchenDescriptionText              *string    `json:"kitchen_description_text"`
-	BathroomDescriptionText             *string    `json:"bathroom_description_text"`
-	StorageDescriptionText              *string    `json:"storage_description_text"`
-	FloorMaterialsDescriptionText       *string    `json:"floor_materials_description_text"`
-	WallMaterialsDescriptionText        *string    `json:"wall_materials_description_text"`
-	BalconyDescriptionText              *string    `json:"balcony_description_text"`
-	SaunaDescriptionText                *string    `json:"sauna_description_text"`
-	ViewsDescriptionText                *string    `json:"views_description_text"`
-	Appliances                          []string   `json:"appliances"`
-	Features                            []string   `json:"features"`
-	SaleListingPlotAreaValue            *float64   `json:"sale_listing_plot_area_value"`
-	ServicesText                        *string    `json:"services_text"`
-	TransportText                       *string    `json:"transport_text"`
-	SaleListingPreviousAskingPrice      *int64     `json:"sale_listing_previous_asking_price"`
-	SaleListingPreviousDebtFreePrice    *int64     `json:"sale_listing_previous_debt_free_price"`
-	SaleListingNewDevelopment           *bool      `json:"sale_listing_new_development"`
-	DescriptionText                     *string    `json:"description_text"`
-	AvailabilityText                    *string    `json:"availability_text"`
-	RenovationsDoneText                 *string    `json:"renovations_done_text"`
-	RenovationsPlannedText              *string    `json:"renovations_planned_text"`
-	AdditionalInfoText                  *string    `json:"additional_info_text"`
-	ChargesText                         *string    `json:"charges_text"`
-	SaleListingMaintenanceChargeMonthly *float64   `json:"sale_listing_maintenance_charge_monthly"`
-	SaleListingTotalChargeMonthly       *float64   `json:"sale_listing_total_charge_monthly"`
-	SaleListingWaterCharge              *float64   `json:"sale_listing_water_charge"`
-	HousingCompanyName                  *string    `json:"housing_company_name"`
-	HousingCompanyBusinessID            *string    `json:"housing_company_business_id"`
-	BuildingMaterial                    *string    `json:"building_material"`
-	HeatingSystem                       *string    `json:"heating_system"`
-	RoofType                            *string    `json:"roof_type"`
-	RoofMaterial                        *string    `json:"roof_material"`
-	CarStorageText                      *string    `json:"car_storage_text"`
-	BuildingDescriptionText             *string    `json:"building_description_text"`
-	BuildingOtherInfoText               *string    `json:"building_other_info_text"`
-}
-
-func (q *Queries) GetPropertySourceOfferingDetail(ctx context.Context, saleListingID *uuid.UUID) (GetPropertySourceOfferingDetailRow, error) {
-	row := q.db.QueryRow(ctx, getPropertySourceOfferingDetail, saleListingID)
-	var i GetPropertySourceOfferingDetailRow
-	err := row.Scan(
-		&i.SaleListingID,
-		&i.SaleListingSourceProvider,
-		&i.SaleListingSourceKind,
-		&i.Url,
-		&i.Headline,
-		&i.StreetAddress,
-		&i.City,
-		&i.Postal,
-		&i.SaleListingLatitude,
-		&i.SaleListingLongitude,
-		&i.RoomLayout,
-		&i.SaleListingRoomsCount,
-		&i.SaleListingAreaValue,
-		&i.SaleListingFloorLevel,
-		&i.PropertyTypeRaw,
-		&i.Condition,
-		&i.SaleListingElevator,
-		&i.EnergyClass,
-		&i.EnergyEfficiencyLabel,
-		&i.PlotTypeRaw,
-		&i.PlotTypeCode,
-		&i.SaleListingPlotOwned,
-		&i.SaleListingAskingPrice,
-		&i.SaleListingDebtFreePrice,
-		&i.SaleListingDebtShareAmount,
-		&i.SaleListingPricePerM2,
-		&i.SaleListingFirstSeenAt,
-		&i.SaleListingLastSeenAt,
-		&i.SaleListingPublishedAt,
-		&i.SaleListingBuildYear,
-		&i.SaleListingTotalFloors,
-		&i.SaleListingApartmentCount,
-		&i.SaleListingLivingAreaValue,
-		&i.SaleListingTotalAreaValue,
-		&i.SaleListingOtherAreaValue,
-		&i.SaleListingBedroomsCount,
-		&i.SaleListingSauna,
-		&i.SaleListingBalcony,
-		&i.ParkingText,
-		&i.KitchenDescriptionText,
-		&i.BathroomDescriptionText,
-		&i.StorageDescriptionText,
-		&i.FloorMaterialsDescriptionText,
-		&i.WallMaterialsDescriptionText,
-		&i.BalconyDescriptionText,
-		&i.SaunaDescriptionText,
-		&i.ViewsDescriptionText,
-		&i.Appliances,
-		&i.Features,
-		&i.SaleListingPlotAreaValue,
-		&i.ServicesText,
-		&i.TransportText,
-		&i.SaleListingPreviousAskingPrice,
-		&i.SaleListingPreviousDebtFreePrice,
-		&i.SaleListingNewDevelopment,
-		&i.DescriptionText,
-		&i.AvailabilityText,
-		&i.RenovationsDoneText,
-		&i.RenovationsPlannedText,
-		&i.AdditionalInfoText,
-		&i.ChargesText,
-		&i.SaleListingMaintenanceChargeMonthly,
-		&i.SaleListingTotalChargeMonthly,
-		&i.SaleListingWaterCharge,
-		&i.HousingCompanyName,
-		&i.HousingCompanyBusinessID,
-		&i.BuildingMaterial,
-		&i.HeatingSystem,
-		&i.RoofType,
-		&i.RoofMaterial,
-		&i.CarStorageText,
-		&i.BuildingDescriptionText,
-		&i.BuildingOtherInfoText,
-	)
-	return i, err
-}
-
-const getPropertySourceOfferingValuationExtractionTexts = `-- name: GetPropertySourceOfferingValuationExtractionTexts :one
-WITH source_doc AS (
-    SELECT
-        doc.listing_status,
-        doc.refreshed_at,
-        doc.room_layout,
-        doc.rooms_count,
-        doc.area_m2,
-        doc.floor_level,
-        doc.total_floors,
-        doc.condition,
-        doc.sauna,
-        doc.balcony,
-        fa.frontdoor_ad_data,
-        sa.shortcut_ad_data,
-        fba.frontdoor_building_announcement_area,
-        fba.frontdoor_building_announcement_room_structure,
-        fb.frontdoor_building_floor_count,
-        fb.frontdoor_building_build_year,
-        fb.frontdoor_building_construction_end_year,
-        fb.frontdoor_building_heating,
-        fb.frontdoor_building_heating_fuel,
-        fb.frontdoor_building_outer_roof_type,
-        fb.frontdoor_building_outer_roof_material,
-        fb.frontdoor_building_car_storage_description,
-        fb.frontdoor_building_description,
-        fb.frontdoor_building_other_info
-    FROM public.listing_search_documents doc
-    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
-    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
-    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE doc.primary_source_listing_id = $1::uuid
-    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
-    LIMIT 1
-)
-SELECT
-    COALESCE(room_layout, frontdoor_building_announcement_room_structure) AS room_layout,
-    rooms_count AS sale_listing_rooms_count,
-    COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bedroomCount}', shortcut_ad_data #>> '{adData,bedrooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), NULL::integer) AS sale_listing_bedrooms_count,
-    COALESCE(area_m2, frontdoor_building_announcement_area) AS sale_listing_area_value,
-    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,livingArea}', shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_living_area_value,
-    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,totalArea}', shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_total_area_value,
-    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,otherArea}', shortcut_ad_data #>> '{adData,sizeOther}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_other_area_value,
-    floor_level AS sale_listing_floor_level,
-    COALESCE(total_floors, frontdoor_building_floor_count) AS sale_listing_total_floors,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,floorLevel}', shortcut_ad_data #>> '{adData,floor}', floor_level::text)), '') AS floor_text,
-    condition,
-    sauna AS sale_listing_sauna,
-    balcony AS sale_listing_balcony,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,carParkingInformation}', shortcut_ad_data #>> '{adData,parkingSpaceInfo}', shortcut_ad_data #>> '{adData,carStorageInfo}')), '') AS parking_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}')), '') AS additional_info_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,kitchenDescription}', frontdoor_ad_data #>> '{property,kitchenDescription}', shortcut_ad_data #>> '{adData,kitchenApplianceInfo}')), '') AS kitchen_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bathroomDescription}', frontdoor_ad_data #>> '{property,bathroomDescription}', shortcut_ad_data #>> '{adData,bathroomApplianceInfo}')), '') AS bathroom_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,storageSpacesDescription}', frontdoor_ad_data #>> '{residenceDetailsDTO,storageSpacesDescription}', shortcut_ad_data #>> '{adData,storageInfo}', shortcut_ad_data #>> '{adData,commonAreaInfo}')), '') AS storage_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,floorMaterialDescription}', frontdoor_ad_data #>> '{property,floorMaterialDescription}', shortcut_ad_data #>> '{adData,floorMaterialInfo}')), '') AS floor_materials_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,wallMaterialDescription}', frontdoor_ad_data #>> '{property,wallMaterialDescription}', shortcut_ad_data #>> '{adData,wallMaterialInfo}')), '') AS wall_materials_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,balconyDescription}', frontdoor_ad_data #>> '{property,balconyDescription}', shortcut_ad_data #>> '{adData,balconyInfo}')), '') AS balcony_description_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,saunaDescription}', shortcut_ad_data #>> '{adData,saunaInfo}')), '') AS sauna_description_text,
-    NULLIF(trim(frontdoor_ad_data #>> '{residenceDetailsDTO,viewsDescription}'), '') AS views_description_text,
-    NULL::text AS building_material,
-    NULLIF(trim(concat_ws(', ', frontdoor_building_heating, array_to_string(frontdoor_building_heating_fuel, ', '))), '') AS heating_system,
-    frontdoor_building_outer_roof_type AS roof_type,
-    frontdoor_building_outer_roof_material AS roof_material,
-    frontdoor_building_car_storage_description AS car_storage_text,
-    frontdoor_building_description AS building_description_text,
-    frontdoor_building_other_info AS building_other_info_text,
-    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', shortcut_ad_data #>> '{priceData,chargesText}', shortcut_ad_data #>> '{priceData,additionalInfo}', shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text
-FROM source_doc
-`
-
-type GetPropertySourceOfferingValuationExtractionTextsRow struct {
-	RoomLayout                    *string  `json:"room_layout"`
-	SaleListingRoomsCount         *int32   `json:"sale_listing_rooms_count"`
-	SaleListingBedroomsCount      *int32   `json:"sale_listing_bedrooms_count"`
-	SaleListingAreaValue          *float64 `json:"sale_listing_area_value"`
-	SaleListingLivingAreaValue    *float64 `json:"sale_listing_living_area_value"`
-	SaleListingTotalAreaValue     *float64 `json:"sale_listing_total_area_value"`
-	SaleListingOtherAreaValue     *float64 `json:"sale_listing_other_area_value"`
-	SaleListingFloorLevel         *int32   `json:"sale_listing_floor_level"`
-	SaleListingTotalFloors        *int32   `json:"sale_listing_total_floors"`
-	FloorText                     *string  `json:"floor_text"`
-	Condition                     *string  `json:"condition"`
-	SaleListingSauna              *bool    `json:"sale_listing_sauna"`
-	SaleListingBalcony            *bool    `json:"sale_listing_balcony"`
-	ParkingText                   *string  `json:"parking_text"`
-	DescriptionText               *string  `json:"description_text"`
-	AdditionalInfoText            *string  `json:"additional_info_text"`
-	KitchenDescriptionText        *string  `json:"kitchen_description_text"`
-	BathroomDescriptionText       *string  `json:"bathroom_description_text"`
-	StorageDescriptionText        *string  `json:"storage_description_text"`
-	FloorMaterialsDescriptionText *string  `json:"floor_materials_description_text"`
-	WallMaterialsDescriptionText  *string  `json:"wall_materials_description_text"`
-	BalconyDescriptionText        *string  `json:"balcony_description_text"`
-	SaunaDescriptionText          *string  `json:"sauna_description_text"`
-	ViewsDescriptionText          *string  `json:"views_description_text"`
-	BuildingMaterial              *string  `json:"building_material"`
-	HeatingSystem                 *string  `json:"heating_system"`
-	RoofType                      *string  `json:"roof_type"`
-	RoofMaterial                  *string  `json:"roof_material"`
-	CarStorageText                *string  `json:"car_storage_text"`
-	BuildingDescriptionText       *string  `json:"building_description_text"`
-	BuildingOtherInfoText         *string  `json:"building_other_info_text"`
-	ChargesText                   *string  `json:"charges_text"`
-}
-
-func (q *Queries) GetPropertySourceOfferingValuationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetPropertySourceOfferingValuationExtractionTextsRow, error) {
-	row := q.db.QueryRow(ctx, getPropertySourceOfferingValuationExtractionTexts, saleListingID)
-	var i GetPropertySourceOfferingValuationExtractionTextsRow
-	err := row.Scan(
-		&i.RoomLayout,
-		&i.SaleListingRoomsCount,
-		&i.SaleListingBedroomsCount,
-		&i.SaleListingAreaValue,
-		&i.SaleListingLivingAreaValue,
-		&i.SaleListingTotalAreaValue,
-		&i.SaleListingOtherAreaValue,
-		&i.SaleListingFloorLevel,
-		&i.SaleListingTotalFloors,
-		&i.FloorText,
-		&i.Condition,
-		&i.SaleListingSauna,
-		&i.SaleListingBalcony,
-		&i.ParkingText,
-		&i.DescriptionText,
-		&i.AdditionalInfoText,
-		&i.KitchenDescriptionText,
-		&i.BathroomDescriptionText,
-		&i.StorageDescriptionText,
-		&i.FloorMaterialsDescriptionText,
-		&i.WallMaterialsDescriptionText,
-		&i.BalconyDescriptionText,
-		&i.SaunaDescriptionText,
-		&i.ViewsDescriptionText,
-		&i.BuildingMaterial,
-		&i.HeatingSystem,
-		&i.RoofType,
-		&i.RoofMaterial,
-		&i.CarStorageText,
-		&i.BuildingDescriptionText,
-		&i.BuildingOtherInfoText,
-		&i.ChargesText,
-	)
-	return i, err
-}
-
 const getRuntimeKV = `-- name: GetRuntimeKV :one
 SELECT kv_value
 FROM runtime.kv_store
@@ -2692,6 +2230,436 @@ func (q *Queries) GetShortcutBuildingUnifiedDetail(ctx context.Context, building
 	return i, err
 }
 
+const getSourceListingDescriptionTexts = `-- name: GetSourceListingDescriptionTexts :one
+WITH source_doc AS (
+    SELECT
+        doc.listing_status,
+        doc.refreshed_at,
+        fa.frontdoor_ad_data,
+        sa.shortcut_ad_data,
+        fba.frontdoor_building_announcement_room_structure,
+        fb.frontdoor_building_description,
+        fb.frontdoor_building_other_info
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE doc.primary_source_listing_id = $1::uuid
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
+SELECT
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
+    COALESCE(NULLIF(trim(COALESCE(frontdoor_building_description, frontdoor_building_other_info)), ''), '') AS building_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}', frontdoor_building_announcement_room_structure)), '') AS additional_info_text
+FROM source_doc
+`
+
+type GetSourceListingDescriptionTextsRow struct {
+	DescriptionText    *string `json:"description_text"`
+	BuildingText       *string `json:"building_text"`
+	AdditionalInfoText *string `json:"additional_info_text"`
+}
+
+func (q *Queries) GetSourceListingDescriptionTexts(ctx context.Context, saleListingID uuid.UUID) (GetSourceListingDescriptionTextsRow, error) {
+	row := q.db.QueryRow(ctx, getSourceListingDescriptionTexts, saleListingID)
+	var i GetSourceListingDescriptionTextsRow
+	err := row.Scan(&i.DescriptionText, &i.BuildingText, &i.AdditionalInfoText)
+	return i, err
+}
+
+const getSourceListingDetail = `-- name: GetSourceListingDetail :one
+SELECT
+    COALESCE(doc.primary_source_listing_id, doc.listing_id) AS sale_listing_id,
+    doc.source AS sale_listing_source_provider,
+    doc.kind AS sale_listing_source_kind,
+    doc.url,
+    doc.headline,
+    doc.address AS street_address,
+    doc.city,
+    doc.postal,
+    doc.latitude AS sale_listing_latitude,
+    doc.longitude AS sale_listing_longitude,
+    doc.room_layout,
+    doc.rooms_count AS sale_listing_rooms_count,
+    doc.area_m2 AS sale_listing_area_value,
+    doc.floor_level AS sale_listing_floor_level,
+    doc.property_type_code AS property_type_raw,
+    doc.condition,
+    doc.elevator AS sale_listing_elevator,
+    doc.energy_class,
+    doc.energy_efficiency_label,
+    NULL::text AS plot_type_raw,
+    doc.property_type_code AS plot_type_code,
+    doc.plot_owned AS sale_listing_plot_owned,
+    doc.asking_price AS sale_listing_asking_price,
+    doc.debt_free_price AS sale_listing_debt_free_price,
+    doc.debt_share_amount AS sale_listing_debt_share_amount,
+    doc.price_per_m2 AS sale_listing_price_per_m2,
+    doc.first_seen_at AS sale_listing_first_seen_at,
+    doc.last_seen_at AS sale_listing_last_seen_at,
+    doc.published_at AS sale_listing_published_at,
+    doc.build_year AS sale_listing_build_year,
+    doc.total_floors AS sale_listing_total_floors,
+    NULL::integer AS sale_listing_apartment_count,
+    NULL::double precision AS sale_listing_living_area_value,
+    NULL::double precision AS sale_listing_total_area_value,
+    NULL::double precision AS sale_listing_other_area_value,
+    NULL::integer AS sale_listing_bedrooms_count,
+    doc.sauna AS sale_listing_sauna,
+    doc.balcony AS sale_listing_balcony,
+    NULL::text AS parking_text,
+    NULL::text AS kitchen_description_text,
+    NULL::text AS bathroom_description_text,
+    NULL::text AS storage_description_text,
+    NULL::text AS floor_materials_description_text,
+    NULL::text AS wall_materials_description_text,
+    NULL::text AS balcony_description_text,
+    NULL::text AS sauna_description_text,
+    NULL::text AS views_description_text,
+    ARRAY[]::text[] AS appliances,
+    ARRAY[]::text[] AS features,
+    NULL::double precision AS sale_listing_plot_area_value,
+    NULL::text AS services_text,
+    NULL::text AS transport_text,
+    NULL::bigint AS sale_listing_previous_asking_price,
+    NULL::bigint AS sale_listing_previous_debt_free_price,
+    doc.new_development AS sale_listing_new_development,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{basicDetails,description}', sa.shortcut_ad_data #>> '{adData,description}', sa.shortcut_ad_data #>> '{description}', sa.shortcut_ad_data #>> '{text}')), '') AS description_text,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{residenceDetailsDTO,freeingDescription}', sa.shortcut_ad_data #>> '{adData,availabilityDescription}', sa.shortcut_ad_data #>> '{availabilityDescription}', sa.shortcut_ad_data #>> '{adData,availableFrom}')), '') AS availability_text,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), '') AS renovations_done_text,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), '') AS renovations_planned_text,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,additionalInfo}', sa.shortcut_ad_data #>> '{adData,additionalInfo}', sa.shortcut_ad_data #>> '{moreInformationAvailableFrom}', sa.shortcut_ad_data #>> '{property,otherInfo}')), '') AS additional_info_text,
+    NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', fa.frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', sa.shortcut_ad_data #>> '{priceData,chargesText}', sa.shortcut_ad_data #>> '{priceData,additionalInfo}', sa.shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', sa.shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text,
+    NULL::double precision AS sale_listing_maintenance_charge_monthly,
+    NULL::double precision AS sale_listing_total_charge_monthly,
+    NULL::double precision AS sale_listing_water_charge,
+    NULL::text AS housing_company_name,
+    NULL::text AS housing_company_business_id,
+    NULL::text AS building_material,
+    NULL::text AS heating_system,
+    NULL::text AS roof_type,
+    NULL::text AS roof_material,
+    NULL::text AS car_storage_text,
+    NULL::text AS building_description_text,
+    NULL::text AS building_other_info_text
+FROM public.listing_search_documents doc
+JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+WHERE doc.primary_source_listing_id = $1
+    AND doc.listing_status = 'active'
+    AND doc.kind IN ('ad', 'announcement')
+LIMIT 1
+`
+
+type GetSourceListingDetailRow struct {
+	SaleListingID                       *uuid.UUID `json:"sale_listing_id"`
+	SaleListingSourceProvider           string     `json:"sale_listing_source_provider"`
+	SaleListingSourceKind               string     `json:"sale_listing_source_kind"`
+	Url                                 *string    `json:"url"`
+	Headline                            *string    `json:"headline"`
+	StreetAddress                       *string    `json:"street_address"`
+	City                                *string    `json:"city"`
+	Postal                              *string    `json:"postal"`
+	SaleListingLatitude                 *float64   `json:"sale_listing_latitude"`
+	SaleListingLongitude                *float64   `json:"sale_listing_longitude"`
+	RoomLayout                          *string    `json:"room_layout"`
+	SaleListingRoomsCount               *int32     `json:"sale_listing_rooms_count"`
+	SaleListingAreaValue                *float64   `json:"sale_listing_area_value"`
+	SaleListingFloorLevel               *int32     `json:"sale_listing_floor_level"`
+	PropertyTypeRaw                     *string    `json:"property_type_raw"`
+	Condition                           *string    `json:"condition"`
+	SaleListingElevator                 *bool      `json:"sale_listing_elevator"`
+	EnergyClass                         *string    `json:"energy_class"`
+	EnergyEfficiencyLabel               *string    `json:"energy_efficiency_label"`
+	PlotTypeRaw                         *string    `json:"plot_type_raw"`
+	PlotTypeCode                        *string    `json:"plot_type_code"`
+	SaleListingPlotOwned                *bool      `json:"sale_listing_plot_owned"`
+	SaleListingAskingPrice              *int64     `json:"sale_listing_asking_price"`
+	SaleListingDebtFreePrice            *int64     `json:"sale_listing_debt_free_price"`
+	SaleListingDebtShareAmount          *int64     `json:"sale_listing_debt_share_amount"`
+	SaleListingPricePerM2               *float64   `json:"sale_listing_price_per_m2"`
+	SaleListingFirstSeenAt              *time.Time `json:"sale_listing_first_seen_at"`
+	SaleListingLastSeenAt               *time.Time `json:"sale_listing_last_seen_at"`
+	SaleListingPublishedAt              *time.Time `json:"sale_listing_published_at"`
+	SaleListingBuildYear                *int32     `json:"sale_listing_build_year"`
+	SaleListingTotalFloors              *int32     `json:"sale_listing_total_floors"`
+	SaleListingApartmentCount           *int32     `json:"sale_listing_apartment_count"`
+	SaleListingLivingAreaValue          *float64   `json:"sale_listing_living_area_value"`
+	SaleListingTotalAreaValue           *float64   `json:"sale_listing_total_area_value"`
+	SaleListingOtherAreaValue           *float64   `json:"sale_listing_other_area_value"`
+	SaleListingBedroomsCount            *int32     `json:"sale_listing_bedrooms_count"`
+	SaleListingSauna                    *bool      `json:"sale_listing_sauna"`
+	SaleListingBalcony                  *bool      `json:"sale_listing_balcony"`
+	ParkingText                         *string    `json:"parking_text"`
+	KitchenDescriptionText              *string    `json:"kitchen_description_text"`
+	BathroomDescriptionText             *string    `json:"bathroom_description_text"`
+	StorageDescriptionText              *string    `json:"storage_description_text"`
+	FloorMaterialsDescriptionText       *string    `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText        *string    `json:"wall_materials_description_text"`
+	BalconyDescriptionText              *string    `json:"balcony_description_text"`
+	SaunaDescriptionText                *string    `json:"sauna_description_text"`
+	ViewsDescriptionText                *string    `json:"views_description_text"`
+	Appliances                          []string   `json:"appliances"`
+	Features                            []string   `json:"features"`
+	SaleListingPlotAreaValue            *float64   `json:"sale_listing_plot_area_value"`
+	ServicesText                        *string    `json:"services_text"`
+	TransportText                       *string    `json:"transport_text"`
+	SaleListingPreviousAskingPrice      *int64     `json:"sale_listing_previous_asking_price"`
+	SaleListingPreviousDebtFreePrice    *int64     `json:"sale_listing_previous_debt_free_price"`
+	SaleListingNewDevelopment           *bool      `json:"sale_listing_new_development"`
+	DescriptionText                     *string    `json:"description_text"`
+	AvailabilityText                    *string    `json:"availability_text"`
+	RenovationsDoneText                 *string    `json:"renovations_done_text"`
+	RenovationsPlannedText              *string    `json:"renovations_planned_text"`
+	AdditionalInfoText                  *string    `json:"additional_info_text"`
+	ChargesText                         *string    `json:"charges_text"`
+	SaleListingMaintenanceChargeMonthly *float64   `json:"sale_listing_maintenance_charge_monthly"`
+	SaleListingTotalChargeMonthly       *float64   `json:"sale_listing_total_charge_monthly"`
+	SaleListingWaterCharge              *float64   `json:"sale_listing_water_charge"`
+	HousingCompanyName                  *string    `json:"housing_company_name"`
+	HousingCompanyBusinessID            *string    `json:"housing_company_business_id"`
+	BuildingMaterial                    *string    `json:"building_material"`
+	HeatingSystem                       *string    `json:"heating_system"`
+	RoofType                            *string    `json:"roof_type"`
+	RoofMaterial                        *string    `json:"roof_material"`
+	CarStorageText                      *string    `json:"car_storage_text"`
+	BuildingDescriptionText             *string    `json:"building_description_text"`
+	BuildingOtherInfoText               *string    `json:"building_other_info_text"`
+}
+
+func (q *Queries) GetSourceListingDetail(ctx context.Context, saleListingID *uuid.UUID) (GetSourceListingDetailRow, error) {
+	row := q.db.QueryRow(ctx, getSourceListingDetail, saleListingID)
+	var i GetSourceListingDetailRow
+	err := row.Scan(
+		&i.SaleListingID,
+		&i.SaleListingSourceProvider,
+		&i.SaleListingSourceKind,
+		&i.Url,
+		&i.Headline,
+		&i.StreetAddress,
+		&i.City,
+		&i.Postal,
+		&i.SaleListingLatitude,
+		&i.SaleListingLongitude,
+		&i.RoomLayout,
+		&i.SaleListingRoomsCount,
+		&i.SaleListingAreaValue,
+		&i.SaleListingFloorLevel,
+		&i.PropertyTypeRaw,
+		&i.Condition,
+		&i.SaleListingElevator,
+		&i.EnergyClass,
+		&i.EnergyEfficiencyLabel,
+		&i.PlotTypeRaw,
+		&i.PlotTypeCode,
+		&i.SaleListingPlotOwned,
+		&i.SaleListingAskingPrice,
+		&i.SaleListingDebtFreePrice,
+		&i.SaleListingDebtShareAmount,
+		&i.SaleListingPricePerM2,
+		&i.SaleListingFirstSeenAt,
+		&i.SaleListingLastSeenAt,
+		&i.SaleListingPublishedAt,
+		&i.SaleListingBuildYear,
+		&i.SaleListingTotalFloors,
+		&i.SaleListingApartmentCount,
+		&i.SaleListingLivingAreaValue,
+		&i.SaleListingTotalAreaValue,
+		&i.SaleListingOtherAreaValue,
+		&i.SaleListingBedroomsCount,
+		&i.SaleListingSauna,
+		&i.SaleListingBalcony,
+		&i.ParkingText,
+		&i.KitchenDescriptionText,
+		&i.BathroomDescriptionText,
+		&i.StorageDescriptionText,
+		&i.FloorMaterialsDescriptionText,
+		&i.WallMaterialsDescriptionText,
+		&i.BalconyDescriptionText,
+		&i.SaunaDescriptionText,
+		&i.ViewsDescriptionText,
+		&i.Appliances,
+		&i.Features,
+		&i.SaleListingPlotAreaValue,
+		&i.ServicesText,
+		&i.TransportText,
+		&i.SaleListingPreviousAskingPrice,
+		&i.SaleListingPreviousDebtFreePrice,
+		&i.SaleListingNewDevelopment,
+		&i.DescriptionText,
+		&i.AvailabilityText,
+		&i.RenovationsDoneText,
+		&i.RenovationsPlannedText,
+		&i.AdditionalInfoText,
+		&i.ChargesText,
+		&i.SaleListingMaintenanceChargeMonthly,
+		&i.SaleListingTotalChargeMonthly,
+		&i.SaleListingWaterCharge,
+		&i.HousingCompanyName,
+		&i.HousingCompanyBusinessID,
+		&i.BuildingMaterial,
+		&i.HeatingSystem,
+		&i.RoofType,
+		&i.RoofMaterial,
+		&i.CarStorageText,
+		&i.BuildingDescriptionText,
+		&i.BuildingOtherInfoText,
+	)
+	return i, err
+}
+
+const getSourceListingValuationExtractionTexts = `-- name: GetSourceListingValuationExtractionTexts :one
+WITH source_doc AS (
+    SELECT
+        doc.listing_status,
+        doc.refreshed_at,
+        doc.room_layout,
+        doc.rooms_count,
+        doc.area_m2,
+        doc.floor_level,
+        doc.total_floors,
+        doc.condition,
+        doc.sauna,
+        doc.balcony,
+        fa.frontdoor_ad_data,
+        sa.shortcut_ad_data,
+        fba.frontdoor_building_announcement_area,
+        fba.frontdoor_building_announcement_room_structure,
+        fb.frontdoor_building_floor_count,
+        fb.frontdoor_building_build_year,
+        fb.frontdoor_building_construction_end_year,
+        fb.frontdoor_building_heating,
+        fb.frontdoor_building_heating_fuel,
+        fb.frontdoor_building_outer_roof_type,
+        fb.frontdoor_building_outer_roof_material,
+        fb.frontdoor_building_car_storage_description,
+        fb.frontdoor_building_description,
+        fb.frontdoor_building_other_info
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
+    LEFT JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE doc.primary_source_listing_id = $1::uuid
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
+SELECT
+    COALESCE(room_layout, frontdoor_building_announcement_room_structure) AS room_layout,
+    rooms_count AS sale_listing_rooms_count,
+    COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE (parsed_value.value::numeric)::int4 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bedroomCount}', shortcut_ad_data #>> '{adData,bedrooms}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), NULL::integer) AS sale_listing_bedrooms_count,
+    COALESCE(area_m2, frontdoor_building_announcement_area) AS sale_listing_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,livingArea}', shortcut_ad_data #>> '{adData,sizeLiving}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_living_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,totalArea}', shortcut_ad_data #>> '{adData,sizeTotal}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_total_area_value,
+    (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,otherArea}', shortcut_ad_data #>> '{adData,sizeOther}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS sale_listing_other_area_value,
+    floor_level AS sale_listing_floor_level,
+    COALESCE(total_floors, frontdoor_building_floor_count) AS sale_listing_total_floors,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,floorLevel}', shortcut_ad_data #>> '{adData,floor}', floor_level::text)), '') AS floor_text,
+    condition,
+    sauna AS sale_listing_sauna,
+    balcony AS sale_listing_balcony,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,carParkingInformation}', shortcut_ad_data #>> '{adData,parkingSpaceInfo}', shortcut_ad_data #>> '{adData,carStorageInfo}')), '') AS parking_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{text}', frontdoor_ad_data #>> '{property,description}', shortcut_ad_data #>> '{adData,description}', shortcut_ad_data #>> '{description}', shortcut_ad_data #>> '{text}')), '') AS description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{moreInformationAvailableFrom}', frontdoor_ad_data #>> '{property,housingCompany,otherInfo}', frontdoor_ad_data #>> '{additionalItemsIncludedInSale}', shortcut_ad_data #>> '{adData,additionalInfo}', shortcut_ad_data #>> '{moreInformationAvailableFrom}', shortcut_ad_data #>> '{property,otherInfo}')), '') AS additional_info_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,kitchenDescription}', frontdoor_ad_data #>> '{property,kitchenDescription}', shortcut_ad_data #>> '{adData,kitchenApplianceInfo}')), '') AS kitchen_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,bathroomDescription}', frontdoor_ad_data #>> '{property,bathroomDescription}', shortcut_ad_data #>> '{adData,bathroomApplianceInfo}')), '') AS bathroom_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,storageSpacesDescription}', frontdoor_ad_data #>> '{residenceDetailsDTO,storageSpacesDescription}', shortcut_ad_data #>> '{adData,storageInfo}', shortcut_ad_data #>> '{adData,commonAreaInfo}')), '') AS storage_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,floorMaterialDescription}', frontdoor_ad_data #>> '{property,floorMaterialDescription}', shortcut_ad_data #>> '{adData,floorMaterialInfo}')), '') AS floor_materials_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,wallMaterialDescription}', frontdoor_ad_data #>> '{property,wallMaterialDescription}', shortcut_ad_data #>> '{adData,wallMaterialInfo}')), '') AS wall_materials_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,balconyDescription}', frontdoor_ad_data #>> '{property,balconyDescription}', shortcut_ad_data #>> '{adData,balconyInfo}')), '') AS balcony_description_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{residenceDetailsDTO,saunaDescription}', shortcut_ad_data #>> '{adData,saunaInfo}')), '') AS sauna_description_text,
+    NULLIF(trim(frontdoor_ad_data #>> '{residenceDetailsDTO,viewsDescription}'), '') AS views_description_text,
+    NULL::text AS building_material,
+    NULLIF(trim(concat_ws(', ', frontdoor_building_heating, array_to_string(frontdoor_building_heating_fuel, ', '))), '') AS heating_system,
+    frontdoor_building_outer_roof_type AS roof_type,
+    frontdoor_building_outer_roof_material AS roof_material,
+    frontdoor_building_car_storage_description AS car_storage_text,
+    frontdoor_building_description AS building_description_text,
+    frontdoor_building_other_info AS building_other_info_text,
+    NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,periodicChargesAdditionalInfo}', frontdoor_ad_data #>> '{property,managementChargesAdditionalInfo}', shortcut_ad_data #>> '{priceData,chargesText}', shortcut_ad_data #>> '{priceData,additionalInfo}', shortcut_ad_data #>> '{property,periodicChargesAdditionalInfo}', shortcut_ad_data #>> '{property,managementChargesAdditionalInfo}')), '') AS charges_text
+FROM source_doc
+`
+
+type GetSourceListingValuationExtractionTextsRow struct {
+	RoomLayout                    *string  `json:"room_layout"`
+	SaleListingRoomsCount         *int32   `json:"sale_listing_rooms_count"`
+	SaleListingBedroomsCount      *int32   `json:"sale_listing_bedrooms_count"`
+	SaleListingAreaValue          *float64 `json:"sale_listing_area_value"`
+	SaleListingLivingAreaValue    *float64 `json:"sale_listing_living_area_value"`
+	SaleListingTotalAreaValue     *float64 `json:"sale_listing_total_area_value"`
+	SaleListingOtherAreaValue     *float64 `json:"sale_listing_other_area_value"`
+	SaleListingFloorLevel         *int32   `json:"sale_listing_floor_level"`
+	SaleListingTotalFloors        *int32   `json:"sale_listing_total_floors"`
+	FloorText                     *string  `json:"floor_text"`
+	Condition                     *string  `json:"condition"`
+	SaleListingSauna              *bool    `json:"sale_listing_sauna"`
+	SaleListingBalcony            *bool    `json:"sale_listing_balcony"`
+	ParkingText                   *string  `json:"parking_text"`
+	DescriptionText               *string  `json:"description_text"`
+	AdditionalInfoText            *string  `json:"additional_info_text"`
+	KitchenDescriptionText        *string  `json:"kitchen_description_text"`
+	BathroomDescriptionText       *string  `json:"bathroom_description_text"`
+	StorageDescriptionText        *string  `json:"storage_description_text"`
+	FloorMaterialsDescriptionText *string  `json:"floor_materials_description_text"`
+	WallMaterialsDescriptionText  *string  `json:"wall_materials_description_text"`
+	BalconyDescriptionText        *string  `json:"balcony_description_text"`
+	SaunaDescriptionText          *string  `json:"sauna_description_text"`
+	ViewsDescriptionText          *string  `json:"views_description_text"`
+	BuildingMaterial              *string  `json:"building_material"`
+	HeatingSystem                 *string  `json:"heating_system"`
+	RoofType                      *string  `json:"roof_type"`
+	RoofMaterial                  *string  `json:"roof_material"`
+	CarStorageText                *string  `json:"car_storage_text"`
+	BuildingDescriptionText       *string  `json:"building_description_text"`
+	BuildingOtherInfoText         *string  `json:"building_other_info_text"`
+	ChargesText                   *string  `json:"charges_text"`
+}
+
+func (q *Queries) GetSourceListingValuationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetSourceListingValuationExtractionTextsRow, error) {
+	row := q.db.QueryRow(ctx, getSourceListingValuationExtractionTexts, saleListingID)
+	var i GetSourceListingValuationExtractionTextsRow
+	err := row.Scan(
+		&i.RoomLayout,
+		&i.SaleListingRoomsCount,
+		&i.SaleListingBedroomsCount,
+		&i.SaleListingAreaValue,
+		&i.SaleListingLivingAreaValue,
+		&i.SaleListingTotalAreaValue,
+		&i.SaleListingOtherAreaValue,
+		&i.SaleListingFloorLevel,
+		&i.SaleListingTotalFloors,
+		&i.FloorText,
+		&i.Condition,
+		&i.SaleListingSauna,
+		&i.SaleListingBalcony,
+		&i.ParkingText,
+		&i.DescriptionText,
+		&i.AdditionalInfoText,
+		&i.KitchenDescriptionText,
+		&i.BathroomDescriptionText,
+		&i.StorageDescriptionText,
+		&i.FloorMaterialsDescriptionText,
+		&i.WallMaterialsDescriptionText,
+		&i.BalconyDescriptionText,
+		&i.SaunaDescriptionText,
+		&i.ViewsDescriptionText,
+		&i.BuildingMaterial,
+		&i.HeatingSystem,
+		&i.RoofType,
+		&i.RoofMaterial,
+		&i.CarStorageText,
+		&i.BuildingDescriptionText,
+		&i.BuildingOtherInfoText,
+		&i.ChargesText,
+	)
+	return i, err
+}
+
 const insertDocumentPropertyClaim = `-- name: InsertDocumentPropertyClaim :exec
 WITH run AS (
     INSERT INTO public.property_dimension_projection_runs (
@@ -2873,20 +2841,20 @@ func (q *Queries) InsertDocumentPropertyClaim(ctx context.Context, arg InsertDoc
 	return err
 }
 
-const insertLLMPropertySourceOfferingRenovation = `-- name: InsertLLMPropertySourceOfferingRenovation :exec
-INSERT INTO public.property_source_offering_renovations (
-    sale_listing_id,
-    property_source_offering_renovation_source_field,
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component,
-    property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence
+const insertLLMSourceListingRenovation = `-- name: InsertLLMSourceListingRenovation :exec
+INSERT INTO public.source_listing_renovations (
+    source_listing_id,
+    source_listing_renovation_source_field,
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component,
+    source_listing_renovation_scope,
+    source_listing_renovation_stage,
+    source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text,
+    source_listing_renovation_confidence
 ) VALUES (
     $1,
     $2,
@@ -2903,7 +2871,7 @@ INSERT INTO public.property_source_offering_renovations (
 )
 `
 
-type InsertLLMPropertySourceOfferingRenovationParams struct {
+type InsertLLMSourceListingRenovationParams struct {
 	SaleListingID   *uuid.UUID `json:"sale_listing_id"`
 	SourceField     *string    `json:"source_field"`
 	Category        *string    `json:"category"`
@@ -2918,8 +2886,8 @@ type InsertLLMPropertySourceOfferingRenovationParams struct {
 	Confidence      *int32     `json:"confidence"`
 }
 
-func (q *Queries) InsertLLMPropertySourceOfferingRenovation(ctx context.Context, arg InsertLLMPropertySourceOfferingRenovationParams) error {
-	_, err := q.db.Exec(ctx, insertLLMPropertySourceOfferingRenovation,
+func (q *Queries) InsertLLMSourceListingRenovation(ctx context.Context, arg InsertLLMSourceListingRenovationParams) error {
+	_, err := q.db.Exec(ctx, insertLLMSourceListingRenovation,
 		arg.SaleListingID,
 		arg.SourceField,
 		arg.Category,
@@ -3227,7 +3195,7 @@ func (q *Queries) InsertPropertyClaim(ctx context.Context, arg InsertPropertyCla
 	return err
 }
 
-const insertPropertySourceOfferingInsight = `-- name: InsertPropertySourceOfferingInsight :exec
+const insertSourceListingInsight = `-- name: InsertSourceListingInsight :exec
 INSERT INTO public.target_observations (
     target_type,
     target_id,
@@ -3274,7 +3242,7 @@ ON CONFLICT (target_type, target_id, observation_key, source_type, source_id) WH
     evidence = EXCLUDED.evidence
 `
 
-type InsertPropertySourceOfferingInsightParams struct {
+type InsertSourceListingInsightParams struct {
 	Key           *string    `json:"key"`
 	Direction     *string    `json:"direction"`
 	Severity      *string    `json:"severity"`
@@ -3285,8 +3253,8 @@ type InsertPropertySourceOfferingInsightParams struct {
 	SaleListingID *uuid.UUID `json:"sale_listing_id"`
 }
 
-func (q *Queries) InsertPropertySourceOfferingInsight(ctx context.Context, arg InsertPropertySourceOfferingInsightParams) error {
-	_, err := q.db.Exec(ctx, insertPropertySourceOfferingInsight,
+func (q *Queries) InsertSourceListingInsight(ctx context.Context, arg InsertSourceListingInsightParams) error {
+	_, err := q.db.Exec(ctx, insertSourceListingInsight,
 		arg.Key,
 		arg.Direction,
 		arg.Severity,
@@ -3335,7 +3303,7 @@ target_candidates AS (
     FROM public.dimension_claims c
     JOIN public.property_dimension_catalog catalog ON catalog.dimension_key = c.dimension_key
     WHERE c.claim_scope IN ('source','manual')
-        AND c.source_table IN ('listing_search_documents', 'property_source_offerings')
+        AND c.source_table = 'listing_search_documents'
         AND c.source_id = $1::uuid
         AND c.target_type = catalog.target_type
 )
@@ -3690,15 +3658,15 @@ func (q *Queries) ListPropertyDocumentsForOffering(ctx context.Context, property
 	return items, nil
 }
 
-const listPropertySourceOfferingInsights = `-- name: ListPropertySourceOfferingInsights :many
+const listSourceListingInsights = `-- name: ListSourceListingInsights :many
 SELECT
-    observation.observation_key AS property_source_offering_insight_key,
-    COALESCE(observation.value #>> '{}', '')::text AS property_source_offering_insight_value,
-    observation.direction AS property_source_offering_insight_direction,
-    observation.severity AS property_source_offering_insight_severity,
-    round(observation.confidence * 100)::integer AS property_source_offering_insight_confidence,
-    COALESCE(observation.evidence ->> 'source_field', '')::text AS property_source_offering_insight_source_field,
-    observation.text AS property_source_offering_insight_text
+    observation.observation_key AS source_listing_insight_key,
+    COALESCE(observation.value #>> '{}', '')::text AS source_listing_insight_value,
+    observation.direction AS source_listing_insight_direction,
+    observation.severity AS source_listing_insight_severity,
+    round(observation.confidence * 100)::integer AS source_listing_insight_confidence,
+    COALESCE(observation.evidence ->> 'source_field', '')::text AS source_listing_insight_source_field,
+    observation.text AS source_listing_insight_text
 FROM public.target_observations observation
 WHERE observation.source_type = 'source_listing'
     AND observation.source_id = $1
@@ -3706,33 +3674,33 @@ WHERE observation.source_type = 'source_listing'
 ORDER BY observation.severity DESC, observation.observation_key
 `
 
-type ListPropertySourceOfferingInsightsRow struct {
-	PropertySourceOfferingInsightKey         string  `json:"property_source_offering_insight_key"`
-	PropertySourceOfferingInsightValue       *string `json:"property_source_offering_insight_value"`
-	PropertySourceOfferingInsightDirection   string  `json:"property_source_offering_insight_direction"`
-	PropertySourceOfferingInsightSeverity    string  `json:"property_source_offering_insight_severity"`
-	PropertySourceOfferingInsightConfidence  *int32  `json:"property_source_offering_insight_confidence"`
-	PropertySourceOfferingInsightSourceField *string `json:"property_source_offering_insight_source_field"`
-	PropertySourceOfferingInsightText        *string `json:"property_source_offering_insight_text"`
+type ListSourceListingInsightsRow struct {
+	SourceListingInsightKey         string  `json:"source_listing_insight_key"`
+	SourceListingInsightValue       *string `json:"source_listing_insight_value"`
+	SourceListingInsightDirection   string  `json:"source_listing_insight_direction"`
+	SourceListingInsightSeverity    string  `json:"source_listing_insight_severity"`
+	SourceListingInsightConfidence  *int32  `json:"source_listing_insight_confidence"`
+	SourceListingInsightSourceField *string `json:"source_listing_insight_source_field"`
+	SourceListingInsightText        *string `json:"source_listing_insight_text"`
 }
 
-func (q *Queries) ListPropertySourceOfferingInsights(ctx context.Context, saleListingID *uuid.UUID) ([]ListPropertySourceOfferingInsightsRow, error) {
-	rows, err := q.db.Query(ctx, listPropertySourceOfferingInsights, saleListingID)
+func (q *Queries) ListSourceListingInsights(ctx context.Context, saleListingID *uuid.UUID) ([]ListSourceListingInsightsRow, error) {
+	rows, err := q.db.Query(ctx, listSourceListingInsights, saleListingID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListPropertySourceOfferingInsightsRow{}
+	items := []ListSourceListingInsightsRow{}
 	for rows.Next() {
-		var i ListPropertySourceOfferingInsightsRow
+		var i ListSourceListingInsightsRow
 		if err := rows.Scan(
-			&i.PropertySourceOfferingInsightKey,
-			&i.PropertySourceOfferingInsightValue,
-			&i.PropertySourceOfferingInsightDirection,
-			&i.PropertySourceOfferingInsightSeverity,
-			&i.PropertySourceOfferingInsightConfidence,
-			&i.PropertySourceOfferingInsightSourceField,
-			&i.PropertySourceOfferingInsightText,
+			&i.SourceListingInsightKey,
+			&i.SourceListingInsightValue,
+			&i.SourceListingInsightDirection,
+			&i.SourceListingInsightSeverity,
+			&i.SourceListingInsightConfidence,
+			&i.SourceListingInsightSourceField,
+			&i.SourceListingInsightText,
 		); err != nil {
 			return nil, err
 		}
@@ -3948,7 +3916,7 @@ const projectListingProviderDimensionClaims = `-- name: ProjectListingProviderDi
 WITH deleted AS (
     DELETE FROM public.dimension_claims
     WHERE claim_scope = 'source'
-        AND source_table IN ('property_source_offerings', 'listing_search_documents')
+        AND source_table = 'listing_search_documents'
         AND source_id = $1::uuid
         AND projection_version = 'listing-provider-v1'
 ),
@@ -4091,7 +4059,7 @@ WITH run AS (
 deleted AS (
     DELETE FROM public.property_renovation_events
     WHERE event_scope = 'source'
-        AND source_table IN ('property_source_offerings', 'listing_search_documents')
+        AND source_table = 'listing_search_documents'
         AND source_id = $2
         AND projection_version = $1
 ),
@@ -4146,25 +4114,25 @@ inserted AS (
         COALESCE(linked.housing_company_id, linked.physical_building_id),
         'listing_search_documents',
         linked.sale_listing_id,
-        renovation.property_source_offering_renovation_source_field,
-        renovation.property_source_offering_renovation_category,
-        NULLIF(renovation.property_source_offering_renovation_component, ''),
-        renovation.property_source_offering_renovation_status,
-        NULLIF(renovation.property_source_offering_renovation_stage, ''),
-        NULLIF(renovation.property_source_offering_renovation_scope, ''),
-        NULLIF(renovation.property_source_offering_renovation_responsibility, ''),
-        renovation.property_source_offering_renovation_year,
+        renovation.source_listing_renovation_source_field,
+        renovation.source_listing_renovation_category,
+        NULLIF(renovation.source_listing_renovation_component, ''),
+        renovation.source_listing_renovation_status,
+        NULLIF(renovation.source_listing_renovation_stage, ''),
+        NULLIF(renovation.source_listing_renovation_scope, ''),
+        NULLIF(renovation.source_listing_renovation_responsibility, ''),
+        renovation.source_listing_renovation_year,
         NULL,
         NULL,
-        renovation.property_source_offering_renovation_cost_estimate_eur,
-        NULLIF(renovation.property_source_offering_renovation_text, ''),
-        jsonb_build_object('evidence_level', CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
-        GREATEST(0, LEAST(1, COALESCE(renovation.property_source_offering_renovation_confidence, 50)::double precision / 100)),
-        CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
+        renovation.source_listing_renovation_cost_estimate_eur,
+        NULLIF(renovation.source_listing_renovation_text, ''),
+        jsonb_build_object('evidence_level', CASE WHEN renovation.source_listing_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
+        GREATEST(0, LEAST(1, COALESCE(renovation.source_listing_renovation_confidence, 50)::double precision / 100)),
+        CASE WHEN renovation.source_listing_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
         COALESCE(linked.last_seen_at, linked.refreshed_at, linked.first_seen_at, now())
     FROM run
     JOIN linked ON COALESCE(linked.housing_company_id, linked.physical_building_id) IS NOT NULL
-    JOIN public.property_source_offering_renovations renovation ON renovation.sale_listing_id = linked.sale_listing_id
+    JOIN public.source_listing_renovations renovation ON renovation.source_listing_id = linked.sale_listing_id
     ON CONFLICT (
         event_scope,
         target_type,
@@ -4229,7 +4197,7 @@ func (q *Queries) RebuildListingDimensionLayerAt(ctx context.Context) (json.RawM
 	return payload, err
 }
 
-const refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding = `-- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
+const refreshSourceListingRenovationsFromFrontdoorBuilding = `-- name: RefreshSourceListingRenovationsFromFrontdoorBuilding :exec
 WITH listing AS (
     SELECT
         doc.primary_source_listing_id AS sale_listing_id,
@@ -4257,22 +4225,22 @@ WITH listing AS (
     LIMIT 1
 ),
 deleted AS (
-    DELETE FROM public.property_source_offering_renovations
-    WHERE sale_listing_id = $1
+    DELETE FROM public.source_listing_renovations
+    WHERE source_listing_id = $1
 )
-INSERT INTO public.property_source_offering_renovations (
-    sale_listing_id,
-    property_source_offering_renovation_source_field,
-    property_source_offering_renovation_category,
-    property_source_offering_renovation_status,
-    property_source_offering_renovation_year,
-    property_source_offering_renovation_component,
-    property_source_offering_renovation_scope,
-    property_source_offering_renovation_stage,
-    property_source_offering_renovation_responsibility,
-    property_source_offering_renovation_cost_estimate_eur,
-    property_source_offering_renovation_text,
-    property_source_offering_renovation_confidence
+INSERT INTO public.source_listing_renovations (
+    source_listing_id,
+    source_listing_renovation_source_field,
+    source_listing_renovation_category,
+    source_listing_renovation_status,
+    source_listing_renovation_year,
+    source_listing_renovation_component,
+    source_listing_renovation_scope,
+    source_listing_renovation_stage,
+    source_listing_renovation_responsibility,
+    source_listing_renovation_cost_estimate_eur,
+    source_listing_renovation_text,
+    source_listing_renovation_confidence
 )
 SELECT
     listing.sale_listing_id,
@@ -4301,8 +4269,8 @@ CROSS JOIN LATERAL (
 WHERE renovation.done IS TRUE
 `
 
-func (q *Queries) RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding(ctx context.Context, saleListingID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, refreshPropertySourceOfferingRenovationsFromFrontdoorBuilding, saleListingID)
+func (q *Queries) RefreshSourceListingRenovationsFromFrontdoorBuilding(ctx context.Context, saleListingID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, refreshSourceListingRenovationsFromFrontdoorBuilding, saleListingID)
 	return err
 }
 
@@ -4613,7 +4581,7 @@ scored AS (
             WHEN c.claim_scope = 'manual' THEN 1::double precision
             WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
             WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-            WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
+            WHEN p.strategy = 'latest_reliable' AND c.source_table = 'listing_search_documents' THEN 1.05::double precision
             ELSE 1::double precision
         END AS authority_factor,
         CASE
@@ -4629,7 +4597,7 @@ scored AS (
                 CASE
                     WHEN p.strategy = 'document_preferred' AND c.source_table = 'property_documents' THEN 1.45::double precision
                     WHEN p.strategy = 'stable_identity' AND c.source_table = 'property_documents' THEN 1.2::double precision
-                    WHEN p.strategy = 'latest_reliable' AND c.source_table IN ('listing_search_documents', 'property_source_offerings') THEN 1.05::double precision
+                    WHEN p.strategy = 'latest_reliable' AND c.source_table = 'listing_search_documents' THEN 1.05::double precision
                     ELSE 1::double precision
                 END
         END AS score

@@ -60,7 +60,7 @@ func (s *Service) extractSourceListingDescriptionInsights(ctx context.Context, s
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return DescriptionExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetPropertySourceOfferingDescriptionTexts(ctx, saleListingID)
+	row, err := s.queries.GetSourceListingDescriptionTexts(ctx, saleListingID)
 	if err != nil {
 		return DescriptionExtractionResult{}, mapNotFound(err)
 	}
@@ -109,12 +109,12 @@ func (s *Service) replaceLLMDescriptionInsights(ctx context.Context, saleListing
 	}
 	defer tx.Rollback(ctx)
 	queries := db.New(tx)
-	if err := queries.DeleteLLMPropertySourceOfferingInsights(ctx, &saleListingID); err != nil {
+	if err := queries.DeleteLLMSourceListingInsights(ctx, &saleListingID); err != nil {
 		return fmt.Errorf("delete previous llm description insights: %w", err)
 	}
 	for _, item := range items {
 		sourceField := llmDescriptionSourceField(item.SourceField)
-		if err := queries.InsertPropertySourceOfferingInsight(ctx, db.InsertPropertySourceOfferingInsightParams{SaleListingID: &saleListingID, SourceField: &sourceField, Key: &item.Key, Value: &item.Value, Direction: &item.Direction, Severity: &item.Severity, Confidence: &item.Confidence, Text: &item.Text}); err != nil {
+		if err := queries.InsertSourceListingInsight(ctx, db.InsertSourceListingInsightParams{SaleListingID: &saleListingID, SourceField: &sourceField, Key: &item.Key, Value: &item.Value, Direction: &item.Direction, Severity: &item.Severity, Confidence: &item.Confidence, Text: &item.Text}); err != nil {
 			return fmt.Errorf("insert llm description insight: %w", err)
 		}
 	}
