@@ -698,12 +698,15 @@ func (s *Service) enrichBuildingFromOfferingSources(ctx context.Context, buildin
 	seen := map[string]struct{}{}
 	var renovationCandidate *buildingRenovationSourceCandidate
 	for _, saleListingID := range rows {
+		if saleListingID == nil {
+			continue
+		}
 		sourceKey := saleListingID.String()
 		if _, ok := seen[sourceKey]; ok {
 			continue
 		}
 		seen[sourceKey] = struct{}{}
-		listing, err := s.saleListingBySourceID(ctx, saleListingID)
+		listing, err := s.saleListingBySourceID(ctx, *saleListingID)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
 				continue
@@ -864,10 +867,7 @@ func (s *Service) resolveListingInput(ctx context.Context, input string, listing
 	if err != nil {
 		return "", mapNotFound(err)
 	}
-	if canonicalID == nil {
-		return "", ErrNotFound
-	}
-	return *canonicalID, nil
+	return canonicalID, nil
 }
 
 func (s *Service) resolveBuildingInput(ctx context.Context, input string, shortcutBase string, frontdoorBase string) (string, error) {

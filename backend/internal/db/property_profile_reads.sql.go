@@ -16,14 +16,12 @@ import (
 const getCanonicalBuildingProfileForSaleListing = `-- name: GetCanonicalBuildingProfileForSaleListing :one
 WITH linked AS (
     SELECT pu.physical_building_id, pu.housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = $1
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC NULLS LAST, source_link.created_at DESC
+    WHERE doc.primary_source_listing_id = $1
+        AND doc.listing_status = 'active'
+    ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
     LIMIT 1
 )
 SELECT
@@ -123,14 +121,12 @@ func (q *Queries) GetCanonicalBuildingProfileForSaleListing(ctx context.Context,
 const getDimensionApartmentProfileForSaleListing = `-- name: GetDimensionApartmentProfileForSaleListing :one
 WITH linked AS (
     SELECT pu.property_unit_id, pu.housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = $1
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC NULLS LAST, source_link.updated_at DESC
+    WHERE doc.primary_source_listing_id = $1
+        AND doc.listing_status = 'active'
+    ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
     LIMIT 1
 )
 SELECT
@@ -249,14 +245,12 @@ func (q *Queries) GetDimensionApartmentProfileForSaleListing(ctx context.Context
 const listSaleListingQualityScores = `-- name: ListSaleListingQualityScores :many
 WITH linked AS (
     SELECT po.property_offering_id, pu.property_unit_id, pu.physical_building_id, pu.housing_company_id
-    FROM public.target_sources source_link
-    JOIN public.property_offerings po ON po.property_offering_id = source_link.target_id
+    FROM public.listing_search_documents doc
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
-    WHERE source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.source_id = $1
-        AND source_link.link_status <> 'rejected'
-    ORDER BY source_link.link_score DESC NULLS LAST, source_link.created_at DESC
+    WHERE doc.primary_source_listing_id = $1
+        AND doc.listing_status = 'active'
+    ORDER BY doc.last_seen_at DESC NULLS LAST, doc.refreshed_at DESC
     LIMIT 1
 ),
 targets AS (
