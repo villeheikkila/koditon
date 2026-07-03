@@ -1,161 +1,263 @@
 -- name: UpsertFrontdoorBuildingAnnouncementSourceListing :one
-INSERT INTO origin.source_listings (
-    source_listing_id,
-    provider,
-    source_kind,
-    native_id,
-    canonical_source_id,
-    raw_table,
-    raw_id,
-    url,
-    payload_hash,
-    normalized_version,
-    normalized_at,
-    first_seen_at,
-    last_seen_at,
-    created_at,
-    updated_at
+WITH source AS (
+    SELECT
+        gen_random_uuid() AS source_listing_id,
+        'frontdoor'::text AS provider,
+        'announcement'::text AS source_kind,
+        fba.frontdoor_building_announcement_id::text AS native_id,
+        'frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text AS canonical_source_id,
+        'frontdoor_building_announcements'::text AS raw_table,
+        fba.frontdoor_building_announcement_id::text AS raw_id,
+        fb.frontdoor_building_url AS url,
+        NULL::text AS payload_hash,
+        fba.frontdoor_building_announcement_data_normalized_version AS normalized_version,
+        now() AS normalized_at,
+        fba.frontdoor_building_announcement_first_seen_at AS first_seen_at,
+        fba.frontdoor_building_announcement_last_seen_at AS last_seen_at,
+        COALESCE(fba.frontdoor_building_announcement_first_seen_at, now()) AS created_at,
+        now() AS updated_at
+    FROM origin.frontdoor_building_announcements fba
+    JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    WHERE fba.frontdoor_building_announcement_id = @frontdoor_building_announcement_id
+        AND fba.frontdoor_building_announcement_rent_period IS NULL
+        AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
+),
+updated AS (
+    UPDATE origin.source_listings target
+    SET
+        canonical_source_id = source.canonical_source_id,
+        provider = source.provider,
+        source_kind = source.source_kind,
+        native_id = source.native_id,
+        raw_table = source.raw_table,
+        raw_id = source.raw_id,
+        url = source.url,
+        payload_hash = source.payload_hash,
+        normalized_version = source.normalized_version,
+        normalized_at = source.normalized_at,
+        first_seen_at = source.first_seen_at,
+        last_seen_at = source.last_seen_at,
+        updated_at = source.updated_at
+    FROM source
+    WHERE target.canonical_source_id = source.canonical_source_id
+        OR (target.provider = source.provider AND target.source_kind = source.source_kind AND target.native_id = source.native_id)
+    RETURNING target.source_listing_id
+),
+inserted AS (
+    INSERT INTO origin.source_listings (
+        source_listing_id,
+        provider,
+        source_kind,
+        native_id,
+        canonical_source_id,
+        raw_table,
+        raw_id,
+        url,
+        payload_hash,
+        normalized_version,
+        normalized_at,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        source.source_listing_id,
+        source.provider,
+        source.source_kind,
+        source.native_id,
+        source.canonical_source_id,
+        source.raw_table,
+        source.raw_id,
+        source.url,
+        source.payload_hash,
+        source.normalized_version,
+        source.normalized_at,
+        source.first_seen_at,
+        source.last_seen_at,
+        source.created_at,
+        source.updated_at
+    FROM source
+    WHERE NOT EXISTS (SELECT 1 FROM updated)
+    RETURNING source_listing_id
 )
-SELECT
-    gen_random_uuid(),
-    'frontdoor',
-    'announcement',
-    fba.frontdoor_building_announcement_id::text,
-    'frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text,
-    'frontdoor_building_announcements',
-    fba.frontdoor_building_announcement_id::text,
-    fb.frontdoor_building_url,
-    NULL::text,
-    fba.frontdoor_building_announcement_data_normalized_version,
-    now(),
-    fba.frontdoor_building_announcement_first_seen_at,
-    fba.frontdoor_building_announcement_last_seen_at,
-    COALESCE(fba.frontdoor_building_announcement_first_seen_at, now()),
-    now()
-FROM origin.frontdoor_building_announcements fba
-JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-WHERE fba.frontdoor_building_announcement_id = @frontdoor_building_announcement_id
-    AND fba.frontdoor_building_announcement_rent_period IS NULL
-    AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
-ON CONFLICT (canonical_source_id) DO UPDATE SET
-    provider = EXCLUDED.provider,
-    source_kind = EXCLUDED.source_kind,
-    native_id = EXCLUDED.native_id,
-    raw_table = EXCLUDED.raw_table,
-    raw_id = EXCLUDED.raw_id,
-    url = EXCLUDED.url,
-    payload_hash = EXCLUDED.payload_hash,
-    normalized_version = EXCLUDED.normalized_version,
-    normalized_at = EXCLUDED.normalized_at,
-    first_seen_at = EXCLUDED.first_seen_at,
-    last_seen_at = EXCLUDED.last_seen_at,
-    updated_at = EXCLUDED.updated_at
-RETURNING source_listing_id;
+SELECT source_listing_id FROM updated
+UNION ALL
+SELECT source_listing_id FROM inserted
+LIMIT 1;
 
 -- name: UpsertFrontdoorAdSourceListing :one
-INSERT INTO origin.source_listings (
-    source_listing_id,
-    provider,
-    source_kind,
-    native_id,
-    canonical_source_id,
-    raw_table,
-    raw_id,
-    url,
-    payload_hash,
-    normalized_version,
-    normalized_at,
-    first_seen_at,
-    last_seen_at,
-    created_at,
-    updated_at
+WITH source AS (
+    SELECT
+        gen_random_uuid() AS source_listing_id,
+        'frontdoor'::text AS provider,
+        'ad'::text AS source_kind,
+        fa.frontdoor_ad_external_id AS native_id,
+        'frontdoor:ad:' || fa.frontdoor_ad_external_id AS canonical_source_id,
+        'frontdoor_ads'::text AS raw_table,
+        fa.frontdoor_ad_id::text AS raw_id,
+        fa.frontdoor_ad_url AS url,
+        fa.frontdoor_ad_data_hash AS payload_hash,
+        fa.frontdoor_ad_data_normalized_version AS normalized_version,
+        now() AS normalized_at,
+        fa.frontdoor_ad_first_seen_at AS first_seen_at,
+        fa.frontdoor_ad_last_seen_at AS last_seen_at,
+        COALESCE(fa.frontdoor_ad_first_seen_at, now()) AS created_at,
+        now() AS updated_at
+    FROM origin.frontdoor_ads fa
+    WHERE fa.frontdoor_ad_id = @frontdoor_ad_id
+        AND fa.frontdoor_ad_data IS NOT NULL
+),
+updated AS (
+    UPDATE origin.source_listings target
+    SET
+        canonical_source_id = source.canonical_source_id,
+        provider = source.provider,
+        source_kind = source.source_kind,
+        native_id = source.native_id,
+        raw_table = source.raw_table,
+        raw_id = source.raw_id,
+        url = source.url,
+        payload_hash = source.payload_hash,
+        normalized_version = source.normalized_version,
+        normalized_at = source.normalized_at,
+        first_seen_at = source.first_seen_at,
+        last_seen_at = source.last_seen_at,
+        updated_at = source.updated_at
+    FROM source
+    WHERE target.canonical_source_id = source.canonical_source_id
+        OR (target.provider = source.provider AND target.source_kind = source.source_kind AND target.native_id = source.native_id)
+    RETURNING target.source_listing_id
+),
+inserted AS (
+    INSERT INTO origin.source_listings (
+        source_listing_id,
+        provider,
+        source_kind,
+        native_id,
+        canonical_source_id,
+        raw_table,
+        raw_id,
+        url,
+        payload_hash,
+        normalized_version,
+        normalized_at,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        source.source_listing_id,
+        source.provider,
+        source.source_kind,
+        source.native_id,
+        source.canonical_source_id,
+        source.raw_table,
+        source.raw_id,
+        source.url,
+        source.payload_hash,
+        source.normalized_version,
+        source.normalized_at,
+        source.first_seen_at,
+        source.last_seen_at,
+        source.created_at,
+        source.updated_at
+    FROM source
+    WHERE NOT EXISTS (SELECT 1 FROM updated)
+    RETURNING source_listing_id
 )
-SELECT
-    gen_random_uuid(),
-    'frontdoor',
-    'ad',
-    fa.frontdoor_ad_external_id,
-    'frontdoor:ad:' || fa.frontdoor_ad_external_id,
-    'frontdoor_ads',
-    fa.frontdoor_ad_id::text,
-    fa.frontdoor_ad_url,
-    fa.frontdoor_ad_data_hash,
-    fa.frontdoor_ad_data_normalized_version,
-    now(),
-    fa.frontdoor_ad_first_seen_at,
-    fa.frontdoor_ad_last_seen_at,
-    COALESCE(fa.frontdoor_ad_first_seen_at, now()),
-    now()
-FROM origin.frontdoor_ads fa
-WHERE fa.frontdoor_ad_id = @frontdoor_ad_id
-    AND fa.frontdoor_ad_data IS NOT NULL
-ON CONFLICT (canonical_source_id) DO UPDATE SET
-    provider = EXCLUDED.provider,
-    source_kind = EXCLUDED.source_kind,
-    native_id = EXCLUDED.native_id,
-    raw_table = EXCLUDED.raw_table,
-    raw_id = EXCLUDED.raw_id,
-    url = EXCLUDED.url,
-    payload_hash = EXCLUDED.payload_hash,
-    normalized_version = EXCLUDED.normalized_version,
-    normalized_at = EXCLUDED.normalized_at,
-    first_seen_at = EXCLUDED.first_seen_at,
-    last_seen_at = EXCLUDED.last_seen_at,
-    updated_at = EXCLUDED.updated_at
-RETURNING source_listing_id;
+SELECT source_listing_id FROM updated
+UNION ALL
+SELECT source_listing_id FROM inserted
+LIMIT 1;
 
 -- name: UpsertShortcutAdSourceListing :one
-INSERT INTO origin.source_listings (
-    source_listing_id,
-    provider,
-    source_kind,
-    native_id,
-    canonical_source_id,
-    raw_table,
-    raw_id,
-    url,
-    payload_hash,
-    normalized_version,
-    normalized_at,
-    first_seen_at,
-    last_seen_at,
-    created_at,
-    updated_at
+WITH source AS (
+    SELECT
+        gen_random_uuid() AS source_listing_id,
+        'shortcut'::text AS provider,
+        'ad'::text AS source_kind,
+        sa.shortcut_ad_id::text AS native_id,
+        'shortcut:ad:' || sa.shortcut_ad_id::text AS canonical_source_id,
+        'shortcut_ads'::text AS raw_table,
+        sa.shortcut_ad_id::text AS raw_id,
+        sa.shortcut_ad_url AS url,
+        sa.shortcut_ad_data_hash AS payload_hash,
+        sa.shortcut_ad_data_normalized_version AS normalized_version,
+        now() AS normalized_at,
+        sa.shortcut_ad_first_seen_at AS first_seen_at,
+        sa.shortcut_ad_last_seen_at AS last_seen_at,
+        COALESCE(sa.shortcut_ad_first_seen_at, now()) AS created_at,
+        now() AS updated_at
+    FROM origin.shortcut_ads sa
+    WHERE sa.shortcut_ad_id = @shortcut_ad_id
+        AND sa.shortcut_ad_type = 'listing'
+        AND sa.shortcut_ad_data IS NOT NULL
+),
+updated AS (
+    UPDATE origin.source_listings target
+    SET
+        canonical_source_id = source.canonical_source_id,
+        provider = source.provider,
+        source_kind = source.source_kind,
+        native_id = source.native_id,
+        raw_table = source.raw_table,
+        raw_id = source.raw_id,
+        url = source.url,
+        payload_hash = source.payload_hash,
+        normalized_version = source.normalized_version,
+        normalized_at = source.normalized_at,
+        first_seen_at = source.first_seen_at,
+        last_seen_at = source.last_seen_at,
+        updated_at = source.updated_at
+    FROM source
+    WHERE target.canonical_source_id = source.canonical_source_id
+        OR (target.provider = source.provider AND target.source_kind = source.source_kind AND target.native_id = source.native_id)
+    RETURNING target.source_listing_id
+),
+inserted AS (
+    INSERT INTO origin.source_listings (
+        source_listing_id,
+        provider,
+        source_kind,
+        native_id,
+        canonical_source_id,
+        raw_table,
+        raw_id,
+        url,
+        payload_hash,
+        normalized_version,
+        normalized_at,
+        first_seen_at,
+        last_seen_at,
+        created_at,
+        updated_at
+    )
+    SELECT
+        source.source_listing_id,
+        source.provider,
+        source.source_kind,
+        source.native_id,
+        source.canonical_source_id,
+        source.raw_table,
+        source.raw_id,
+        source.url,
+        source.payload_hash,
+        source.normalized_version,
+        source.normalized_at,
+        source.first_seen_at,
+        source.last_seen_at,
+        source.created_at,
+        source.updated_at
+    FROM source
+    WHERE NOT EXISTS (SELECT 1 FROM updated)
+    RETURNING source_listing_id
 )
-SELECT
-    gen_random_uuid(),
-    'shortcut',
-    'ad',
-    sa.shortcut_ad_id::text,
-    'shortcut:ad:' || sa.shortcut_ad_id::text,
-    'shortcut_ads',
-    sa.shortcut_ad_id::text,
-    sa.shortcut_ad_url,
-    sa.shortcut_ad_data_hash,
-    sa.shortcut_ad_data_normalized_version,
-    now(),
-    sa.shortcut_ad_first_seen_at,
-    sa.shortcut_ad_last_seen_at,
-    COALESCE(sa.shortcut_ad_first_seen_at, now()),
-    now()
-FROM origin.shortcut_ads sa
-WHERE sa.shortcut_ad_id = @shortcut_ad_id
-    AND sa.shortcut_ad_type = 'listing'
-    AND sa.shortcut_ad_data IS NOT NULL
-ON CONFLICT (canonical_source_id) DO UPDATE SET
-    provider = EXCLUDED.provider,
-    source_kind = EXCLUDED.source_kind,
-    native_id = EXCLUDED.native_id,
-    raw_table = EXCLUDED.raw_table,
-    raw_id = EXCLUDED.raw_id,
-    url = EXCLUDED.url,
-    payload_hash = EXCLUDED.payload_hash,
-    normalized_version = EXCLUDED.normalized_version,
-    normalized_at = EXCLUDED.normalized_at,
-    first_seen_at = EXCLUDED.first_seen_at,
-    last_seen_at = EXCLUDED.last_seen_at,
-    updated_at = EXCLUDED.updated_at
-RETURNING source_listing_id;
+SELECT source_listing_id FROM updated
+UNION ALL
+SELECT source_listing_id FROM inserted
+LIMIT 1;
 
 -- name: DeleteFrontdoorBuildingAnnouncementSourceListing :exec
 DELETE FROM origin.source_listings

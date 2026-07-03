@@ -947,9 +947,9 @@ SELECT
     COALESCE(doc.headline, ''),
     doc.first_seen_at,
     COALESCE(evidence.observed_at, doc.last_seen_at),
-    entity_evidence.link_status,
-    entity_evidence.link_method,
-    (entity_evidence.confidence * 100)::int4
+    COALESCE(entity_evidence.link_status, ''),
+    COALESCE(entity_evidence.link_method, ''),
+    COALESCE((entity_evidence.confidence * 100)::int4, 0)
 FROM public.listing_search_documents doc
 JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
     AND entity_evidence.link_status <> 'rejected'

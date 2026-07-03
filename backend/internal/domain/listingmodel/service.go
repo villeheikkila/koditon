@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"koditon/internal/db"
@@ -53,7 +54,7 @@ func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, annou
 
 // ReconcileShortcutAd publishes one Shortcut ad into the canonical listing graph.
 func (s *Service) ReconcileShortcutAd(ctx context.Context, shortcutAdID int64) (Result, error) {
-	sourceListingID, err := s.queries.UpsertShortcutAdSourceListing(ctx, &shortcutAdID)
+	sourceListingID, err := requiredSourceListingID(s.queries.UpsertShortcutAdSourceListing(ctx, &shortcutAdID))
 	if err != nil {
 		return Result{}, fmt.Errorf("upsert shortcut ad source listing: %w", err)
 	}
@@ -62,7 +63,7 @@ func (s *Service) ReconcileShortcutAd(ctx context.Context, shortcutAdID int64) (
 
 // ReconcileFrontdoorAd publishes one Frontdoor ad into the canonical listing graph.
 func (s *Service) ReconcileFrontdoorAd(ctx context.Context, frontdoorAdID uuid.UUID) (Result, error) {
-	sourceListingID, err := s.queries.UpsertFrontdoorAdSourceListing(ctx, &frontdoorAdID)
+	sourceListingID, err := requiredSourceListingID(s.queries.UpsertFrontdoorAdSourceListing(ctx, &frontdoorAdID))
 	if err != nil {
 		return Result{}, fmt.Errorf("upsert frontdoor ad source listing: %w", err)
 	}
@@ -71,7 +72,7 @@ func (s *Service) ReconcileFrontdoorAd(ctx context.Context, frontdoorAdID uuid.U
 
 // ReconcileFrontdoorBuildingAnnouncement publishes one Frontdoor building announcement into the canonical listing graph.
 func (s *Service) ReconcileFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) (Result, error) {
-	sourceListingID, err := s.queries.UpsertFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementID)
+	sourceListingID, err := requiredSourceListingID(s.queries.UpsertFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementID))
 	if err != nil {
 		return Result{}, fmt.Errorf("upsert frontdoor announcement source listing: %w", err)
 	}
@@ -81,6 +82,16 @@ func (s *Service) ReconcileFrontdoorBuildingAnnouncement(ctx context.Context, an
 // ReconcileSourceListing publishes one normalized source listing into the canonical listing graph.
 func (s *Service) ReconcileSourceListing(ctx context.Context, sourceListingID uuid.UUID) (Result, error) {
 	return s.reconcileSourceListing(ctx, sourceListingID)
+}
+
+func requiredSourceListingID(id *uuid.UUID, err error) (uuid.UUID, error) {
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if id == nil {
+		return uuid.Nil, pgx.ErrNoRows
+	}
+	return *id, nil
 }
 
 func (s *Service) reconcileSourceListing(ctx context.Context, sourceListingID uuid.UUID) (Result, error) {
