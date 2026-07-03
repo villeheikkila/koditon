@@ -677,7 +677,7 @@ RETURNING sale_listing_id;
 -- name: RefreshPropertySourceOfferingRenovationsFromFrontdoorBuilding :exec
 WITH listing AS (
     SELECT
-        sl.sale_listing_id,
+        doc.primary_source_listing_id AS sale_listing_id,
         fb.frontdoor_building_elevator_renovated,
         fb.frontdoor_building_elevator_renovated_year,
         fb.frontdoor_building_facade_renovated,
@@ -692,10 +692,14 @@ WITH listing AS (
         fb.frontdoor_building_balcony_renovated_year,
         fb.frontdoor_building_electricity_renovated,
         fb.frontdoor_building_electricity_renovated_year
-    FROM public.property_source_offerings sl
-    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = evidence.frontdoor_building_announcement_id
     JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
-    WHERE sl.sale_listing_id = @sale_listing_id
+    WHERE doc.primary_source_listing_id = @sale_listing_id
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
 ),
 deleted AS (
     DELETE FROM public.property_source_offering_renovations
