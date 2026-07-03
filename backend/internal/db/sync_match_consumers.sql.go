@@ -102,6 +102,7 @@ announcement_candidates AS (
                 AND fba.frontdoor_building_announcement_area IS NOT NULL
                 AND abs(removed_ads.area - fba.frontdoor_building_announcement_area) < 0.05
                 AND fba.frontdoor_building_announcement_first_seen_at >= removed_ads.removed_at - interval '30 days'
+                AND fba.frontdoor_building_announcement_first_seen_at <= removed_ads.removed_at + interval '30 days'
                 THEN 'area_timing'
             ELSE NULL
         END AS match_rule
@@ -144,9 +145,16 @@ linked AS (
             'match_rule', unique_candidates.match_rule,
             'source_listing_id', unique_candidates.primary_source_listing_id,
             'frontdoor_building_announcement_id', unique_candidates.frontdoor_building_announcement_id
-        )
+    )
     FROM unique_candidates
     WHERE unique_candidates.rule_candidate_count = 1
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.entity_evidence existing
+            WHERE existing.evidence_source_id = unique_candidates.evidence_source_id
+                AND existing.listing_id = unique_candidates.listing_id
+                AND existing.link_status <> 'rejected'
+        )
     ORDER BY unique_candidates.listing_id, unique_candidates.match_rule, unique_candidates.evidence_source_id
     LIMIT $2::int4
     ON CONFLICT (evidence_source_id, listing_id) WHERE listing_id IS NOT NULL AND link_status <> 'rejected' DO UPDATE SET
