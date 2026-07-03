@@ -73,146 +73,109 @@ lookup_input AS (
     SELECT
         address_norm,
         translate(address_norm, 'åäö', 'aao') AS address_ascii_norm,
-        substring(address_norm from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_norm,
-        substring(translate(address_norm, 'åäö', 'aao') from '^(.*)\s+[0-9]+(\s*[[:alpha:]])?\s*$') AS street_name_ascii_norm,
-        substring(address_norm from '\s([0-9]+)(\s*[[:alpha:]])?\s*$') AS street_number_norm,
-        substring(translate(address_norm, 'åäö', 'aao') from '\s[0-9]+\s*([[:alpha:]])\s*$') AS building_letter_ascii_norm,
         postal_norm
     FROM lookup_input_raw
 ),
-selected_listing_matches AS (
+doc_matches AS (
     SELECT
-        sl.sale_listing_id,
-        source_link.target_id AS property_offering_id
-    FROM public.property_source_offerings sl
+        doc.listing_id,
+        doc.property_offering_id,
+        doc.source,
+        doc.kind,
+        doc.native_id,
+        doc.canonical_id,
+        doc.url,
+        doc.headline,
+        doc.address,
+        doc.city,
+        doc.postal,
+        doc.latitude,
+        doc.longitude,
+        doc.asking_price,
+        doc.debt_free_price,
+        doc.area_m2,
+        doc.room_layout,
+        doc.first_seen_at,
+        doc.last_seen_at,
+        doc.published_at,
+        doc.refreshed_at,
+        doc.search_text,
+        NULLIF(trim(regexp_replace(lower(regexp_replace(trim(COALESCE(doc.address, '')), '[^[:alnum:]åäöÅÄÖ]+', ' ', 'g')), '\s+', ' ', 'g')), '') AS doc_address_norm
+    FROM public.listing_search_documents doc
     CROSS JOIN lookup_input li
-    LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
-        AND source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    WHERE ($4::text = 'all' OR sl.sale_listing_source_provider = $4::text)
-        AND sl.sale_listing_source_kind = ANY(ARRAY['ad'::text, 'announcement'::text])
-        AND trim($3::text) <> ''
-        AND COALESCE(sl.sale_listing_postal_norm, NULLIF(regexp_replace(trim(COALESCE(sl.sale_listing_postal, '')), '[^0-9]+', '', 'g'), '')) = li.postal_norm
+    WHERE doc.listing_status = 'active'
+        AND ($4::text = 'all' OR doc.source_providers @> ARRAY[$4::text])
+        AND doc.kind = ANY(ARRAY['ad'::text, 'announcement'::text])
+        AND (li.postal_norm IS NULL OR NULLIF(regexp_replace(trim(COALESCE(doc.postal, '')), '[^0-9]+', '', 'g'), '') = li.postal_norm)
         AND (
-            sl.sale_listing_address_norm = li.address_norm
-            OR translate(sl.sale_listing_address_norm, 'åäö', 'aao') = li.address_ascii_norm
-            OR lower(COALESCE(sl.sale_listing_street_address, '')) LIKE ('%' || lower(trim($1::text)) || '%')
-            OR translate(lower(COALESCE(sl.sale_listing_street_address, '')), 'åäö', 'aao') LIKE ('%' || li.address_ascii_norm || '%')
-            OR (
-                sl.sale_listing_street_name_norm IS NOT NULL
-                AND sl.sale_listing_street_number_norm IS NOT NULL
-                AND (
-                    li.building_letter_ascii_norm IS NULL
-                    OR translate(COALESCE(sl.sale_listing_building_letter_norm, ''), 'åäö', 'aao') = li.building_letter_ascii_norm
-                )
-                AND (
-                    (' ' || li.address_norm || ' ')
-                        LIKE ('% ' || sl.sale_listing_street_name_norm || ' ' || sl.sale_listing_street_number_norm || ' %')
-                    OR (' ' || li.address_ascii_norm || ' ')
-                        LIKE ('% ' || translate(sl.sale_listing_street_name_norm, 'åäö', 'aao') || ' ' || sl.sale_listing_street_number_norm || ' %')
-                )
-            )
+            li.address_norm IS NULL
+            OR NULLIF(trim(regexp_replace(lower(regexp_replace(trim(COALESCE(doc.address, '')), '[^[:alnum:]åäöÅÄÖ]+', ' ', 'g')), '\s+', ' ', 'g')), '') = li.address_norm
+            OR translate(NULLIF(trim(regexp_replace(lower(regexp_replace(trim(COALESCE(doc.address, '')), '[^[:alnum:]åäöÅÄÖ]+', ' ', 'g')), '\s+', ' ', 'g')), ''), 'åäö', 'aao') = li.address_ascii_norm
+            OR lower(COALESCE(doc.address, '')) LIKE ('%' || lower(trim($1::text)) || '%')
+            OR lower(doc.search_text) LIKE ('%' || lower(trim($1::text)) || '%')
         )
-        AND (trim($2::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($2::text)) || '%'))
-    UNION ALL
-    SELECT
-        sl.sale_listing_id,
-        source_link.target_id AS property_offering_id
-    FROM public.property_source_offerings sl
-    CROSS JOIN lookup_input li
-    LEFT JOIN public.target_sources source_link ON source_link.source_id = sl.sale_listing_id
-        AND source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    WHERE ($4::text = 'all' OR sl.sale_listing_source_provider = $4::text)
-        AND sl.sale_listing_source_kind = ANY(ARRAY['ad'::text, 'announcement'::text])
-        AND trim($3::text) = ''
-        AND li.street_name_ascii_norm IS NOT NULL
-        AND li.street_number_norm IS NOT NULL
-        AND translate(sl.sale_listing_street_name_norm, 'åäö', 'aao') = li.street_name_ascii_norm
-        AND sl.sale_listing_street_number_norm = li.street_number_norm
-        AND (
-            li.building_letter_ascii_norm IS NULL
-            OR translate(COALESCE(sl.sale_listing_building_letter_norm, ''), 'åäö', 'aao') = li.building_letter_ascii_norm
-        )
-        AND (trim($2::text) = '' OR lower(COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '')) LIKE ('%' || lower(trim($2::text)) || '%'))
-),
-selected_listing_ids AS (
-    SELECT DISTINCT ON (sale_listing_id)
-        sale_listing_id,
-        property_offering_id
-    FROM selected_listing_matches
-    ORDER BY sale_listing_id, property_offering_id NULLS LAST
+        AND (trim($2::text) = '' OR lower(COALESCE(doc.city, '')) LIKE ('%' || lower(trim($2::text)) || '%'))
 ),
 selected_listings AS (
     SELECT
-        sl.sale_listing_id,
-        sl.sale_listing_canonical_id,
-        sl.sale_listing_source_provider,
-        sl.sale_listing_source_kind,
-        sl.sale_listing_native_id,
-        COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-        sl.sale_listing_street_address AS address,
-        COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
-        COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
-        sl.sale_listing_latitude,
-        sl.sale_listing_longitude,
-        sl.sale_listing_asking_price,
-        sl.sale_listing_debt_free_price,
-        sl.sale_listing_area_value,
-        sl.sale_listing_room_layout AS room_layout,
-        sl.sale_listing_url AS url,
-        CASE
-            WHEN sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad' THEN sl.shortcut_ad_id IS NOT NULL AND COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-            WHEN sl.sale_listing_source_provider = 'frontdoor' AND sl.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-            ELSE false
-        END AS external_url_available,
-        sl.sale_listing_first_seen_at,
-        sl.sale_listing_last_seen_at,
-        sl.sale_listing_published_at,
-        sl.sale_listing_created_at,
-        sl.sale_listing_updated_at,
-        sl.sale_listing_previous_asking_price,
-        sl.sale_listing_previous_debt_free_price,
+        doc.listing_id AS sale_listing_id,
+        doc.canonical_id AS sale_listing_canonical_id,
+        doc.source AS sale_listing_source_provider,
+        doc.kind AS sale_listing_source_kind,
+        doc.native_id AS sale_listing_native_id,
+        COALESCE(doc.headline, doc.address, doc.native_id) AS headline,
+        doc.address,
+        doc.city AS city,
+        doc.postal AS postal,
+        doc.latitude AS sale_listing_latitude,
+        doc.longitude AS sale_listing_longitude,
+        doc.asking_price AS sale_listing_asking_price,
+        doc.debt_free_price AS sale_listing_debt_free_price,
+        doc.area_m2 AS sale_listing_area_value,
+        doc.room_layout,
+        doc.url,
+        COALESCE(doc.url, '') <> '' AS external_url_available,
+        doc.first_seen_at AS sale_listing_first_seen_at,
+        doc.last_seen_at AS sale_listing_last_seen_at,
+        doc.published_at AS sale_listing_published_at,
+        doc.refreshed_at AS sale_listing_created_at,
+        doc.refreshed_at AS sale_listing_updated_at,
+        NULL::bigint AS sale_listing_previous_asking_price,
+        NULL::bigint AS sale_listing_previous_debt_free_price,
         NULLIF(direct_price.link_status, '') AS prices_match_status,
-        sl.sale_listing_source_match_status AS source_match_status,
-        sli.property_offering_id,
+        'confirmed'::text AS source_match_status,
+        doc.property_offering_id,
         pu.housing_company_id,
         hc.housing_company_name AS housing_company_name,
-        sl.sale_listing_availability_text AS availability_text,
-        sl.sale_listing_renovations_done_text AS renovations_done_text,
-        sl.sale_listing_renovations_planned_text AS renovations_planned_text,
-        sl.sale_listing_additional_info_text AS additional_info_text,
-        sl.sale_listing_charges_text AS charges_text,
+        ''::text AS availability_text,
+        ''::text AS renovations_done_text,
+        ''::text AS renovations_planned_text,
+        ''::text AS additional_info_text,
+        ''::text AS charges_text,
         COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json,
         ROW_NUMBER() OVER (
             ORDER BY
                 CASE
-                    WHEN sl.sale_listing_address_norm = li.address_norm THEN 0
-                    WHEN translate(sl.sale_listing_address_norm, 'åäö', 'aao') = li.address_ascii_norm THEN 1
-                    WHEN lower(COALESCE(sl.sale_listing_street_address, '')) = lower(trim($1::text)) THEN 1
+                    WHEN doc.doc_address_norm = li.address_norm THEN 0
+                    WHEN translate(doc.doc_address_norm, 'åäö', 'aao') = li.address_ascii_norm THEN 1
+                    WHEN lower(COALESCE(doc.address, '')) = lower(trim($1::text)) THEN 1
                     ELSE 3
                 END,
-                sl.sale_listing_last_seen_at DESC NULLS LAST,
-                sl.sale_listing_source_provider,
-                sl.sale_listing_source_kind,
-                sl.sale_listing_native_id
+                doc.last_seen_at DESC NULLS LAST,
+                doc.source,
+                doc.kind,
+                doc.native_id
         ) AS listing_rank,
         count(*) OVER ()::integer AS listing_count
-    FROM selected_listing_ids sli
-    JOIN public.property_source_offerings sl ON sl.sale_listing_id = sli.sale_listing_id
-    LEFT JOIN public.property_offerings po ON po.property_offering_id = sli.property_offering_id
+    FROM doc_matches doc
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.housing_companies hc ON hc.housing_company_id = pu.housing_company_id
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     LEFT JOIN LATERAL (
         SELECT price_link.link_status
         FROM public.price_links price_link
-        WHERE price_link.target_type = 'source_listing'
-            AND price_link.target_id = sl.sale_listing_id
+        WHERE price_link.target_type = 'listing'
+            AND price_link.target_id = doc.property_offering_id
             AND price_link.link_status <> 'rejected'
         ORDER BY price_link.link_score DESC NULLS LAST, price_link.updated_at DESC
         LIMIT 1
@@ -228,8 +191,8 @@ selected_listings AS (
             'text', COALESCE(observation.text, '')
         ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
         FROM public.target_observations observation
-        WHERE observation.source_type = 'source_listing'
-            AND observation.source_id = sl.sale_listing_id
+        WHERE observation.target_type = 'listing'
+            AND observation.target_id = doc.property_offering_id
             AND observation.superseded_at IS NULL
     ) insight_rows ON true
     CROSS JOIN lookup_input li
@@ -283,58 +246,56 @@ matched_offerings AS (
 ),
 offering_source_records AS (
     SELECT
-        source_link.target_id AS property_offering_id,
-        sr.sale_listing_id,
-        sr.sale_listing_canonical_id,
-        sr.sale_listing_source_provider,
-        sr.sale_listing_source_kind,
-        sr.sale_listing_native_id,
-        COALESCE(sr.sale_listing_headline, sr.sale_listing_street_address, sr.sale_listing_native_id) AS headline,
-        sr.sale_listing_street_address AS address,
-        COALESCE(sr.sale_listing_city, sr.sale_listing_city_norm, '') AS city,
-        COALESCE(sr.sale_listing_postal, sr.sale_listing_postal_norm, '') AS postal,
-        sr.sale_listing_latitude,
-        sr.sale_listing_longitude,
-        sr.sale_listing_asking_price,
-        sr.sale_listing_debt_free_price,
-        sr.sale_listing_area_value,
-        sr.sale_listing_room_layout AS room_layout,
-        sr.sale_listing_url AS url,
+        doc.property_offering_id,
+        doc.listing_id AS sale_listing_id,
+        doc.canonical_id AS sale_listing_canonical_id,
+        evidence.provider AS sale_listing_source_provider,
         CASE
-            WHEN sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad' THEN sr.shortcut_ad_id IS NOT NULL AND COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'
-            WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-            WHEN sr.sale_listing_source_provider = 'frontdoor' AND sr.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-            ELSE false
-        END AS external_url_available,
-        sr.sale_listing_first_seen_at,
-        sr.sale_listing_last_seen_at,
-        sr.sale_listing_updated_at,
-        sr.sale_listing_previous_asking_price,
-        sr.sale_listing_previous_debt_free_price,
+            WHEN evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
+            WHEN evidence.source_kind = 'frontdoor_ad' THEN 'ad'
+            WHEN evidence.source_kind = 'shortcut_ad' THEN 'ad'
+            ELSE evidence.source_kind
+        END AS sale_listing_source_kind,
+        COALESCE(evidence.external_id, doc.native_id) AS sale_listing_native_id,
+        COALESCE(doc.headline, doc.address, evidence.external_id, doc.native_id) AS headline,
+        doc.address,
+        doc.city AS city,
+        doc.postal AS postal,
+        doc.latitude AS sale_listing_latitude,
+        doc.longitude AS sale_listing_longitude,
+        doc.asking_price AS sale_listing_asking_price,
+        doc.debt_free_price AS sale_listing_debt_free_price,
+        doc.area_m2 AS sale_listing_area_value,
+        doc.room_layout,
+        COALESCE(evidence.url, doc.url) AS url,
+        COALESCE(evidence.url, doc.url, '') <> '' AS external_url_available,
+        doc.first_seen_at AS sale_listing_first_seen_at,
+        COALESCE(evidence.observed_at, doc.last_seen_at) AS sale_listing_last_seen_at,
+        doc.refreshed_at AS sale_listing_updated_at,
+        NULL::bigint AS sale_listing_previous_asking_price,
+        NULL::bigint AS sale_listing_previous_debt_free_price,
         direct_price.prices_transaction_id,
         NULLIF(direct_price.link_status, '') AS prices_match_status,
-        source_link.link_status AS source_link_status,
-        source_link.link_method AS source_link_method,
-        source_link.link_score AS property_offering_source_link_score,
-        sr.sale_listing_availability_text AS availability_text,
-        sr.sale_listing_renovations_done_text AS renovations_done_text,
-        sr.sale_listing_renovations_planned_text AS renovations_planned_text,
-        sr.sale_listing_additional_info_text AS additional_info_text,
-        sr.sale_listing_charges_text AS charges_text,
+        entity_evidence.link_status AS source_link_status,
+        entity_evidence.link_method AS source_link_method,
+        (entity_evidence.confidence * 100)::int4 AS property_offering_source_link_score,
+        ''::text AS availability_text,
+        ''::text AS renovations_done_text,
+        ''::text AS renovations_planned_text,
+        ''::text AS additional_info_text,
+        ''::text AS charges_text,
         COALESCE(insight_rows.insights_json, '[]'::jsonb) AS insights_json
     FROM matched_offerings mo
-    JOIN public.target_sources source_link ON source_link.target_id = mo.property_offering_id
-        AND source_link.target_type = 'listing'
-        AND source_link.source_type = 'source_listing'
-        AND source_link.link_status <> 'rejected'
-    JOIN public.property_source_offerings sr ON sr.sale_listing_id = source_link.source_id
-    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sr.frontdoor_ad_id
-    LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sr.frontdoor_building_announcement_id
+    JOIN public.listing_search_documents doc ON doc.property_offering_id = mo.property_offering_id
+        AND doc.listing_status = 'active'
+    JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id
+        AND entity_evidence.link_status <> 'rejected'
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id
     LEFT JOIN LATERAL (
         SELECT price_link.prices_transaction_id, price_link.link_status
         FROM public.price_links price_link
-        WHERE price_link.target_type = 'source_listing'
-            AND price_link.target_id = sr.sale_listing_id
+        WHERE price_link.target_type = 'listing'
+            AND price_link.target_id = doc.property_offering_id
             AND price_link.link_status <> 'rejected'
         ORDER BY price_link.link_score DESC NULLS LAST, price_link.updated_at DESC
         LIMIT 1
@@ -350,8 +311,8 @@ offering_source_records AS (
             'text', COALESCE(observation.text, '')
         ) ORDER BY observation.severity DESC, observation.observation_key) AS insights_json
         FROM public.target_observations observation
-        WHERE observation.source_type = 'source_listing'
-            AND observation.source_id = sr.sale_listing_id
+        WHERE observation.target_type = 'listing'
+            AND observation.target_id = doc.property_offering_id
             AND observation.superseded_at IS NULL
     ) insight_rows ON true
 ),
@@ -381,8 +342,8 @@ links AS (
         COALESCE(lc.sale_listing_prices_transaction_match_reasons, price_link.link_reasons) AS reasons,
         1 AS link_rank
     FROM limited_listings selected
-    JOIN public.price_links price_link ON price_link.target_type = 'source_listing'
-        AND price_link.target_id = selected.sale_listing_id
+    JOIN public.price_links price_link ON price_link.target_type = 'listing'
+        AND price_link.target_id = selected.property_offering_id
         AND price_link.link_status <> 'rejected'
     LEFT JOIN latest_candidates lc ON lc.sale_listing_id = selected.sale_listing_id
         AND lc.prices_transaction_id = price_link.prices_transaction_id
@@ -422,8 +383,8 @@ links AS (
         3
     FROM limited_listings selected
     JOIN offering_source_records osr ON osr.property_offering_id = selected.property_offering_id
-    JOIN public.price_links price_link ON price_link.target_type = 'source_listing'
-        AND price_link.target_id = osr.sale_listing_id
+    JOIN public.price_links price_link ON price_link.target_type = 'listing'
+        AND price_link.target_id = selected.property_offering_id
         AND price_link.link_status <> 'rejected'
     LEFT JOIN latest_candidates lc ON lc.sale_listing_id = osr.sale_listing_id
         AND lc.prices_transaction_id = price_link.prices_transaction_id
@@ -597,7 +558,7 @@ type LookupAddressListingsRow struct {
 	SaleListingPreviousDebtFreePrice     *int64          `json:"sale_listing_previous_debt_free_price"`
 	PricesMatchStatus                    *string         `json:"prices_match_status"`
 	SourceMatchStatus                    *string         `json:"source_match_status"`
-	PropertyOfferingID                   *uuid.UUID      `json:"property_offering_id"`
+	PropertyOfferingID                   uuid.UUID       `json:"property_offering_id"`
 	HousingCompanyID                     uuid.UUID       `json:"housing_company_id"`
 	HousingCompanyName                   *string         `json:"housing_company_name"`
 	AvailabilityText                     *string         `json:"availability_text"`
@@ -657,7 +618,7 @@ type LookupAddressListingsRow struct {
 	SaleListingPreviousDebtFreePrice_2   *int64          `json:"sale_listing_previous_debt_free_price_2"`
 	Coalesce_28                          *string         `json:"coalesce_28"`
 	Coalesce_29                          *string         `json:"coalesce_29"`
-	PropertyOfferingSourceLinkScore      int32           `json:"property_offering_source_link_score"`
+	PropertyOfferingSourceLinkScore      *int32          `json:"property_offering_source_link_score"`
 	Coalesce_30                          *string         `json:"coalesce_30"`
 	Coalesce_31                          *string         `json:"coalesce_31"`
 	Coalesce_32                          *string         `json:"coalesce_32"`
@@ -892,42 +853,40 @@ SELECT
                     'listing'::text AS match_type,
                     price_link.price_link_id::text AS id,
                     ''::text AS offering_id,
-                    sl.sale_listing_canonical_id AS canonical_id,
-                    sl.sale_listing_source_provider AS source,
-                    sl.sale_listing_native_id AS native_id,
-                    COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-                    sl.sale_listing_street_address AS address,
-                    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
-                    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
+                    doc.canonical_id,
+                    doc.source,
+                    doc.native_id,
+                    COALESCE(doc.headline, doc.address, doc.native_id) AS headline,
+                    doc.address,
+                    doc.city,
+                    doc.postal,
                     price_link.link_status AS status,
                     price_link.link_method AS method,
                     price_link.link_score AS score
                 FROM public.price_links price_link
-                JOIN public.property_source_offerings sl ON sl.sale_listing_id = price_link.target_id
+                JOIN public.listing_search_documents doc ON doc.primary_source_listing_id = price_link.target_id
+                    AND doc.listing_status = 'active'
                 WHERE price_link.prices_transaction_id = pt.prices_transaction_id
                     AND price_link.target_type = 'source_listing'
                     AND price_link.link_status <> 'rejected'
                 UNION ALL
                 SELECT
                     'offering_source'::text AS match_type,
-                    price_link.price_link_id::text || ':' || sl.sale_listing_id::text AS id,
+                    price_link.price_link_id::text || ':' || doc.listing_id::text AS id,
                     price_link.target_id::text AS offering_id,
-                    sl.sale_listing_canonical_id AS canonical_id,
-                    sl.sale_listing_source_provider AS source,
-                    sl.sale_listing_native_id AS native_id,
-                    COALESCE(sl.sale_listing_headline, sl.sale_listing_street_address, sl.sale_listing_native_id) AS headline,
-                    sl.sale_listing_street_address AS address,
-                    COALESCE(sl.sale_listing_city, sl.sale_listing_city_norm, '') AS city,
-                    COALESCE(sl.sale_listing_postal, sl.sale_listing_postal_norm, '') AS postal,
+                    doc.canonical_id,
+                    doc.source,
+                    doc.native_id,
+                    COALESCE(doc.headline, doc.address, doc.native_id) AS headline,
+                    doc.address,
+                    doc.city,
+                    doc.postal,
                     price_link.link_status AS status,
                     price_link.link_method AS method,
                     price_link.link_score AS score
                 FROM public.price_links price_link
-                JOIN public.target_sources source_link ON source_link.target_type = 'listing'
-                    AND source_link.target_id = price_link.target_id
-                    AND source_link.source_type = 'source_listing'
-                    AND source_link.link_status <> 'rejected'
-                JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id
+                JOIN public.listing_search_documents doc ON doc.property_offering_id = price_link.target_id
+                    AND doc.listing_status = 'active'
                 WHERE price_link.prices_transaction_id = pt.prices_transaction_id
                     AND price_link.target_type = 'listing'
                     AND price_link.link_status <> 'rejected'
@@ -1071,35 +1030,31 @@ const lookupAddressSourceCandidates = `-- name: LookupAddressSourceCandidates :m
 WITH selected AS (
     SELECT unnest($1::uuid[])::uuid AS sale_listing_id
 ),
-selected_links AS (
+selected_docs AS (
     SELECT
         selected.sale_listing_id AS selected_sale_listing_id,
-        selected_link.target_id AS selected_property_offering_id
+        doc.property_offering_id AS selected_property_offering_id
     FROM selected
-    JOIN public.target_sources selected_link ON selected_link.target_type = 'listing'
-        AND selected_link.source_type = 'source_listing'
-        AND selected_link.source_id = selected.sale_listing_id
-        AND selected_link.link_status <> 'rejected'
+    JOIN public.listing_search_documents doc ON doc.listing_id = selected.sale_listing_id
+        AND doc.listing_status = 'active'
 ),
 candidate_links AS (
     SELECT
-        selected_links.selected_sale_listing_id,
-        candidate_link.source_id AS candidate_sale_listing_id,
-        selected_links.selected_property_offering_id,
-        candidate_link.target_id AS candidate_property_offering_id,
-        'target_source'::text AS direction,
-        candidate_link.link_score AS match_score,
-        CASE WHEN candidate_link.link_score >= 95 THEN 'high' WHEN candidate_link.link_score >= 80 THEN 'medium' ELSE 'low' END AS match_confidence,
-        candidate_link.link_status AS match_status,
-        candidate_link.link_reasons AS match_reasons,
+        selected_docs.selected_sale_listing_id,
+        candidate.listing_id AS candidate_sale_listing_id,
+        selected_docs.selected_property_offering_id,
+        candidate.property_offering_id AS candidate_property_offering_id,
+        'listing_document'::text AS direction,
+        100::int4 AS match_score,
+        'high'::text AS match_confidence,
+        'confirmed'::text AS match_status,
+        jsonb_build_object('method', 'listing_search_documents') AS match_reasons,
         NULL::double precision AS price_delta_percent,
-        candidate_link.updated_at AS match_created_at
-    FROM selected_links
-    JOIN public.target_sources candidate_link ON candidate_link.target_type = 'listing'
-        AND candidate_link.target_id = selected_links.selected_property_offering_id
-        AND candidate_link.source_type = 'source_listing'
-        AND candidate_link.source_id <> selected_links.selected_sale_listing_id
-        AND candidate_link.link_status <> 'rejected'
+        candidate.refreshed_at AS match_created_at
+    FROM selected_docs
+    JOIN public.listing_search_documents candidate ON candidate.property_offering_id = selected_docs.selected_property_offering_id
+        AND candidate.listing_id <> selected_docs.selected_sale_listing_id
+        AND candidate.listing_status = 'active'
 ),
 ranked_latest AS (
     SELECT
@@ -1122,26 +1077,21 @@ ranked_latest AS (
 )
 SELECT
     latest.selected_sale_listing_id,
-    candidate.sale_listing_id,
-    candidate.sale_listing_canonical_id,
-    candidate.sale_listing_source_provider,
-    candidate.sale_listing_source_kind,
-    candidate.sale_listing_native_id,
-    COALESCE(candidate.sale_listing_headline, candidate.sale_listing_street_address, candidate.sale_listing_native_id) AS headline,
-    candidate.sale_listing_street_address AS address,
-    COALESCE(candidate.sale_listing_city, candidate.sale_listing_city_norm, '') AS city,
-    COALESCE(candidate.sale_listing_postal, candidate.sale_listing_postal_norm, '') AS postal,
-    candidate.sale_listing_asking_price,
-    candidate.sale_listing_debt_free_price,
-    candidate.sale_listing_area_value,
-    candidate.sale_listing_room_layout AS room_layout,
-    candidate.sale_listing_url AS url,
-    CASE
-        WHEN candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad' THEN candidate.shortcut_ad_id IS NOT NULL AND COALESCE(candidate.sale_listing_url, '') <> '' AND candidate.sale_listing_last_seen_at >= now() - interval '7 days'
-        WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'ad' THEN fa.frontdoor_ad_id IS NOT NULL AND fa.frontdoor_ad_page_not_found = false
-        WHEN candidate.sale_listing_source_provider = 'frontdoor' AND candidate.sale_listing_source_kind = 'announcement' THEN COALESCE(fba.frontdoor_building_announcement_published, false)
-        ELSE false
-    END AS external_url_available,
+    candidate.listing_id AS sale_listing_id,
+    candidate.canonical_id AS sale_listing_canonical_id,
+    candidate.source AS sale_listing_source_provider,
+    candidate.kind AS sale_listing_source_kind,
+    candidate.native_id AS sale_listing_native_id,
+    COALESCE(candidate.headline, candidate.address, candidate.native_id) AS headline,
+    candidate.address,
+    candidate.city,
+    candidate.postal,
+    candidate.asking_price AS sale_listing_asking_price,
+    candidate.debt_free_price AS sale_listing_debt_free_price,
+    candidate.area_m2 AS sale_listing_area_value,
+    candidate.room_layout,
+    candidate.url,
+    COALESCE(candidate.url, '') <> '' AS external_url_available,
     latest.selected_property_offering_id,
     latest.candidate_property_offering_id,
     latest.direction,
@@ -1152,9 +1102,7 @@ SELECT
     latest.match_reasons,
     latest.match_created_at
 FROM ranked_latest latest
-JOIN public.property_source_offerings candidate ON candidate.sale_listing_id = latest.candidate_sale_listing_id
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = candidate.frontdoor_ad_id
-LEFT JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = candidate.frontdoor_building_announcement_id
+JOIN public.listing_search_documents candidate ON candidate.listing_id = latest.candidate_sale_listing_id
 WHERE latest.candidate_rank <= 5
 ORDER BY latest.selected_sale_listing_id, latest.match_score DESC, latest.match_created_at DESC
 LIMIT 250
@@ -1180,8 +1128,8 @@ type LookupAddressSourceCandidatesRow struct {
 	SelectedPropertyOfferingID  uuid.UUID       `json:"selected_property_offering_id"`
 	CandidatePropertyOfferingID uuid.UUID       `json:"candidate_property_offering_id"`
 	Direction                   *string         `json:"direction"`
-	MatchStatus                 string          `json:"match_status"`
-	MatchScore                  int32           `json:"match_score"`
+	MatchStatus                 *string         `json:"match_status"`
+	MatchScore                  *int32          `json:"match_score"`
 	MatchConfidence             *string         `json:"match_confidence"`
 	PriceDeltaPercent           *float64        `json:"price_delta_percent"`
 	MatchReasons                json.RawMessage `json:"match_reasons"`

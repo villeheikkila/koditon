@@ -553,37 +553,37 @@ func TestAddressRawTransactionsExposeOfferingSourceMatches(t *testing.T) {
 	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
 		"'offering_source'::text AS match_type",
-		"price_link.price_link_id::text || ':' || sl.sale_listing_id::text AS id",
+		"price_link.price_link_id::text || ':' || doc.listing_id::text AS id",
 		"price_link.target_id::text AS offering_id",
-		"JOIN public.target_sources source_link ON source_link.target_type = 'listing'",
-		"JOIN public.property_source_offerings sl ON sl.sale_listing_id = source_link.source_id",
+		"JOIN public.listing_search_documents doc ON doc.property_offering_id = price_link.target_id",
 	} {
 		if !strings.Contains(sql, want) {
 			t.Fatalf("expected raw transaction SQL to include %q", want)
 		}
 	}
-	if strings.Contains(sql, "primary_listing.sale_listing_canonical_id") {
-		t.Fatal("expected raw transaction matches to use offering source rows instead of only the primary listing")
+	if strings.Contains(sql, "JOIN public.property_source_offerings sl") {
+		t.Fatal("expected raw transaction matches to avoid source staging rows")
 	}
 }
 
-func TestAddressLookupUsesLiveShortcutAdAvailability(t *testing.T) {
+func TestAddressLookupUsesListingSearchDocuments(t *testing.T) {
 	sql := serviceReportingSQLForTest(t)
 	for _, want := range []string{
-		"sl.sale_listing_source_provider = 'shortcut' AND sl.sale_listing_source_kind = 'ad'",
-		"sr.sale_listing_source_provider = 'shortcut' AND sr.sale_listing_source_kind = 'ad'",
-		"COALESCE(sl.sale_listing_url, '') <> '' AND sl.sale_listing_last_seen_at >= now() - interval '7 days'",
-		"COALESCE(sr.sale_listing_url, '') <> '' AND sr.sale_listing_last_seen_at >= now() - interval '7 days'",
+		"FROM public.listing_search_documents doc",
+		"doc.listing_status = 'active'",
+		"doc.source_providers @> ARRAY[$4::text]",
+		"JOIN public.entity_evidence entity_evidence ON entity_evidence.listing_id = doc.listing_id",
+		"JOIN public.evidence_sources evidence ON evidence.evidence_source_id = entity_evidence.evidence_source_id",
 	} {
 		if !strings.Contains(sql, want) {
 			t.Fatalf("expected address lookup SQL to include %q", want)
 		}
 	}
-	if !strings.Contains(sql, "candidate.sale_listing_source_provider = 'shortcut' AND candidate.sale_listing_source_kind = 'ad'") {
-		t.Fatal("expected source candidates SQL to include shortcut ad availability")
+	if strings.Contains(sql, "sl.sale_listing_source_provider = 'shortcut'") {
+		t.Fatal("expected address lookup SQL to avoid source staging availability checks")
 	}
-	if !strings.Contains(sql, "candidate.sale_listing_last_seen_at >= now() - interval '7 days'") {
-		t.Fatal("expected source candidates SQL to require recent shortcut sightings")
+	if strings.Contains(sql, "JOIN public.property_source_offerings candidate") {
+		t.Fatal("expected address source candidates to avoid source staging rows")
 	}
 }
 
