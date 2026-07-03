@@ -76,9 +76,9 @@ func (s *Service) ReconcileFrontdoorBuildingAnnouncement(ctx context.Context, an
 	return s.reconcileSourceListing(ctx, sourceListingID)
 }
 
-// ReconcileSourceOffering publishes one normalized source offering into the canonical listing graph.
-func (s *Service) ReconcileSourceOffering(ctx context.Context, sourceOfferingID uuid.UUID) (Result, error) {
-	return s.reconcileSourceListing(ctx, sourceOfferingID)
+// ReconcileSourceListing publishes one normalized source listing into the canonical listing graph.
+func (s *Service) ReconcileSourceListing(ctx context.Context, sourceListingID uuid.UUID) (Result, error) {
+	return s.reconcileSourceListing(ctx, sourceListingID)
 }
 
 func (s *Service) reconcileSourceListing(ctx context.Context, sourceListingID uuid.UUID) (Result, error) {
@@ -92,9 +92,9 @@ func (s *Service) reconcileSourceListing(ctx context.Context, sourceListingID uu
 		}
 	}()
 	qtx := s.queries.WithTx(tx)
-	row, err := qtx.ReconcileSourceOfferingListingModel(ctx, sourceListingID)
+	row, err := qtx.ReconcileSourceListingModel(ctx, sourceListingID)
 	if err != nil {
-		return Result{}, fmt.Errorf("reconcile source offering listing model: %w", err)
+		return Result{}, fmt.Errorf("reconcile source listing model: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("commit listing model reconciliation: %w", err)

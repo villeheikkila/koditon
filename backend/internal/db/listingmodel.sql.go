@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const reconcileSourceOfferingListingModel = `-- name: ReconcileSourceOfferingListingModel :one
+const reconcileSourceListingModel = `-- name: ReconcileSourceListingModel :one
 WITH source AS (
     SELECT
         frontdoor_ad_id,
@@ -718,16 +718,16 @@ JOIN offering ON true
 JOIN listing ON true
 `
 
-type ReconcileSourceOfferingListingModelRow struct {
+type ReconcileSourceListingModelRow struct {
 	EvidenceSourceID   *uuid.UUID `json:"evidence_source_id"`
 	PropertyOfferingID uuid.UUID  `json:"property_offering_id"`
 	ListingID          uuid.UUID  `json:"listing_id"`
 	SearchDocuments    *int32     `json:"search_documents"`
 }
 
-func (q *Queries) ReconcileSourceOfferingListingModel(ctx context.Context, dollar_1 uuid.UUID) (ReconcileSourceOfferingListingModelRow, error) {
-	row := q.db.QueryRow(ctx, reconcileSourceOfferingListingModel, dollar_1)
-	var i ReconcileSourceOfferingListingModelRow
+func (q *Queries) ReconcileSourceListingModel(ctx context.Context, dollar_1 uuid.UUID) (ReconcileSourceListingModelRow, error) {
+	row := q.db.QueryRow(ctx, reconcileSourceListingModel, dollar_1)
+	var i ReconcileSourceListingModelRow
 	err := row.Scan(
 		&i.EvidenceSourceID,
 		&i.PropertyOfferingID,

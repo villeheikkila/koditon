@@ -1,4 +1,4 @@
--- name: ReconcileSourceOfferingListingModel :one
+-- name: ReconcileSourceListingModel :one
 WITH source AS (
     SELECT
         frontdoor_ad_id,
