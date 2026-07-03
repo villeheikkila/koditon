@@ -69,7 +69,7 @@ func (s *Service) extractSourceListingRenovations(ctx context.Context, saleListi
 	if strings.TrimSpace(s.renovationExtractorAPIKey) == "" {
 		return RenovationExtractionResult{}, ErrRenovationExtractorNotConfigured
 	}
-	row, err := s.queries.GetSaleListingRenovationExtractionTexts(ctx, &saleListingID)
+	row, err := s.queries.GetSaleListingRenovationExtractionTexts(ctx, saleListingID)
 	if err != nil {
 		return RenovationExtractionResult{}, mapNotFound(err)
 	}

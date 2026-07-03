@@ -3062,14 +3062,22 @@ func (q *Queries) GetRuntimeKV(ctx context.Context, kvKey *string) ([]byte, erro
 }
 
 const getSaleListingRenovationExtractionTexts = `-- name: GetSaleListingRenovationExtractionTexts :one
+WITH source_doc AS (
+    SELECT
+        fa.frontdoor_ad_data,
+        sa.shortcut_ad_data
+    FROM public.listing_search_documents doc
+    JOIN public.evidence_sources evidence ON evidence.evidence_source_id = doc.primary_evidence_source_id
+    LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = evidence.frontdoor_ad_id
+    LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = evidence.shortcut_ad_id
+    WHERE doc.primary_source_listing_id = $1::uuid
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
 SELECT
-    COALESCE(pso.sale_listing_renovations_done_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', sa.shortcut_ad_data #>> '{adData,renovationsDoneDescription}', sa.shortcut_ad_data #>> '{property,renovationsDoneDescription}')), ''), '')::text AS done_text,
-    COALESCE(pso.sale_listing_renovations_planned_text, NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', fa.frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', sa.shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', sa.shortcut_ad_data #>> '{property,renovationsPlannedDescription}')), ''), '')::text AS planned_text
-FROM public.property_source_offerings pso
-LEFT JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = pso.frontdoor_ad_id
-LEFT JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = pso.shortcut_ad_id
-WHERE pso.sale_listing_id = $1
-LIMIT 1
+    COALESCE(NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,renovationsDoneDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsDoneDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsDone}', shortcut_ad_data #>> '{adData,renovationsDoneDescription}', shortcut_ad_data #>> '{property,renovationsDoneDescription}', shortcut_ad_data #>> '{adData,renovationInfo}', shortcut_ad_data #>> '{buildingData,renovationInfo}')), ''), '')::text AS done_text,
+    COALESCE(NULLIF(trim(COALESCE(frontdoor_ad_data #>> '{property,renovationsPlannedDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsPlannedDescription}', frontdoor_ad_data #>> '{property,housingCompany,renovationsPlanned}', shortcut_ad_data #>> '{adData,renovationsPlannedDescription}', shortcut_ad_data #>> '{property,renovationsPlannedDescription}', shortcut_ad_data #>> '{adData,renovationFutureInfo}', shortcut_ad_data #>> '{buildingData,renovationFutureInfo}')), ''), '')::text AS planned_text
+FROM source_doc
 `
 
 type GetSaleListingRenovationExtractionTextsRow struct {
@@ -3077,7 +3085,7 @@ type GetSaleListingRenovationExtractionTextsRow struct {
 	PlannedText *string `json:"planned_text"`
 }
 
-func (q *Queries) GetSaleListingRenovationExtractionTexts(ctx context.Context, saleListingID *uuid.UUID) (GetSaleListingRenovationExtractionTextsRow, error) {
+func (q *Queries) GetSaleListingRenovationExtractionTexts(ctx context.Context, saleListingID uuid.UUID) (GetSaleListingRenovationExtractionTextsRow, error) {
 	row := q.db.QueryRow(ctx, getSaleListingRenovationExtractionTexts, saleListingID)
 	var i GetSaleListingRenovationExtractionTextsRow
 	err := row.Scan(&i.DoneText, &i.PlannedText)
@@ -3735,7 +3743,7 @@ WITH run AS (
     VALUES (
         'source_claims',
         COALESCE(NULLIF($1, ''), 'listing-llm-v1'),
-        'property_source_offerings',
+        'listing_search_documents',
         $2,
         'succeeded',
         now()
@@ -3824,7 +3832,7 @@ SELECT
     payload.value,
     payload.value_kind,
     catalog.unit,
-    'property_source_offerings',
+    'listing_search_documents',
     $2,
     NULLIF($3, ''),
     now(),
@@ -3910,8 +3918,8 @@ INSERT INTO public.target_observations (
     evidence
 )
 SELECT
-    source_link.target_type,
-    source_link.target_id,
+    'listing',
+    doc.listing_id,
     $1,
     CASE
         WHEN $2::text = 'negative' THEN 'risk'
@@ -3924,13 +3932,13 @@ SELECT
     NULLIF($5, ''),
     $6::integer::double precision / 100,
     'source_listing',
-    source_link.source_id,
+    doc.primary_source_listing_id,
     jsonb_build_object('source_field', $7::text)
-FROM public.target_sources source_link
-WHERE source_link.target_type = 'listing'
-    AND source_link.source_type = 'source_listing'
-    AND source_link.source_id = $8::uuid
-    AND source_link.link_status <> 'rejected'
+FROM public.listing_search_documents doc
+WHERE doc.primary_source_listing_id = $8::uuid
+    AND doc.listing_status <> 'rejected'
+ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+LIMIT 1
 ON CONFLICT (target_type, target_id, observation_key, source_type, source_id) WHERE superseded_at IS NULL DO UPDATE SET
     observation_kind = EXCLUDED.observation_kind,
     severity = EXCLUDED.severity,
@@ -4749,7 +4757,7 @@ WITH run AS (
     ) VALUES (
         'renovation_events',
         $1,
-        'property_source_offerings',
+        'listing_search_documents',
         $2,
         'succeeded',
         now()
@@ -4759,29 +4767,25 @@ WITH run AS (
 deleted AS (
     DELETE FROM public.property_renovation_events
     WHERE event_scope = 'source'
-        AND source_table = 'property_source_offerings'
+        AND source_table IN ('property_source_offerings', 'listing_search_documents')
         AND source_id = $2
         AND projection_version = $1
 ),
 linked AS (
     SELECT
-        pos.sale_listing_id,
+        doc.primary_source_listing_id AS sale_listing_id,
         COALESCE(pu.housing_company_id, pb.housing_company_id) AS housing_company_id,
         pu.physical_building_id,
-        pos.sale_listing_last_seen_at,
-        pos.sale_listing_updated_at,
-        pos.sale_listing_created_at
-    FROM public.property_source_offerings pos
-    LEFT JOIN public.target_sources link
-        ON link.source_id = pos.sale_listing_id
-        AND link.target_type = 'listing'
-        AND link.source_type = 'source_listing'
-        AND link.link_status <> 'rejected'
-    LEFT JOIN public.property_offerings po ON po.property_offering_id = link.target_id
+        doc.last_seen_at,
+        doc.refreshed_at,
+        doc.first_seen_at
+    FROM public.listing_search_documents doc
+    LEFT JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
     LEFT JOIN public.property_units pu ON pu.property_unit_id = po.property_unit_id
     LEFT JOIN public.physical_buildings pb ON pb.physical_building_id = pu.physical_building_id
-    WHERE pos.sale_listing_id = $2
-    ORDER BY link.link_score DESC NULLS LAST, link.updated_at DESC NULLS LAST
+    WHERE doc.primary_source_listing_id = $2
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
     LIMIT 1
 ),
 inserted AS (
@@ -4816,7 +4820,7 @@ inserted AS (
         'source',
         CASE WHEN linked.housing_company_id IS NOT NULL THEN 'housing_company' ELSE 'building' END,
         COALESCE(linked.housing_company_id, linked.physical_building_id),
-        'property_source_offerings',
+        'listing_search_documents',
         linked.sale_listing_id,
         renovation.property_source_offering_renovation_source_field,
         renovation.property_source_offering_renovation_category,
@@ -4833,7 +4837,7 @@ inserted AS (
         jsonb_build_object('evidence_level', CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 'listing_llm' ELSE 'listing_field' END),
         GREATEST(0, LEAST(1, COALESCE(renovation.property_source_offering_renovation_confidence, 50)::double precision / 100)),
         CASE WHEN renovation.property_source_offering_renovation_source_field LIKE 'llm_%' THEN 0.75 ELSE 0.65 END,
-        COALESCE(linked.sale_listing_last_seen_at, linked.sale_listing_updated_at, linked.sale_listing_created_at, now())
+        COALESCE(linked.last_seen_at, linked.refreshed_at, linked.first_seen_at, now())
     FROM run
     JOIN linked ON COALESCE(linked.housing_company_id, linked.physical_building_id) IS NOT NULL
     JOIN public.property_source_offering_renovations renovation ON renovation.sale_listing_id = linked.sale_listing_id
