@@ -68,9 +68,9 @@ func (s *Service) ReconcileShortcutAd(ctx context.Context, shortcutAdID int64) (
 
 // ReconcileFrontdoorAd publishes one Frontdoor ad into the canonical listing graph.
 func (s *Service) ReconcileFrontdoorAd(ctx context.Context, frontdoorAdID uuid.UUID) (Result, error) {
-	sourceListingID, err := s.queries.CanonicalizeFrontdoorAdSaleListing(ctx, &frontdoorAdID)
+	sourceListingID, err := s.queries.UpsertFrontdoorAdSourceListing(ctx, &frontdoorAdID)
 	if err != nil {
-		return Result{}, fmt.Errorf("canonicalize frontdoor ad listing model source: %w", err)
+		return Result{}, fmt.Errorf("upsert frontdoor ad source listing: %w", err)
 	}
 	return s.reconcileSourceListing(ctx, sourceListingID)
 }
