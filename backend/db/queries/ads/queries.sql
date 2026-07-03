@@ -3568,6 +3568,45 @@ ORDER BY
 LIMIT @limit_count::int;
 
 -- name: GetShortcutAdUnifiedDetail :one
+WITH sl AS (
+    SELECT
+        doc.address AS sale_listing_street_address,
+        doc.city AS sale_listing_city,
+        doc.postal AS sale_listing_postal,
+        doc.latitude AS sale_listing_latitude,
+        doc.longitude AS sale_listing_longitude,
+        doc.room_layout AS sale_listing_room_layout,
+        doc.asking_price AS sale_listing_asking_price,
+        doc.area_m2 AS sale_listing_area_value,
+        NULL::text AS sale_listing_description_text,
+        NULL::text AS sale_listing_availability_text,
+        NULL::text AS sale_listing_renovations_done_text,
+        NULL::text AS sale_listing_renovations_planned_text,
+        NULL::text AS sale_listing_additional_info_text,
+        NULL::text AS sale_listing_charges_text,
+        NULL::double precision AS sale_listing_maintenance_charge_monthly,
+        NULL::double precision AS sale_listing_total_charge_monthly,
+        NULL::double precision AS sale_listing_water_charge,
+        doc.debt_free_price AS sale_listing_debt_free_price,
+        doc.debt_share_amount AS sale_listing_debt_share_amount,
+        doc.price_per_m2 AS sale_listing_price_per_m2,
+        doc.floor_level AS sale_listing_floor_level,
+        doc.total_floors AS sale_listing_total_floors,
+        doc.build_year AS sale_listing_build_year,
+        doc.condition AS sale_listing_condition,
+        doc.energy_class AS sale_listing_energy_class,
+        CASE WHEN doc.plot_owned IS TRUE THEN 'owned' WHEN doc.plot_owned IS FALSE THEN 'leased' ELSE NULL END AS sale_listing_plot_type_raw,
+        doc.elevator AS sale_listing_elevator,
+        doc.sauna AS sale_listing_sauna,
+        doc.rooms_count AS sale_listing_rooms_count
+    FROM public.listing_search_documents doc
+    WHERE doc.source = 'shortcut'
+        AND doc.kind = 'ad'
+        AND doc.native_id = sqlc.arg(ad_id)::text
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
 SELECT
     sa.shortcut_ad_id,
     sa.shortcut_ad_url,
@@ -3612,8 +3651,8 @@ SELECT
     (SELECT COUNT(*)::bigint FROM origin.shortcut_building_rentals sbr WHERE sbr.shortcut_building_id = sb.shortcut_building_id) AS building_rental_count
 FROM origin.shortcut_ads sa
 LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
-LEFT JOIN public.property_source_offerings sl ON sl.shortcut_ad_id = sa.shortcut_ad_id
-WHERE sa.shortcut_ad_id = sqlc.arg(ad_id)
+LEFT JOIN sl ON true
+WHERE sa.shortcut_ad_id = sqlc.arg(ad_id)::bigint
 LIMIT 1;
 
 -- name: GetShortcutBuildingUnifiedDetail :one
@@ -3671,6 +3710,46 @@ WHERE sb.shortcut_building_id = sqlc.arg(building_id)
 LIMIT 1;
 
 -- name: GetFrontdoorAdUnifiedDetail :one
+WITH sl AS (
+    SELECT
+        doc.address AS sale_listing_street_address,
+        doc.city AS sale_listing_city,
+        doc.postal AS sale_listing_postal,
+        doc.latitude AS sale_listing_latitude,
+        doc.longitude AS sale_listing_longitude,
+        doc.asking_price AS sale_listing_asking_price,
+        doc.area_m2 AS sale_listing_area_value,
+        doc.room_layout AS sale_listing_room_layout,
+        doc.property_type_code AS sale_listing_property_type_raw,
+        doc.condition AS sale_listing_condition,
+        NULL::text AS sale_listing_description_text,
+        NULL::text AS sale_listing_availability_text,
+        NULL::text AS sale_listing_renovations_done_text,
+        NULL::text AS sale_listing_renovations_planned_text,
+        NULL::text AS sale_listing_additional_info_text,
+        NULL::text AS sale_listing_charges_text,
+        NULL::double precision AS sale_listing_maintenance_charge_monthly,
+        NULL::double precision AS sale_listing_total_charge_monthly,
+        NULL::double precision AS sale_listing_water_charge,
+        doc.debt_free_price AS sale_listing_debt_free_price,
+        doc.debt_share_amount AS sale_listing_debt_share_amount,
+        doc.price_per_m2 AS sale_listing_price_per_m2,
+        doc.floor_level AS sale_listing_floor_level,
+        doc.total_floors AS sale_listing_total_floors,
+        doc.build_year AS sale_listing_build_year,
+        doc.energy_class AS sale_listing_energy_class,
+        CASE WHEN doc.plot_owned IS TRUE THEN 'owned' WHEN doc.plot_owned IS FALSE THEN 'leased' ELSE NULL END AS sale_listing_plot_type_raw,
+        doc.elevator AS sale_listing_elevator,
+        doc.sauna AS sale_listing_sauna,
+        doc.rooms_count AS sale_listing_rooms_count
+    FROM public.listing_search_documents doc
+    WHERE doc.source = 'frontdoor'
+        AND doc.kind = 'ad'
+        AND doc.native_id = sqlc.arg(external_id)::text
+        AND doc.listing_status <> 'rejected'
+    ORDER BY (doc.listing_status = 'active') DESC, doc.refreshed_at DESC
+    LIMIT 1
+)
 SELECT
     fa.frontdoor_ad_id,
     fa.frontdoor_ad_external_id,
@@ -3713,7 +3792,7 @@ SELECT
     sl.sale_listing_rooms_count AS frontdoor_ad_rooms_count,
     fa.frontdoor_ad_data
 FROM origin.frontdoor_ads fa
-LEFT JOIN public.property_source_offerings sl ON sl.frontdoor_ad_id = fa.frontdoor_ad_id
+LEFT JOIN sl ON true
 WHERE fa.frontdoor_ad_external_id = sqlc.arg(external_id)
 LIMIT 1;
 

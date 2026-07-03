@@ -662,7 +662,7 @@ func (s *Service) DetailByCanonicalID(ctx context.Context, canonicalID string) (
 			if err != nil {
 				return UnifiedEntityDetail{}, fmt.Errorf("parse shortcut ad id: %w", err)
 			}
-			row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, &adID)
+			row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, adID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return UnifiedEntityDetail{}, fmt.Errorf("%w: shortcut ad", ErrNotFound)

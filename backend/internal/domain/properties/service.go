@@ -512,7 +512,7 @@ func (s *Service) RentalByID(ctx context.Context, input string, shortcutBase str
 		if err != nil {
 			return Rental{}, fmt.Errorf("parse shortcut ad id: %w", err)
 		}
-		row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, &adID)
+		row, err := s.queries.GetShortcutAdUnifiedDetail(ctx, adID)
 		if err != nil {
 			return Rental{}, mapNotFound(err)
 		}
