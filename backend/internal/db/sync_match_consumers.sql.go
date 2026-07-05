@@ -62,8 +62,7 @@ WITH removed_ads AS (
     JOIN origin.source_listings sl ON sl.source_listing_id = doc.primary_source_listing_id
         AND sl.provider = 'frontdoor'
         AND sl.source_kind = 'ad'
-        AND sl.raw_table = 'frontdoor_ads'
-    JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id::text = sl.raw_id
+    JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
     CROSS JOIN LATERAL (
         SELECT
             NULLIF(fa.frontdoor_ad_data #>> '{housingCompanyAnnouncementFriendlyId}', '') AS housing_company_friendly_id,

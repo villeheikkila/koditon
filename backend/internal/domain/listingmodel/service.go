@@ -36,8 +36,7 @@ func NewService(logger *slog.Logger, pool *pgxpool.Pool) *Service {
 
 // RemoveShortcutAdListing removes the canonical listing projection for a non-listing Shortcut ad.
 func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int64) error {
-	shortcutAdIDText := fmt.Sprint(shortcutAdID)
-	if err := s.queries.DeleteShortcutAdSourceListing(ctx, &shortcutAdIDText); err != nil {
+	if err := s.queries.DeleteShortcutAdSourceListing(ctx, &shortcutAdID); err != nil {
 		return fmt.Errorf("delete shortcut source listing: %w", err)
 	}
 	return nil
@@ -45,8 +44,7 @@ func (s *Service) RemoveShortcutAdListing(ctx context.Context, shortcutAdID int6
 
 // RemoveFrontdoorBuildingAnnouncement removes the canonical listing projection for a rental Frontdoor announcement.
 func (s *Service) RemoveFrontdoorBuildingAnnouncement(ctx context.Context, announcementID uuid.UUID) error {
-	announcementIDText := announcementID.String()
-	if err := s.queries.DeleteFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementIDText); err != nil {
+	if err := s.queries.DeleteFrontdoorBuildingAnnouncementSourceListing(ctx, &announcementID); err != nil {
 		return fmt.Errorf("delete frontdoor announcement source listing: %w", err)
 	}
 	return nil

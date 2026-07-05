@@ -728,8 +728,9 @@ CREATE TABLE origin.source_listings (
     source_kind text NOT NULL,
     native_id text NOT NULL,
     canonical_source_id text NOT NULL,
-    raw_table text NOT NULL,
-    raw_id text NOT NULL,
+    shortcut_ad_id bigint,
+    frontdoor_ad_id uuid,
+    frontdoor_building_announcement_id uuid,
     url text,
     payload_hash text,
     normalized_version integer DEFAULT 0 NOT NULL,
@@ -738,6 +739,7 @@ CREATE TABLE origin.source_listings (
     last_seen_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT source_listings_one_source_check CHECK ((num_nonnulls(shortcut_ad_id, frontdoor_ad_id, frontdoor_building_announcement_id) = 1)),
     CONSTRAINT source_listings_provider_check CHECK ((provider = ANY (ARRAY['shortcut'::text, 'frontdoor'::text]))),
     CONSTRAINT source_listings_source_kind_check CHECK ((source_kind = ANY (ARRAY['ad'::text, 'announcement'::text])))
 );
@@ -1843,7 +1845,11 @@ CREATE INDEX idx_source_housing_companies_native ON origin.source_housing_compan
 
 CREATE INDEX idx_source_listings_last_seen ON origin.source_listings USING btree (last_seen_at DESC);
 
-CREATE INDEX idx_source_listings_raw ON origin.source_listings USING btree (raw_table, raw_id);
+CREATE UNIQUE INDEX idx_source_listings_frontdoor_ad ON origin.source_listings USING btree (frontdoor_ad_id) WHERE (frontdoor_ad_id IS NOT NULL);
+
+CREATE UNIQUE INDEX idx_source_listings_frontdoor_building_announcement ON origin.source_listings USING btree (frontdoor_building_announcement_id) WHERE (frontdoor_building_announcement_id IS NOT NULL);
+
+CREATE UNIQUE INDEX idx_source_listings_shortcut_ad ON origin.source_listings USING btree (shortcut_ad_id) WHERE (shortcut_ad_id IS NOT NULL);
 
 CREATE UNIQUE INDEX prices_transactions_unique_key ON origin.prices_transactions USING btree (prices_neighborhood_id, prices_transaction_description, prices_transaction_type, prices_transaction_area, prices_transaction_price, prices_transaction_price_per_square_meter, prices_transaction_build_year, prices_transaction_floor, prices_transaction_elevator, prices_transaction_condition, prices_transaction_plot, prices_transaction_energy_class, prices_transaction_category) NULLS NOT DISTINCT;
 
@@ -2148,6 +2154,15 @@ ALTER TABLE ONLY public.evidence_sources
 
 ALTER TABLE ONLY public.evidence_sources
     ADD CONSTRAINT evidence_sources_shortcut_ad_id_fkey FOREIGN KEY (shortcut_ad_id) REFERENCES origin.shortcut_ads(shortcut_ad_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY origin.source_listings
+    ADD CONSTRAINT source_listings_frontdoor_ad_id_fkey FOREIGN KEY (frontdoor_ad_id) REFERENCES origin.frontdoor_ads(frontdoor_ad_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY origin.source_listings
+    ADD CONSTRAINT source_listings_frontdoor_building_announcement_id_fkey FOREIGN KEY (frontdoor_building_announcement_id) REFERENCES origin.frontdoor_building_announcements(frontdoor_building_announcement_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY origin.source_listings
+    ADD CONSTRAINT source_listings_shortcut_ad_id_fkey FOREIGN KEY (shortcut_ad_id) REFERENCES origin.shortcut_ads(shortcut_ad_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.listing_search_documents
     ADD CONSTRAINT listing_search_documents_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;

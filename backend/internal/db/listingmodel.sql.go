@@ -12,27 +12,47 @@ import (
 )
 
 const deleteFrontdoorBuildingAnnouncementSourceListing = `-- name: DeleteFrontdoorBuildingAnnouncementSourceListing :exec
-DELETE FROM origin.source_listings
-WHERE provider = 'frontdoor'
-    AND source_kind = 'announcement'
-    AND raw_table = 'frontdoor_building_announcements'
-    AND raw_id = $1::text
+WITH target AS (
+    SELECT source_listing_id
+    FROM origin.source_listings
+    WHERE provider = 'frontdoor'
+        AND source_kind = 'announcement'
+        AND frontdoor_building_announcement_id = $1
+), deleted_listings AS (
+    DELETE FROM public.listings listing
+    USING target
+    WHERE listing.primary_source_listing_id = target.source_listing_id
+    RETURNING listing.listing_id
+)
+DELETE FROM origin.source_listings source_listing
+USING target
+WHERE source_listing.source_listing_id = target.source_listing_id
 `
 
-func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *string) error {
+func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
 	return err
 }
 
 const deleteShortcutAdSourceListing = `-- name: DeleteShortcutAdSourceListing :exec
-DELETE FROM origin.source_listings
-WHERE provider = 'shortcut'
-    AND source_kind = 'ad'
-    AND raw_table = 'shortcut_ads'
-    AND raw_id = $1::text
+WITH target AS (
+    SELECT source_listing_id
+    FROM origin.source_listings
+    WHERE provider = 'shortcut'
+        AND source_kind = 'ad'
+        AND shortcut_ad_id = $1
+), deleted_listings AS (
+    DELETE FROM public.listings listing
+    USING target
+    WHERE listing.primary_source_listing_id = target.source_listing_id
+    RETURNING listing.listing_id
+)
+DELETE FROM origin.source_listings source_listing
+USING target
+WHERE source_listing.source_listing_id = target.source_listing_id
 `
 
-func (q *Queries) DeleteShortcutAdSourceListing(ctx context.Context, shortcutAdID *string) error {
+func (q *Queries) DeleteShortcutAdSourceListing(ctx context.Context, shortcutAdID *int64) error {
 	_, err := q.db.Exec(ctx, deleteShortcutAdSourceListing, shortcutAdID)
 	return err
 }
@@ -85,14 +105,19 @@ WITH announcement_source AS (
         sl.provider AS sale_listing_source_provider,
         concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2) AS sale_listing_street_address,
         fb.frontdoor_building_floor_count AS sale_listing_total_floors,
-        sl.canonical_source_id AS sale_listing_unit_match_key,
+        CASE
+            WHEN NULLIF(fb.frontdoor_building_postcode, '') IS NOT NULL
+                AND NULLIF(lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2))), '') IS NOT NULL
+                AND fba.frontdoor_building_announcement_area IS NOT NULL
+                THEN concat_ws('|', 'unit_v1', regexp_replace(trim(fb.frontdoor_building_postcode), '[^0-9]+', '', 'g'), lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2))), round(fba.frontdoor_building_announcement_area::numeric * 10)::text)
+            ELSE sl.canonical_source_id
+        END AS sale_listing_unit_match_key,
         sl.url AS sale_listing_url,
         fba.frontdoor_building_announcement_new_building AS sale_listing_new_development,
         NULL::boolean AS sale_listing_balcony,
         NULL::bigint AS shortcut_ad_id
     FROM origin.source_listings sl
-    JOIN origin.frontdoor_building_announcements fba ON sl.raw_table = 'frontdoor_building_announcements'
-        AND sl.raw_id = fba.frontdoor_building_announcement_id::text
+    JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     LEFT JOIN origin.sale_listing_property_type_aliases property_type
         ON property_type.sale_listing_property_type_alias = lower(trim(COALESCE(fba.frontdoor_building_announcement_property_subtype, fba.frontdoor_building_announcement_property_type)))
@@ -147,14 +172,19 @@ shortcut_source AS (
         sl.provider AS sale_listing_source_provider,
         COALESCE(raw.street_address, sb.shortcut_building_address) AS sale_listing_street_address,
         raw.total_floors AS sale_listing_total_floors,
-        sl.canonical_source_id AS sale_listing_unit_match_key,
+        CASE
+            WHEN NULLIF(raw.postal, '') IS NOT NULL
+                AND NULLIF(lower(trim(COALESCE(raw.street_address, sb.shortcut_building_address))), '') IS NOT NULL
+                AND COALESCE(raw.living_area, raw.area) IS NOT NULL
+                THEN concat_ws('|', 'unit_v1', regexp_replace(trim(raw.postal), '[^0-9]+', '', 'g'), lower(trim(COALESCE(raw.street_address, sb.shortcut_building_address))), round(COALESCE(raw.living_area, raw.area)::numeric * 10)::text)
+            ELSE sl.canonical_source_id
+        END AS sale_listing_unit_match_key,
         sl.url AS sale_listing_url,
         raw.new_development AS sale_listing_new_development,
         raw.balcony AS sale_listing_balcony,
         sa.shortcut_ad_id AS shortcut_ad_id
     FROM origin.source_listings sl
-    JOIN origin.shortcut_ads sa ON sl.raw_table = 'shortcut_ads'
-        AND sl.raw_id = sa.shortcut_ad_id::text
+    JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
     LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
     CROSS JOIN LATERAL (
         SELECT
@@ -232,14 +262,19 @@ frontdoor_ad_source AS (
         sl.provider AS sale_listing_source_provider,
         raw.street_address AS sale_listing_street_address,
         raw.total_floors AS sale_listing_total_floors,
-        sl.canonical_source_id AS sale_listing_unit_match_key,
+        CASE
+            WHEN NULLIF(raw.postal, '') IS NOT NULL
+                AND NULLIF(lower(trim(raw.street_address)), '') IS NOT NULL
+                AND COALESCE(raw.living_area, raw.area) IS NOT NULL
+                THEN concat_ws('|', 'unit_v1', regexp_replace(trim(raw.postal), '[^0-9]+', '', 'g'), lower(trim(raw.street_address)), round(COALESCE(raw.living_area, raw.area)::numeric * 10)::text)
+            ELSE sl.canonical_source_id
+        END AS sale_listing_unit_match_key,
         sl.url AS sale_listing_url,
         raw.new_development AS sale_listing_new_development,
         raw.balcony AS sale_listing_balcony,
         NULL::bigint AS shortcut_ad_id
     FROM origin.source_listings sl
-    JOIN origin.frontdoor_ads fa ON sl.raw_table = 'frontdoor_ads'
-        AND sl.raw_id = fa.frontdoor_ad_id::text
+    JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
     CROSS JOIN LATERAL (
         SELECT
             NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_data #>> '{property,streetNameFreeForm}')), '') AS street_address,
@@ -532,8 +567,9 @@ source_listing AS (
         source_kind,
         native_id,
         canonical_source_id,
-        raw_table,
-        raw_id,
+        shortcut_ad_id,
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
         url,
         payload_hash,
         normalized_version,
@@ -549,13 +585,9 @@ source_listing AS (
         source.sale_listing_source_kind,
         source.sale_listing_native_id,
         source.sale_listing_canonical_id,
-        CASE
-            WHEN source.shortcut_ad_id IS NOT NULL THEN 'shortcut_ads'
-            WHEN source.frontdoor_ad_id IS NOT NULL THEN 'frontdoor_ads'
-            WHEN source.frontdoor_building_announcement_id IS NOT NULL THEN 'frontdoor_building_announcements'
-            ELSE 'listing_model'
-        END,
-        COALESCE(source.shortcut_ad_id::text, source.frontdoor_ad_id::text, source.frontdoor_building_announcement_id::text, source.sale_listing_id::text),
+        source.shortcut_ad_id,
+        source.frontdoor_ad_id,
+        source.frontdoor_building_announcement_id,
         source.sale_listing_url,
         COALESCE(sa.shortcut_ad_data_hash, fa.frontdoor_ad_data_hash),
         GREATEST(COALESCE(sa.shortcut_ad_data_normalized_version, 0), COALESCE(fa.frontdoor_ad_data_normalized_version, 0), COALESCE(fba.frontdoor_building_announcement_data_normalized_version, 0)),
@@ -573,8 +605,9 @@ source_listing AS (
         provider = EXCLUDED.provider,
         source_kind = EXCLUDED.source_kind,
         native_id = EXCLUDED.native_id,
-        raw_table = EXCLUDED.raw_table,
-        raw_id = EXCLUDED.raw_id,
+        shortcut_ad_id = EXCLUDED.shortcut_ad_id,
+        frontdoor_ad_id = EXCLUDED.frontdoor_ad_id,
+        frontdoor_building_announcement_id = EXCLUDED.frontdoor_building_announcement_id,
         url = EXCLUDED.url,
         payload_hash = EXCLUDED.payload_hash,
         normalized_version = EXCLUDED.normalized_version,
@@ -1111,8 +1144,9 @@ WITH source AS (
         'ad'::text AS source_kind,
         fa.frontdoor_ad_external_id AS native_id,
         'frontdoor:ad:' || fa.frontdoor_ad_external_id AS canonical_source_id,
-        'frontdoor_ads'::text AS raw_table,
-        fa.frontdoor_ad_id::text AS raw_id,
+        NULL::bigint AS shortcut_ad_id,
+        fa.frontdoor_ad_id,
+        NULL::uuid AS frontdoor_building_announcement_id,
         fa.frontdoor_ad_url AS url,
         fa.frontdoor_ad_data_hash AS payload_hash,
         fa.frontdoor_ad_data_normalized_version AS normalized_version,
@@ -1132,8 +1166,9 @@ updated AS (
         provider = source.provider,
         source_kind = source.source_kind,
         native_id = source.native_id,
-        raw_table = source.raw_table,
-        raw_id = source.raw_id,
+        shortcut_ad_id = source.shortcut_ad_id,
+        frontdoor_ad_id = source.frontdoor_ad_id,
+        frontdoor_building_announcement_id = source.frontdoor_building_announcement_id,
         url = source.url,
         payload_hash = source.payload_hash,
         normalized_version = source.normalized_version,
@@ -1153,8 +1188,9 @@ inserted AS (
         source_kind,
         native_id,
         canonical_source_id,
-        raw_table,
-        raw_id,
+        shortcut_ad_id,
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
         url,
         payload_hash,
         normalized_version,
@@ -1170,8 +1206,9 @@ inserted AS (
         source.source_kind,
         source.native_id,
         source.canonical_source_id,
-        source.raw_table,
-        source.raw_id,
+        source.shortcut_ad_id,
+        source.frontdoor_ad_id,
+        source.frontdoor_building_announcement_id,
         source.url,
         source.payload_hash,
         source.normalized_version,
@@ -1205,8 +1242,9 @@ WITH source AS (
         'announcement'::text AS source_kind,
         fba.frontdoor_building_announcement_id::text AS native_id,
         'frontdoor:announcement:' || fba.frontdoor_building_announcement_id::text AS canonical_source_id,
-        'frontdoor_building_announcements'::text AS raw_table,
-        fba.frontdoor_building_announcement_id::text AS raw_id,
+        NULL::bigint AS shortcut_ad_id,
+        NULL::uuid AS frontdoor_ad_id,
+        fba.frontdoor_building_announcement_id,
         fb.frontdoor_building_url AS url,
         NULL::text AS payload_hash,
         fba.frontdoor_building_announcement_data_normalized_version AS normalized_version,
@@ -1228,8 +1266,9 @@ updated AS (
         provider = source.provider,
         source_kind = source.source_kind,
         native_id = source.native_id,
-        raw_table = source.raw_table,
-        raw_id = source.raw_id,
+        shortcut_ad_id = source.shortcut_ad_id,
+        frontdoor_ad_id = source.frontdoor_ad_id,
+        frontdoor_building_announcement_id = source.frontdoor_building_announcement_id,
         url = source.url,
         payload_hash = source.payload_hash,
         normalized_version = source.normalized_version,
@@ -1249,8 +1288,9 @@ inserted AS (
         source_kind,
         native_id,
         canonical_source_id,
-        raw_table,
-        raw_id,
+        shortcut_ad_id,
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
         url,
         payload_hash,
         normalized_version,
@@ -1266,8 +1306,9 @@ inserted AS (
         source.source_kind,
         source.native_id,
         source.canonical_source_id,
-        source.raw_table,
-        source.raw_id,
+        source.shortcut_ad_id,
+        source.frontdoor_ad_id,
+        source.frontdoor_building_announcement_id,
         source.url,
         source.payload_hash,
         source.normalized_version,
@@ -1301,8 +1342,9 @@ WITH source AS (
         'ad'::text AS source_kind,
         sa.shortcut_ad_id::text AS native_id,
         'shortcut:ad:' || sa.shortcut_ad_id::text AS canonical_source_id,
-        'shortcut_ads'::text AS raw_table,
-        sa.shortcut_ad_id::text AS raw_id,
+        sa.shortcut_ad_id,
+        NULL::uuid AS frontdoor_ad_id,
+        NULL::uuid AS frontdoor_building_announcement_id,
         sa.shortcut_ad_url AS url,
         sa.shortcut_ad_data_hash AS payload_hash,
         sa.shortcut_ad_data_normalized_version AS normalized_version,
@@ -1323,8 +1365,9 @@ updated AS (
         provider = source.provider,
         source_kind = source.source_kind,
         native_id = source.native_id,
-        raw_table = source.raw_table,
-        raw_id = source.raw_id,
+        shortcut_ad_id = source.shortcut_ad_id,
+        frontdoor_ad_id = source.frontdoor_ad_id,
+        frontdoor_building_announcement_id = source.frontdoor_building_announcement_id,
         url = source.url,
         payload_hash = source.payload_hash,
         normalized_version = source.normalized_version,
@@ -1344,8 +1387,9 @@ inserted AS (
         source_kind,
         native_id,
         canonical_source_id,
-        raw_table,
-        raw_id,
+        shortcut_ad_id,
+        frontdoor_ad_id,
+        frontdoor_building_announcement_id,
         url,
         payload_hash,
         normalized_version,
@@ -1361,8 +1405,9 @@ inserted AS (
         source.source_kind,
         source.native_id,
         source.canonical_source_id,
-        source.raw_table,
-        source.raw_id,
+        source.shortcut_ad_id,
+        source.frontdoor_ad_id,
+        source.frontdoor_building_announcement_id,
         source.url,
         source.payload_hash,
         source.normalized_version,
