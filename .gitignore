@@ -2,5 +2,6 @@
 .mcp.json
 data/
 tmp/
+.tmp/
 .claude/
 .traceway/

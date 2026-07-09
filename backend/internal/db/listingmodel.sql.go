@@ -617,6 +617,290 @@ source_listing AS (
         updated_at = EXCLUDED.updated_at
     RETURNING source_listing_id
 ),
+source_match_base AS (
+    SELECT
+        source_listing.source_listing_id,
+        source.sale_listing_source_provider AS provider,
+        source.sale_listing_source_kind AS source_kind,
+        NULLIF(regexp_replace(trim(COALESCE(source.sale_listing_postal_norm, source.sale_listing_postal, '')), '[^0-9]+', '', 'g'), '') AS postal_norm,
+        NULLIF(lower(trim(COALESCE(source.sale_listing_city_norm, source.sale_listing_city, ''))), '') AS city_norm,
+        NULLIF(lower(trim(regexp_replace(COALESCE(source.sale_listing_address_norm, source.sale_listing_street_address, ''), '[[:space:]]+', ' ', 'g'))), '') AS address_norm,
+        COALESCE(source.sale_listing_living_area_value, source.sale_listing_area_value) AS area_m2,
+        source.sale_listing_rooms_count AS rooms_count,
+        NULLIF(lower(trim(source.sale_listing_room_layout)), '') AS room_layout_norm,
+        source.sale_listing_floor_level AS floor_level,
+        source.sale_listing_asking_price AS asking_price,
+        source.sale_listing_debt_free_price AS debt_free_price,
+        source.sale_listing_build_year AS build_year,
+        NULLIF(lower(trim(source.sale_listing_housing_company_business_id)), '') AS housing_company_business_id,
+        NULLIF(lower(trim(source.sale_listing_housing_company_name)), '') AS housing_company_name_norm,
+        source.sale_listing_first_seen_at AS first_seen_at,
+        source.sale_listing_last_seen_at AS last_seen_at
+    FROM source
+    JOIN source_listing ON true
+),
+source_match_parsed AS (
+    SELECT
+        source_match_base.source_listing_id,
+        source_match_base.provider,
+        source_match_base.source_kind,
+        source_match_base.postal_norm,
+        source_match_base.city_norm,
+        source_match_base.address_norm,
+        source_match_base.area_m2,
+        source_match_base.rooms_count,
+        source_match_base.room_layout_norm,
+        source_match_base.floor_level,
+        source_match_base.asking_price,
+        source_match_base.debt_free_price,
+        source_match_base.build_year,
+        source_match_base.housing_company_business_id,
+        source_match_base.housing_company_name_norm,
+        source_match_base.first_seen_at,
+        source_match_base.last_seen_at,
+        NULLIF(regexp_replace(source_match_base.address_norm, '[[:space:]]+[0-9]+.*$', ''), '') AS street_norm,
+        NULLIF(substring(source_match_base.address_norm from '([0-9]+([-–][0-9]+)?)[[:alpha:]]?($|[[:space:]])'), '') AS house_norm,
+        NULLIF(substring(source_match_base.address_norm from '[0-9]+[-–]?[0-9]*[[:space:]]*([[:alpha:]])([[:space:]]*[0-9]+)?[[:space:]]*$'), '') AS stair_norm,
+        NULLIF(substring(source_match_base.address_norm from '[0-9]+[-–]?[0-9]*[[:space:]]*[[:alpha:]]?[[:space:]]+([0-9]{1,4})[[:space:]]*$'), '') AS apartment_norm,
+        CASE WHEN source_match_base.area_m2 IS NULL THEN NULL ELSE round(source_match_base.area_m2::numeric * 10)::int4 END AS area_tenths
+    FROM source_match_base
+),
+match_facts AS (
+    INSERT INTO public.source_listing_match_facts (
+        source_listing_id,
+        provider,
+        source_kind,
+        postal_norm,
+        city_norm,
+        address_norm,
+        street_norm,
+        house_norm,
+        stair_norm,
+        apartment_norm,
+        area_m2,
+        area_tenths,
+        rooms_count,
+        room_layout_norm,
+        floor_level,
+        asking_price,
+        debt_free_price,
+        build_year,
+        housing_company_business_id,
+        housing_company_name_norm,
+        first_seen_at,
+        last_seen_at,
+        refreshed_at
+    )
+    SELECT
+        source_listing_id,
+        provider,
+        source_kind,
+        postal_norm,
+        city_norm,
+        address_norm,
+        street_norm,
+        house_norm,
+        stair_norm,
+        apartment_norm,
+        area_m2,
+        area_tenths,
+        rooms_count,
+        room_layout_norm,
+        floor_level,
+        asking_price,
+        debt_free_price,
+        build_year,
+        housing_company_business_id,
+        housing_company_name_norm,
+        first_seen_at,
+        last_seen_at,
+        now()
+    FROM source_match_parsed
+    ON CONFLICT (source_listing_id) DO UPDATE SET
+        provider = EXCLUDED.provider,
+        source_kind = EXCLUDED.source_kind,
+        postal_norm = EXCLUDED.postal_norm,
+        city_norm = EXCLUDED.city_norm,
+        address_norm = EXCLUDED.address_norm,
+        street_norm = EXCLUDED.street_norm,
+        house_norm = EXCLUDED.house_norm,
+        stair_norm = EXCLUDED.stair_norm,
+        apartment_norm = EXCLUDED.apartment_norm,
+        area_m2 = EXCLUDED.area_m2,
+        area_tenths = EXCLUDED.area_tenths,
+        rooms_count = EXCLUDED.rooms_count,
+        room_layout_norm = EXCLUDED.room_layout_norm,
+        floor_level = EXCLUDED.floor_level,
+        asking_price = EXCLUDED.asking_price,
+        debt_free_price = EXCLUDED.debt_free_price,
+        build_year = EXCLUDED.build_year,
+        housing_company_business_id = EXCLUDED.housing_company_business_id,
+        housing_company_name_norm = EXCLUDED.housing_company_name_norm,
+        first_seen_at = EXCLUDED.first_seen_at,
+        last_seen_at = EXCLUDED.last_seen_at,
+        refreshed_at = now()
+    RETURNING
+        source_listing_id,
+        provider,
+        source_kind,
+        postal_norm,
+        city_norm,
+        address_norm,
+        street_norm,
+        house_norm,
+        stair_norm,
+        apartment_norm,
+        area_m2,
+        area_tenths,
+        rooms_count,
+        room_layout_norm,
+        floor_level,
+        asking_price,
+        debt_free_price,
+        build_year,
+        housing_company_business_id,
+        housing_company_name_norm,
+        first_seen_at,
+        last_seen_at
+),
+match_blocks AS (
+    SELECT DISTINCT postal_norm, street_norm, house_norm, area_tenths
+    FROM match_facts
+    WHERE postal_norm IS NOT NULL
+        AND street_norm IS NOT NULL
+        AND house_norm IS NOT NULL
+        AND area_tenths IS NOT NULL
+),
+compatible_match_pairs AS (
+    SELECT
+        a.source_listing_id AS source_listing_id_a,
+        b.source_listing_id AS source_listing_id_b,
+        a.provider AS source_provider,
+        b.provider AS matched_provider,
+        a.address_norm AS source_address_norm,
+        b.address_norm AS matched_address_norm,
+        a.postal_norm,
+        a.street_norm,
+        a.house_norm,
+        a.area_tenths,
+        a.stair_norm AS source_stair_norm,
+        b.stair_norm AS matched_stair_norm,
+        a.apartment_norm AS source_apartment_norm,
+        b.apartment_norm AS matched_apartment_norm,
+        a.asking_price AS source_asking_price,
+        b.asking_price AS matched_asking_price,
+        a.debt_free_price AS source_debt_free_price,
+        b.debt_free_price AS matched_debt_free_price
+    FROM match_blocks
+    JOIN public.source_listing_match_facts a ON a.postal_norm = match_blocks.postal_norm
+        AND a.street_norm = match_blocks.street_norm
+        AND a.house_norm = match_blocks.house_norm
+        AND a.area_tenths = match_blocks.area_tenths
+    JOIN public.source_listing_match_facts b ON b.source_listing_id > a.source_listing_id
+        AND b.postal_norm = a.postal_norm
+        AND b.street_norm = a.street_norm
+        AND b.house_norm = a.house_norm
+        AND b.area_tenths = a.area_tenths
+    WHERE (a.stair_norm IS NULL OR b.stair_norm IS NULL OR a.stair_norm = b.stair_norm)
+        AND (a.apartment_norm IS NULL OR b.apartment_norm IS NULL OR a.apartment_norm = b.apartment_norm)
+),
+pair_counts AS (
+    SELECT source_listing_id, count(*)::int4 AS compatible_pair_count
+    FROM (
+        SELECT source_listing_id_a AS source_listing_id FROM compatible_match_pairs
+        UNION ALL
+        SELECT source_listing_id_b AS source_listing_id FROM compatible_match_pairs
+    ) pair_members
+    GROUP BY source_listing_id
+),
+classified_match_pairs AS (
+    SELECT
+        compatible_match_pairs.source_listing_id_a,
+        compatible_match_pairs.source_listing_id_b,
+        source_counts.compatible_pair_count AS source_compatible_pair_count,
+        matched_counts.compatible_pair_count AS matched_compatible_pair_count,
+        CASE
+            WHEN source_address_norm = matched_address_norm THEN 'exact_provider_neutral_unit_v1'
+            ELSE 'address_missing_stair_one_to_one_v1'
+        END AS match_method,
+        CASE WHEN source_address_norm = matched_address_norm THEN 100 ELSE 95 END AS match_score,
+        'high'::text AS match_confidence,
+        CASE WHEN source_counts.compatible_pair_count = 1 AND matched_counts.compatible_pair_count = 1 THEN 'accepted' ELSE 'proposed' END AS match_status,
+        jsonb_strip_nulls(jsonb_build_object(
+            'postal_norm', postal_norm,
+            'street_norm', street_norm,
+            'house_norm', house_norm,
+            'area_tenths', area_tenths,
+            'source_provider', source_provider,
+            'matched_provider', matched_provider,
+            'source_address_norm', source_address_norm,
+            'matched_address_norm', matched_address_norm,
+            'source_stair_norm', source_stair_norm,
+            'matched_stair_norm', matched_stair_norm,
+            'source_apartment_norm', source_apartment_norm,
+            'matched_apartment_norm', matched_apartment_norm,
+            'source_asking_price', source_asking_price,
+            'matched_asking_price', matched_asking_price,
+            'source_debt_free_price', source_debt_free_price,
+            'matched_debt_free_price', matched_debt_free_price,
+            'source_compatible_pair_count', source_counts.compatible_pair_count,
+            'matched_compatible_pair_count', matched_counts.compatible_pair_count
+        )) AS match_reasons
+    FROM compatible_match_pairs
+    JOIN pair_counts source_counts ON source_counts.source_listing_id = compatible_match_pairs.source_listing_id_a
+    JOIN pair_counts matched_counts ON matched_counts.source_listing_id = compatible_match_pairs.source_listing_id_b
+),
+source_match_candidates AS (
+    INSERT INTO public.source_listing_match_candidates (
+        source_listing_id_a,
+        source_listing_id_b,
+        match_method,
+        match_score,
+        match_confidence,
+        match_status,
+        match_reasons,
+        updated_at,
+        decided_at
+    )
+    SELECT
+        source_listing_id_a,
+        source_listing_id_b,
+        match_method,
+        match_score,
+        match_confidence,
+        match_status,
+        match_reasons,
+        now(),
+        CASE WHEN match_status = 'accepted' THEN now() ELSE NULL::timestamptz END
+    FROM classified_match_pairs
+    WHERE match_status = 'accepted'
+        OR (source_compatible_pair_count <= 2 AND matched_compatible_pair_count <= 2)
+    ON CONFLICT (source_listing_id_a, source_listing_id_b, match_method) WHERE (match_status <> 'rejected') DO UPDATE SET
+        match_score = EXCLUDED.match_score,
+        match_confidence = EXCLUDED.match_confidence,
+        match_status = EXCLUDED.match_status,
+        match_reasons = EXCLUDED.match_reasons,
+        updated_at = now(),
+        decided_at = CASE WHEN EXCLUDED.match_status = 'accepted' THEN COALESCE(public.source_listing_match_candidates.decided_at, now()) ELSE public.source_listing_match_candidates.decided_at END
+    RETURNING source_listing_id_a, source_listing_id_b, match_method, match_score, match_status
+),
+matched_offering AS (
+    SELECT
+        doc.property_offering_id,
+        po.property_offering_identity_key,
+        candidate.match_score
+    FROM source_match_candidates candidate
+    JOIN match_facts ON true
+    JOIN public.listing_search_documents doc ON doc.primary_source_listing_id = CASE
+        WHEN candidate.source_listing_id_a = match_facts.source_listing_id THEN candidate.source_listing_id_b
+        ELSE candidate.source_listing_id_a
+    END
+    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
+    WHERE candidate.match_status = 'accepted'
+        AND (candidate.source_listing_id_a = match_facts.source_listing_id OR candidate.source_listing_id_b = match_facts.source_listing_id)
+    ORDER BY candidate.match_score DESC, po.property_offering_created_at ASC
+    LIMIT 1
+),
 housing_company AS (
     INSERT INTO public.housing_companies (
         housing_company_identity_key,
@@ -822,7 +1106,7 @@ offering AS (
     SELECT
         (SELECT property_unit_id FROM property_unit LIMIT 1),
         (SELECT property_house_id FROM property_house LIMIT 1),
-        'offering:' || COALESCE(NULLIF(source.sale_listing_unit_match_key, ''), source.sale_listing_canonical_id),
+        COALESCE((SELECT property_offering_identity_key FROM matched_offering LIMIT 1), 'offering:' || COALESCE(NULLIF(source.sale_listing_unit_match_key, ''), source.sale_listing_canonical_id)),
         'sale',
         COALESCE(source.sale_listing_headline, source.sale_listing_street_address, source.sale_listing_native_id),
         source.sale_listing_asking_price,

@@ -1130,6 +1130,51 @@ CREATE TABLE public.listing_search_documents (
     CONSTRAINT listing_search_documents_status_check CHECK ((listing_status = ANY (ARRAY['active'::text, 'stale'::text, 'removed'::text, 'rejected'::text, 'ambiguous'::text])))
 );
 
+CREATE TABLE public.source_listing_match_facts (
+    source_listing_id uuid NOT NULL,
+    provider text NOT NULL,
+    source_kind text NOT NULL,
+    postal_norm text,
+    city_norm text,
+    address_norm text,
+    street_norm text,
+    house_norm text,
+    stair_norm text,
+    apartment_norm text,
+    area_m2 double precision,
+    area_tenths integer,
+    rooms_count integer,
+    room_layout_norm text,
+    floor_level integer,
+    asking_price bigint,
+    debt_free_price bigint,
+    build_year integer,
+    housing_company_business_id text,
+    housing_company_name_norm text,
+    first_seen_at timestamp with time zone,
+    last_seen_at timestamp with time zone,
+    refreshed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public.source_listing_match_candidates (
+    source_listing_match_candidate_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_listing_id_a uuid NOT NULL,
+    source_listing_id_b uuid NOT NULL,
+    match_method text NOT NULL,
+    match_score integer NOT NULL,
+    match_confidence text NOT NULL,
+    match_status text DEFAULT 'proposed'::text NOT NULL,
+    match_reasons jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    decided_at timestamp with time zone,
+    CONSTRAINT source_listing_match_candidates_distinct_check CHECK ((source_listing_id_a <> source_listing_id_b)),
+    CONSTRAINT source_listing_match_candidates_order_check CHECK ((source_listing_id_a < source_listing_id_b)),
+    CONSTRAINT source_listing_match_candidates_confidence_check CHECK ((match_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))),
+    CONSTRAINT source_listing_match_candidates_method_check CHECK ((match_method = ANY (ARRAY['exact_provider_neutral_unit_v1'::text, 'address_missing_stair_one_to_one_v1'::text]))),
+    CONSTRAINT source_listing_match_candidates_status_check CHECK ((match_status = ANY (ARRAY['proposed'::text, 'accepted'::text, 'rejected'::text, 'superseded'::text])))
+);
+
 CREATE TABLE public.property_houses (
     property_house_id uuid DEFAULT gen_random_uuid() NOT NULL,
     property_house_identity_key text NOT NULL,
@@ -1611,6 +1656,12 @@ ALTER TABLE ONLY public.listing_search_documents
 ALTER TABLE ONLY public.listing_price_match_states
     ADD CONSTRAINT listing_price_match_states_pkey PRIMARY KEY (source_listing_id);
 
+ALTER TABLE ONLY public.source_listing_match_candidates
+    ADD CONSTRAINT source_listing_match_candidates_pkey PRIMARY KEY (source_listing_match_candidate_id);
+
+ALTER TABLE ONLY public.source_listing_match_facts
+    ADD CONSTRAINT source_listing_match_facts_pkey PRIMARY KEY (source_listing_id);
+
 ALTER TABLE ONLY public.physical_buildings
     ADD CONSTRAINT physical_buildings_physical_building_identity_key_key UNIQUE (physical_building_identity_key);
 
@@ -1955,6 +2006,16 @@ CREATE INDEX idx_listing_search_documents_search_trgm ON public.listing_search_d
 
 CREATE INDEX idx_listing_search_documents_source ON public.listing_search_documents USING btree (source, kind);
 
+CREATE UNIQUE INDEX idx_source_listing_match_candidates_active_pair_method ON public.source_listing_match_candidates USING btree (source_listing_id_a, source_listing_id_b, match_method) WHERE (match_status <> 'rejected'::text);
+
+CREATE INDEX idx_source_listing_match_candidates_a ON public.source_listing_match_candidates USING btree (source_listing_id_a, match_status);
+
+CREATE INDEX idx_source_listing_match_candidates_b ON public.source_listing_match_candidates USING btree (source_listing_id_b, match_status);
+
+CREATE INDEX idx_source_listing_match_facts_block ON public.source_listing_match_facts USING btree (postal_norm, street_norm, house_norm, area_tenths) WHERE ((postal_norm IS NOT NULL) AND (street_norm IS NOT NULL) AND (house_norm IS NOT NULL) AND (area_tenths IS NOT NULL));
+
+CREATE INDEX idx_source_listing_match_facts_provider ON public.source_listing_match_facts USING btree (provider, source_kind);
+
 CREATE INDEX idx_physical_buildings_housing_company ON public.physical_buildings USING btree (housing_company_id);
 
 CREATE INDEX idx_physical_buildings_lat_lng ON public.physical_buildings USING btree (physical_building_latitude, physical_building_longitude) WHERE ((physical_building_latitude IS NOT NULL) AND (physical_building_longitude IS NOT NULL));
@@ -2175,6 +2236,15 @@ ALTER TABLE ONLY public.listing_search_documents
 
 ALTER TABLE ONLY public.listing_search_documents
     ADD CONSTRAINT listing_search_documents_source_listing_id_fkey FOREIGN KEY (primary_source_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.source_listing_match_candidates
+    ADD CONSTRAINT source_listing_match_candidates_source_listing_id_a_fkey FOREIGN KEY (source_listing_id_a) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.source_listing_match_candidates
+    ADD CONSTRAINT source_listing_match_candidates_source_listing_id_b_fkey FOREIGN KEY (source_listing_id_b) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.source_listing_match_facts
+    ADD CONSTRAINT source_listing_match_facts_source_listing_id_fkey FOREIGN KEY (source_listing_id) REFERENCES origin.source_listings(source_listing_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.listing_price_match_states
     ADD CONSTRAINT listing_price_match_states_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(listing_id) ON DELETE CASCADE;
