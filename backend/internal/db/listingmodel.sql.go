@@ -129,15 +129,15 @@ WITH announcement_source AS (
         lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2))) AS sale_listing_address_norm,
         fb.frontdoor_building_apartment_count AS sale_listing_apartment_count,
         fba.frontdoor_building_announcement_area AS sale_listing_area_value,
-        CASE WHEN fba.frontdoor_building_announcement_search_price IS NULL THEN NULL ELSE fba.frontdoor_building_announcement_search_price::bigint END AS sale_listing_asking_price,
+        CASE WHEN current_price.source_listing_id IS NULL THEN fba.frontdoor_building_announcement_search_price::bigint ELSE current_price.asking_price END AS sale_listing_asking_price,
         COALESCE(fba.frontdoor_building_announcement_construction_finished_year, fb.frontdoor_building_build_year, fb.frontdoor_building_construction_end_year) AS sale_listing_build_year,
         lower(trim(concat_ws(' ', fba.frontdoor_building_announcement_address_line1, fba.frontdoor_building_announcement_address_line2, fb.frontdoor_building_postcode, COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area)))) AS sale_listing_building_match_key,
         sl.canonical_source_id AS sale_listing_canonical_id,
         COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area) AS sale_listing_city,
         lower(trim(COALESCE(fba.frontdoor_building_announcement_location, fb.frontdoor_building_municipality, fb.frontdoor_building_post_area))) AS sale_listing_city_norm,
         NULL::text AS sale_listing_condition,
-        NULL::bigint AS sale_listing_debt_free_price,
-        NULL::bigint AS sale_listing_debt_share_amount,
+        current_price.debt_free_price AS sale_listing_debt_free_price,
+        current_price.debt_share_amount AS sale_listing_debt_share_amount,
         concat_ws(' ', fb.frontdoor_building_description, fb.frontdoor_building_other_info) AS sale_listing_description_text,
         fb.frontdoor_building_has_elevator AS sale_listing_elevator,
         fb.frontdoor_building_energy_certificate_code AS sale_listing_energy_class,
@@ -157,7 +157,7 @@ WITH announcement_source AS (
         NULL::boolean AS sale_listing_plot_owned,
         fb.frontdoor_building_postcode AS sale_listing_postal,
         fb.frontdoor_building_postcode AS sale_listing_postal_norm,
-        fba.frontdoor_building_announcement_price_per_square AS sale_listing_price_per_m2,
+        CASE WHEN current_price.source_listing_id IS NULL THEN fba.frontdoor_building_announcement_price_per_square ELSE current_price.price_per_m2 END AS sale_listing_price_per_m2,
         property_type.sale_listing_property_type_code AS sale_listing_property_type_code,
         NULL::timestamptz AS sale_listing_published_at,
         NULL::text AS sale_listing_room_category_code,
@@ -179,15 +179,18 @@ WITH announcement_source AS (
         sl.url AS sale_listing_url,
         fba.frontdoor_building_announcement_new_building AS sale_listing_new_development,
         NULL::boolean AS sale_listing_balcony,
+        CASE WHEN fba.frontdoor_building_announcement_published IS FALSE THEN 'removed'::text ELSE 'active'::text END AS sale_listing_status,
         NULL::bigint AS shortcut_ad_id
     FROM origin.source_listings sl
     JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_announcement_id = sl.frontdoor_building_announcement_id
     JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
+    LEFT JOIN origin.source_listing_price_periods current_price ON current_price.source_listing_id = sl.source_listing_id AND current_price.superseded_at IS NULL
     LEFT JOIN origin.sale_listing_property_type_aliases property_type
         ON property_type.sale_listing_property_type_alias = lower(trim(COALESCE(fba.frontdoor_building_announcement_property_subtype, fba.frontdoor_building_announcement_property_type)))
     WHERE sl.source_listing_id = $1::uuid
         AND sl.provider = 'frontdoor'
         AND sl.source_kind = 'announcement'
+        AND fba.frontdoor_building_announcement_identity_key NOT LIKE 'legacy:%'
 ),
 shortcut_source AS (
     SELECT
@@ -196,15 +199,15 @@ shortcut_source AS (
         lower(trim(COALESCE(raw.street_address, sb.shortcut_building_address))) AS sale_listing_address_norm,
         NULL::integer AS sale_listing_apartment_count,
         raw.area AS sale_listing_area_value,
-        raw.price AS sale_listing_asking_price,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.price ELSE current_price.asking_price END AS sale_listing_asking_price,
         COALESCE(raw.build_year, sb.shortcut_building_construction_year) AS sale_listing_build_year,
         lower(trim(concat_ws(' ', COALESCE(raw.street_address, sb.shortcut_building_address), raw.postal, raw.city))) AS sale_listing_building_match_key,
         sl.canonical_source_id AS sale_listing_canonical_id,
         raw.city AS sale_listing_city,
         lower(trim(raw.city)) AS sale_listing_city_norm,
         raw.condition AS sale_listing_condition,
-        raw.debt_free_price AS sale_listing_debt_free_price,
-        raw.debt_share_amount AS sale_listing_debt_share_amount,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.debt_free_price ELSE current_price.debt_free_price END AS sale_listing_debt_free_price,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.debt_share_amount ELSE current_price.debt_share_amount END AS sale_listing_debt_share_amount,
         raw.description_text AS sale_listing_description_text,
         NULL::boolean AS sale_listing_elevator,
         raw.energy_class AS sale_listing_energy_class,
@@ -224,7 +227,7 @@ shortcut_source AS (
         NULL::boolean AS sale_listing_plot_owned,
         raw.postal AS sale_listing_postal,
         raw.postal AS sale_listing_postal_norm,
-        COALESCE(raw.price_per_m2, CASE WHEN raw.price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN raw.price::double precision / raw.area ELSE NULL END) AS sale_listing_price_per_m2,
+        CASE WHEN current_price.source_listing_id IS NULL THEN COALESCE(raw.price_per_m2, CASE WHEN raw.price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN raw.price::double precision / raw.area ELSE NULL END) ELSE COALESCE(current_price.price_per_m2, CASE WHEN current_price.asking_price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN current_price.asking_price::double precision / raw.area ELSE NULL END) END AS sale_listing_price_per_m2,
         NULL::text AS sale_listing_property_type_code,
         (sa.shortcut_ad_data #>> '{adData,published}')::timestamptz AS sale_listing_published_at,
         NULL::text AS sale_listing_room_category_code,
@@ -246,10 +249,15 @@ shortcut_source AS (
         sl.url AS sale_listing_url,
         raw.new_development AS sale_listing_new_development,
         raw.balcony AS sale_listing_balcony,
+        CASE
+            WHEN lower(trim(COALESCE(sa.shortcut_ad_data #>> '{status}', sa.shortcut_ad_data #>> '{adData,status}', sa.shortcut_ad_data #>> '{listingStatus}', ''))) IN ('sold', 'unpublished', 'removed', 'inactive', 'expired', 'deleted', 'archived') THEN 'removed'::text
+            ELSE 'active'::text
+        END AS sale_listing_status,
         sa.shortcut_ad_id AS shortcut_ad_id
     FROM origin.source_listings sl
     JOIN origin.shortcut_ads sa ON sa.shortcut_ad_id = sl.shortcut_ad_id
     LEFT JOIN origin.shortcut_buildings sb ON sb.shortcut_building_id = sa.shortcut_building_id
+    LEFT JOIN origin.source_listing_price_periods current_price ON current_price.source_listing_id = sl.source_listing_id AND current_price.superseded_at IS NULL
     CROSS JOIN LATERAL (
         SELECT
             COALESCE(CASE WHEN NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '') IS NOT NULL AND NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), '') IS NOT NULL THEN concat_ws(' ', NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,streetNumber}'), ''), NULLIF(trim(sa.shortcut_ad_data #>> '{address,buildingLetter}'), '')) ELSE NULL END, NULLIF(trim(sa.shortcut_ad_data #>> '{address,formattedAddress}'), ''), NULLIF(trim(COALESCE(sa.shortcut_ad_data #>> '{address,street,name}', sa.shortcut_ad_data #>> '{address,street}')), '')) AS street_address,
@@ -286,15 +294,15 @@ frontdoor_ad_source AS (
         lower(trim(raw.street_address)) AS sale_listing_address_norm,
         NULL::integer AS sale_listing_apartment_count,
         raw.area AS sale_listing_area_value,
-        raw.price AS sale_listing_asking_price,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.price ELSE current_price.asking_price END AS sale_listing_asking_price,
         raw.build_year AS sale_listing_build_year,
         lower(trim(concat_ws(' ', raw.street_address, raw.postal, raw.city))) AS sale_listing_building_match_key,
         sl.canonical_source_id AS sale_listing_canonical_id,
         raw.city AS sale_listing_city,
         lower(trim(raw.city)) AS sale_listing_city_norm,
         raw.condition AS sale_listing_condition,
-        raw.debt_free_price AS sale_listing_debt_free_price,
-        raw.debt_share_amount AS sale_listing_debt_share_amount,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.debt_free_price ELSE current_price.debt_free_price END AS sale_listing_debt_free_price,
+        CASE WHEN current_price.source_listing_id IS NULL THEN raw.debt_share_amount ELSE current_price.debt_share_amount END AS sale_listing_debt_share_amount,
         raw.description_text AS sale_listing_description_text,
         NULL::boolean AS sale_listing_elevator,
         raw.energy_class AS sale_listing_energy_class,
@@ -314,7 +322,7 @@ frontdoor_ad_source AS (
         NULL::boolean AS sale_listing_plot_owned,
         raw.postal AS sale_listing_postal,
         raw.postal AS sale_listing_postal_norm,
-        COALESCE(raw.price_per_m2, CASE WHEN raw.price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN raw.price::double precision / raw.area ELSE NULL END) AS sale_listing_price_per_m2,
+        CASE WHEN current_price.source_listing_id IS NULL THEN COALESCE(raw.price_per_m2, CASE WHEN raw.price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN raw.price::double precision / raw.area ELSE NULL END) ELSE COALESCE(current_price.price_per_m2, CASE WHEN current_price.asking_price IS NOT NULL AND raw.area IS NOT NULL AND raw.area > 0 THEN current_price.asking_price::double precision / raw.area ELSE NULL END) END AS sale_listing_price_per_m2,
         NULL::text AS sale_listing_property_type_code,
         raw.published_at AS sale_listing_published_at,
         NULL::text AS sale_listing_room_category_code,
@@ -336,15 +344,20 @@ frontdoor_ad_source AS (
         sl.url AS sale_listing_url,
         raw.new_development AS sale_listing_new_development,
         raw.balcony AS sale_listing_balcony,
+        CASE
+            WHEN fa.frontdoor_ad_page_not_found OR lower(trim(COALESCE(fa.frontdoor_ad_data #>> '{status}', ''))) IN ('sold', 'unpublished', 'removed', 'inactive', 'expired', 'deleted', 'archived') THEN 'removed'::text
+            ELSE 'active'::text
+        END AS sale_listing_status,
         NULL::bigint AS shortcut_ad_id
     FROM origin.source_listings sl
     JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    LEFT JOIN origin.source_listing_price_periods current_price ON current_price.source_listing_id = sl.source_listing_id AND current_price.superseded_at IS NULL
     CROSS JOIN LATERAL (
         SELECT
             NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,streetAddressFreeForm}', fa.frontdoor_ad_data #>> '{property,address}', fa.frontdoor_ad_data #>> '{property,streetNameFreeForm}')), '') AS street_address,
             NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,municipalityNameFreeForm}', fa.frontdoor_ad_data #>> '{property,municipality}', fa.frontdoor_ad_data #>> '{property,city}', fa.frontdoor_ad_data #>> '{property,postCode,postArea}')), '') AS city,
             NULLIF(trim(COALESCE(fa.frontdoor_ad_data #>> '{property,postalCode}', fa.frontdoor_ad_data #>> '{property,addressPostalCode}', fa.frontdoor_ad_data #>> '{property,postCode,postCode}')), '') AS postal,
-            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{debfFreePrice}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{preparsed,price}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price,
+            COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{sellingPrice}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{preparsed,price}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS price,
             COALESCE((SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{preparsed,area}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value), (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL ELSE parsed_value.value::float8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{property,livingArea}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value)) AS area,
             (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{debfFreePrice}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS debt_free_price,
             (SELECT CASE WHEN parsed_value.value IS NULL THEN NULL WHEN length(parsed_value.value) - length(replace(parsed_value.value, '.', '')) > 1 THEN NULL ELSE (parsed_value.value::numeric)::int8 END FROM (SELECT NULLIF(regexp_replace(replace(COALESCE(fa.frontdoor_ad_data #>> '{debtShareAmount}', ''), ',', '.'), '[^0-9\.-]', '', 'g'), '') AS value) parsed_value) AS debt_share_amount,
@@ -423,6 +436,7 @@ source AS (
         sale_listing_url,
         sale_listing_new_development,
         sale_listing_balcony,
+        sale_listing_status,
         shortcut_ad_id
     FROM announcement_source
     UNION ALL
@@ -476,6 +490,7 @@ source AS (
         sale_listing_url,
         sale_listing_new_development,
         sale_listing_balcony,
+        sale_listing_status,
         shortcut_ad_id
     FROM shortcut_source
     UNION ALL
@@ -529,6 +544,7 @@ source AS (
         sale_listing_url,
         sale_listing_new_development,
         sale_listing_balcony,
+        sale_listing_status,
         shortcut_ad_id
     FROM frontdoor_ad_source
 ),
@@ -1266,7 +1282,7 @@ offering AS (
         source.sale_listing_price_per_m2,
         source.sale_listing_first_seen_at,
         source.sale_listing_last_seen_at,
-        'active',
+        source.sale_listing_status,
         source.sale_listing_id,
         jsonb_build_object('evidence_source_id', (SELECT evidence_source_id FROM evidence LIMIT 1), 'method', 'listingmodel_reconcile'),
         now()
@@ -1280,7 +1296,7 @@ offering AS (
         property_offering_price_per_m2 = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_price_per_m2 ELSE public.property_offerings.property_offering_price_per_m2 END,
         property_offering_first_seen_at = LEAST(COALESCE(public.property_offerings.property_offering_first_seen_at, EXCLUDED.property_offering_first_seen_at), COALESCE(EXCLUDED.property_offering_first_seen_at, public.property_offerings.property_offering_first_seen_at)),
         property_offering_last_seen_at = GREATEST(COALESCE(public.property_offerings.property_offering_last_seen_at, EXCLUDED.property_offering_last_seen_at), COALESCE(EXCLUDED.property_offering_last_seen_at, public.property_offerings.property_offering_last_seen_at)),
-        property_offering_status = EXCLUDED.property_offering_status,
+        property_offering_status = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_status ELSE public.property_offerings.property_offering_status END,
         primary_sale_listing_id = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.primary_sale_listing_id ELSE public.property_offerings.primary_sale_listing_id END,
         property_offering_match_reasons = public.property_offerings.property_offering_match_reasons || EXCLUDED.property_offering_match_reasons,
         property_offering_updated_at = now()
@@ -1301,7 +1317,7 @@ listing AS (
     SELECT
         offering.property_offering_id,
         'sale',
-        'active',
+        source.sale_listing_status,
         source_listing.source_listing_id,
         offering.property_unit_id,
         offering.property_house_id,
@@ -1313,7 +1329,7 @@ listing AS (
     JOIN offering ON true
     ON CONFLICT (listing_id) DO UPDATE SET
         listing_type = EXCLUDED.listing_type,
-        listing_status = EXCLUDED.listing_status,
+        listing_status = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.listing_status ELSE public.listings.listing_status END,
         primary_source_listing_id = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.primary_source_listing_id ELSE public.listings.primary_source_listing_id END,
         unit_id = EXCLUDED.unit_id,
         house_id = EXCLUDED.house_id,
@@ -1520,7 +1536,7 @@ search_document AS (
         source.sale_listing_plot_owned,
         source.sale_listing_new_development,
         'sale',
-        'active',
+        source.sale_listing_status,
         source.sale_listing_published_at,
         source.sale_listing_first_seen_at,
         source.sale_listing_last_seen_at,
@@ -1741,6 +1757,7 @@ WITH source AS (
     FROM origin.frontdoor_building_announcements fba
     JOIN origin.frontdoor_buildings fb ON fb.frontdoor_building_id = fba.frontdoor_building_id
     WHERE fba.frontdoor_building_announcement_id = $1
+        AND fba.frontdoor_building_announcement_identity_key NOT LIKE 'legacy:%'
         AND fba.frontdoor_building_announcement_rent_period IS NULL
         AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
 ),

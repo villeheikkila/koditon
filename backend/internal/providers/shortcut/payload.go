@@ -25,8 +25,17 @@ type ShortcutAdPayloadV1 struct {
 	AdType             AdType
 	Address            ShortcutAddressPayloadV1
 	BuildingExternalID *int64
+	Price              ShortcutPricePayloadV1
 	Raw                json.RawMessage
 	SchemaVersion      int16
+}
+
+// ShortcutPricePayloadV1 contains normalized source price fields.
+type ShortcutPricePayloadV1 struct {
+	AskingPrice     *float64
+	DebtFreePrice   *float64
+	DebtShareAmount *float64
+	PricePerM2      *float64
 }
 
 // ShortcutAddressPayloadV1 contains structured address fields used for matching.
@@ -188,7 +197,7 @@ func ValidateShortcutAdPayloadV1(raw json.RawMessage, expectedAdID int64) (*Shor
 	if err != nil {
 		return nil, err
 	}
-	return &ShortcutAdPayloadV1{AdID: adID, AdType: adType, Address: wire.Address.Payload(), BuildingExternalID: wire.BuildingExternalID(), Raw: raw, SchemaVersion: ShortcutAdPayloadSchemaVersion}, nil
+	return &ShortcutAdPayloadV1{AdID: adID, AdType: adType, Address: wire.Address.Payload(), BuildingExternalID: wire.BuildingExternalID(), Price: wire.PriceData.Payload(adType), Raw: raw, SchemaVersion: ShortcutAdPayloadSchemaVersion}, nil
 }
 
 func (p shortcutAdPayloadV1Wire) validate(expectedAdID int64) (int64, error) {
@@ -262,6 +271,28 @@ func (p addressPayloadV1) Payload() ShortcutAddressPayloadV1 {
 
 func (p pricePayloadV1) HasUsablePrice() bool {
 	return anyFloatLike(p.PriceSell, p.Price, p.PriceDebtFree, p.RentPerMonth, p.RentPerDay, p.RentPerWeek, p.RentPerWeekend, p.RentPerYear)
+}
+
+func (p pricePayloadV1) Payload(adType AdType) ShortcutPricePayloadV1 {
+	askingPrice := firstFloatLikePtr(p.PriceSell, p.Price)
+	if adType == AdTypeRental {
+		askingPrice = firstFloatLikePtr(p.RentPerMonth, p.RentPerWeek, p.RentPerDay, p.RentPerWeekend, p.RentPerYear, p.Price)
+	}
+	return ShortcutPricePayloadV1{
+		AskingPrice:     askingPrice,
+		DebtFreePrice:   firstFloatLikePtr(p.PriceDebtFree),
+		DebtShareAmount: firstFloatLikePtr(p.DebtShare),
+		PricePerM2:      firstFloatLikePtr(p.PricePerSqm, p.PricePerSquareM),
+	}
+}
+
+func firstFloatLikePtr(values ...FloatLike) *float64 {
+	for _, value := range values {
+		if parsed, ok := value.Float64(); ok {
+			return &parsed
+		}
+	}
+	return nil
 }
 
 func (p adDataPayloadV1) HasUsableSize() bool {

@@ -165,6 +165,7 @@ func (c *Consumer) handleShortcutWorkflow(ctx context.Context, params json.RawMe
 }
 
 func (c *Consumer) runShortcutSitemapWorkflow(ctx context.Context, logger *slog.Logger, buildingsOnly bool) (shortcutSitemapResult, error) {
+	refreshID := absurd.MustTaskContext(ctx).TaskID()
 	sitemap, err := absurd.Step(ctx, "fetch-sitemap", func(ctx context.Context) (shortcutSitemapResult, error) {
 		buildingIDs, adIDs, err := c.shortcutService.SyncSitemap(ctx)
 		if err != nil {
@@ -178,14 +179,14 @@ func (c *Consumer) runShortcutSitemapWorkflow(ctx context.Context, logger *slog.
 	_, err = absurd.Step(ctx, "spawn-shortcut-scraper-syncs", func(ctx context.Context) (shortcutFanoutResult, error) {
 		enqueued := 0
 		for _, entityID := range sitemap.BuildingEntityIDs {
-			if err := c.spawnShortcutSync(ctx, TaskTypeShortcutScraperSync, entityID); err != nil {
+			if err := c.spawnShortcutSync(ctx, TaskTypeShortcutScraperSync, refreshID, entityID); err != nil {
 				return shortcutFanoutResult{}, err
 			}
 			enqueued++
 		}
 		if !buildingsOnly {
 			for _, entityID := range sitemap.AdEntityIDs {
-				if err := c.spawnShortcutSync(ctx, TaskTypeShortcutScraperSync, entityID); err != nil {
+				if err := c.spawnShortcutSync(ctx, TaskTypeShortcutScraperSync, refreshID, entityID); err != nil {
 					return shortcutFanoutResult{}, err
 				}
 				enqueued++
@@ -214,12 +215,12 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 		if err != nil {
 			return shortcutEntityResult{}, fmt.Errorf("invalid shortcut ad id: %w", err)
 		}
-		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
+		if _, err := absurd.Step(ctx, "fetch-source:v2", func(ctx context.Context) (struct{}, error) {
 			return struct{}{}, c.shortcutService.SyncAd(ctx, adID)
 		}); err != nil {
 			return shortcutEntityResult{}, err
 		}
-		if _, err := absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (shortcutFanoutResult, error) {
+		if _, err := absurd.Step(ctx, "canonicalize-source-ad:v2", func(ctx context.Context) (shortcutFanoutResult, error) {
 			ad, err := c.queries.GetShortcutAdByID(ctx, &adID)
 			if err != nil {
 				return shortcutFanoutResult{}, fmt.Errorf("load synced shortcut ad for canonicalization enqueue: %w", err)
@@ -239,7 +240,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 		if err != nil {
 			return shortcutEntityResult{}, fmt.Errorf("invalid shortcut building id: %w", err)
 		}
-		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
+		if _, err := absurd.Step(ctx, "fetch-source:v2", func(ctx context.Context) (struct{}, error) {
 			return struct{}{}, c.shortcutService.SyncBuilding(ctx, buildingID)
 		}); err != nil {
 			return shortcutEntityResult{}, err
@@ -252,7 +253,7 @@ func (c *Consumer) runShortcutEntityWorkflow(ctx context.Context, logger *slog.L
 	return shortcutEntityResult{EntityID: entityID, Type: params.SourceType, Mode: mode}, nil
 }
 
-func (c *Consumer) spawnShortcutSync(ctx context.Context, kind string, entityID string) error {
+func (c *Consumer) spawnShortcutSync(ctx context.Context, kind string, refreshID string, entityID string) error {
 	app := c.shortcutAPIWorkflowClient
 	if kind == TaskTypeShortcutScraperSync {
 		app = c.shortcutScraperWorkflowClient
@@ -266,8 +267,9 @@ func (c *Consumer) spawnShortcutSync(ctx context.Context, kind string, entityID 
 		return err
 	}
 	_, err = workflows.Spawn(ctx, app, workflows.SpawnTaskRequest{
-		TaskName: kind,
-		Params:   params,
+		TaskName:       kind,
+		Params:         params,
+		IdempotencyKey: workflows.SourceRefreshIdempotencyKey(kind, refreshID, entityID),
 	})
 	return err
 }

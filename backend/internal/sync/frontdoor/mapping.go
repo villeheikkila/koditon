@@ -3,14 +3,16 @@ package frontdoor
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
 
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	"koditon/internal/platform/util"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
 	"koditon/internal/sync/sourcejson"
-
-	"github.com/google/uuid"
 )
 
 func mapBatchUpsertAdsFromSitemapParams(entries []client.SitemapEntry) db.BatchUpsertFrontdoorAdsFromSitemapParams {
@@ -158,6 +160,7 @@ func mapBuildingParams(housingCompanyID int64, data *frontdoorpayload.HousingCom
 
 func mapAnnouncementParams(ann frontdoorpayload.Announcement, buildingID uuid.UUID) db.UpsertFrontdoorBuildingAnnouncementParams {
 	return db.UpsertFrontdoorBuildingAnnouncementParams{
+		FrontdoorBuildingAnnouncementIdentityKey:              ptr(announcementIdentityKey(ann, buildingID)),
 		FrontdoorBuildingAnnouncementExternalID:               util.Int32Ptr(ann.ID),
 		FrontdoorBuildingAnnouncementFriendlyID:               ann.FriendlyID,
 		FrontdoorBuildingAnnouncementUnpublishingTime:         ann.UnpublishingTime,
@@ -185,6 +188,27 @@ func mapAnnouncementParams(ann frontdoorpayload.Announcement, buildingID uuid.UU
 		FrontdoorBuildingAnnouncementRentalUniqueNo:           util.Int32Ptr(ann.RentalUniqueNo),
 		FrontdoorBuildingID:                                   &buildingID,
 	}
+}
+
+func announcementIdentityKey(ann frontdoorpayload.Announcement, buildingID uuid.UUID) string {
+	if ann.ID != nil {
+		return "external:" + strconv.Itoa(*ann.ID)
+	}
+	if ann.FriendlyID != nil && strings.TrimSpace(*ann.FriendlyID) != "" {
+		return "friendly:" + strings.TrimSpace(*ann.FriendlyID)
+	}
+	rentalUniqueNo := "none"
+	if ann.RentalUniqueNo != nil {
+		rentalUniqueNo = strconv.Itoa(*ann.RentalUniqueNo)
+	}
+	return fmt.Sprintf("fallback:%s:%s:%s:%s", buildingID, rentalUniqueNo, normalizedIdentityPart(ann.AddressLine1), normalizedIdentityPart(ann.AddressLine2))
+}
+
+func normalizedIdentityPart(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(*value))
 }
 
 //go:fix inline

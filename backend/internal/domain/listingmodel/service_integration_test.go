@@ -96,6 +96,89 @@ func TestSourceListingAssignmentLifecycle(t *testing.T) {
 	}
 }
 
+func TestReconcileProjectsShortcutSoldStatus(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = os.Getenv("LOCAL_DATABASE_URL")
+	}
+	if databaseURL == "" {
+		t.Skip("set TEST_DATABASE_URL or LOCAL_DATABASE_URL to run DB-backed listing model tests")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin transaction: %v", err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	queries := db.New(tx)
+	adID := int64(910000003)
+	sourceListingID := insertShortcutListingFixture(t, ctx, tx, queries, adID, 50, 200000, time.Now())
+	result := reconcileListingFixture(t, ctx, queries, sourceListingID)
+	assertProjectedListingStatus(t, ctx, tx, result.ListingID, "active")
+	payload := shortcutListingPayload(50, 200000)
+	var body map[string]any
+	if err := json.Unmarshal(payload, &body); err != nil {
+		t.Fatalf("unmarshal shortcut fixture: %v", err)
+	}
+	body["status"] = "sold"
+	payload, err = json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal sold shortcut fixture: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE origin.shortcut_ads SET shortcut_ad_data = $2, shortcut_ad_data_hash = $3, shortcut_ad_data_changed_at = now() WHERE shortcut_ad_id = $1`, adID, payload, uuid.NewString()); err != nil {
+		t.Fatalf("update shortcut sold body: %v", err)
+	}
+	upsertedSourceID, err := queries.UpsertShortcutAdSourceListing(ctx, &adID)
+	sourceListingID = requiredFixtureSourceID(t, upsertedSourceID, err)
+	result = reconcileListingFixture(t, ctx, queries, sourceListingID)
+	assertProjectedListingStatus(t, ctx, tx, result.ListingID, "removed")
+}
+
+func TestReconcileProjectsFrontdoorUnpublishedStatus(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = os.Getenv("LOCAL_DATABASE_URL")
+	}
+	if databaseURL == "" {
+		t.Skip("set TEST_DATABASE_URL or LOCAL_DATABASE_URL to run DB-backed listing model tests")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin transaction: %v", err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	queries := db.New(tx)
+	adID := uuid.New()
+	externalID := "frontdoor-status-" + adID.String()
+	payload := frontdoorListingPayload("PUBLISHED")
+	if _, err := tx.Exec(ctx, `INSERT INTO origin.frontdoor_ads (frontdoor_ad_id, frontdoor_ad_external_id, frontdoor_ad_url, frontdoor_ad_data, frontdoor_ad_data_hash) VALUES ($1, $2, $3, $4, $5)`, adID, externalID, "https://example.invalid/frontdoor-status", payload, uuid.NewString()); err != nil {
+		t.Fatalf("insert frontdoor ad: %v", err)
+	}
+	sourceListingID, err := queries.UpsertFrontdoorAdSourceListing(ctx, &adID)
+	sourceID := requiredFixtureSourceID(t, sourceListingID, err)
+	result := reconcileListingFixture(t, ctx, queries, sourceID)
+	assertProjectedListingStatus(t, ctx, tx, result.ListingID, "active")
+	payload = frontdoorListingPayload("UNPUBLISHED")
+	if _, err := tx.Exec(ctx, `UPDATE origin.frontdoor_ads SET frontdoor_ad_data = $2, frontdoor_ad_data_hash = $3, frontdoor_ad_data_changed_at = now() WHERE frontdoor_ad_id = $1`, adID, payload, uuid.NewString()); err != nil {
+		t.Fatalf("update frontdoor unpublished body: %v", err)
+	}
+	sourceListingID, err = queries.UpsertFrontdoorAdSourceListing(ctx, &adID)
+	sourceID = requiredFixtureSourceID(t, sourceListingID, err)
+	result = reconcileListingFixture(t, ctx, queries, sourceID)
+	assertProjectedListingStatus(t, ctx, tx, result.ListingID, "removed")
+}
+
 func insertShortcutListingFixture(t *testing.T, ctx context.Context, tx pgx.Tx, queries *db.Queries, adID int64, area int, price int64, seenAt time.Time) uuid.UUID {
 	t.Helper()
 	payload := shortcutListingPayload(area, price)
@@ -118,6 +201,15 @@ func shortcutListingPayload(area int, price int64) json.RawMessage {
 		"address":   map[string]any{"street": map[string]any{"name": "Testikatu"}, "streetNumber": "7", "buildingLetter": "A", "city": map[string]any{"name": "Helsinki"}, "zipCode": map[string]any{"value": "00100"}},
 		"adData":    map[string]any{"size": area, "rooms": 2, "roomConfiguration": "2h+k"},
 		"priceData": map[string]any{"priceSell": price},
+	})
+	return payload
+}
+
+func frontdoorListingPayload(status string) json.RawMessage {
+	payload, _ := json.Marshal(map[string]any{
+		"property":     map[string]any{"streetAddressFreeForm": "Testikatu 8 A", "municipalityNameFreeForm": "Helsinki", "postalCode": "00100", "livingArea": 50},
+		"sellingPrice": 200000,
+		"status":       status,
 	})
 	return payload
 }
@@ -167,6 +259,19 @@ func assertCandidateStatus(t *testing.T, ctx context.Context, tx pgx.Tx, sourceL
 		_ = tx.QueryRow(ctx, `SELECT COALESCE(string_agg(concat_ws('|', match_method, match_status, match_score::text), ', '), '') FROM public.source_listing_match_candidates WHERE source_listing_id_a = LEAST($1::uuid, $2::uuid) AND source_listing_id_b = GREATEST($1::uuid, $2::uuid)`, sourceListingID1, sourceListingID2).Scan(&candidates)
 		_ = tx.QueryRow(ctx, `SELECT count(*) FROM public.source_listing_match_facts a JOIN public.source_listing_match_facts b ON b.source_listing_id > a.source_listing_id AND b.postal_norm = a.postal_norm AND b.street_norm = a.street_norm AND b.house_norm = a.house_norm AND b.area_tenths = a.area_tenths WHERE a.source_listing_id IN ($1, $2) AND b.source_listing_id IN ($1, $2) AND (a.stair_norm IS NULL OR b.stair_norm IS NULL OR a.stair_norm = b.stair_norm) AND (a.apartment_norm IS NULL OR b.apartment_norm IS NULL OR a.apartment_norm = b.apartment_norm)`, sourceListingID1, sourceListingID2).Scan(&compatiblePairs)
 		t.Fatalf("%s candidate count = %d, want %d; compatible pairs: %d; facts: %s; candidates: %s", status, count, expected, compatiblePairs, facts, candidates)
+	}
+}
+
+func assertProjectedListingStatus(t *testing.T, ctx context.Context, tx pgx.Tx, listingID uuid.UUID, want string) {
+	t.Helper()
+	var offeringStatus string
+	var listingStatus string
+	var searchStatus string
+	if err := tx.QueryRow(ctx, `SELECT offering.property_offering_status, listing.listing_status, document.listing_status FROM public.property_offerings offering JOIN public.listings listing ON listing.listing_id = offering.property_offering_id JOIN public.listing_search_documents document ON document.listing_id = listing.listing_id WHERE listing.listing_id = $1`, listingID).Scan(&offeringStatus, &listingStatus, &searchStatus); err != nil {
+		t.Fatalf("read projected statuses: %v", err)
+	}
+	if offeringStatus != want || listingStatus != want || searchStatus != want {
+		t.Fatalf("projected statuses = offering:%s listing:%s search:%s, want %s", offeringStatus, listingStatus, searchStatus, want)
 	}
 }
 

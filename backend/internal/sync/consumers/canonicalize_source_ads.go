@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
+	"strings"
 
+	"github.com/earendil-works/absurd/sdks/go/absurd"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -23,7 +24,7 @@ const (
 	TaskTypeCanonicalizeSourceAdsFanout         = "canonicalize_source_ads_fanout"
 	TaskTypeCanonicalizeSourceAd                = "canonicalize_source_ad"
 	TaskTypeCanonicalLinkFrontdoorAnnouncements = "canonical_link_frontdoor_announcements"
-	currentSourceAdCanonicalizationVersion      = int32(2)
+	currentSourceAdCanonicalizationVersion      = int32(3)
 )
 
 type canonicalizeSourceAdsFanoutPayload struct {
@@ -53,9 +54,9 @@ func (c *Consumer) canonicalizeFrontdoorBuildingAnnouncement(ctx context.Context
 		return fmt.Errorf("load frontdoor building announcement for canonicalization: %w", err)
 	}
 	model := listingmodel.NewService(logger, c.pool)
-	if announcement.FrontdoorBuildingAnnouncementRentPeriod != nil || announcement.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
+	if strings.HasPrefix(announcement.FrontdoorBuildingAnnouncementIdentityKey, "legacy:") || announcement.FrontdoorBuildingAnnouncementRentPeriod != nil || announcement.FrontdoorBuildingAnnouncementRentalUniqueNo != nil {
 		if err := model.RemoveFrontdoorBuildingAnnouncement(ctx, announcementID); err != nil {
-			return fmt.Errorf("delete rental frontdoor announcement source offering: %w", err)
+			return fmt.Errorf("delete excluded frontdoor announcement source offering: %w", err)
 		}
 		version := currentSourceAdCanonicalizationVersion
 		return c.queries.MarkFrontdoorBuildingAnnouncementDataNormalized(ctx, db.MarkFrontdoorBuildingAnnouncementDataNormalizedParams{FrontdoorBuildingAnnouncementDataNormalizedVersion: &version, FrontdoorBuildingAnnouncementID: &announcementID})
@@ -170,7 +171,11 @@ func (c *Consumer) enqueueCanonicalizeSourceAd(ctx context.Context, sourceTable,
 		Params:   payload,
 	}
 	if priority > 0 {
-		req.IdempotencyKey = fmt.Sprintf("source-refresh-canonicalize:%s:%s:%d", sourceTable, sourceID, time.Now().UTC().UnixNano())
+		task, ok := absurd.TaskFromContext(ctx)
+		if !ok {
+			return errors.New("source refresh canonicalization requires a workflow task context")
+		}
+		req.IdempotencyKey = workflows.SourceRefreshIdempotencyKey(TaskTypeCanonicalizeSourceAd, task.TaskID(), sourceTable+":"+sourceID)
 	}
 	_, err = workflows.Spawn(ctx, c.canonicalWorkflowClient, req)
 	return err

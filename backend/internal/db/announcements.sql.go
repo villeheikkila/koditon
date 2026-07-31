@@ -13,12 +13,13 @@ import (
 )
 
 const getFrontdoorBuildingAnnouncementByID = `-- name: GetFrontdoorBuildingAnnouncementByID :one
-SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version FROM origin.frontdoor_building_announcements
+SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_identity_key, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version FROM origin.frontdoor_building_announcements
 WHERE frontdoor_building_announcement_id = $1
 `
 
 type GetFrontdoorBuildingAnnouncementByIDRow struct {
 	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementIdentityKey              string     `json:"frontdoor_building_announcement_identity_key"`
 	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
 	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
 	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
@@ -57,6 +58,7 @@ func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, doll
 	var i GetFrontdoorBuildingAnnouncementByIDRow
 	err := row.Scan(
 		&i.FrontdoorBuildingAnnouncementID,
+		&i.FrontdoorBuildingAnnouncementIdentityKey,
 		&i.FrontdoorBuildingAnnouncementExternalID,
 		&i.FrontdoorBuildingAnnouncementFriendlyID,
 		&i.FrontdoorBuildingAnnouncementUnpublishingTime,
@@ -93,13 +95,15 @@ func (q *Queries) GetFrontdoorBuildingAnnouncementByID(ctx context.Context, doll
 }
 
 const listFrontdoorBuildingAnnouncements = `-- name: ListFrontdoorBuildingAnnouncements :many
-SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version FROM origin.frontdoor_building_announcements
+SELECT frontdoor_building_announcement_id, frontdoor_building_announcement_identity_key, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version FROM origin.frontdoor_building_announcements
 WHERE frontdoor_building_id = $1
+    AND frontdoor_building_announcement_identity_key NOT LIKE 'legacy:%'
 ORDER BY frontdoor_building_announcement_last_seen_at DESC
 `
 
 type ListFrontdoorBuildingAnnouncementsRow struct {
 	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementIdentityKey              string     `json:"frontdoor_building_announcement_identity_key"`
 	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
 	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
 	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
@@ -144,6 +148,7 @@ func (q *Queries) ListFrontdoorBuildingAnnouncements(ctx context.Context, dollar
 		var i ListFrontdoorBuildingAnnouncementsRow
 		if err := rows.Scan(
 			&i.FrontdoorBuildingAnnouncementID,
+			&i.FrontdoorBuildingAnnouncementIdentityKey,
 			&i.FrontdoorBuildingAnnouncementExternalID,
 			&i.FrontdoorBuildingAnnouncementFriendlyID,
 			&i.FrontdoorBuildingAnnouncementUnpublishingTime,
@@ -205,6 +210,7 @@ func (q *Queries) MarkFrontdoorBuildingAnnouncementDataNormalized(ctx context.Co
 
 const upsertFrontdoorBuildingAnnouncement = `-- name: UpsertFrontdoorBuildingAnnouncement :one
 INSERT INTO origin.frontdoor_building_announcements (
+    frontdoor_building_announcement_identity_key,
     frontdoor_building_announcement_external_id,
     frontdoor_building_announcement_friendly_id,
     frontdoor_building_announcement_unpublishing_time,
@@ -261,16 +267,20 @@ INSERT INTO origin.frontdoor_building_announcements (
     $24,
     $25,
     $26,
+    $27,
     now(),
     now(),
-    $27
+    $28
 )
-ON CONFLICT (frontdoor_building_announcement_external_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_search_price) DO UPDATE
+ON CONFLICT (frontdoor_building_announcement_identity_key) DO UPDATE
 SET frontdoor_building_announcement_last_seen_at = now(),
+    frontdoor_building_announcement_external_id = COALESCE(EXCLUDED.frontdoor_building_announcement_external_id, frontdoor_building_announcements.frontdoor_building_announcement_external_id),
     frontdoor_building_announcement_friendly_id = COALESCE(EXCLUDED.frontdoor_building_announcement_friendly_id, frontdoor_building_announcements.frontdoor_building_announcement_friendly_id),
+    frontdoor_building_announcement_unpublishing_time = COALESCE(EXCLUDED.frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcements.frontdoor_building_announcement_unpublishing_time),
     frontdoor_building_announcement_address_line1 = COALESCE(EXCLUDED.frontdoor_building_announcement_address_line1, frontdoor_building_announcements.frontdoor_building_announcement_address_line1),
     frontdoor_building_announcement_address_line2 = COALESCE(EXCLUDED.frontdoor_building_announcement_address_line2, frontdoor_building_announcements.frontdoor_building_announcement_address_line2),
     frontdoor_building_announcement_location = COALESCE(EXCLUDED.frontdoor_building_announcement_location, frontdoor_building_announcements.frontdoor_building_announcement_location),
+    frontdoor_building_announcement_search_price = EXCLUDED.frontdoor_building_announcement_search_price,
     frontdoor_building_announcement_notify_price_changed = COALESCE(EXCLUDED.frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcements.frontdoor_building_announcement_notify_price_changed),
     frontdoor_building_announcement_property_type = COALESCE(EXCLUDED.frontdoor_building_announcement_property_type, frontdoor_building_announcements.frontdoor_building_announcement_property_type),
     frontdoor_building_announcement_property_subtype = COALESCE(EXCLUDED.frontdoor_building_announcement_property_subtype, frontdoor_building_announcements.frontdoor_building_announcement_property_subtype),
@@ -280,7 +290,7 @@ SET frontdoor_building_announcement_last_seen_at = now(),
     frontdoor_building_announcement_room_structure = COALESCE(EXCLUDED.frontdoor_building_announcement_room_structure, frontdoor_building_announcements.frontdoor_building_announcement_room_structure),
     frontdoor_building_announcement_area = COALESCE(EXCLUDED.frontdoor_building_announcement_area, frontdoor_building_announcements.frontdoor_building_announcement_area),
     frontdoor_building_announcement_total_area = COALESCE(EXCLUDED.frontdoor_building_announcement_total_area, frontdoor_building_announcements.frontdoor_building_announcement_total_area),
-    frontdoor_building_announcement_price_per_square = COALESCE(EXCLUDED.frontdoor_building_announcement_price_per_square, frontdoor_building_announcements.frontdoor_building_announcement_price_per_square),
+    frontdoor_building_announcement_price_per_square = EXCLUDED.frontdoor_building_announcement_price_per_square,
     frontdoor_building_announcement_days_on_market = COALESCE(EXCLUDED.frontdoor_building_announcement_days_on_market, frontdoor_building_announcements.frontdoor_building_announcement_days_on_market),
     frontdoor_building_announcement_new_building = COALESCE(EXCLUDED.frontdoor_building_announcement_new_building, frontdoor_building_announcements.frontdoor_building_announcement_new_building),
     frontdoor_building_announcement_main_image_hidden = COALESCE(EXCLUDED.frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcements.frontdoor_building_announcement_main_image_hidden),
@@ -289,13 +299,15 @@ SET frontdoor_building_announcement_last_seen_at = now(),
     frontdoor_building_announcement_published = COALESCE(EXCLUDED.frontdoor_building_announcement_published, frontdoor_building_announcements.frontdoor_building_announcement_published),
     frontdoor_building_announcement_rent_period = COALESCE(EXCLUDED.frontdoor_building_announcement_rent_period, frontdoor_building_announcements.frontdoor_building_announcement_rent_period),
     frontdoor_building_announcement_rental_unique_no = COALESCE(EXCLUDED.frontdoor_building_announcement_rental_unique_no, frontdoor_building_announcements.frontdoor_building_announcement_rental_unique_no),
+    frontdoor_building_id = EXCLUDED.frontdoor_building_id,
     frontdoor_building_announcement_unpublishing_time_date = COALESCE(EXCLUDED.frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcements.frontdoor_building_announcement_unpublishing_time_date),
     frontdoor_building_announcement_data_normalized_at = NULL,
     frontdoor_building_announcement_data_normalized_version = 0
-RETURNING frontdoor_building_announcement_id, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version
+RETURNING frontdoor_building_announcement_id, frontdoor_building_announcement_identity_key, frontdoor_building_announcement_external_id, frontdoor_building_announcement_friendly_id, frontdoor_building_announcement_unpublishing_time, frontdoor_building_announcement_address_line1, frontdoor_building_announcement_address_line2, frontdoor_building_announcement_location, frontdoor_building_announcement_search_price, frontdoor_building_announcement_notify_price_changed, frontdoor_building_announcement_property_type, frontdoor_building_announcement_property_subtype, frontdoor_building_announcement_construction_finished_year, frontdoor_building_announcement_main_image_uri, frontdoor_building_announcement_has_open_bidding, frontdoor_building_announcement_room_structure, frontdoor_building_announcement_area, frontdoor_building_announcement_total_area, frontdoor_building_announcement_price_per_square, frontdoor_building_announcement_days_on_market, frontdoor_building_announcement_new_building, frontdoor_building_announcement_main_image_hidden, frontdoor_building_announcement_is_company_announcement, frontdoor_building_announcement_show_bidding_indicators, frontdoor_building_announcement_published, frontdoor_building_announcement_rent_period, frontdoor_building_announcement_rental_unique_no, frontdoor_building_id, frontdoor_building_announcement_first_seen_at, frontdoor_building_announcement_last_seen_at, frontdoor_building_announcement_unpublishing_time_date, frontdoor_building_announcement_data_normalized_at, frontdoor_building_announcement_data_normalized_version
 `
 
 type UpsertFrontdoorBuildingAnnouncementParams struct {
+	FrontdoorBuildingAnnouncementIdentityKey              *string    `json:"frontdoor_building_announcement_identity_key"`
 	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
 	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
 	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
@@ -327,6 +339,7 @@ type UpsertFrontdoorBuildingAnnouncementParams struct {
 
 type UpsertFrontdoorBuildingAnnouncementRow struct {
 	FrontdoorBuildingAnnouncementID                       uuid.UUID  `json:"frontdoor_building_announcement_id"`
+	FrontdoorBuildingAnnouncementIdentityKey              string     `json:"frontdoor_building_announcement_identity_key"`
 	FrontdoorBuildingAnnouncementExternalID               *int32     `json:"frontdoor_building_announcement_external_id"`
 	FrontdoorBuildingAnnouncementFriendlyID               *string    `json:"frontdoor_building_announcement_friendly_id"`
 	FrontdoorBuildingAnnouncementUnpublishingTime         *float64   `json:"frontdoor_building_announcement_unpublishing_time"`
@@ -362,6 +375,7 @@ type UpsertFrontdoorBuildingAnnouncementRow struct {
 
 func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg UpsertFrontdoorBuildingAnnouncementParams) (UpsertFrontdoorBuildingAnnouncementRow, error) {
 	row := q.db.QueryRow(ctx, upsertFrontdoorBuildingAnnouncement,
+		arg.FrontdoorBuildingAnnouncementIdentityKey,
 		arg.FrontdoorBuildingAnnouncementExternalID,
 		arg.FrontdoorBuildingAnnouncementFriendlyID,
 		arg.FrontdoorBuildingAnnouncementUnpublishingTime,
@@ -393,6 +407,7 @@ func (q *Queries) UpsertFrontdoorBuildingAnnouncement(ctx context.Context, arg U
 	var i UpsertFrontdoorBuildingAnnouncementRow
 	err := row.Scan(
 		&i.FrontdoorBuildingAnnouncementID,
+		&i.FrontdoorBuildingAnnouncementIdentityKey,
 		&i.FrontdoorBuildingAnnouncementExternalID,
 		&i.FrontdoorBuildingAnnouncementFriendlyID,
 		&i.FrontdoorBuildingAnnouncementUnpublishingTime,

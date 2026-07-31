@@ -226,7 +226,7 @@ func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *
 	if err != nil {
 		return canonicalizeSourceAdPayload{}, err
 	}
-	_, err = absurd.Step(ctx, "canonicalize-source-ad:v2", func(ctx context.Context) (struct{}, error) {
+	_, err = absurd.Step(ctx, "canonicalize-source-ad:v3", func(ctx context.Context) (struct{}, error) {
 		switch payload.SourceTable {
 		case "frontdoor_ad":
 			return struct{}{}, c.canonicalizeFrontdoorAd(ctx, logger, payload.SourceID)

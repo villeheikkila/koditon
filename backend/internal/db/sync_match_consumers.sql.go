@@ -217,6 +217,7 @@ UNION ALL
  FROM origin.frontdoor_building_announcements
  WHERE frontdoor_building_announcement_rent_period IS NULL
      AND frontdoor_building_announcement_rental_unique_no IS NULL
+     AND frontdoor_building_announcement_identity_key NOT LIKE 'legacy:%'
      AND (frontdoor_building_announcement_data_normalized_at IS NULL
          OR frontdoor_building_announcement_data_normalized_version < $1::int4)
  ORDER BY frontdoor_building_announcement_last_seen_at ASC

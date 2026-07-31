@@ -121,6 +121,7 @@ func (c *Consumer) handleFrontdoorWorkflow(ctx context.Context, params json.RawM
 }
 
 func (c *Consumer) runFrontdoorSitemapWorkflow(ctx context.Context, logger *slog.Logger, buildingsOnly bool) (frontdoorSitemapResult, error) {
+	refreshID := absurd.MustTaskContext(ctx).TaskID()
 	sitemap, err := absurd.Step(ctx, "fetch-sitemap", func(ctx context.Context) (frontdoorSitemapResult, error) {
 		adIDs, buildingIDs, err := c.frontdoorService.SyncSitemap(ctx)
 		if err != nil {
@@ -135,14 +136,14 @@ func (c *Consumer) runFrontdoorSitemapWorkflow(ctx context.Context, logger *slog
 		enqueued := 0
 		if !buildingsOnly {
 			for _, entityID := range sitemap.AdEntityIDs {
-				if err := c.spawnFrontdoorSync(ctx, entityID); err != nil {
+				if err := c.spawnFrontdoorSync(ctx, refreshID, entityID); err != nil {
 					return frontdoorFanoutResult{}, err
 				}
 				enqueued++
 			}
 		}
 		for _, entityID := range sitemap.BuildingEntityIDs {
-			if err := c.spawnFrontdoorSync(ctx, entityID); err != nil {
+			if err := c.spawnFrontdoorSync(ctx, refreshID, entityID); err != nil {
 				return frontdoorFanoutResult{}, err
 			}
 			enqueued++
@@ -166,12 +167,12 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 	}
 	switch params.SourceType {
 	case "ad":
-		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
+		if _, err := absurd.Step(ctx, "fetch-source:v2", func(ctx context.Context) (struct{}, error) {
 			return struct{}{}, c.frontdoorService.SyncAd(ctx, params.SourceID)
 		}); err != nil {
 			return frontdoorEntityResult{}, err
 		}
-		if _, err := absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (frontdoorFanoutResult, error) {
+		if _, err := absurd.Step(ctx, "canonicalize-source-ad:v2", func(ctx context.Context) (frontdoorFanoutResult, error) {
 			ad, err := c.queries.GetFrontdoorAdByExternalID(ctx, &params.SourceID)
 			if err != nil {
 				return frontdoorFanoutResult{}, fmt.Errorf("load synced frontdoor ad for canonicalization enqueue: %w", err)
@@ -187,12 +188,12 @@ func (c *Consumer) runFrontdoorEntityWorkflow(ctx context.Context, logger *slog.
 			return frontdoorEntityResult{}, err
 		}
 	case "building":
-		if _, err := absurd.Step(ctx, "fetch-source", func(ctx context.Context) (struct{}, error) {
+		if _, err := absurd.Step(ctx, "fetch-source:v2", func(ctx context.Context) (struct{}, error) {
 			return struct{}{}, c.frontdoorService.SyncBuilding(ctx, params.SourceID)
 		}); err != nil {
 			return frontdoorEntityResult{}, err
 		}
-		if _, err := absurd.Step(ctx, "canonicalize-source-announcements", func(ctx context.Context) (frontdoorFanoutResult, error) {
+		if _, err := absurd.Step(ctx, "canonicalize-source-announcements:v2", func(ctx context.Context) (frontdoorFanoutResult, error) {
 			buildingID, err := c.resolveSyncedFrontdoorBuildingID(ctx, params.SourceID)
 			if err != nil {
 				return frontdoorFanoutResult{}, err
@@ -238,7 +239,7 @@ func (c *Consumer) resolveSyncedFrontdoorBuildingID(ctx context.Context, sourceI
 	return building.FrontdoorBuildingID, nil
 }
 
-func (c *Consumer) spawnFrontdoorSync(ctx context.Context, entityID string) error {
+func (c *Consumer) spawnFrontdoorSync(ctx context.Context, refreshID string, entityID string) error {
 	entityType, sourceID, err := parseJobEntity(entityID)
 	if err != nil {
 		return err
@@ -248,8 +249,9 @@ func (c *Consumer) spawnFrontdoorSync(ctx context.Context, entityID string) erro
 		return err
 	}
 	_, err = workflows.Spawn(ctx, c.frontdoorWorkflowClient, workflows.SpawnTaskRequest{
-		TaskName: TaskTypeFrontdoorSync,
-		Params:   params,
+		TaskName:       TaskTypeFrontdoorSync,
+		Params:         params,
+		IdempotencyKey: workflows.SourceRefreshIdempotencyKey(TaskTypeFrontdoorSync, refreshID, entityID),
 	})
 	return err
 }

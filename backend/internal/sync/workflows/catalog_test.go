@@ -93,6 +93,19 @@ func TestCronSlotIdempotencyKeyUsesUTCMinuteSlot(t *testing.T) {
 	}
 }
 
+func TestSourceRefreshIdempotencyKeyScopesEntityToRefresh(t *testing.T) {
+	t.Parallel()
+	a := SourceRefreshIdempotencyKey("frontdoor_sync", "refresh-1", "ad:123")
+	b := SourceRefreshIdempotencyKey("frontdoor_sync", "refresh-1", "ad:123")
+	c := SourceRefreshIdempotencyKey("frontdoor_sync", "refresh-2", "ad:123")
+	if a != b {
+		t.Fatalf("same refresh produced different keys: %q != %q", a, b)
+	}
+	if a == c {
+		t.Fatalf("different refreshes produced the same key: %q", a)
+	}
+}
+
 func TestValidateTaskParams(t *testing.T) {
 	t.Parallel()
 	if err := ValidateTaskParams("frontdoor_sync", json.RawMessage(`{"source_type":"ad","source_id":"123"}`)); err != nil {

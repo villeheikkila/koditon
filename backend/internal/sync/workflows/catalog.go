@@ -164,6 +164,13 @@ func CronSlotIdempotencyKey(taskName, scheduleName string, slot time.Time) strin
 	return "cron:" + hex.EncodeToString(sum[:])[:24]
 }
 
+// SourceRefreshIdempotencyKey scopes a source entity task to one parent refresh.
+func SourceRefreshIdempotencyKey(taskName, refreshID, sourceID string) string {
+	raw := strings.TrimSpace(taskName) + "|" + strings.TrimSpace(refreshID) + "|" + strings.TrimSpace(sourceID)
+	sum := sha256.Sum256([]byte(raw))
+	return "source-refresh:" + hex.EncodeToString(sum[:])[:24]
+}
+
 func normalizeParams(params json.RawMessage) json.RawMessage {
 	if len(params) == 0 || string(params) == "null" {
 		return json.RawMessage(`{}`)

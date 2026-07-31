@@ -149,6 +149,30 @@ func TestValidateShortcutAdPayloadV1AcceptsTopLevelBuildingIDAndRentPrice(t *tes
 	if payload.BuildingExternalID == nil || *payload.BuildingExternalID != 765 {
 		t.Fatalf("expected building external id 765, got %v", payload.BuildingExternalID)
 	}
+	if payload.Price.AskingPrice == nil || *payload.Price.AskingPrice != 990 {
+		t.Fatalf("expected asking price 990, got %v", payload.Price.AskingPrice)
+	}
+}
+
+func TestValidateShortcutAdPayloadV1ExtractsSalePriceState(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{"cardId":130,"cardType":100,"address":{"street":"A"},"priceData":{"priceSell":"200000.4","priceDebtFree":225000,"debtShare":"25000","pricePerSquareMeter":5000},"buildingData":{}}`)
+	payload, err := ValidateShortcutAdPayloadV1(raw, 130)
+	if err != nil {
+		t.Fatalf("expected valid payload: %v", err)
+	}
+	if payload.Price.AskingPrice == nil || *payload.Price.AskingPrice != 200000.4 {
+		t.Fatalf("unexpected asking price: %v", payload.Price.AskingPrice)
+	}
+	if payload.Price.DebtFreePrice == nil || *payload.Price.DebtFreePrice != 225000 {
+		t.Fatalf("unexpected debt-free price: %v", payload.Price.DebtFreePrice)
+	}
+	if payload.Price.DebtShareAmount == nil || *payload.Price.DebtShareAmount != 25000 {
+		t.Fatalf("unexpected debt share: %v", payload.Price.DebtShareAmount)
+	}
+	if payload.Price.PricePerM2 == nil || *payload.Price.PricePerM2 != 5000 {
+		t.Fatalf("unexpected price per square metre: %v", payload.Price.PricePerM2)
+	}
 }
 
 func TestValidateShortcutAdPayloadV1AcceptsSizeTotalFallback(t *testing.T) {

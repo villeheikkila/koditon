@@ -7,22 +7,25 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	client "koditon/internal/clients/frontdoor"
 	"koditon/internal/db"
 	"koditon/internal/platform/httpratelimit"
 	frontdoorpayload "koditon/internal/providers/frontdoor"
 	"koditon/internal/sync/sourcejson"
+	"koditon/internal/sync/sourceprice"
 )
 
 type Service struct {
 	client  *client.Client
+	pool    *pgxpool.Pool
 	queries *db.Queries
 	logger  *slog.Logger
 }
 
 func NewService(
-	dbtx db.DBTX,
+	pool *pgxpool.Pool,
 	logger *slog.Logger,
 	baseURL string,
 	userAgent string,
@@ -39,7 +42,8 @@ func NewService(
 	)
 	return &Service{
 		client:  frontdoorClient,
-		queries: db.New(dbtx),
+		pool:    pool,
+		queries: db.New(pool),
 		logger:  logger.With("component", "frontdoor"),
 	}
 }
@@ -100,9 +104,40 @@ func (s *Service) SyncAd(ctx context.Context, friendlyID string) error {
 	if err != nil {
 		return fmt.Errorf("prepare ad data (friendly_id=%s): %w", friendlyID, err)
 	}
-	if err := s.queries.UpdateFrontdoorAdData(ctx, params); err != nil {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin frontdoor ad update (friendly_id=%s): %w", friendlyID, err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+				s.logger.DebugContext(ctx, "rollback frontdoor ad update", "friendly_id", friendlyID, "error", rollbackErr)
+			}
+		}
+	}()
+	queries := s.queries.WithTx(tx)
+	if err := queries.UpdateFrontdoorAdData(ctx, params); err != nil {
 		return fmt.Errorf("update ad data (friendly_id=%s): %w", friendlyID, err)
 	}
+	storedAd, err := queries.GetFrontdoorAdByExternalID(ctx, &friendlyID)
+	if err != nil {
+		return fmt.Errorf("load updated ad (friendly_id=%s): %w", friendlyID, err)
+	}
+	sourceListingID, err := queries.UpsertFrontdoorAdSourceListing(ctx, &storedAd.FrontdoorAdID)
+	if err != nil {
+		return fmt.Errorf("register frontdoor source listing (friendly_id=%s): %w", friendlyID, err)
+	}
+	if sourceListingID != nil {
+		observation := sourceprice.Observation{AskingPrice: sourceprice.RoundedAmount(ad.SellingPrice), DebtFreePrice: sourceprice.RoundedAmount(ad.DebfFreePrice), DebtShareAmount: sourceprice.RoundedAmount(ad.DebtShareAmount), PricePerM2: sourceprice.NonNegative(ad.PricePerSquareMeter), SourcePayloadHash: params.FrontdoorAdDataHash}
+		if _, err := sourceprice.Observe(ctx, queries, *sourceListingID, observation); err != nil {
+			return fmt.Errorf("observe frontdoor source price (friendly_id=%s): %w", friendlyID, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit frontdoor ad update (friendly_id=%s): %w", friendlyID, err)
+	}
+	committed = true
 	return nil
 }
 
@@ -217,16 +252,44 @@ func (s *Service) upsertBuildingAnnouncements(ctx context.Context, housingCompan
 	if err != nil {
 		return fmt.Errorf("get building id: %w", err)
 	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin announcement update: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+				s.logger.DebugContext(ctx, "rollback frontdoor announcement update", "housing_company_id", housingCompanyID, "error", rollbackErr)
+			}
+		}
+	}()
+	queries := s.queries.WithTx(tx)
 	for _, ann := range announcements {
 		params := mapAnnouncementParams(ann, buildingID)
-		if _, err := s.queries.UpsertFrontdoorBuildingAnnouncement(ctx, params); err != nil {
+		stored, err := queries.UpsertFrontdoorBuildingAnnouncement(ctx, params)
+		if err != nil {
 			annID := 0
 			if ann.ID != nil {
 				annID = *ann.ID
 			}
 			return fmt.Errorf("upsert announcement (id=%d, friendly_id=%s): %w", annID, valueOrEmpty(ann.FriendlyID), err)
 		}
+		sourceListingID, err := queries.UpsertFrontdoorBuildingAnnouncementSourceListing(ctx, &stored.FrontdoorBuildingAnnouncementID)
+		if err != nil {
+			return fmt.Errorf("register frontdoor announcement source listing (id=%s): %w", stored.FrontdoorBuildingAnnouncementID, err)
+		}
+		if sourceListingID != nil {
+			observation := sourceprice.Observation{AskingPrice: sourceprice.RoundedAmount(ann.SearchPrice), PricePerM2: sourceprice.NonNegative(ann.PricePerSquare)}
+			if _, err := sourceprice.Observe(ctx, queries, *sourceListingID, observation); err != nil {
+				return fmt.Errorf("observe frontdoor announcement price (id=%s): %w", stored.FrontdoorBuildingAnnouncementID, err)
+			}
+		}
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit announcement update: %w", err)
+	}
+	committed = true
 	return nil
 }
 
@@ -251,26 +314,18 @@ func extractAnnouncements(building *frontdoorpayload.HousingCompanyResponse) []f
 }
 
 func filterUniqueAnnouncements(announcements []frontdoorpayload.Announcement) []frontdoorpayload.Announcement {
-	seen := make(map[string]bool)
+	seen := make(map[string]int)
 	var unique []frontdoorpayload.Announcement
 	for _, announcement := range announcements {
-		id := int64(0)
-		if announcement.ID != nil {
-			id = int64(*announcement.ID)
+		key := announcementIdentityKey(announcement, uuid.Nil)
+		if index, ok := seen[key]; ok {
+			if announcement.Published != nil && *announcement.Published {
+				unique[index] = announcement
+			}
+			continue
 		}
-		unpublishingTime := int64(0)
-		if announcement.UnpublishingTime != nil {
-			unpublishingTime = int64(*announcement.UnpublishingTime)
-		}
-		searchPrice := int64(0)
-		if announcement.SearchPrice != nil {
-			searchPrice = int64(*announcement.SearchPrice)
-		}
-		key := fmt.Sprintf("%d_%d_%d", id, unpublishingTime, searchPrice)
-		if !seen[key] {
-			seen[key] = true
-			unique = append(unique, announcement)
-		}
+		seen[key] = len(unique)
+		unique = append(unique, announcement)
 	}
 	return unique
 }

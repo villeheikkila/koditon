@@ -8,25 +8,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	client "koditon/internal/clients/shortcut"
 	"koditon/internal/db"
 	"koditon/internal/platform/httpratelimit"
 	"koditon/internal/platform/logging"
 	shortcutpayload "koditon/internal/providers/shortcut"
 	"koditon/internal/sync/sourcejson"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"koditon/internal/sync/sourceprice"
 )
 
 type Service struct {
 	client  *client.Client
+	pool    *pgxpool.Pool
 	queries *db.Queries
 	logger  *slog.Logger
 }
 
 func NewService(
-	dbtx db.DBTX,
+	pool *pgxpool.Pool,
 	logger *slog.Logger,
 	baseURL string,
 	docsBaseURL string,
@@ -35,7 +38,7 @@ func NewService(
 	sitemapBase string,
 	rateLimit httpratelimit.Config,
 ) *Service {
-	queries := db.New(dbtx)
+	queries := db.New(pool)
 	tokenLoad := func(ctx context.Context) (*client.Tokens, error) {
 		dbToken, err := queries.GetValidShortcutToken(ctx)
 		if err != nil {
@@ -73,6 +76,7 @@ func NewService(
 	)
 	return &Service{
 		client:  shortcutClient,
+		pool:    pool,
 		queries: queries,
 		logger:  logger.With("component", "shortcut"),
 	}
@@ -182,9 +186,36 @@ func (s *Service) SyncAd(ctx context.Context, adID int64) error {
 	if err != nil {
 		return fmt.Errorf("prepare ad data (ad_id=%d): %w", adID, err)
 	}
-	if _, err = s.queries.UpsertShortcutAd(ctx, params); err != nil {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin shortcut ad update (ad_id=%d): %w", adID, err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+				s.logger.DebugContext(ctx, "rollback shortcut ad update", "ad_id", adID, "error", rollbackErr)
+			}
+		}
+	}()
+	queries := s.queries.WithTx(tx)
+	if _, err = queries.UpsertShortcutAd(ctx, params); err != nil {
 		return fmt.Errorf("upsert ad data (ad_id=%d): %w", adID, err)
 	}
+	sourceListingID, err := queries.UpsertShortcutAdSourceListing(ctx, &adID)
+	if err != nil {
+		return fmt.Errorf("register shortcut source listing (ad_id=%d): %w", adID, err)
+	}
+	if sourceListingID != nil {
+		observation := sourceprice.Observation{AskingPrice: sourceprice.RoundedAmount(payload.Price.AskingPrice), DebtFreePrice: sourceprice.RoundedAmount(payload.Price.DebtFreePrice), DebtShareAmount: sourceprice.RoundedAmount(payload.Price.DebtShareAmount), PricePerM2: sourceprice.NonNegative(payload.Price.PricePerM2), SourcePayloadHash: params.ShortcutAdDataHash}
+		if _, err := sourceprice.Observe(ctx, queries, *sourceListingID, observation); err != nil {
+			return fmt.Errorf("observe shortcut source price (ad_id=%d): %w", adID, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit shortcut ad update (ad_id=%d): %w", adID, err)
+	}
+	committed = true
 	return nil
 }
 
