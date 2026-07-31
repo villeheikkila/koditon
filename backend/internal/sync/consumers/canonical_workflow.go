@@ -226,7 +226,7 @@ func (c *Consumer) runCanonicalizeSourceAdWorkflow(ctx context.Context, logger *
 	if err != nil {
 		return canonicalizeSourceAdPayload{}, err
 	}
-	_, err = absurd.Step(ctx, "canonicalize-source-ad", func(ctx context.Context) (struct{}, error) {
+	_, err = absurd.Step(ctx, "canonicalize-source-ad:v2", func(ctx context.Context) (struct{}, error) {
 		switch payload.SourceTable {
 		case "frontdoor_ad":
 			return struct{}{}, c.canonicalizeFrontdoorAd(ctx, logger, payload.SourceID)
@@ -249,7 +249,7 @@ func (c *Consumer) runCanonicalLinkFrontdoorAnnouncementsWorkflow(ctx context.Co
 	if err != nil {
 		return canonicalFanoutResult{}, err
 	}
-	result, err := absurd.Step(ctx, "link-announcements", func(ctx context.Context) (canonicalFanoutResult, error) {
+	result, err := absurd.Step(ctx, "link-announcement-candidates:v2", func(ctx context.Context) (canonicalFanoutResult, error) {
 		rows, err := c.queries.LinkFrontdoorAnnouncementsToRemovedAds(ctx, db.LinkFrontdoorAnnouncementsToRemovedAdsParams{LimitCount: payload.Limit, MinAgeHours: payload.MinAgeHours})
 		if err != nil {
 			return canonicalFanoutResult{}, fmt.Errorf("link frontdoor announcements to removed ads: %w", err)

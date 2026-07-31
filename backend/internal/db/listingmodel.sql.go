@@ -11,50 +11,114 @@ import (
 	"github.com/google/uuid"
 )
 
-const deleteFrontdoorBuildingAnnouncementSourceListing = `-- name: DeleteFrontdoorBuildingAnnouncementSourceListing :exec
+const deleteFrontdoorBuildingAnnouncementSourceListing = `-- name: DeleteFrontdoorBuildingAnnouncementSourceListing :one
 WITH target AS (
-    SELECT source_listing_id
-    FROM origin.source_listings
-    WHERE provider = 'frontdoor'
-        AND source_kind = 'announcement'
-        AND frontdoor_building_announcement_id = $1
-), deleted_listings AS (
+    SELECT source_listing.source_listing_id, target_source.target_id
+    FROM origin.source_listings source_listing
+    LEFT JOIN public.target_sources target_source ON target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.source_id = source_listing.source_listing_id
+        AND target_source.link_status = 'confirmed'
+    WHERE source_listing.provider = 'frontdoor'
+        AND source_listing.source_kind = 'announcement'
+        AND source_listing.frontdoor_building_announcement_id = $1
+), deleted_source AS (
+    DELETE FROM origin.source_listings source_listing
+    USING target
+    WHERE source_listing.source_listing_id = target.source_listing_id
+    RETURNING source_listing.source_listing_id
+), deleted_target_source AS (
+    DELETE FROM public.target_sources target_source
+    USING target
+    WHERE target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.source_id = target.source_listing_id
+    RETURNING target_source.target_source_id
+), replacement AS (
+    SELECT replacement_source.source_id AS source_listing_id
+    FROM target
+    JOIN public.target_sources replacement_source ON replacement_source.target_type = 'listing'
+        AND replacement_source.target_id = target.target_id
+        AND replacement_source.source_type = 'source_listing'
+        AND replacement_source.source_id <> target.source_listing_id
+        AND replacement_source.link_status = 'confirmed'
+    JOIN origin.source_listings source_listing ON source_listing.source_listing_id = replacement_source.source_id
+    ORDER BY
+        CASE WHEN source_listing.source_kind = 'ad' THEN 0 ELSE 1 END,
+        source_listing.last_seen_at DESC NULLS LAST,
+        source_listing.canonical_source_id
+    LIMIT 1
+), deleted_listing AS (
     DELETE FROM public.listings listing
     USING target
-    WHERE listing.primary_source_listing_id = target.source_listing_id
+    WHERE listing.listing_id = target.target_id
+        AND NOT EXISTS (SELECT 1 FROM replacement)
     RETURNING listing.listing_id
 )
-DELETE FROM origin.source_listings source_listing
-USING target
-WHERE source_listing.source_listing_id = target.source_listing_id
+SELECT (SELECT source_listing_id FROM replacement LIMIT 1)::uuid AS replacement_source_listing_id
+FROM deleted_source
 `
 
-func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
-	return err
+func (q *Queries) DeleteFrontdoorBuildingAnnouncementSourceListing(ctx context.Context, frontdoorBuildingAnnouncementID *uuid.UUID) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteFrontdoorBuildingAnnouncementSourceListing, frontdoorBuildingAnnouncementID)
+	var replacement_source_listing_id *uuid.UUID
+	err := row.Scan(&replacement_source_listing_id)
+	return replacement_source_listing_id, err
 }
 
-const deleteShortcutAdSourceListing = `-- name: DeleteShortcutAdSourceListing :exec
+const deleteShortcutAdSourceListing = `-- name: DeleteShortcutAdSourceListing :one
 WITH target AS (
-    SELECT source_listing_id
-    FROM origin.source_listings
-    WHERE provider = 'shortcut'
-        AND source_kind = 'ad'
-        AND shortcut_ad_id = $1
-), deleted_listings AS (
+    SELECT source_listing.source_listing_id, target_source.target_id
+    FROM origin.source_listings source_listing
+    LEFT JOIN public.target_sources target_source ON target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.source_id = source_listing.source_listing_id
+        AND target_source.link_status = 'confirmed'
+    WHERE source_listing.provider = 'shortcut'
+        AND source_listing.source_kind = 'ad'
+        AND source_listing.shortcut_ad_id = $1
+), deleted_source AS (
+    DELETE FROM origin.source_listings source_listing
+    USING target
+    WHERE source_listing.source_listing_id = target.source_listing_id
+    RETURNING source_listing.source_listing_id
+), deleted_target_source AS (
+    DELETE FROM public.target_sources target_source
+    USING target
+    WHERE target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.source_id = target.source_listing_id
+    RETURNING target_source.target_source_id
+), replacement AS (
+    SELECT replacement_source.source_id AS source_listing_id
+    FROM target
+    JOIN public.target_sources replacement_source ON replacement_source.target_type = 'listing'
+        AND replacement_source.target_id = target.target_id
+        AND replacement_source.source_type = 'source_listing'
+        AND replacement_source.source_id <> target.source_listing_id
+        AND replacement_source.link_status = 'confirmed'
+    JOIN origin.source_listings source_listing ON source_listing.source_listing_id = replacement_source.source_id
+    ORDER BY
+        CASE WHEN source_listing.source_kind = 'ad' THEN 0 ELSE 1 END,
+        source_listing.last_seen_at DESC NULLS LAST,
+        source_listing.canonical_source_id
+    LIMIT 1
+), deleted_listing AS (
     DELETE FROM public.listings listing
     USING target
-    WHERE listing.primary_source_listing_id = target.source_listing_id
+    WHERE listing.listing_id = target.target_id
+        AND NOT EXISTS (SELECT 1 FROM replacement)
     RETURNING listing.listing_id
 )
-DELETE FROM origin.source_listings source_listing
-USING target
-WHERE source_listing.source_listing_id = target.source_listing_id
+SELECT (SELECT source_listing_id FROM replacement LIMIT 1)::uuid AS replacement_source_listing_id
+FROM deleted_source
 `
 
-func (q *Queries) DeleteShortcutAdSourceListing(ctx context.Context, shortcutAdID *int64) error {
-	_, err := q.db.Exec(ctx, deleteShortcutAdSourceListing, shortcutAdID)
-	return err
+func (q *Queries) DeleteShortcutAdSourceListing(ctx context.Context, shortcutAdID *int64) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteShortcutAdSourceListing, shortcutAdID)
+	var replacement_source_listing_id *uuid.UUID
+	err := row.Scan(&replacement_source_listing_id)
+	return replacement_source_listing_id, err
 }
 
 const reconcileSourceListingModel = `-- name: ReconcileSourceListingModel :one
@@ -763,13 +827,58 @@ match_facts AS (
         first_seen_at,
         last_seen_at
 ),
-match_blocks AS (
-    SELECT DISTINCT postal_norm, street_norm, house_norm, area_tenths
+candidate_match_facts AS MATERIALIZED (
+    SELECT
+        existing.source_listing_id,
+        existing.provider,
+        existing.source_kind,
+        existing.postal_norm,
+        existing.address_norm,
+        existing.street_norm,
+        existing.house_norm,
+        existing.stair_norm,
+        existing.apartment_norm,
+        existing.area_tenths,
+        existing.asking_price,
+        existing.debt_free_price
+    FROM public.source_listing_match_facts existing
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM match_facts current
+        WHERE current.source_listing_id = existing.source_listing_id
+    )
+    UNION ALL
+    SELECT
+        current.source_listing_id,
+        current.provider,
+        current.source_kind,
+        current.postal_norm,
+        current.address_norm,
+        current.street_norm,
+        current.house_norm,
+        current.stair_norm,
+        current.apartment_norm,
+        current.area_tenths,
+        current.asking_price,
+        current.debt_free_price
+    FROM match_facts current
+),
+match_lock AS MATERIALIZED (
+    SELECT pg_advisory_xact_lock(hashtextextended(concat_ws('|', postal_norm, street_norm, house_norm, area_tenths::text), 0))
     FROM match_facts
     WHERE postal_norm IS NOT NULL
         AND street_norm IS NOT NULL
         AND house_norm IS NOT NULL
         AND area_tenths IS NOT NULL
+),
+match_blocks AS (
+    SELECT DISTINCT match_facts.postal_norm, match_facts.street_norm, match_facts.house_norm, match_facts.area_tenths
+    FROM match_facts
+    JOIN match_lock ON true
+    WHERE match_facts.postal_norm IS NOT NULL
+        AND match_facts.street_norm IS NOT NULL
+        AND match_facts.house_norm IS NOT NULL
+        AND match_facts.area_tenths IS NOT NULL
 ),
 compatible_match_pairs AS (
     SELECT
@@ -792,11 +901,11 @@ compatible_match_pairs AS (
         a.debt_free_price AS source_debt_free_price,
         b.debt_free_price AS matched_debt_free_price
     FROM match_blocks
-    JOIN public.source_listing_match_facts a ON a.postal_norm = match_blocks.postal_norm
+    JOIN candidate_match_facts a ON a.postal_norm = match_blocks.postal_norm
         AND a.street_norm = match_blocks.street_norm
         AND a.house_norm = match_blocks.house_norm
         AND a.area_tenths = match_blocks.area_tenths
-    JOIN public.source_listing_match_facts b ON b.source_listing_id > a.source_listing_id
+    JOIN candidate_match_facts b ON b.source_listing_id > a.source_listing_id
         AND b.postal_norm = a.postal_norm
         AND b.street_norm = a.street_norm
         AND b.house_norm = a.house_norm
@@ -824,8 +933,8 @@ classified_match_pairs AS (
             ELSE 'address_missing_stair_one_to_one_v1'
         END AS match_method,
         CASE WHEN source_address_norm = matched_address_norm THEN 100 ELSE 95 END AS match_score,
-        'high'::text AS match_confidence,
-        CASE WHEN source_counts.compatible_pair_count = 1 AND matched_counts.compatible_pair_count = 1 THEN 'accepted' ELSE 'proposed' END AS match_status,
+        CASE WHEN source_address_norm = matched_address_norm THEN 'high'::text ELSE 'medium'::text END AS match_confidence,
+        'proposed'::text AS match_status,
         jsonb_strip_nulls(jsonb_build_object(
             'postal_norm', postal_norm,
             'street_norm', street_norm,
@@ -850,6 +959,23 @@ classified_match_pairs AS (
     JOIN pair_counts source_counts ON source_counts.source_listing_id = compatible_match_pairs.source_listing_id_a
     JOIN pair_counts matched_counts ON matched_counts.source_listing_id = compatible_match_pairs.source_listing_id_b
 ),
+superseded_match_candidates AS (
+    UPDATE public.source_listing_match_candidates candidate
+    SET match_status = 'superseded',
+        updated_at = now(),
+        decided_at = now()
+    FROM match_facts
+    WHERE candidate.match_status IN ('proposed', 'accepted')
+        AND (candidate.source_listing_id_a = match_facts.source_listing_id OR candidate.source_listing_id_b = match_facts.source_listing_id)
+        AND NOT EXISTS (
+            SELECT 1
+            FROM classified_match_pairs current_candidate
+            WHERE current_candidate.source_listing_id_a = candidate.source_listing_id_a
+                AND current_candidate.source_listing_id_b = candidate.source_listing_id_b
+                AND current_candidate.match_method = candidate.match_method
+        )
+    RETURNING candidate.source_listing_match_candidate_id
+),
 source_match_candidates AS (
     INSERT INTO public.source_listing_match_candidates (
         source_listing_id_a,
@@ -859,6 +985,7 @@ source_match_candidates AS (
         match_confidence,
         match_status,
         match_reasons,
+        evaluation_version,
         updated_at,
         decided_at
     )
@@ -870,36 +997,61 @@ source_match_candidates AS (
         match_confidence,
         match_status,
         match_reasons,
+        'source_listing_match_v2',
         now(),
-        CASE WHEN match_status = 'accepted' THEN now() ELSE NULL::timestamptz END
+        NULL::timestamptz
     FROM classified_match_pairs
-    WHERE match_status = 'accepted'
-        OR (source_compatible_pair_count <= 2 AND matched_compatible_pair_count <= 2)
-    ON CONFLICT (source_listing_id_a, source_listing_id_b, match_method) WHERE (match_status <> 'rejected') DO UPDATE SET
+    WHERE source_compatible_pair_count <= 2
+        AND matched_compatible_pair_count <= 2
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.source_listing_match_candidates rejected
+            WHERE rejected.source_listing_id_a = classified_match_pairs.source_listing_id_a
+                AND rejected.source_listing_id_b = classified_match_pairs.source_listing_id_b
+                AND rejected.match_method = classified_match_pairs.match_method
+                AND rejected.match_status = 'rejected'
+        )
+    ON CONFLICT (source_listing_id_a, source_listing_id_b, match_method) WHERE (match_status IN ('proposed', 'accepted')) DO UPDATE SET
         match_score = EXCLUDED.match_score,
         match_confidence = EXCLUDED.match_confidence,
-        match_status = EXCLUDED.match_status,
         match_reasons = EXCLUDED.match_reasons,
-        updated_at = now(),
-        decided_at = CASE WHEN EXCLUDED.match_status = 'accepted' THEN COALESCE(public.source_listing_match_candidates.decided_at, now()) ELSE public.source_listing_match_candidates.decided_at END
+        evaluation_version = EXCLUDED.evaluation_version,
+        updated_at = now()
     RETURNING source_listing_id_a, source_listing_id_b, match_method, match_score, match_status
 ),
-matched_offering AS (
+assigned_listing AS (
     SELECT
-        doc.property_offering_id,
+        target_source.target_id AS listing_id,
         po.property_offering_identity_key,
-        candidate.match_score
-    FROM source_match_candidates candidate
+        doc.primary_source_listing_id,
+        CASE
+            WHEN doc.listing_id IS NULL OR doc.primary_source_listing_id IS NULL OR doc.primary_source_listing_id = match_facts.source_listing_id THEN true
+            WHEN ROW(
+                CASE WHEN match_facts.source_kind = 'ad' THEN 0 ELSE 1 END,
+                CASE WHEN match_facts.asking_price IS NOT NULL OR match_facts.debt_free_price IS NOT NULL THEN 0 ELSE 1 END,
+                -extract(epoch FROM COALESCE(match_facts.last_seen_at, '-infinity'::timestamptz)),
+                match_facts.source_listing_id::text
+            ) < ROW(
+                CASE WHEN doc.kind = 'ad' THEN 0 ELSE 1 END,
+                CASE WHEN doc.asking_price IS NOT NULL OR doc.debt_free_price IS NOT NULL THEN 0 ELSE 1 END,
+                -extract(epoch FROM COALESCE(doc.last_seen_at, '-infinity'::timestamptz)),
+                COALESCE(doc.primary_source_listing_id::text, '')
+            ) THEN true
+            ELSE false
+        END AS replace_projection
+    FROM public.target_sources target_source
     JOIN match_facts ON true
-    JOIN public.listing_search_documents doc ON doc.primary_source_listing_id = CASE
-        WHEN candidate.source_listing_id_a = match_facts.source_listing_id THEN candidate.source_listing_id_b
-        ELSE candidate.source_listing_id_a
-    END
-    JOIN public.property_offerings po ON po.property_offering_id = doc.property_offering_id
-    WHERE candidate.match_status = 'accepted'
-        AND (candidate.source_listing_id_a = match_facts.source_listing_id OR candidate.source_listing_id_b = match_facts.source_listing_id)
-    ORDER BY candidate.match_score DESC, po.property_offering_created_at ASC
+    JOIN public.property_offerings po ON po.property_offering_id = target_source.target_id
+    LEFT JOIN public.listing_search_documents doc ON doc.listing_id = target_source.target_id
+    WHERE target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.source_id = match_facts.source_listing_id
+        AND target_source.link_status = 'confirmed'
+    ORDER BY (target_source.link_method = 'manual') DESC, target_source.created_at
     LIMIT 1
+),
+projection_policy AS (
+    SELECT COALESCE((SELECT replace_projection FROM assigned_listing LIMIT 1), true) AS replace_projection
 ),
 housing_company AS (
     INSERT INTO public.housing_companies (
@@ -1106,7 +1258,7 @@ offering AS (
     SELECT
         (SELECT property_unit_id FROM property_unit LIMIT 1),
         (SELECT property_house_id FROM property_house LIMIT 1),
-        COALESCE((SELECT property_offering_identity_key FROM matched_offering LIMIT 1), 'offering:' || COALESCE(NULLIF(source.sale_listing_unit_match_key, ''), source.sale_listing_canonical_id)),
+        COALESCE((SELECT property_offering_identity_key FROM assigned_listing LIMIT 1), 'offering:source:' || source.sale_listing_id::text),
         'sale',
         COALESCE(source.sale_listing_headline, source.sale_listing_street_address, source.sale_listing_native_id),
         source.sale_listing_asking_price,
@@ -1122,14 +1274,14 @@ offering AS (
     ON CONFLICT (property_offering_identity_key) DO UPDATE SET
         property_unit_id = COALESCE(public.property_offerings.property_unit_id, EXCLUDED.property_unit_id),
         property_house_id = COALESCE(public.property_offerings.property_house_id, EXCLUDED.property_house_id),
-        property_offering_headline = EXCLUDED.property_offering_headline,
-        property_offering_asking_price = EXCLUDED.property_offering_asking_price,
-        property_offering_debt_free_price = EXCLUDED.property_offering_debt_free_price,
-        property_offering_price_per_m2 = EXCLUDED.property_offering_price_per_m2,
+        property_offering_headline = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_headline ELSE public.property_offerings.property_offering_headline END,
+        property_offering_asking_price = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_asking_price ELSE public.property_offerings.property_offering_asking_price END,
+        property_offering_debt_free_price = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_debt_free_price ELSE public.property_offerings.property_offering_debt_free_price END,
+        property_offering_price_per_m2 = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.property_offering_price_per_m2 ELSE public.property_offerings.property_offering_price_per_m2 END,
         property_offering_first_seen_at = LEAST(COALESCE(public.property_offerings.property_offering_first_seen_at, EXCLUDED.property_offering_first_seen_at), COALESCE(EXCLUDED.property_offering_first_seen_at, public.property_offerings.property_offering_first_seen_at)),
         property_offering_last_seen_at = GREATEST(COALESCE(public.property_offerings.property_offering_last_seen_at, EXCLUDED.property_offering_last_seen_at), COALESCE(EXCLUDED.property_offering_last_seen_at, public.property_offerings.property_offering_last_seen_at)),
         property_offering_status = EXCLUDED.property_offering_status,
-        primary_sale_listing_id = EXCLUDED.primary_sale_listing_id,
+        primary_sale_listing_id = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.primary_sale_listing_id ELSE public.property_offerings.primary_sale_listing_id END,
         property_offering_match_reasons = public.property_offerings.property_offering_match_reasons || EXCLUDED.property_offering_match_reasons,
         property_offering_updated_at = now()
     RETURNING property_offering_id, property_unit_id, property_house_id
@@ -1162,13 +1314,48 @@ listing AS (
     ON CONFLICT (listing_id) DO UPDATE SET
         listing_type = EXCLUDED.listing_type,
         listing_status = EXCLUDED.listing_status,
-        primary_source_listing_id = EXCLUDED.primary_source_listing_id,
+        primary_source_listing_id = CASE WHEN (SELECT replace_projection FROM projection_policy) THEN EXCLUDED.primary_source_listing_id ELSE public.listings.primary_source_listing_id END,
         unit_id = EXCLUDED.unit_id,
         house_id = EXCLUDED.house_id,
         first_seen_at = LEAST(COALESCE(public.listings.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, public.listings.first_seen_at)),
         last_seen_at = GREATEST(COALESCE(public.listings.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, public.listings.last_seen_at)),
         updated_at = now()
     RETURNING listing_id
+),
+target_source AS (
+    INSERT INTO public.target_sources (
+        target_type,
+        target_id,
+        source_type,
+        source_id,
+        link_status,
+        link_method,
+        link_score,
+        link_reasons,
+        first_seen_at,
+        last_seen_at,
+        updated_at
+    )
+    SELECT
+        'listing',
+        listing.listing_id,
+        'source_listing',
+        source_listing.source_listing_id,
+        'confirmed',
+        'sync_auto',
+        100,
+        jsonb_build_object('method', 'listingmodel_reconcile'),
+        source.sale_listing_first_seen_at,
+        source.sale_listing_last_seen_at,
+        now()
+    FROM source
+    JOIN source_listing ON true
+    JOIN listing ON true
+    ON CONFLICT (target_type, target_id, source_type, source_id) DO UPDATE SET
+        first_seen_at = LEAST(COALESCE(public.target_sources.first_seen_at, EXCLUDED.first_seen_at), COALESCE(EXCLUDED.first_seen_at, public.target_sources.first_seen_at)),
+        last_seen_at = GREATEST(COALESCE(public.target_sources.last_seen_at, EXCLUDED.last_seen_at), COALESCE(EXCLUDED.last_seen_at, public.target_sources.last_seen_at)),
+        updated_at = now()
+    RETURNING target_id, source_id
 ),
 listing_evidence AS (
     INSERT INTO public.entity_evidence (
@@ -1230,23 +1417,25 @@ house_evidence AS (
     ON CONFLICT DO NOTHING
     RETURNING entity_evidence_id
 ),
+linked_listing_sources AS (
+    SELECT target_source.target_id, target_source.source_id
+    FROM public.target_sources target_source
+    JOIN offering ON offering.property_offering_id = target_source.target_id
+    WHERE target_source.target_type = 'listing'
+        AND target_source.source_type = 'source_listing'
+        AND target_source.link_status = 'confirmed'
+    UNION
+    SELECT target_source.target_id, target_source.source_id
+    FROM target_source
+),
 source_summary AS (
     SELECT
         offering.property_offering_id,
-        array_agg(DISTINCT linked_evidence.provider ORDER BY linked_evidence.provider) FILTER (WHERE linked_evidence.provider IS NOT NULL) AS source_providers,
-        array_agg(DISTINCT CASE
-            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
-            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
-            ELSE linked_evidence.source_kind
-        END ORDER BY CASE
-            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
-            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
-            ELSE linked_evidence.source_kind
-        END) AS source_kinds
+        array_agg(DISTINCT linked_source.provider ORDER BY linked_source.provider) AS source_providers,
+        array_agg(DISTINCT linked_source.source_kind ORDER BY linked_source.source_kind) AS source_kinds
     FROM offering
-    JOIN public.entity_evidence linked_entity ON linked_entity.listing_id = offering.property_offering_id
-        AND linked_entity.link_status <> 'rejected'
-    JOIN public.evidence_sources linked_evidence ON linked_evidence.evidence_source_id = linked_entity.evidence_source_id
+    JOIN linked_listing_sources source_link ON source_link.target_id = offering.property_offering_id
+    JOIN origin.source_listings linked_source ON linked_source.source_listing_id = source_link.source_id
     GROUP BY offering.property_offering_id
 ),
 search_document AS (
@@ -1389,13 +1578,25 @@ search_document AS (
         source_providers = EXCLUDED.source_providers,
         source_kinds = EXCLUDED.source_kinds,
         refreshed_at = now()
+    WHERE (SELECT replace_projection FROM projection_policy)
     RETURNING listing_id
+),
+refreshed_source_summary AS (
+    UPDATE public.listing_search_documents document
+    SET source_providers = source_summary.source_providers,
+        source_kinds = source_summary.source_kinds,
+        refreshed_at = now()
+    FROM source_summary
+    JOIN offering ON offering.property_offering_id = source_summary.property_offering_id
+    WHERE NOT (SELECT replace_projection FROM projection_policy)
+        AND document.listing_id = offering.property_offering_id
+    RETURNING document.listing_id
 )
 SELECT
     evidence.evidence_source_id,
     offering.property_offering_id,
     listing.listing_id,
-    (SELECT count(*)::int4 FROM search_document) AS search_documents
+    ((SELECT count(*) FROM search_document) + (SELECT count(*) FROM refreshed_source_summary))::int4 AS search_documents
 FROM evidence
 JOIN offering ON true
 JOIN listing ON true

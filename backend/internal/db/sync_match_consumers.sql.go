@@ -50,19 +50,17 @@ func (q *Queries) BackfillBuildingCoordinates(ctx context.Context) (int64, error
 const linkFrontdoorAnnouncementsToRemovedAds = `-- name: LinkFrontdoorAnnouncementsToRemovedAds :execrows
 WITH removed_ads AS (
     SELECT DISTINCT
-        doc.listing_id,
-        doc.property_offering_id,
-        doc.primary_source_listing_id,
+        source_listing.source_listing_id,
         fa.frontdoor_ad_id,
         COALESCE(fa.frontdoor_ad_last_seen_at, doc.last_seen_at) AS removed_at,
         raw.area,
         raw.price,
         COALESCE(by_friendly.frontdoor_building_id, by_business.frontdoor_building_id) AS frontdoor_building_id
     FROM public.listing_search_documents doc
-    JOIN origin.source_listings sl ON sl.source_listing_id = doc.primary_source_listing_id
-        AND sl.provider = 'frontdoor'
-        AND sl.source_kind = 'ad'
-    JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = sl.frontdoor_ad_id
+    JOIN origin.source_listings source_listing ON source_listing.source_listing_id = doc.primary_source_listing_id
+        AND source_listing.provider = 'frontdoor'
+        AND source_listing.source_kind = 'ad'
+    JOIN origin.frontdoor_ads fa ON fa.frontdoor_ad_id = source_listing.frontdoor_ad_id
     CROSS JOIN LATERAL (
         SELECT
             NULLIF(fa.frontdoor_ad_data #>> '{housingCompanyAnnouncementFriendlyId}', '') AS housing_company_friendly_id,
@@ -79,15 +77,13 @@ WITH removed_ads AS (
         AND doc.listing_status = 'active'
         AND fa.frontdoor_ad_data IS NOT NULL
         AND (fa.frontdoor_ad_page_not_found OR fa.frontdoor_ad_data #>> '{status}' = 'UNPUBLISHED')
-        AND COALESCE(fa.frontdoor_ad_last_seen_at, doc.last_seen_at) <= now() - ($1::int4 * interval '1 hour')
+        AND COALESCE(fa.frontdoor_ad_last_seen_at, doc.last_seen_at) <= now() - ($2::int4 * interval '1 hour')
         AND COALESCE(by_friendly.frontdoor_building_id, by_business.frontdoor_building_id) IS NOT NULL
 ),
 announcement_candidates AS (
     SELECT
-        removed_ads.listing_id,
-        removed_ads.property_offering_id,
-        removed_ads.primary_source_listing_id,
-        evidence.evidence_source_id,
+        removed_ads.source_listing_id AS removed_source_listing_id,
+        announcement_source.source_listing_id AS announcement_source_listing_id,
         fba.frontdoor_building_announcement_id,
         CASE
             WHEN removed_ads.area IS NOT NULL
@@ -109,96 +105,87 @@ announcement_candidates AS (
     JOIN origin.frontdoor_building_announcements fba ON fba.frontdoor_building_id = removed_ads.frontdoor_building_id
         AND fba.frontdoor_building_announcement_rent_period IS NULL
         AND fba.frontdoor_building_announcement_rental_unique_no IS NULL
-    JOIN public.evidence_sources evidence ON evidence.frontdoor_building_announcement_id = fba.frontdoor_building_announcement_id
+    JOIN origin.source_listings announcement_source ON announcement_source.frontdoor_building_announcement_id = fba.frontdoor_building_announcement_id
+        AND announcement_source.provider = 'frontdoor'
+        AND announcement_source.source_kind = 'announcement'
 ),
 unique_candidates AS (
     SELECT
-        announcement_candidates.listing_id,
-        announcement_candidates.property_offering_id,
-        announcement_candidates.primary_source_listing_id,
-        announcement_candidates.evidence_source_id,
+        announcement_candidates.removed_source_listing_id,
+        announcement_candidates.announcement_source_listing_id,
         announcement_candidates.frontdoor_building_announcement_id,
         announcement_candidates.match_rule,
-        CASE WHEN announcement_candidates.match_rule = 'area_price' THEN 0.82 ELSE 0.74 END::double precision AS confidence,
-        count(*) OVER (PARTITION BY announcement_candidates.listing_id, announcement_candidates.match_rule) AS rule_candidate_count
+        CASE WHEN announcement_candidates.match_rule = 'area_price' THEN 92 ELSE 85 END AS match_score,
+        count(*) OVER (PARTITION BY announcement_candidates.removed_source_listing_id, announcement_candidates.match_rule) AS rule_candidate_count
     FROM announcement_candidates
     WHERE announcement_candidates.match_rule IS NOT NULL
 ),
-linked AS (
-    INSERT INTO public.entity_evidence (
-        evidence_source_id,
-        listing_id,
-        link_status,
-        link_method,
-        confidence,
-        reasons
+ordered_candidates AS (
+    SELECT
+        CASE WHEN removed_source_listing_id < announcement_source_listing_id THEN removed_source_listing_id ELSE announcement_source_listing_id END AS source_listing_id_a,
+        CASE WHEN removed_source_listing_id < announcement_source_listing_id THEN announcement_source_listing_id ELSE removed_source_listing_id END AS source_listing_id_b,
+        frontdoor_building_announcement_id,
+        match_rule,
+        match_score
+    FROM unique_candidates
+    WHERE rule_candidate_count = 1
+        AND removed_source_listing_id <> announcement_source_listing_id
+)
+INSERT INTO public.source_listing_match_candidates (
+        source_listing_id_a,
+        source_listing_id_b,
+        match_method,
+        match_score,
+        match_confidence,
+        match_status,
+        match_reasons,
+        evaluation_version,
+        updated_at
     )
     SELECT
-        unique_candidates.evidence_source_id,
-        unique_candidates.listing_id,
-        'candidate',
-        'source_match_auto',
-        unique_candidates.confidence,
+        ordered_candidates.source_listing_id_a,
+        ordered_candidates.source_listing_id_b,
+        'frontdoor_removed_ad_announcement_v1',
+        ordered_candidates.match_score,
+        'medium',
+        'proposed',
         jsonb_build_object(
             'method', 'frontdoor_removed_ad_announcement_link',
-            'match_rule', unique_candidates.match_rule,
-            'source_listing_id', unique_candidates.primary_source_listing_id,
-            'frontdoor_building_announcement_id', unique_candidates.frontdoor_building_announcement_id
+            'match_rule', ordered_candidates.match_rule,
+            'frontdoor_building_announcement_id', ordered_candidates.frontdoor_building_announcement_id
+        ),
+        'source_listing_match_v2',
+        now()
+    FROM ordered_candidates
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.source_listing_match_candidates rejected
+        WHERE rejected.source_listing_id_a = ordered_candidates.source_listing_id_a
+            AND rejected.source_listing_id_b = ordered_candidates.source_listing_id_b
+            AND rejected.match_method = 'frontdoor_removed_ad_announcement_v1'
+            AND rejected.match_status = 'rejected'
     )
-    FROM unique_candidates
-    WHERE unique_candidates.rule_candidate_count = 1
-        AND NOT EXISTS (
-            SELECT 1
-            FROM public.entity_evidence existing
-            WHERE existing.evidence_source_id = unique_candidates.evidence_source_id
-                AND existing.listing_id = unique_candidates.listing_id
-                AND existing.link_status <> 'rejected'
-        )
-    ORDER BY unique_candidates.listing_id, unique_candidates.match_rule, unique_candidates.evidence_source_id
-    LIMIT $2::int4
-    ON CONFLICT (evidence_source_id, listing_id) WHERE listing_id IS NOT NULL AND link_status <> 'rejected' DO UPDATE SET
-        link_status = EXCLUDED.link_status,
-        link_method = EXCLUDED.link_method,
-        confidence = GREATEST(public.entity_evidence.confidence, EXCLUDED.confidence),
-        reasons = public.entity_evidence.reasons || EXCLUDED.reasons,
-        updated_at = now()
-    RETURNING listing_id, evidence_source_id
-),
-source_summary AS (
-    SELECT
-        doc.listing_id,
-        array_agg(DISTINCT linked_evidence.provider ORDER BY linked_evidence.provider) FILTER (WHERE linked_evidence.provider IS NOT NULL) AS source_providers,
-        array_agg(DISTINCT CASE
-            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
-            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
-            ELSE linked_evidence.source_kind
-        END ORDER BY CASE
-            WHEN linked_evidence.source_kind = 'frontdoor_building_announcement' THEN 'announcement'
-            WHEN linked_evidence.source_kind IN ('frontdoor_ad', 'shortcut_ad') THEN 'ad'
-            ELSE linked_evidence.source_kind
-        END) AS source_kinds
-    FROM linked
-    JOIN public.listing_search_documents doc ON doc.listing_id = linked.listing_id
-    JOIN public.entity_evidence linked_entity ON linked_entity.listing_id = doc.listing_id
-        AND linked_entity.link_status <> 'rejected'
-    JOIN public.evidence_sources linked_evidence ON linked_evidence.evidence_source_id = linked_entity.evidence_source_id
-    GROUP BY doc.listing_id
-)
-UPDATE public.listing_search_documents doc
-SET source_providers = COALESCE(source_summary.source_providers, doc.source_providers),
-    source_kinds = COALESCE(source_summary.source_kinds, doc.source_kinds),
-    refreshed_at = now()
-FROM source_summary
-WHERE doc.listing_id = source_summary.listing_id
+    ORDER BY ordered_candidates.source_listing_id_a, ordered_candidates.source_listing_id_b
+    LIMIT $1::int4
+ON CONFLICT (source_listing_id_a, source_listing_id_b, match_method) WHERE match_status IN ('proposed', 'accepted') DO UPDATE SET
+    match_score = EXCLUDED.match_score,
+    match_confidence = EXCLUDED.match_confidence,
+    match_reasons = EXCLUDED.match_reasons,
+    evaluation_version = EXCLUDED.evaluation_version,
+    updated_at = now()
+WHERE public.source_listing_match_candidates.match_score IS DISTINCT FROM EXCLUDED.match_score
+    OR public.source_listing_match_candidates.match_confidence IS DISTINCT FROM EXCLUDED.match_confidence
+    OR public.source_listing_match_candidates.match_reasons IS DISTINCT FROM EXCLUDED.match_reasons
+    OR public.source_listing_match_candidates.evaluation_version IS DISTINCT FROM EXCLUDED.evaluation_version
 `
 
 type LinkFrontdoorAnnouncementsToRemovedAdsParams struct {
-	MinAgeHours int32 `json:"min_age_hours"`
 	LimitCount  int32 `json:"limit_count"`
+	MinAgeHours int32 `json:"min_age_hours"`
 }
 
 func (q *Queries) LinkFrontdoorAnnouncementsToRemovedAds(ctx context.Context, arg LinkFrontdoorAnnouncementsToRemovedAdsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, linkFrontdoorAnnouncementsToRemovedAds, arg.MinAgeHours, arg.LimitCount)
+	result, err := q.db.Exec(ctx, linkFrontdoorAnnouncementsToRemovedAds, arg.LimitCount, arg.MinAgeHours)
 	if err != nil {
 		return 0, err
 	}
